@@ -37,14 +37,42 @@ LEFT JOIN runner_sarr s USING (race_date, race_no, horse_no)
 
 
 def _tags(conn: Connection, date: str, race_no: int,
-          horse_no: int) -> tuple[str, ...]:
+          horse_no: int) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Returns (tags, lane_notes).
+
+    Lane descriptors are stored namespaced 'lane:' so they share one table with
+    trip tags while staying separable: they are an objective statement of where
+    the horse travelled, not a judgement about its trip.
+    """
     rows = conn.execute(
         "SELECT tag FROM runner_tags WHERE race_date=? AND race_no=? AND horse_no=? "
         "ORDER BY tag", (date, race_no, horse_no)).fetchall()
-    return tuple(r["tag"] for r in rows)
+    tags, lanes = [], []
+    for r in rows:
+        tag = r["tag"]
+        (lanes if tag.startswith("lane:") else tags).append(
+            tag[5:] if tag.startswith("lane:") else tag)
+    return tuple(tags), tuple(lanes)
 
 
-def _to_line(row, tags: tuple[str, ...] = ()) -> RunnerLine:
+def _comments(conn: Connection, date: str, race_no: int,
+              horse_no: int) -> tuple[str | None, str | None]:
+    """Returns (running_comment, incident_comment).
+
+    Two accounts of the same race, kept apart. Corunning is HKJC's objective
+    description of where the horse went; the incident report is the stewards'
+    account of what went wrong. The form guide shows both.
+    """
+    rows = conn.execute(
+        "SELECT source, comment_text FROM runner_comments "
+        "WHERE race_date=? AND race_no=? AND horse_no=?",
+        (date, race_no, horse_no)).fetchall()
+    by_source = {r["source"]: r["comment_text"] for r in rows}
+    return by_source.get("corunning"), by_source.get("incident")
+
+
+def _to_line(row, tags: tuple[str, ...] = (), lane_notes: tuple[str, ...] = (),
+             comments: tuple[str | None, str | None] = (None, None)) -> RunnerLine:
     return RunnerLine(
         race_date=row["race_date"], race_no=row["race_no"],
         horse_no=row["horse_no"], horse_name=row["horse_name"],
@@ -65,7 +93,9 @@ def _to_line(row, tags: tuple[str, ...] = ()) -> RunnerLine:
         pace_style=row["pace_style"], early_dev=row["early_dev"],
         late_dev=row["late_dev"],
         sarr=row["sarr"], sarr_rank=row["sarr_rank"],
-        tags=tags, win_odds=row["win_odds"],
+        tags=tags, lane_notes=lane_notes,
+        running_comment=comments[0], incident_comment=comments[1],
+        win_odds=row["win_odds"],
     )
 
 
@@ -79,8 +109,10 @@ def get_race(date: str, race_no: int, *, conn: Connection | None = None) -> Race
                         " ORDER BY r.horse_no", (date, race_no)).fetchall()
         if not rows:
             return RaceLine(race_date=date, race_no=race_no)
-        runners = tuple(_to_line(r, _tags(conn, date, race_no, r["horse_no"]))
-                        for r in rows)
+        runners = tuple(
+            _to_line(r, *_tags(conn, date, race_no, r["horse_no"]),
+                     comments=_comments(conn, date, race_no, r["horse_no"]))
+            for r in rows)
         head = rows[0]
         return RaceLine(
             race_date=date, race_no=race_no, venue=head["venue"],
@@ -125,8 +157,10 @@ def get_horse_form(horse_name: str, *, limit: int = 6, before: str | None = None
         sql += " ORDER BY r.race_date DESC, r.race_no DESC LIMIT ?"
         params.append(limit)
         rows = conn.execute(sql, params).fetchall()
-        return [_to_line(r, _tags(conn, r["race_date"], r["race_no"], r["horse_no"]))
-                for r in rows]
+        return [
+            _to_line(r, *_tags(conn, r["race_date"], r["race_no"], r["horse_no"]),
+                     comments=_comments(conn, r["race_date"], r["race_no"], r["horse_no"]))
+            for r in rows]
     finally:
         if own:
             conn.close()

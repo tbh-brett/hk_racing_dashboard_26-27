@@ -31,9 +31,12 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
-__all__ = ["CoRunningError", "parse_corunning", "url_for", "extract_lane_notes"]
+from hkrd.ingest._client import NotFound, fetch_html, urls
 
-CORUNNING_URL = "https://racing.hkjc.com/en-us/local/information/corunning"
+__all__ = ["CoRunningError", "parse_corunning", "url_for", "extract_lane_notes",
+           "fetch", "fetch_meeting", "comment_rows", "lane_tag_rows"]
+
+CORUNNING_URL = urls.corunning
 
 # Header text -> the field it feeds. Matched case-insensitively on a substring,
 # because HKJC varies the exact wording between seasons.
@@ -154,3 +157,77 @@ def extract_lane_notes(comment: str) -> tuple[str, ...]:
         return ()
     text = comment.lower()
     return tuple(tag for tag, pat in _LANE_PATTERNS if re.search(pat, text))
+
+
+# ── fetching ─────────────────────────────────────────────────────────────────
+#
+# There is no HKJC API; this is HTML scraping against the public site. These
+# functions return plain dicts and know nothing about the database.
+
+
+def fetch(date: str, race_no: int, *, session=None) -> list[dict[str, Any]]:
+    """One race's comments on running.
+
+    date is YYYY-MM-DD or YYYYMMDD.
+    """
+    compact = date.replace("-", "")
+    html = fetch_html(CORUNNING_URL, {"date": compact, "raceno": race_no},
+                      session=session)
+    return parse_corunning(html, source=url_for(date, race_no))
+
+
+def fetch_meeting(date: str, *, max_races: int = 11,
+                  session=None) -> dict[int, list[dict[str, Any]]]:
+    """Every race on a card, keyed by race number.
+
+    Walks 1..max_races and stops at the first race that does not exist -- a
+    meeting is a contiguous block, so a 404 means the card has ended.
+
+    Only a 404 stops the walk. Any other failure propagates, because "the card
+    ended" and "the fetch broke" are different facts and a scraper that treats a
+    500 as the end of the card reports a short meeting instead of an outage.
+    Likewise a race that exists but cannot be parsed raises: that is a layout
+    change and must be seen, not skipped.
+    """
+    out: dict[int, list[dict[str, Any]]] = {}
+    for race_no in range(1, max_races + 1):
+        try:
+            html = fetch_html(CORUNNING_URL, {"date": date.replace("-", ""),
+                                              "raceno": race_no}, session=session)
+        except NotFound:
+            break
+        rows = parse_corunning(html, source=url_for(date, race_no))
+        out[race_no] = rows
+    return out
+
+
+def comment_rows(date: str, race_no: int,
+                 rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Shape parsed rows for store.upsert_comments.
+
+    source='corunning' keeps these distinct from the stewards' incident report:
+    they are different accounts of the same race and the form guide shows both.
+    """
+    return [{
+        "race_date": date, "race_no": race_no, "horse_no": r["horse_no"],
+        "comment_text": r["comment"], "source": "corunning",
+    } for r in rows if r.get("horse_no") and r.get("comment")]
+
+
+def lane_tag_rows(date: str, race_no: int,
+                  rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Lane descriptors as runner_tags rows.
+
+    Confidence is 1.0 because these are not inferred: the comment states the
+    horse raced three wide, so the tag records exactly that. Contrast the OCR
+    approach, which produced a lane number with no way to check it.
+    """
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        if not r.get("horse_no"):
+            continue
+        for tag in extract_lane_notes(r.get("comment", "")):
+            out.append({"race_date": date, "race_no": race_no,
+                        "horse_no": r["horse_no"], "tag": f"lane:{tag}",
+                        "confidence": 1.0})
+    return out

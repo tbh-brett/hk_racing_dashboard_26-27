@@ -97,6 +97,11 @@ class RunnerLine:
     sarr: float | None = None
     sarr_rank: int | None = None
     tags: tuple[str, ...] = ()
+    # Where the horse actually travelled, read from HKJC's comments on
+    # running rather than inferred from a photograph.
+    lane_notes: tuple[str, ...] = ()
+    running_comment: str | None = None
+    incident_comment: str | None = None
 
     # market — always post-time unless stated
     win_odds: float | None = None
@@ -127,6 +132,7 @@ class RunnerLine:
         d["running_positions"] = list(self.running_positions)
         d["section_times"] = list(self.section_times)
         d["tags"] = list(self.tags)
+        d["lane_notes"] = list(self.lane_notes)
         d["finish_time_display"] = self.finish_time_display
         d["figure_display"] = self.figure_display
         d["style_ordinal"] = self.style_ordinal
