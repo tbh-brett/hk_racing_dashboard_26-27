@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from hkrd.query import formguide as fg_q, model, race as race_q
+from hkrd.query import formguide as fg_q, market as market_q, model, race as race_q
 
 WEB = Path(__file__).resolve().parent.parent.parent / "web"
 
@@ -92,6 +92,33 @@ def condition_fit(name: str, distance: int | None = None, course: str | None = N
 @app.get("/api/head-to-head/{horse_a}/{horse_b}")
 def head_to_head(horse_a: str, horse_b: str, before: str | None = None) -> dict:
     return fg_q.head_to_head(horse_a, horse_b, before=before)
+
+
+# ── market ───────────────────────────────────────────────────────────────────
+
+@app.get("/api/market/concentration/{date}/{race_no}")
+def concentration(date: str, race_no: int, at: str = "latest") -> dict:
+    """Top-3 de-vigged win probability, with the age of the price it used.
+
+    Read early this understates the band in ~60% of races, so the figure
+    carries its own staleness rather than presenting as post-time.
+    """
+    return market_q.concentration(date, race_no, at=at)
+
+
+@app.get("/api/market/movement/{date}/{race_no}")
+def movement(date: str, race_no: int) -> dict:
+    return {"race_date": date, "race_no": race_no,
+            "runners": market_q.price_movement(date, race_no)}
+
+
+@app.get("/api/market/coverage")
+def coverage() -> dict:
+    """Which meetings have odds and which do not.
+
+    A capture that silently did not run is what actually cost the odds history.
+    """
+    return market_q.odds_coverage()
 
 
 # ── model transparency (Lab / Model Analysis) ────────────────────────────────
