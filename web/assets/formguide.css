@@ -1,0 +1,136 @@
+/* formguide.css — the row grammar.
+ *
+ * Design brief 02's diagnosis: the old guide read as chaotic not because it was
+ * dense but because every horse block invented its own layout, so the eye could
+ * never establish a rhythm. The fix is one column grid at one set of widths,
+ * used identically in every state.
+ *
+ * Row height is fixed. Nothing a row contains -- a note, a trip tag, a missing
+ * value -- is allowed to change it. Missing values render an explicit em dash
+ * rather than collapsing the column.
+ */
+
+:root {
+  --fg-grid: 44px minmax(160px, 1.4fr) 34px 46px minmax(96px, 1fr)
+             minmax(96px, 1fr) 88px 62px minmax(190px, 1.2fr) minmax(120px, 0.8fr);
+  --fg-row-h: 28px;
+}
+
+.fg-head, .fg-row {
+  display: grid;
+  grid-template-columns: var(--fg-grid);
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: var(--fg-row-h);
+  padding: 0 var(--sp-3);
+}
+.fg-head {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--surface-2); color: var(--text-dim);
+  font-size: var(--fs-xs); font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; border-bottom: 1px solid var(--line-2);
+}
+.fg-row {
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: var(--fs);
+}
+.fg-row:hover { background: var(--surface-2); }
+.fg-row[aria-expanded="true"] { background: var(--surface-2); box-shadow: inset 2px 0 0 var(--edge); }
+
+.c-no, .c-draw, .c-wt, .c-odds { font-family: var(--font-mono); text-align: right; }
+.c-horse { color: var(--text); font-weight: 500; white-space: nowrap;
+           overflow: hidden; text-overflow: ellipsis; }
+.c-jockey, .c-trainer { color: var(--text-dim); white-space: nowrap;
+                        overflow: hidden; text-overflow: ellipsis; }
+
+/* Four distinct hues, never brightness steps — brief 05 §2. The test is that
+   Leader reads as different from Closer from six feet without reading the word. */
+.style { font-family: var(--font-mono); font-size: var(--fs-sm);
+         padding: 1px 6px; white-space: nowrap; }
+.style-leader   { color: var(--style-leader);   background: var(--style-leader-ground); }
+.style-onpace   { color: var(--style-onpace);   background: var(--style-onpace-ground); }
+.style-midfield { color: var(--style-midfield); background: var(--style-midfield-ground); }
+.style-closer   { color: var(--style-closer);   background: var(--style-closer-ground); }
+.style-unknown  { color: var(--text-faint); }
+
+/* The figure sequence IS the trend. Brief 03 §7: do not draw a second
+   sparkline for it — that shows the same information twice in two shapes that
+   both look like the odds-movement sparkline. */
+.seq { display: flex; gap: var(--sp-2); font-family: var(--font-mono);
+       font-size: var(--fs-sm); align-items: baseline; }
+.seq b { font-weight: 600; color: var(--text-2); }
+.seq .up { color: var(--win); }
+.seq .down { color: var(--loss); }
+.seq .none { color: var(--text-faint); }
+
+.flags { display: flex; gap: var(--sp-1); flex-wrap: nowrap; overflow: hidden; }
+.flag { font-family: var(--font-mono); font-size: var(--fs-xs);
+        padding: 0 4px; border: 1px solid var(--line-2); color: var(--text-dim);
+        white-space: nowrap; }
+.flag.trouble { color: var(--edge); border-color: var(--edge); }
+.flag.lane { color: var(--book); border-color: var(--book-dim); }
+.flag.book { color: var(--book); border-color: var(--book); }
+
+/* ── expanded: the six-run table ───────────────────────────────────────────
+   Fixed columns, fixed widths, fixed row height, identical for every horse
+   whether it has six runs or one. */
+
+.fg-detail { background: var(--bg); border-bottom: 1px solid var(--line-2);
+             padding: var(--sp-3) var(--sp-3) var(--sp-4); }
+.trial-band { min-height: 24px; display: flex; align-items: center;
+              gap: var(--sp-3); padding: 0 var(--sp-3); margin-bottom: var(--sp-2);
+              font-size: var(--fs-sm); color: var(--text-dim);
+              border-left: 2px solid var(--line-2); }
+.runs { width: 100%; border-collapse: collapse; font-size: var(--fs); }
+.runs th { text-align: left; font-size: var(--fs-xs); letter-spacing: .1em;
+           text-transform: uppercase; color: var(--text-dim); font-weight: 600;
+           padding: var(--sp-1) var(--sp-2); border-bottom: 1px solid var(--line-2); }
+.runs td { padding: var(--sp-1) var(--sp-2); border-bottom: 1px solid var(--line);
+           height: 26px; white-space: nowrap; }
+.runs tr { cursor: pointer; }
+.runs tr:hover td { background: var(--surface); }
+.runs .num { text-align: right; font-family: var(--font-mono); }
+.runs .missing { color: var(--text-faint); }
+
+/* ── deep: one run opened ─────────────────────────────────────────────────── */
+
+.deep { background: var(--surface); border-left: 2px solid var(--edge);
+        padding: var(--sp-3) var(--sp-4); margin: var(--sp-2) 0; }
+.deep h4 { margin: 0 0 var(--sp-2); font-size: var(--fs); font-weight: 600;
+           color: var(--text-2); }
+.splits { display: flex; gap: var(--sp-4); font-family: var(--font-mono);
+          font-size: var(--fs); margin-bottom: var(--sp-3); flex-wrap: wrap; }
+.split { display: flex; flex-direction: column; gap: 1px; }
+.split .t { color: var(--text-2); }
+.split .p { color: var(--text-dim); font-size: var(--fs-sm); }
+/* Constrained width: the whole point is reading the five finishers and their
+   next starts as one block. Stretched across a 1600px viewport the eye has to
+   travel, which defeats "legible at a glance". */
+.quality { display: flex; flex-direction: column; gap: 2px;
+           font-size: var(--fs-sm); max-width: 52ch; }
+.quality .line { display: grid; grid-template-columns: 24px 1fr 168px;
+                 gap: var(--sp-2); font-family: var(--font-mono); }
+.quality .next-good { color: var(--win); }
+.quality .next-poor { color: var(--text-dim); }
+.quality .next-none { color: var(--text-faint); }
+.comment { color: var(--text-dim); font-size: var(--fs); line-height: 1.5;
+           max-width: 90ch; margin-top: var(--sp-2); }
+.comment b { color: var(--text-2); font-weight: 500; }
+
+/* ── condition-fit panel (rendered through the shared overlay) ───────────── */
+
+.fit { min-width: 300px; padding: var(--sp-3); }
+.fit h5 { margin: 0 0 var(--sp-2); font-size: var(--fs-sm); letter-spacing: .1em;
+          text-transform: uppercase; color: var(--text-dim); font-weight: 600; }
+.fit-row { display: grid; grid-template-columns: 1fr 56px 56px 60px;
+           gap: var(--sp-2); font-family: var(--font-mono); font-size: var(--fs);
+           padding: 2px 0; }
+.fit-row .k { font-family: var(--font); color: var(--text-2); }
+/* Weak evidence must look weak. A cell at n=1 must not carry the same visual
+   authority as one at n=40. */
+.fit-row.thin { color: var(--text-faint); }
+.fit-row.thin .k { color: var(--text-faint); }
+.fit-note { margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-faint);
+            line-height: 1.4; max-width: 34ch; }

@@ -71,7 +71,9 @@ export function anchoredPanel(trigger, render, { className = 'panel' } = {}) {
     if (open) return;
     open = true;
     el = el || render();
-    el.className = className;
+    // Add the panel class rather than assigning it: the render function styles
+    // its own content, and overwriting className silently discards that.
+    el.classList.add(className);
     el.style.position = 'fixed';
     el.style.visibility = 'hidden';
     el.style.zIndex = 'var(--z-panel)';

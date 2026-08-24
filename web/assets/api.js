@@ -30,6 +30,9 @@ export const api = {
   meeting: (date) => get(`/meeting/${date}`),
   race: (date, no) => get(`/race/${date}/${no}`),
   horse: (name, limit = 6) => get(`/horse/${encodeURIComponent(name)}?limit=${limit}`),
+  formGuide: (date, no, history = 6) =>
+    get(`/formguide/${date}/${no}?history=${history}`),
+  raceQuality: (date, no) => get(`/race-quality/${date}/${no}`),
   etRace: (date, no) => get(`/model/et/${date}/${no}`),
   etSummary: () => get('/model/et/summary'),
   status: () => get('/status'),

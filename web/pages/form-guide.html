@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Form Guide</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/pages.css">
+<link rel="stylesheet" href="../assets/formguide.css">
+</head>
+<body>
+
+<div class="chrome-meeting">
+  <div class="brand"><span class="dot"></span>RACEDAY</div>
+  <div class="meeting" id="meeting-context">—</div>
+  <div class="freshness" id="freshness"></div>
+</div>
+
+<nav class="chrome-nav" id="nav"></nav>
+
+<main class="page">
+  <header class="page-head">
+    <h1>Form Guide</h1>
+    <div class="controls">
+      <select id="meeting-select" aria-label="Meeting"></select>
+      <select id="race-select" aria-label="Race"></select>
+      <button id="expand-all" class="btn">Expand all</button>
+    </div>
+  </header>
+
+  <div class="race-context" id="race-context"></div>
+
+  <!-- One column grid, shared by every state. A collapsed row and an expanded
+       row line up on their left-hand columns so the eye tracks straight down. -->
+  <div class="fg-head" role="row">
+    <span class="c-no">No</span>
+    <span class="c-horse">Horse</span>
+    <span class="c-draw">Dr</span>
+    <span class="c-wt">Wt</span>
+    <span class="c-jockey">Jockey</span>
+    <span class="c-trainer">Trainer</span>
+    <span class="c-style">Style</span>
+    <span class="c-odds">Odds</span>
+    <span class="c-seq">Last 6 figures</span>
+    <span class="c-flags">Flags</span>
+  </div>
+
+  <div id="runners"></div>
+</main>
+
+<script type="module" src="../assets/form-guide.js"></script>
+</body>
+</html>
