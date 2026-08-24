@@ -40,9 +40,12 @@ class CoerceError(ValueError):
 _MARGIN_CODES: dict[str, float] = {
     "NOSE": 0.05,
     "SH": 0.10,   # short head
+    "SHD": 0.10,  # short head, alternate spelling
     "HD": 0.20,   # head
     "N": 0.30,    # neck
-    "SN": 0.30,   # short neck, seen in older results
+    "NK": 0.30,   # neck, alternate spelling
+    "SN": 0.30,   # short neck
+    "DH": 0.00,   # dead heat with the horse ahead: no margin between them
 }
 
 # The winner, or a margin that was never measured.
