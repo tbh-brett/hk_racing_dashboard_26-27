@@ -49,17 +49,56 @@ merits; it is not what A2 was asking about.
 
 ---
 
-## A3 — Where does the database live? **Settled: Postgres on Supabase**
+## A3 — Where does the database live? **Settled: SQLite on a persistent volume**
 
-Chosen over local SQLite, Turso and a VPS. Consequences, all reflected in `AGENTS.md`:
+Superseded an earlier choice of Supabase Postgres, once the requirement was restated as
+"accessible, faster, and newly scraped results integrated onto it."
 
-- The schema in `REBUILD.md §2` needs porting off SQLite DDL (`REAL` → `DOUBLE PRECISION`,
-  `TEXT` dates → `DATE`).
-- `store/` is a `psycopg` wrapper, not a `sqlite3` one. The smoke test enforces that no
-  other module imports a driver.
-- `INSERT ... ON CONFLICT DO UPDATE` carries over unchanged — it is native Postgres syntax.
-- `jobs/migrate_legacy.py` is the one sanctioned `sqlite3` importer, for reading the legacy
-  file offline.
+Local SQLite wins on that phrasing. Measured on this data: a targeted query returns in
+**0.000s**, a full-table read in 1.09s, the equivalent spreadsheet in 15.33s. A hosted
+database would add a network round-trip to every one of those queries, against a rule that
+no endpoint may exceed 500ms — for a single-user workload of 21,423 rows growing by roughly
+650 twice a week. Postgres would have bought concurrency this project does not need.
+
+Durability, which is the real argument for hosting, comes from **Litestream** instead: it
+streams the WAL to S3-compatible storage continuously, so the recovery point is seconds.
+It runs as a sidecar, not a dependency, and the application never knows about it.
+
+Consequences:
+
+- The schema in `REBUILD.md §2` is used **as written** — no DDL porting.
+- `store/` is a thin `sqlite3` wrapper, as originally specified, and stays the only module
+  that imports it.
+- WAL mode is mandatory, not optional: the scraper writes while the API reads, and on race
+  day they must not block each other.
+- `jobs/migrate_legacy.py` becomes a SQLite→SQLite copy, which is markedly simpler than a
+  cross-engine migration.
+
+---
+
+## A4 — Stack **Settled: FastAPI + the Design HTML**
+
+Streamlit is not a requirement. The eleven design briefs specify, among other things:
+
+- a flyout filter overlay that floats above the table while it live-updates underneath
+  (brief 10)
+- a viewport-fixed hover panel with collision detection and portal rendering, specified
+  precisely because naive in-flow positioning caused a feedback loop that made the page
+  vibrate (brief 09 §1)
+- fixed row heights with popovers that must never reflow the row (brief 04 §1)
+- expansion state persisting across race switches (brief 02)
+- side-by-side scrolling All-Up panels (brief 08 §3)
+
+These are DOM-level requirements. Streamlit's rerun-per-interaction model cannot express
+them, so building there would mean shipping a materially reduced version of a design that
+was deliberately drawn unconstrained.
+
+FastAPI serves JSON; `web/` holds the Design output and talks to it over `fetch`. The
+`RunnerLine` grammar becomes the serialisation format, which is what makes a run look
+identical in Race Day, Form Guide, Lookup and Results — it is the same object.
+
+This changes nothing in Phases 0–3. `ingest`, `store`, `derive` and `query` are identical
+under either frontend; only the layer above `query/` differs.
 
 ---
 
@@ -125,7 +164,7 @@ actually lost is `lbws` (per-section margins) from May.
 | Item | Why it matters |
 |---|---|
 | **A1 — security** | The My Bets password is live in `dashboard.py:17770` on a public repo, alongside two account statements and a 1,078-row bet log. Deferred by decision; still live. |
-| **A4 — stack** | Streamlit vs the Design HTML on a FastAPI backend. Much of the design (hover panels, inline editing, live odds, sticky headers) is what Streamlit's rerun model fights. Shapes Phase 4. |
 | **B2 — odds pruning** | `prune_old_snapshots` is still called at `scrape_hkjc_live_odds.py:500` in the old repo. Every meeting that passes loses data permanently. Independent of this rebuild. |
 | **C1 — where does Lab go?** | Design brief 08 dropped Lab from the nav; brief 05 then specified its first content (SARR component breakdown, FUSE blend). Nav currently resolves to seven items with Lab unhomed. |
 | **C2 — Trials `RESULT` column** | Empty on every row. Populate with the horse's next start, or remove. |
+| **Repo hosting** | GitHub writes are refused for this account — the git proxy 403s and the app integration cannot create repos or push. Needs GitHub reconnected before any of this reaches a remote. |

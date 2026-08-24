@@ -3,12 +3,9 @@
 Working rules for any AI coding agent on this repo. `AGENTS.md` is read automatically by
 several tools; if yours doesn't, paste this as your first message each session.
 
-**Project:** Hong Kong racing analytics. Python + Postgres + Streamlit. Single maintainer.
-Race meetings happen twice a week and the system must work on those days.
-
-> **Amended from the handoff bundle.** The original specified one SQLite file. Storage is
-> now **Postgres on Supabase** (decision A3). Every rule below that named SQLite has been
-> restated for Postgres; nothing else changed. Amendments are marked `[A3]`.
+**Project:** Hong Kong racing analytics. Python + SQLite + FastAPI, with the Claude Design
+output served as the frontend. Single maintainer. Race meetings happen twice a week and the
+system must work on those days.
 
 ---
 
@@ -17,32 +14,34 @@ Race meetings happen twice a week and the system must work on those days.
 Imports flow one direction only:
 
 ```
-ingest → store → derive → query → ui
+ingest → store → derive → query → api → web
 ```
 
-- `store/` is the **only** module that may import a database driver (`psycopg`). `[A3]`
-  Everything else calls a function in `store/` or `query/`.
-- `ui/` imports **only** from `query/`. No SQL, no `requests`, no `subprocess` in any UI file, ever.
+- `store/` is the **only** module that may `import sqlite3`. Everything else calls a
+  function in `store/` or `query/`.
+- `api/` imports **only** from `query/`. No SQL, no `requests`, no `subprocess` in any
+  router, ever. Routers return JSON; they never build HTML.
+- `web/` is static — the Design HTML, CSS and JS. It talks to `api/` over `fetch`. It has
+  no Python and no database access of any kind.
 - `ingest/` knows about HKJC and returns plain dicts. It does not know the database exists.
 - `derive/` reads raw tables, writes derived tables. Every derived table must be safe to
   `DROP` and rebuild from raw.
 - Never call our own Python via `subprocess`. Import it. `subprocess` is for Playwright only.
-- **One exception to the driver rule:** `jobs/migrate_legacy.py` may import `sqlite3` and
-  `openpyxl` to read the legacy `hkjc.db`. It is a one-shot reader, runs offline, and must
-  never be imported by anything else. `[A3]`
 
 If a task seems to need a violation, stop and say so rather than working around it.
 
 ## Data rules
 
-- **One database.** Not a database plus spreadsheets plus a folder of JSON. If a value is
-  worth keeping, it goes in a table. `[A3]`
-- **Types are coerced at write time in `store/`, never at read time.** Odds are
-  `DOUBLE PRECISION`, places are `INTEGER`, dates are `DATE`. `[A3]`
+- **One SQLite file.** Not a database plus spreadsheets plus a folder of JSON. If a value is
+  worth keeping, it goes in a table.
+- **Types are coerced at write time in `store/`, never at read time.** Odds are `REAL`,
+  places are `INTEGER`, dates are `TEXT` as `YYYY-MM-DD`.
 - **All writes are idempotent:** `INSERT ... ON CONFLICT DO UPDATE`. Re-running any scrape
-  must never duplicate a row. (Native Postgres syntax — unchanged from the original spec.)
+  must never duplicate a row.
 - **Primary keys:** races `(race_date, race_no)`; runners `(race_date, race_no, horse_no)`;
   horses `(horse_name)`.
+- **WAL mode, always.** The scraper writes while the API reads. Without WAL they block each
+  other on race day, which is the one day it cannot happen.
 - **Join history on `horse_name`, never `horse_id`.** Verified against the legacy data:
   `horse_id` is 0% populated in July 2026, 54.6% in June, 90% in April — the degradation
   starts in **April, not July**. Any join on it silently returns partial history for every
@@ -103,16 +102,24 @@ If a task seems to need a violation, stop and say so rather than working around 
 - **Every job reports row counts, never silence.** A zero must be visible immediately.
   Silent success and silent failure must never look the same.
 
+## API rules
+
+- Every endpoint returns JSON shaped by the `RunnerLine` grammar. A run looks the same in
+  Race Day, Form Guide, Lookup and Results because it is the same serialised object.
+- **No endpoint may exceed 500ms** on current data. Add an index rather than optimising
+  Python. Caching belongs in `query/`, not in the router.
+- Errors return a real status code and a message naming what failed. Never a 200 with an
+  empty list.
+
 ## Secrets
 
-- The Supabase connection string lives in `.env` (local) or `st.secrets` (deployed).
-  Never in source, never in a committed file. `.env` is gitignored. `[A3]`
-- No password, account number, or bet log is ever committed.
+- Nothing secret is committed — no password, account number, or bet log. Local config lives
+  in `.env`, which is gitignored.
 
 ## File size
 
 - Hard cap 600 lines per file. At 500, propose a split before adding.
-- One page per file in `ui/pages/`.
+- One page per file in `web/pages/`, one router per file in `hkrd/api/`.
 
 ## Testing
 

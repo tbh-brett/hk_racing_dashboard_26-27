@@ -1,0 +1,18 @@
+# Litestream — continuous replication of the SQLite file to object storage.
+#
+# This is what makes a single SQLite file safe to depend on: it streams the WAL
+# to S3-compatible storage as writes happen, so the recovery point is seconds
+# rather than the last manual copy. It runs as a sidecar process, not a Python
+# dependency, and the application is unaware of it.
+#
+#   litestream replicate -config ops/litestream.yml
+#   litestream restore -config ops/litestream.yml /data/hkrd.db
+#
+# The database still needs WAL mode enabled, which store/connect.py sets.
+
+dbs:
+  - path: /data/hkrd.db
+    replicas:
+      - url: ${LITESTREAM_REPLICA_URL}
+        retention: 720h          # 30 days
+        sync-interval: 10s
