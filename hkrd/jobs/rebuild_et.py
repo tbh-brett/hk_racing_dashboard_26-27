@@ -21,7 +21,7 @@ from pathlib import Path
 import pandas as pd
 
 from hkrd.derive import et
-from hkrd.store.connect import get_conn, init_db, transaction
+from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
 # The new schema splits race context from runner rows, so ET's inputs are
 # assembled by a join rather than read off one flat sheet.
@@ -67,10 +67,15 @@ def load_runs(conn) -> pd.DataFrame:
     return pd.read_sql(RUNS_SQL, conn)
 
 
-def rebuild(db: Path, *, window_months: int = 24,
+def rebuild(db: Path | None = None, *, window_months: int = 24,
             shrinkage_k: float = et.DEFAULT_SHRINKAGE_K) -> ETReport:
+    """Rebuild into `db`, defaulting to the configured database.
+
+    The default lives here rather than at the caller so api/ can trigger the
+    job without importing store/.
+    """
     report = ETReport()
-    conn = get_conn(db)
+    conn = get_conn(db if db is not None else db_path())
     try:
         init_db(conn)
         raw = load_runs(conn)
@@ -132,8 +137,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--shrinkage-k", type=float, default=et.DEFAULT_SHRINKAGE_K)
     a = ap.parse_args(argv)
 
-    from hkrd.store.connect import db_path
-    report = rebuild(a.db or db_path(), window_months=a.window_months,
+    report = rebuild(a.db, window_months=a.window_months,
                      shrinkage_k=a.shrinkage_k)
     print(report.render())
     return 1 if report.errors else 0

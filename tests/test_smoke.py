@@ -127,9 +127,14 @@ def test_only_store_imports_sqlite3() -> None:
     assert not offenders, "\n".join(offenders)
 
 
-def test_api_imports_only_query() -> None:
-    """Routers reach the data through query/ and nowhere else."""
-    forbidden = {"ingest", "store", "derive", "model", "jobs"}
+def test_api_imports_only_query_and_jobs() -> None:
+    """Routers read through query/ and trigger work through jobs/.
+
+    Nothing else: reaching into store/ or derive/ from a router puts SQL and
+    formula knowledge behind an HTTP handler, which is how the previous
+    dashboard ended up with 152 places that each knew how to load data.
+    """
+    forbidden = {"ingest", "store", "derive"}
     offenders = []
     for f in py_files():
         if not rel(f).startswith("api/"):

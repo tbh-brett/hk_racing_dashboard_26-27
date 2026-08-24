@@ -19,8 +19,14 @@ ingest → store → derive → query → api → web
 
 - `store/` is the **only** module that may `import sqlite3`. Everything else calls a
   function in `store/` or `query/`.
-- `api/` imports **only** from `query/`. No SQL, no `requests`, no `subprocess` in any
-  router, ever. Routers return JSON; they never build HTML.
+- `api/` imports from `query/` for reads and `jobs/` for actions, and nothing else.
+  Never `store/`, never `derive/`, never `ingest/`. No SQL, no `requests`, no
+  `subprocess` in any router, ever. Routers return JSON; they never build HTML.
+
+  The read path is `... → query → api`. Triggering work is a different motion: a
+  refresh button has to run a job, so `api/ → jobs/` is allowed and is the only
+  write path out of a router. A job owns its own defaults (including which
+  database it writes) so a router never reaches into `store/` to supply them.
 - `web/` is static — the Design HTML, CSS and JS. It talks to `api/` over `fetch`. It has
   no Python and no database access of any kind.
 - `ingest/` knows about HKJC and returns plain dicts. It does not know the database exists.

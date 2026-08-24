@@ -12,7 +12,12 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-__all__ = ["get_conn", "transaction", "init_db", "db_path"]
+__all__ = ["get_conn", "transaction", "init_db", "db_path", "Connection"]
+
+# Layers above store/ need to name a connection in a type hint without
+# importing the driver. They depend on this alias, so the driver stays
+# swappable and the "only store/ imports sqlite3" rule stays literal.
+Connection = sqlite3.Connection
 
 _SCHEMA = Path(__file__).with_name("schema.sql")
 

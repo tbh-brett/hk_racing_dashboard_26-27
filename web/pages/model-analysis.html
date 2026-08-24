@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Model Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/pages.css">
+</head>
+<body>
+
+<div class="chrome-meeting">
+  <div class="brand"><span class="dot"></span>RACEDAY</div>
+  <div class="meeting" id="meeting-context">—</div>
+  <div class="freshness" id="freshness"></div>
+</div>
+
+<nav class="chrome-nav" id="nav"></nav>
+
+<main class="page">
+  <header class="page-head">
+    <h1>Model Analysis</h1>
+    <div class="controls">
+      <select id="meeting-select" aria-label="Meeting"></select>
+      <select id="race-select" aria-label="Race"></select>
+      <button id="rebuild-et" class="btn">Rebuild ET</button>
+    </div>
+  </header>
+
+  <div id="job-result" class="job-result" hidden></div>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>ET — expected time</h2>
+      <span class="muted" id="et-version"></span>
+    </div>
+
+    <p class="note">
+      ET is a <strong>descriptive</strong> figure, not a model input. It carries real
+      standalone signal (AUC 0.658 predicting the next run) but adds nothing on top of
+      the market price once log-odds are controlled (p = 0.746). Read it; do not build
+      selection rules on it.
+    </p>
+
+    <div class="stat-row" id="et-summary"></div>
+
+    <div class="invariants" id="et-invariants"></div>
+
+    <div class="table-scroll">
+      <table class="grid" id="et-table">
+        <thead>
+          <tr>
+            <th class="num">No</th><th>Horse</th><th class="num">Pl</th>
+            <th class="num">Time</th><th class="num">Figure</th>
+            <th class="num" title="Was this a fast time for these conditions?">vs par</th>
+            <th class="num" title="Did this horse outrun the field it was in?">vs race</th>
+            <th class="num">n<sub>eff</sub></th><th>Confidence</th><th>Level</th>
+          </tr>
+        </thead>
+        <tbody id="et-body"></tbody>
+      </table>
+    </div>
+
+    <p class="note quiet">
+      <strong>vs par</strong> and <strong>vs race</strong> answer different questions and
+      are shown separately — the v4 model conflated them. A par time is a property of the
+      race: every runner above shares one, and if that count is ever not 1 the model is
+      wrong regardless of its accuracy.
+    </p>
+  </section>
+</main>
+
+<script type="module" src="../assets/model-analysis.js"></script>
+</body>
+</html>

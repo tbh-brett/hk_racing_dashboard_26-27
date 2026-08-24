@@ -1,0 +1,130 @@
+/* pages.css — shared page furniture. Every colour is a token; no hex here.
+   The smoke test fails the build on a raw hex outside tokens.css. */
+
+/* ── global chrome ──────────────────────────────────────────────────────────
+   Three fixed layers with strict ownership (design brief 08 §1): meeting
+   context, page nav, then page controls. Page-level content never leaks up
+   into the top two -- that leak is what made the top-left button change
+   identity between pages in the previous build. */
+
+.chrome-meeting {
+  display: flex; align-items: stretch; height: 32px;
+  background: var(--bg-deep); border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: var(--fs);
+}
+.chrome-meeting .brand {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: 0 var(--sp-4); border-right: 1px solid var(--line);
+  font-weight: 600; letter-spacing: .16em;
+}
+.chrome-meeting .dot { width: 9px; height: 9px; background: var(--alert); }
+.chrome-meeting .meeting {
+  display: flex; align-items: center; gap: var(--sp-5);
+  padding: 0 var(--sp-5); color: var(--text-2);
+}
+.chrome-meeting .freshness {
+  display: flex; align-items: center; gap: var(--sp-2);
+  margin-left: auto; padding: 0 var(--sp-4);
+  border-left: 1px solid var(--line); font-size: var(--fs-sm);
+}
+.freshness .src { display: flex; align-items: baseline; gap: var(--sp-1);
+  padding: 1px 5px; border: 1px solid var(--line-2); }
+.freshness .name { color: var(--text-dim); }
+.freshness .ok { color: var(--win); }
+.freshness .stale { color: var(--edge); }
+
+.chrome-nav {
+  display: flex; align-items: stretch; height: 34px;
+  background: var(--surface); border-bottom: 1px solid var(--line-2);
+}
+.chrome-nav a {
+  display: flex; align-items: center; padding: 0 var(--sp-5);
+  font-size: var(--fs); font-weight: 500; letter-spacing: .03em;
+  color: var(--text-dim); border-right: 1px solid var(--line);
+}
+.chrome-nav a:hover { background: rgba(255, 255, 255, .06); color: var(--text-2); }
+.chrome-nav a[aria-current="page"] {
+  color: var(--text); box-shadow: inset 0 -2px 0 var(--alert);
+}
+
+/* ── page ──────────────────────────────────────────────────────────────── */
+
+.page { padding: var(--sp-5); }
+.page-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-5); margin-bottom: var(--sp-4);
+}
+.page-head h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .02em; }
+.controls { display: flex; align-items: center; gap: var(--sp-2); }
+
+select, .btn {
+  font-family: var(--font-mono); font-size: var(--fs);
+  background: var(--surface-2); color: var(--text-2);
+  border: 1px solid var(--line-2); padding: 4px var(--sp-3);
+}
+/* Every interactive element defines all four states as complete pairs.
+   Setting a hover foreground without its background is what made selected
+   chips render white-on-white in the previous build. */
+select:hover, .btn:hover { background: var(--line-2); color: var(--text); }
+.btn { cursor: pointer; }
+.btn:disabled { opacity: .5; cursor: progress; }
+.btn:focus-visible, select:focus-visible { outline: 2px solid var(--edge); outline-offset: 1px; }
+
+.job-result {
+  margin-bottom: var(--sp-4); padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--line-2); background: var(--surface);
+  font-family: var(--font-mono); font-size: var(--fs);
+}
+.job-result.ok { border-color: var(--book); color: var(--book); }
+.job-result.err { border-color: var(--alert); color: var(--alert); }
+
+/* ── panel ─────────────────────────────────────────────────────────────── */
+
+.panel { background: var(--surface); border: 1px solid var(--line-2); padding: var(--sp-4); }
+.panel-head { display: flex; align-items: baseline; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.panel-head h2 { margin: 0; font-size: var(--fs-md); font-weight: 600; }
+.muted, .quiet { color: var(--text-dim); }
+.note { font-size: var(--fs); color: var(--text-dim); max-width: 78ch; line-height: 1.5; }
+.note strong { color: var(--text-2); font-weight: 600; }
+
+.stat-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); margin: var(--sp-4) 0; }
+.stat { display: flex; flex-direction: column; gap: 2px; }
+.stat .v { font-family: var(--font-mono); font-size: var(--fs-md); color: var(--text); }
+.stat .k { font-size: var(--fs-xs); letter-spacing: .12em; color: var(--text-dim); text-transform: uppercase; }
+
+.invariants { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-bottom: var(--sp-4); }
+.inv { font-family: var(--font-mono); font-size: var(--fs-sm);
+       padding: 3px var(--sp-3); border: 1px solid var(--line-2); }
+.inv.pass { color: var(--win); border-color: var(--win); }
+.inv.fail { color: var(--alert); border-color: var(--alert); }
+
+/* ── grid ──────────────────────────────────────────────────────────────────
+   Wide content scrolls inside its own container; the page body never scrolls
+   sideways. */
+
+.table-scroll { overflow-x: auto; }
+.grid { width: 100%; border-collapse: collapse; font-size: var(--fs); }
+.grid th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--surface-2); color: var(--text-dim);
+  font-size: var(--fs-xs); font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; text-align: left;
+  padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--line-2);
+  white-space: nowrap;
+}
+.grid td {
+  padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.grid tbody tr:hover { background: rgba(255, 255, 255, .035); }
+.grid .num { text-align: right; font-family: var(--font-mono); }
+.grid .name { color: var(--text); }
+.pos { color: var(--win); }
+.neg { color: var(--loss); }
+
+/* Sample size drives visual weight. A thin cell must never render with the
+   same authority as a well-evidenced one. */
+.thin { color: var(--text-faint); }
+.conf-high { color: var(--text-2); }
+.conf-medium { color: var(--text-dim); }
+.conf-low { color: var(--text-faint); font-style: italic; }
