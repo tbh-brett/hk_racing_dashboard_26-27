@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; padding:0; background:#0e1117; }
+  * { box-sizing: border-box; }
+  a { color:#f0a824; text-decoration:none; }
+  a:hover { color:#ffc75a; }
+  input, textarea { outline:none; }
+  ::-webkit-scrollbar { width:9px; height:9px; }
+  ::-webkit-scrollbar-track { background:#0e1117; }
+  ::-webkit-scrollbar-thumb { background:#2b303a; }
+  @keyframes tick { 0%,100% { opacity:1 } 50% { opacity:.35 } }
+</style>
+</helmet>
+<div style="min-height:100vh;background:#0e1117;color:#fafafa;font-family:'IBM Plex Sans',system-ui,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;-webkit-font-smoothing:antialiased">
+
+  <div style="display:flex;align-items:stretch;height:32px;border-bottom:1px solid #1c202a;background:#0b0e13;overflow-x:auto">
+    <div style="display:flex;align-items:center;gap:9px;padding:0 14px;border-right:1px solid #1c202a;flex:none">
+      <div style="width:9px;height:9px;background:#e63946;flex:none"></div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:12px;letter-spacing:.16em">RACEDAY</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;padding:0 16px;flex:none;min-width:max-content;font-family:'IBM Plex Mono',monospace;font-size:12px;white-space:nowrap">
+      <span style="font-weight:600">HV</span>
+      <span style="color:#cfd3da">15 Jul 2026</span>
+      <span style="color:#8b929e">11 races</span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:#8b929e"><span style="width:6px;height:6px;border-radius:50%;background:#35b37e;animation:tick 1.6s infinite;flex:none"></span>active meeting · 16:22</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;padding:0 14px;border-left:1px solid #1c202a;flex:none;min-width:max-content;margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px">
+      <span style="color:#6f757f;letter-spacing:.1em">DATA</span>
+      <sc-for list="{{ freshness }}" as="f" hint-placeholder-count="5">
+        <span onClick="{{ f.go }}" style="display:flex;align-items:baseline;gap:4px;cursor:pointer;padding:1px 5px;border:1px solid {{ f.border }};background:{{ f.bg }};white-space:nowrap" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.07)">
+          <span style="color:#8b929e">{{ f.name }}</span>
+          <span style="color:{{ f.color }};font-weight:600">{{ f.mark }}</span>
+          <span style="color:{{ f.color }}">{{ f.age }}</span>
+        </span>
+      </sc-for>
+      <sc-if value="{{ refreshMsg }}" hint-placeholder-val="{{ false }}">
+        <span style="color:#2ec4b6;white-space:nowrap">{{ refreshMsg }}</span>
+      </sc-if>
+    </div>
+  </div>
+
+  <nav style="display:flex;align-items:stretch;height:34px;border-bottom:1px solid #262a33;background:#12151b">
+    <sc-for list="{{ pages }}" as="p" hint-placeholder-count="6">
+      <a href="{{ p.href }}" style="display:flex;align-items:center;padding:0 16px;font-size:12px;font-weight:500;letter-spacing:.03em;cursor:pointer;color:#8b929e;border-right:1px solid #1c202a;text-decoration:none" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.06)">
+        <span style="color:{{ p.color }};border-bottom:2px solid {{ p.mark }};padding-bottom:1px">{{ p.name }}</span>
+      </a>
+    </sc-for>
+  </nav>
+
+  <div style="display:flex;align-items:stretch;height:36px;border-bottom:1px solid #262a33">
+    <div style="display:flex;align-items:center;padding:0 12px 0 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e;letter-spacing:.1em">RESULTS</div>
+    <div style="display:flex;align-items:stretch">
+      <sc-for list="{{ races }}" as="r" hint-placeholder-count="11">
+        <div onClick="{{ r.go }}" style="display:flex;flex-direction:column;justify-content:center;align-items:center;width:52px;cursor:{{ r.cursor }};border-right:1px solid #1c202a;font-family:'IBM Plex Mono',monospace;background:{{ r.bg }};border-top:2px solid {{ r.mark }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.05)">
+          <div style="font-size:13px;font-weight:600;line-height:1.1;color:{{ r.fg }}">{{ r.n }}</div>
+          <div style="font-size:9px;color:{{ r.sub }};letter-spacing:.04em">{{ r.label }}</div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="flex:1"></div>
+    <div style="display:flex;align-items:center;gap:12px;padding:0 14px;border-left:1px solid #262a33;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e">
+      <span>{{ done.count }} OF 11 RUN</span>
+      <span onClick="{{ rescrape }}" style="cursor:pointer;border:1px solid #2b303a;padding:1px 8px;letter-spacing:.06em" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.08)">RE-SCRAPE THIS RACE</span>
+      <sc-if value="{{ scrapeMsg }}" hint-placeholder-val="{{ false }}">
+        <span style="color:#2ec4b6">{{ scrapeMsg }}</span>
+      </sc-if>
+    </div>
+  </div>
+
+  <sc-if value="{{ notRun }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;height:calc(100vh - 74px);font-family:'IBM Plex Mono',monospace;color:#6f757f">
+      <div style="font-size:13px;letter-spacing:.08em">{{ notRunLabel }} HAS NOT BEEN RUN</div>
+      <div style="font-size:11px;color:#4c525c">Off at {{ notRunOff }} · nothing to review yet</div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ hasResult }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;align-items:stretch;min-height:calc(100vh - 74px)">
+    <div style="flex:1;min-width:0;border-right:1px solid #262a33">
+
+      <div style="display:flex;align-items:center;border-bottom:1px solid #262a33;background:#1a1d23">
+        <div style="display:flex;align-items:baseline;gap:10px;padding:9px 14px;border-right:1px solid #262a33">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600">{{ hdr.no }}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#8b929e">{{ hdr.off }}</span>
+        </div>
+        <div style="display:flex;gap:18px;padding:0 16px;font-family:'IBM Plex Mono',monospace;font-size:12px;flex-wrap:wrap">
+          <div><span style="color:#8b929e">DIST </span>{{ hdr.dist }}</div>
+          <div><span style="color:#8b929e">CLASS </span>{{ hdr.cls }}</div>
+          <div><span style="color:#8b929e">GOING </span>{{ hdr.going }}</div>
+          <div><span style="color:#8b929e">COURSE </span>{{ hdr.course }}</div>
+          <div><span style="color:#8b929e">WIN TIME </span><span style="font-weight:600">{{ hdr.time }}</span></div>
+          <div style="display:flex;align-items:center;gap:7px">
+            <span style="color:#8b929e">RACE PACE</span>
+            <div style="display:flex;gap:2px">
+              <sc-for list="{{ paceScale }}" as="s" hint-placeholder-count="5">
+                <div style="width:9px;height:9px;background:{{ s.bg }}"></div>
+              </sc-for>
+            </div>
+            <span style="font-weight:600;color:{{ hdr.paceColor }}">{{ hdr.pace }}</span>
+          </div>
+        </div>
+        <div style="flex:1"></div>
+        <div style="display:flex;align-items:center;gap:10px;padding:0 14px;border-left:1px solid #262a33">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e;letter-spacing:.08em">RACE QUALITY</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:{{ hdr.qColor }};border:1px solid {{ hdr.qBorder }};background:{{ hdr.qBg }};padding:2px 7px;letter-spacing:.08em">{{ hdr.quality }}</span>
+          <a href="{{ hdr.video }}" target="_blank" rel="noopener" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#c8792f;border:1px solid #3d2a14;padding:2px 8px">▶ REPLAY</a>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:34px 34px 156px 74px 26px 76px 78px 34px 54px 60px 52px 100px 1fr 62px;align-items:center;height:26px;background:#12151b;border-bottom:1px solid #2b303a;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.08em;color:#8b929e">
+        <div style="padding:0 4px;text-align:center">FIN</div>
+        <div style="padding:0 4px;text-align:center">NO</div>
+        <div style="padding:0 8px">HORSE</div>
+        <div style="padding:0 6px">JOCKEY</div>
+        <div style="padding:0 2px;text-align:center">DR</div>
+        <div style="padding:0 6px">TRAINER</div>
+        <div style="padding:0 6px">STYLE</div>
+        <div style="padding:0 4px;text-align:right">WT</div>
+        <div style="padding:0 6px;text-align:right">MARGIN</div>
+        <div style="padding:0 6px;text-align:right">WIN SP</div>
+        <div style="padding:0 6px;text-align:right">PLC SP</div>
+        <div style="padding:0 6px;text-align:right">ET FIGURE</div>
+        <div style="padding:0 8px">POSITIONS · TRIP</div>
+        <div style="padding:0 8px;text-align:right">NOTE</div>
+      </div>
+
+      <sc-for list="{{ result }}" as="r" hint-placeholder-count="12">
+        <div>
+          <div onClick="{{ r.toggle }}" style="display:grid;grid-template-columns:34px 34px 156px 74px 26px 76px 78px 34px 54px 60px 52px 100px 1fr 62px;align-items:center;min-height:29px;cursor:pointer;border-bottom:1px solid #191d24;background:{{ r.bg }};border-left:3px solid {{ r.rule }};font-family:'IBM Plex Mono',monospace" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.035)">
+            <div style="padding:0 4px;text-align:center;font-size:14px;font-weight:600;color:{{ r.finColor }}">{{ r.fin }}</div>
+            <div style="padding:0 4px;text-align:center;font-size:12px;font-weight:600">{{ r.no }}</div>
+            <div style="padding:0 8px;display:flex;align-items:baseline;gap:6px;white-space:nowrap;overflow:hidden">
+              <span style="font-size:9px;color:{{ r.caretColor }};width:6px">{{ r.caret }}</span>
+              <span style="font-size:12px;font-weight:600;color:{{ r.nameColor }};overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span>
+              <sc-if value="{{ r.bb }}" hint-placeholder-val="{{ false }}">
+                <span style="flex:none;font-size:9px;padding:0 4px;color:#2ec4b6;border:1px solid #1e4a45">BB</span>
+              </sc-if>
+              <sc-if value="{{ r.vetAny }}" hint-placeholder-val="{{ false }}">
+                <span style="flex:none;font-size:9px;padding:0 4px;color:{{ r.vetColor }};border:1px solid {{ r.vetBorder }};background:{{ r.vetBg }}">{{ r.vetTag }}</span>
+              </sc-if>
+            </div>
+            <div style="padding:0 6px;font-size:11px;color:#cfd3da;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.jockey }}</div>
+            <div style="padding:0 2px;text-align:center;font-size:11px;color:#cfd3da">{{ r.draw }}</div>
+            <div style="padding:0 6px;font-size:10px;color:#8b929e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.trainer }}</div>
+            <div style="padding:0 6px"><span style="display:inline-block;max-width:100%;font-size:9px;padding:1px 4px;white-space:nowrap;overflow:hidden;color:{{ r.styleColor }};background:{{ r.styleBg }}">{{ r.style }}</span></div>
+            <div style="padding:0 4px;text-align:right;font-size:11px;color:#cfd3da">{{ r.wt }}</div>
+            <div style="padding:0 6px;text-align:right;font-size:11px;color:#cfd3da">{{ r.margin }}</div>
+            <div style="padding:0 6px;text-align:right;font-size:12px;font-weight:600">{{ r.winSp }}</div>
+            <div style="padding:0 6px;text-align:right;font-size:12px;color:#cfd3da">{{ r.plcSp }}</div>
+            <div style="padding:0 6px;display:flex;align-items:center;gap:6px;justify-content:flex-end">
+              <span style="font-size:12px;font-weight:600;color:{{ r.figColor }}">{{ r.fig }}</span>
+              <div style="width:34px;height:7px;background:#191d24"><div style="height:7px;background:{{ r.figColor }};width:{{ r.figW }}%"></div></div>
+            </div>
+            <div style="padding:0 8px;display:flex;align-items:center;gap:8px;min-width:0">
+              <span style="font-size:10px;color:#cfd3da;letter-spacing:.04em;white-space:nowrap">{{ r.pos }}</span>
+              <sc-for list="{{ r.tripTags }}" as="t" hint-placeholder-count="1">
+                <span style="flex:none;font-size:9px;padding:0 4px;white-space:nowrap;color:#c8792f;border:1px solid #3d2a14">{{ t.label }}</span>
+              </sc-for>
+            </div>
+            <div style="padding:0 8px;display:flex;align-items:center;justify-content:flex-end;gap:5px">
+              <sc-if value="{{ r.bookedHere }}" hint-placeholder-val="{{ false }}">
+                <span title="already in the blackbook from this run" style="width:6px;height:6px;background:#2ec4b6;flex:none"></span>
+              </sc-if>
+              <span onClick="{{ r.noteClick }}" style="font-size:10px;padding:0 5px;cursor:pointer;color:{{ r.noteColor }};border:1px solid {{ r.noteBorder }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ r.noteMark }}</span>
+            </div>
+          </div>
+
+          <sc-if value="{{ r.open }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:stretch;border-bottom:1px solid #1e232c;background:#0e131a;border-left:2px solid #2b3a4a">
+            <div style="flex:1;min-width:0;padding:9px 12px 10px 12px;border-right:1px solid #1e232c">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#6f757f;margin-bottom:6px">SECTIONALS · POSITION AT EACH</div>
+              <div style="display:flex;gap:4px">
+                <sc-for list="{{ r.splits }}" as="s" hint-placeholder-count="5">
+                  <div style="flex:1;border:1px solid #232a34;background:#12171f;padding:4px 6px">
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;letter-spacing:.06em">{{ s.seg }}</div>
+                    <div style="display:flex;align-items:baseline;gap:6px;margin-top:2px">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:{{ s.color }}">{{ s.t }}</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e">P{{ s.p }}</span>
+                    </div>
+                    <div style="height:3px;background:#1c2129;margin-top:4px"><div style="height:3px;background:{{ s.color }};width:{{ s.w }}%"></div></div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display:flex;gap:18px;margin-top:9px;font-family:'IBM Plex Mono',monospace;font-size:11px;flex-wrap:wrap">
+                <div><span style="color:#6f757f">JUMP z </span><span style="color:{{ r.jumpColor }};font-weight:600">{{ r.jump }}</span></div>
+                <div><span style="color:#6f757f">LANE </span><span style="color:#cfd3da">{{ r.lane }}</span></div>
+                <div><span style="color:#6f757f">GROUND LOST </span><span style="color:{{ r.lostColor }};font-weight:600">{{ r.lost }}</span></div>
+                <div><span style="color:#6f757f">LAST 400 RANK </span><span style="color:{{ r.l400Color }};font-weight:600">{{ r.l400 }}</span></div>
+                <div><span style="color:#6f757f">GEAR </span><span style="color:#cfd3da">{{ r.gear }}</span></div>
+              </div>
+              <sc-if value="{{ r.stewardAny }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:9px;padding:6px 8px;border-left:2px solid #3d2a14;background:#17120b;font-size:12px;line-height:1.45;color:#cfd3da">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.09em;color:#c8792f">STEWARDS</span> {{ r.steward }}
+                </div>
+              </sc-if>
+              <sc-if value="{{ r.vetAny }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:7px;padding:6px 8px;border-left:2px solid {{ r.vetColor }};background:{{ r.vetBg }};font-size:12px;line-height:1.45;color:#cfd3da">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.09em;color:{{ r.vetColor }}">VET · {{ r.vetKind }}</span> {{ r.vetDetail }}
+                </div>
+              </sc-if>
+            </div>
+            <div style="width:300px;flex:none;padding:9px 12px 10px 12px">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#6f757f;margin-bottom:6px">WHAT THIS RUN SAYS</div>
+              <div style="font-size:12px;line-height:1.5;color:#cfd3da">{{ r.read }}</div>
+              <div style="display:flex;align-items:baseline;gap:8px;margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:11px">
+                <span style="color:#6f757f">FIGURE v PAR</span>
+                <span style="color:{{ r.figColor }};font-weight:600">{{ r.figVsPar }}</span>
+                <span style="margin-left:auto;color:#6f757f">SP RANK {{ r.spRank }} · FINISHED {{ r.fin }}</span>
+              </div>
+            </div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ r.noteOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="border-bottom:1px solid #1e2a2a;background:#0e1518;border-left:2px solid #1e4a45;padding:9px 12px 11px 12px">
+            <div style="display:flex;align-items:baseline;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.09em;color:#2ec4b6">
+              RUN NOTE · {{ r.no }} {{ r.name }}
+              <span style="margin-left:auto;color:#5f7a78;letter-spacing:0">{{ r.noteMeta }}</span>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:7px">
+              <input value="{{ r.draft }}" onChange="{{ r.noteType }}" placeholder="what did this run actually show" style="flex:1;min-width:0;background:#0b0e13;border:1px solid #24323a;color:#fafafa;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:4px 7px" />
+              <span onClick="{{ r.noteSave }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#2ec4b6;border:1px solid #1e4a45;padding:4px 10px;cursor:pointer;white-space:nowrap" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">SAVE NOTE</span>
+              <span onClick="{{ r.noteClose }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e;border:1px solid #2b303a;padding:4px 10px;cursor:pointer" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.08)">CLOSE</span>
+            </div>
+
+            <div style="margin-top:9px;padding-top:8px;border-top:1px solid #1b2b2b">
+              <sc-if value="{{ r.bookedHere }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:baseline;gap:7px;font-family:'IBM Plex Mono',monospace;font-size:10px;flex-wrap:wrap">
+                  <span style="color:#2ec4b6;letter-spacing:.06em">■ IN THE BLACKBOOK</span>
+                  <span style="color:#5f7a78">{{ r.bookedMeta }}</span>
+                  <sc-for list="{{ r.bookedTags }}" as="t" hint-placeholder-count="2">
+                    <span style="font-size:9px;padding:0 4px;color:{{ t.color }};border:1px solid #2b3a3a">{{ t.label }}</span>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ r.canPromote }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span onClick="{{ r.promoteOpenClick }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;color:#2ec4b6;border:1px solid #1e4a45;background:#12211f;padding:3px 9px;cursor:pointer;white-space:nowrap" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">+ ADD TO BLACKBOOK</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#5f7a78">same form as the Form Guide — reviewing and booking is one action</span>
+                </div>
+              </sc-if>
+            </div>
+
+            <sc-if value="{{ r.promoteOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:9px;padding-top:8px;border-top:1px solid #1b2b2b;max-width:520px">
+              <div style="display:flex;align-items:baseline;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.09em;color:#2ec4b6">ADD TO BLACKBOOK<span style="color:#5f7a78;letter-spacing:0">pre-filled from this result</span></div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;margin-top:7px;letter-spacing:.06em">HORSE</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600">{{ r.no }} {{ r.name }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;margin-top:6px;letter-spacing:.06em">SOURCE RUN</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#cfd3da">{{ r.promoteSource }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;margin-top:6px;letter-spacing:.06em">REASON</div>
+              <textarea value="{{ r.promoteReason }}" onChange="{{ r.promoteType }}" rows="3" style="width:100%;margin-top:3px;background:#0b0e13;border:1px solid #24323a;color:#fafafa;font-family:'IBM Plex Sans',sans-serif;font-size:12px;line-height:1.45;padding:5px 6px;resize:vertical"></textarea>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;margin-top:7px;letter-spacing:.06em">TAGS <span style="color:#4c525c">{{ r.tagCount }} SELECTED</span></div>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
+                <sc-for list="{{ r.tagPicker }}" as="t" hint-placeholder-count="10">
+                  <span onClick="{{ t.go }}" style="font-family:'IBM Plex Mono',monospace;font-size:9px;padding:1px 5px;cursor:pointer;white-space:nowrap;color:{{ t.color }};border:1px solid {{ t.border }};background:{{ t.bg }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ t.label }}</span>
+                </sc-for>
+              </div>
+              <div style="display:flex;align-items:center;gap:7px;margin-top:9px">
+                <span onClick="{{ r.promoteConfirm }}" style="flex:1;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.07em;padding:4px 0;cursor:pointer;color:{{ r.confirmColor }};border:1px solid {{ r.confirmBorder }};background:{{ r.confirmBg }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ r.confirmLabel }}</span>
+                <span onClick="{{ r.promoteCancel }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e;border:1px solid #2b303a;padding:4px 10px;cursor:pointer" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.08)">CANCEL</span>
+              </div>
+            </div>
+            </sc-if>
+          </div>
+          </sc-if>
+        </div>
+      </sc-for>
+
+      <div style="border-top:1px solid #262a33;background:#0b0e13;padding:10px 14px">
+        <div style="display:flex;align-items:baseline;gap:10px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#c8792f">STEWARDS' REPORT</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f757f">{{ steward.count }} PARAGRAPHS · {{ steward.tagCount }} TRIP TAGS EXTRACTED</span>
+        </div>
+        <sc-for list="{{ steward.items }}" as="s" hint-placeholder-count="4">
+          <div style="display:flex;gap:10px;margin-top:7px;align-items:flex-start">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:#cfd3da;width:104px;flex:none;white-space:nowrap">{{ s.subject }}</span>
+            <span style="font-size:12px;line-height:1.5;color:#8b929e;flex:1">{{ s.text }}</span>
+            <div style="display:flex;gap:4px;flex:none;flex-wrap:wrap;width:190px;justify-content:flex-end">
+              <sc-for list="{{ s.tags }}" as="t" hint-placeholder-count="1">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;padding:0 5px;white-space:nowrap;color:{{ t.color }};border:1px solid {{ t.border }};background:{{ t.bg }};height:15px;line-height:15px">{{ t.label }}</span>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <aside style="width:352px;flex:none;background:#12151b">
+      <div style="padding:9px 12px;border-bottom:1px solid #262a33">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#8b929e;margin-bottom:7px">DIVIDENDS PAID · PER $10 UNIT</div>
+        <sc-for list="{{ dividends }}" as="d" hint-placeholder-count="8">
+          <div style="display:flex;align-items:baseline;gap:8px;height:21px;font-family:'IBM Plex Mono',monospace;font-size:11px">
+            <span style="color:{{ d.labelColor }};width:38px;letter-spacing:.06em">{{ d.pool }}</span>
+            <span style="color:#6f757f;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ d.combo }}</span>
+            <span style="font-size:12px;font-weight:600;color:{{ d.color }};width:78px;text-align:right">${{ d.amount }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="padding:9px 12px;border-bottom:1px solid #262a33;background:{{ bets.bg }}">
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#8b929e">DID MY BETS HIT</span>
+          <a href="Bets.dc.html" style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#8b929e">LEDGER →</a>
+        </div>
+        <sc-if value="{{ bets.none }}" hint-placeholder-val="{{ false }}">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4c525c">NO BETS LOGGED ON THIS RACE</div>
+        </sc-if>
+        <sc-for list="{{ bets.rows }}" as="b" hint-placeholder-count="2">
+          <div style="display:flex;align-items:baseline;gap:7px;padding:2px 0;font-family:'IBM Plex Mono',monospace;font-size:11px;white-space:nowrap">
+            <span style="width:8px;height:8px;background:{{ b.acctColor }};flex:none"></span>
+            <span style="color:#cfd3da;width:40px">{{ b.type }}</span>
+            <span style="color:#8b929e;flex:1;overflow:hidden;text-overflow:ellipsis">{{ b.sel }}</span>
+            <span style="color:#8b929e">${{ b.stake }}</span>
+            <span style="color:#5b616b">→</span>
+            <span style="width:62px;text-align:right;font-weight:600;color:{{ b.plColor }}">{{ b.pl }}</span>
+          </div>
+        </sc-for>
+        <sc-if value="{{ bets.any }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;align-items:baseline;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid #1e232c;font-family:'IBM Plex Mono',monospace;font-size:11px">
+            <span style="color:#6f757f">RACE P/L</span>
+            <span style="margin-left:auto;font-size:14px;font-weight:600;color:{{ bets.plColor }}">{{ bets.pl }}</span>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="padding:9px 12px;border-bottom:1px solid #262a33;background:#12181a">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#2ec4b6;margin-bottom:7px">BLACKBOOK HORSES THAT RAN</div>
+        <sc-if value="{{ bbRan.none }}" hint-placeholder-val="{{ false }}">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4c525c">NONE OF THE BOOK WAS ENGAGED HERE</div>
+        </sc-if>
+        <sc-for list="{{ bbRan.rows }}" as="b" hint-placeholder-count="2">
+          <div style="padding:5px 0;border-bottom:1px solid #16211f">
+            <div style="display:flex;align-items:baseline;gap:7px;font-family:'IBM Plex Mono',monospace;font-size:11px;white-space:nowrap">
+              <span style="font-weight:600;color:#2ec4b6">{{ b.no }} {{ b.name }}</span>
+              <span style="color:#cfd3da">{{ b.finLabel }}</span>
+              <span style="margin-left:auto;font-size:10px;letter-spacing:.06em;padding:0 5px;color:{{ b.verdictColor }};border:1px solid {{ b.verdictBorder }};background:{{ b.verdictBg }}">{{ b.verdict }}</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:7px;margin-top:3px;font-family:'IBM Plex Mono',monospace;font-size:10px">
+              <span style="color:#5f7a78">{{ b.tags }}</span>
+              <span style="margin-left:auto;color:{{ b.backedColor }}">{{ b.backed }}</span>
+            </div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ bbRan.missedAny }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:7px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#c9748f;line-height:1.5">{{ bbRan.missedNote }}</div>
+        </sc-if>
+      </div>
+
+      <div style="padding:9px 12px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#8b929e;margin-bottom:7px">RACE QUALITY CONTEXT</div>
+        <div style="font-size:12px;line-height:1.5;color:#cfd3da">{{ quality.note }}</div>
+        <div style="display:flex;align-items:baseline;gap:8px;margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:11px">
+          <span style="color:#6f757f">WINNING FIGURE</span>
+          <span style="font-weight:600;color:{{ quality.figColor }}">{{ quality.fig }}</span>
+          <span style="margin-left:auto;color:#6f757f">PAR FOR C{{ hdr.cls }} · 100</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:8px;margin-top:4px;font-family:'IBM Plex Mono',monospace;font-size:11px">
+          <span style="color:#6f757f">SPREAD 1st TO 5th</span>
+          <span style="color:#cfd3da">{{ quality.spread }}</span>
+          <span style="margin-left:auto;color:#6f757f">{{ quality.spreadNote }}</span>
+        </div>
+        <div style="margin-top:9px;padding-top:8px;border-top:1px solid #1e232c;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f757f;line-height:1.6">
+          Whether the first five go on to win is what settles this — those runs have not happened yet. The verdict above is provisional and will be revised, not backfilled silently.
+        </div>
+      </div>
+    </aside>
+  </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+const AMBER = '#f0a824', TEAL = '#2ec4b6', MUTED = '#8b929e', MAGENTA = '#c9748f';
+const WIN_C = '#35b37e', LOSS = '#e0637f', VIOLET = '#b7a2e8', COPPER = '#c8792f';
+
+const RACES = [
+  [1, '1200', 5, '15:15', true], [2, '1650', 4, '15:45', true], [3, '1800', 4, '16:45', false],
+  [4, '1200', 3, '17:15', false], [5, '1650', 4, '17:45', false], [6, '1000', 2, '18:15', false],
+  [7, '1800', 4, '18:45', false], [8, '1200', 3, '19:15', false], [9, '2200', 4, '19:45', false],
+  [10, '1650', 5, '20:15', false], [11, '1200', 4, '20:45', false],
+];
+
+const STYLE_SKIN = {
+  'Leader': { color: '#ff8a5c', bg: '#3a2013' }, 'On-Pace': { color: '#e8c04a', bg: '#3a3012' },
+  'Midfield': { color: '#9aa7b8', bg: '#1f2630' }, 'Closer': { color: '#4fb3e0', bg: '#12283a' },
+};
+const TEMPO = ['Very Slow', 'Slow', 'Neutral', 'Fast', 'Very Fast'];
+const TEMPO_COLOR = ['#4a7fb5', '#6f9fbf', '#8b929e', '#d3843f', '#e0562f'];
+
+const BB_TAGS = [
+  ['ability', '#9aa7b8'], ['improving', '#7fc8a9'], ['stable-change', '#b7a2e8'],
+  ['turn-of-foot', '#e8c04a'], ['incident', '#c8792f'], ['bad-conditions', '#7fa7c9'],
+  ['strong-race', '#ff8a5c'], ['trial-ability', '#8fb8d8'], ['trial-improving', '#8fd8c4'],
+  ['trial-profile', '#c0a8d8'],
+];
+const TAG_COLOR = {};
+BB_TAGS.forEach(([t, c]) => { TAG_COLOR[t] = c; });
+
+// R2 — HV 1650m Class 4, run at 15:45. fin, no, name, jockey, draw, trainer, wt, style,
+// margin, winSp, plcSp, etFigure, positions, splits, jump, lane, groundLost, last400rank, gear, trip tags
+const R2 = [
+  [1, 8, 'WINNING VIBE', 'K Teetan', 4, 'C Fownes', 126, 'On-Pace', '—', 3.9, 1.6, 106,
+    '3 3 2 1', [['24.18', 3], ['23.06', 3], ['22.84', 2], ['22.61', 1]], 0.42, 'one out', 1.2, 1, 'B', []],
+  [2, 5, 'GLORY STAR', 'J Moreira', 7, 'A S Cruz', 128, 'Closer', '0.75L', 4.4, 1.8, 105,
+    '9 8 6 2', [['24.61', 9], ['23.22', 8], ['22.90', 6], ['22.44', 2]], -0.61, 'two out', 3.4, 1, 'B+TT', ['wide throughout']],
+  [3, 3, 'ROYAL RACER', 'M F Poon', 2, 'F C Lor', 121, 'Midfield', '1.5L', 7.8, 2.4, 103,
+    '5 5 4 3', [['24.40', 5], ['23.15', 5], ['22.96', 4], ['22.79', 3]], 0.08, 'inside, saved', 0.9, 4, '—', []],
+  [4, 1, 'TRIPLE MOON', 'L Ferraris', 1, 'D J Whyte', 133, 'Leader', '2.2L', 6.1, 2.1, 102,
+    '1 1 1 4', [['23.94', 1], ['22.88', 1], ['22.91', 1], ['23.31', 4]], 1.14, 'inside, saved', 0.4, 11, 'V', []],
+  [5, 12, 'MR ANDERSON', 'C Y Ho', 11, 'K W Lui', 119, 'Closer', '3.0L', 12.0, 3.6, 100,
+    '11 11 9 5', [['24.88', 11], ['23.34', 11], ['22.86', 9], ['22.52', 5]], -0.94, 'wide, 3–4 out', 5.1, 2, '—', ['slow away', 'wide throughout']],
+  [6, 11, 'SUPER FORTUNE', 'E C W Wong', 9, 'W Y So', 120, 'On-Pace', '3.8L', 21.0, 5.4, 99,
+    '4 4 5 6', [['24.30', 4], ['23.10', 4], ['23.02', 5], ['23.14', 6]], 0.31, 'one out', 1.8, 8, 'XB', []],
+  [7, 6, 'WINNING ENDEAVOUR', 'A Atzeni', 5, 'M Newnham', 127, 'Midfield', '4.4L', 8.1, 2.7, 98,
+    '7 6 7 7', [['24.52', 7], ['23.19', 6], ['23.08', 7], ['23.06', 7]], -0.22, 'two out', 2.6, 6, 'B', ['short of room']],
+  [8, 2, 'KING OPIE', 'H Bowman', 3, 'J Size', 130, 'Midfield', '5.9L', 4.6, 1.9, 96,
+    '6 7 8 8', [['24.45', 6], ['23.28', 7], ['23.24', 8], ['23.35', 8]], -0.05, 'one out', 1.5, 10, '—', ['checked 400m']],
+  [9, 9, 'HAPPY JOURNEY', 'B Avdulla', 8, 'P F Yiu', 124, 'Closer', '7.1L', 15.0, 4.2, 94,
+    '10 10 10 9', [['24.72', 10], ['23.40', 10], ['23.19', 10], ['23.29', 9]], -0.71, 'three out', 4.2, 5, '—', []],
+  [10, 4, 'SOUND GUARD', 'K C Leung', 6, 'C H Yip', 122, 'Midfield', '9.4L', 26.0, 7.1, 91,
+    '8 9 11 10', [['24.58', 8], ['23.44', 9], ['23.51', 11], ['23.62', 10]], -0.18, 'two out', 2.2, 12, 'TT', []],
+  [11, 10, 'GOLD MOUNT', 'P N Wong', 10, 'K H Ting', 118, 'Leader', '13.0L', 41.0, 11.0, 86,
+    '2 2 3 11', [['24.02', 2], ['22.94', 2], ['23.16', 3], ['24.48', 11]], 0.88, 'inside, saved', 0.6, 12, '—', []],
+  [12, 7, 'ATOMIC FORCE', 'J Orman', 12, 'R Gibson', 125, 'Closer', '21.5L', 9.8, 3.1, 78,
+    '12 12 12 12', [['25.10', 12], ['23.62', 12], ['24.02', 12], ['25.40', 12]], -1.42, 'wide, 3–4 out', 5.8, 12, 'B', ['hampered straight']],
+];
+
+const R2_DIVIDENDS = [
+  ['WIN', '8 WINNING VIBE', 39.0, true],
+  ['PLACE', '8 WINNING VIBE', 16.0, true],
+  ['PLACE', '5 GLORY STAR', 18.0, true],
+  ['PLACE', '3 ROYAL RACER', 24.0, false],
+  ['QIN', '5 · 8', 78.5, false],
+  ['QPL', '3 · 8', 21.0, false],
+  ['TRIO', '3 · 5 · 8', 187.0, false],
+  ['TCE', '8 → 5 → 3', 1240.0, false],
+  ['FCT', '8 → 5', 289.0, false],
+  ['QTT', '3 · 5 · 8 · 1', 4560.0, false],
+];
+
+// stewards' report — the trip tags on the runner rows are extracted from these paragraphs
+const R2_STEWARDS = [
+  ['5 GLORY STAR', 'Raced wide without cover from the 1200m and was not able to obtain a position closer to the inside running rail until the home turn.', ['wide throughout']],
+  ['12 MR ANDERSON', 'Was slow to stride on jumping and as a result was ridden along in the early stages. Raced three to four horses off the fence for the majority of the event.', ['slow away', 'wide throughout']],
+  ['2 KING OPIE', 'Approaching the 400m was checked when awkwardly placed behind a tiring runner and lost ground as a consequence.', ['checked 400m']],
+  ['6 WINNING ENDEAVOUR', 'Became short of room on the entrance to the straight and was unable to be ridden out to the satisfaction of the Stewards.', ['short of room']],
+  ['7 ATOMIC FORCE', 'Was hampered on the straight and finished a long way back. A veterinary examination revealed no abnormality. Trainer advised a satisfactory trial will be required before racing again.', ['hampered straight']],
+];
+
+const R2_VET = {
+  7: ['significant', 'Post-race examination revealed no abnormality, but a satisfactory official trial is required before the horse may race again.'],
+  10: ['routine', 'Passed post-race veterinary examination.'],
+};
+
+// bets already logged on R2, from the Bets ledger
+const R2_BETS = [
+  { acct: 'brett', type: 'QPL', sel: '2 · 5, 7, 9', stake: 300, ret: 640 },
+  { acct: 'kelvin', type: 'PLACE', sel: '11 SUPER FORTUNE', stake: 200, ret: 0 },
+];
+const ACCT_COLOR = { brett: TEAL, kelvin: VIOLET };
+
+// entries already in the book, and which run put them there
+const BOOKED = {
+  11: { tags: ['ability', 'improving'], date: '14 MAY', backed: true },
+  9: { tags: ['trial-improving'], date: '28 JUN', backed: false },
+  6: { tags: ['strong-race'], date: '30 JUN', backed: false },
+};
+
+const SOURCES = [
+  { k: 'card', name: 'Card', mins: 122, normal: 720, rows: '47 runners · 12 gear · 4 scratchings' },
+  { k: 'odds', name: 'Odds', mins: 47, normal: 15, rows: '132 win · 132 place · 2 matrices' },
+  { k: 'results', name: 'Results', mins: 37, normal: 240, rows: '24 runners · 10 dividends · 5 comments' },
+  { k: 'trials', name: 'Trials', mins: 4320, normal: 10080, rows: '38 trials · 38 comments' },
+  { k: 'vet', name: 'Vet', mins: 118, normal: 720, rows: '6 records · 2 significant' },
+];
+function ageLabel(mins) {
+  if (mins == null) return '—';
+  if (mins < 60) return mins + 'm';
+  if (mins < 1440) return Math.round(mins / 60) + 'h';
+  return Math.round(mins / 1440) + 'd';
+}
+function ordinal(n) {
+  const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+function money(v) { return Math.round(v).toLocaleString('en-US'); }
+function replayUrl(race) {
+  return 'https://racing.hkjc.com/contentAsset/videoplayer_v4/video-player-iframe_v4.html?type=replay-full&date=20260715&race=' + race + '&lang=eng';
+}
+function figColor(f) { return f >= 105 ? '#fafafa' : (f >= 100 ? '#cfd3da' : MUTED); }
+
+class Component extends DCLogic {
+  state = {
+    race: 2, open: 2, noteOpen: null, notes: {}, draft: '',
+    promoteOpen: null, promoteReason: '', promoteTags: [],
+    booked: Object.assign({}, BOOKED),
+    refreshed: null, scraped: false,
+  };
+
+  openNote(key, existing) {
+    this.setState({ noteOpen: key, draft: existing || '', promoteOpen: null });
+  }
+  saveNote(key) {
+    this.setState(s => {
+      const notes = Object.assign({}, s.notes);
+      notes[key] = { text: s.draft, added: '15 JUL' };
+      return { notes };
+    });
+  }
+  openPromote(key, text, tags) {
+    this.setState({ promoteOpen: key, promoteReason: text, promoteTags: tags });
+  }
+  togglePromoteTag(t) {
+    this.setState(s => ({ promoteTags: s.promoteTags.indexOf(t) >= 0 ? s.promoteTags.filter(x => x !== t) : s.promoteTags.concat([t]) }));
+  }
+  confirmPromote(no) {
+    this.setState(s => {
+      if (!s.promoteTags.length) return {};
+      const booked = Object.assign({}, s.booked);
+      booked[no] = { tags: s.promoteTags.slice(), date: '15 JUL', backed: false };
+      return { booked, promoteOpen: null, promoteTags: [], promoteReason: '' };
+    });
+  }
+
+  renderVals() {
+    const st = this.state;
+    const race = st.race;
+    const meta = RACES.find(r => r[0] === race) || RACES[1];
+    const hasResult = race === 2;
+    const winFig = R2[0][11];
+    const spOrder = R2.slice().sort((a, b) => a[9] - b[9]).map(r => r[1]);
+    const maxSplitAll = Math.max.apply(null, R2.reduce((a, r) => a.concat(r[13].map(s => Number(s[0]))), []));
+    const minSplitAll = Math.min.apply(null, R2.reduce((a, r) => a.concat(r[13].map(s => Number(s[0]))), []));
+    const spread = (R2[0][11] - R2[4][11]);
+
+    const betPl = R2_BETS.reduce((a, b) => a + b.ret - b.stake, 0);
+
+    const bbRows = R2.filter(r => st.booked[r[1]]).map(r => {
+      const e = st.booked[r[1]];
+      const fin = r[0];
+      const played = fin <= 3;
+      return {
+        no: r[1], name: r[2], finLabel: ordinal(fin) + ' of 12',
+        tags: e.tags.join(' · '),
+        verdict: played ? 'THESIS HELD' : (fin <= 6 ? 'INCONCLUSIVE' : 'THESIS FAILED'),
+        verdictColor: played ? AMBER : (fin <= 6 ? '#cfd3da' : MUTED),
+        verdictBorder: played ? '#4a3a18' : '#2b303a',
+        verdictBg: played ? '#241d0e' : 'transparent',
+        backed: e.backed ? 'BACKED' : 'NOT BACKED',
+        backedColor: e.backed ? '#cfd3da' : MAGENTA,
+      };
+    });
+    const missed = bbRows.filter(b => b.backed === 'NOT BACKED');
+
+    return {
+      pages: [
+        ['Race Day', 'Race Day.dc.html'],
+        ['Form Guide', 'Form Guide.dc.html'],
+        ['Bets', 'Bets.dc.html'],
+        ['Blackbook', 'Blackbook.dc.html'],
+        ['Results', 'Results.dc.html'],
+        ['Lookup', 'Lookup.dc.html'],
+        ['Trials', 'Trials.dc.html'],
+      ].map(([name, href], i) => ({
+        name, color: i === 4 ? '#fafafa' : 'inherit', mark: i === 4 ? '#e63946' : 'transparent', href,
+      })),
+
+      freshness: SOURCES.map(s => {
+        const stale = s.mins == null ? false : s.mins > s.normal;
+        const missing = s.mins == null;
+        return {
+          name: s.name,
+          mark: missing ? '—' : (stale ? '⚠' : '✓'),
+          age: missing ? '' : ageLabel(s.mins),
+          color: missing ? '#6f757f' : (stale ? COPPER : WIN_C),
+          border: stale ? '#3d2a14' : 'transparent',
+          bg: stale ? 'rgba(200,121,47,0.10)' : 'transparent',
+          go: () => this.setState({ refreshed: s.k }),
+        };
+      }),
+      refreshMsg: st.refreshed
+        ? (SOURCES.find(s => s.k === st.refreshed) || {}).name + ' refreshed · ' + (SOURCES.find(s => s.k === st.refreshed) || {}).rows
+        : '',
+
+      races: RACES.map(([n, dist, cls, off, run]) => {
+        const cur = n === race;
+        return {
+          n, label: dist, go: () => this.setState({ race: n, open: null, noteOpen: null }),
+          cursor: 'pointer',
+          bg: cur ? '#1a1d23' : 'transparent',
+          mark: cur ? '#e63946' : 'transparent',
+          fg: cur ? '#fafafa' : (run ? '#cfd3da' : '#4c525c'),
+          sub: cur ? '#8b929e' : (run ? '#5b616b' : '#3a4048'),
+        };
+      }),
+      done: { count: RACES.filter(r => r[4]).length },
+      rescrape: () => this.setState({ scraped: true }),
+      scrapeMsg: st.scraped ? 'R2 re-scraped · 12 runners · 10 dividends · 5 comments · 2 vet' : '',
+
+      hasResult, notRun: !hasResult,
+      notRunLabel: 'R' + race,
+      notRunOff: meta[3],
+
+      hdr: {
+        no: 'R2', off: '15:45', dist: '1650m', cls: '4', going: 'Good', course: 'C',
+        time: '1:38.42',
+        pace: 'Fast (-0.61)', paceColor: TEMPO_COLOR[3],
+        quality: winFig >= 105 ? 'ABOVE PAR' : (winFig >= 100 ? 'AT PAR' : 'BELOW PAR'),
+        qColor: winFig >= 105 ? AMBER : '#cfd3da',
+        qBorder: winFig >= 105 ? '#4a3a18' : '#2b303a',
+        qBg: winFig >= 105 ? '#241d0e' : 'transparent',
+        video: replayUrl(2),
+      },
+      paceScale: TEMPO.map((t, i) => ({ bg: i === 3 ? TEMPO_COLOR[i] : '#1e232c' })),
+
+      result: R2.map(row => {
+        const [fin, no, name, jockey, draw, trainer, wt, style, margin, winSp, plcSp, fig, pos, splits, jump, lane, lost, l400, gear, trips] = row;
+        const key = 'R2:' + no;
+        const note = st.notes[key];
+        const entry = st.booked[no];
+        const bookedHere = !!entry && entry.date === '15 JUL';
+        const vet = R2_VET[no];
+        const vetSig = !!vet && vet[0] === 'significant';
+        const sw = R2_STEWARDS.find(s => s[0].indexOf(' ' + name) >= 0);
+        const promoteOpen = st.promoteOpen === key;
+        const maxSp = Math.max.apply(null, splits.map(s => Number(s[0])));
+        const minSp = Math.min.apply(null, splits.map(s => Number(s[0])));
+        const spRank = spOrder.indexOf(no) + 1;
+        const beatMarket = spRank - fin;
+        return {
+          fin, no, name, jockey, draw, trainer, wt, margin,
+          winSp: winSp >= 10 ? String(Math.round(winSp)) : winSp.toFixed(1),
+          plcSp: plcSp.toFixed(1),
+          finColor: fin === 1 ? AMBER : (fin <= 3 ? '#fafafa' : MUTED),
+          nameColor: entry ? TEAL : '#fafafa',
+          style, styleColor: STYLE_SKIN[style].color, styleBg: STYLE_SKIN[style].bg,
+          fig, figColor: figColor(fig),
+          figW: Math.max(4, (fig - 74) / (108 - 74) * 100),
+          figVsPar: (fig >= 100 ? '+' : '−') + Math.abs(fig - 100),
+          spRank: ordinal(spRank),
+          pos: pos.split(' ').join('  '),
+          tripTags: trips.map(t => ({ label: t })),
+          bb: !!entry,
+          gear: gear === '—' ? 'none' : gear,
+          vetAny: !!vet,
+          vetTag: vet ? (vetSig ? 'VET !' : 'VET') : '',
+          vetKind: vet ? (vetSig ? 'SIGNIFICANT' : 'ROUTINE') : '',
+          vetDetail: vet ? vet[1] : '',
+          vetColor: vetSig ? '#e0637f' : '#7f8a99',
+          vetBorder: vetSig ? '#4a2027' : '#2b303a',
+          vetBg: vetSig ? 'rgba(224,99,127,0.10)' : 'rgba(127,138,153,0.07)',
+          stewardAny: !!sw,
+          steward: sw ? sw[1] : '',
+          splits: splits.map((s, j) => ({
+            seg: ['0–400', '400–800', '800–1200', 'LAST 450'][j] || 'SEG ' + (j + 1),
+            t: s[0], p: s[1],
+            color: Number(s[0]) <= minSp + (maxSp - minSp) * 0.34 ? AMBER : '#cfd3da',
+            w: maxSp === minSp ? 50 : 100 - ((Number(s[0]) - minSplitAll) / (maxSplitAll - minSplitAll)) * 84,
+          })),
+          jump: (jump > 0 ? '+' : '') + jump.toFixed(2),
+          jumpColor: jump > 0.3 ? AMBER : (jump < -0.5 ? MUTED : '#cfd3da'),
+          lane,
+          lost: lost.toFixed(1) + 'm',
+          lostColor: lost >= 3.5 ? COPPER : '#cfd3da',
+          l400: ordinal(l400),
+          l400Color: l400 <= 3 ? AMBER : '#cfd3da',
+          read: (() => {
+            if (fin === 1) return 'Won on figure as well as on the line — the ' + ordinal(l400) + ' fastest last 400m off an on-pace trip. Nothing to reinterpret.';
+            if (beatMarket >= 3) return 'Beat its price by ' + beatMarket + ' places off a ' + lane + ' trip. The figure of ' + fig + ' is the part worth keeping.';
+            if (l400 <= 3 && fin > 4) return 'Ran the ' + ordinal(l400) + ' fastest last 400m and still finished ' + ordinal(fin) + '. The finishing position understates the run — this is exactly the sort of line to book.';
+            if (lost >= 3.5) return 'Lost ' + lost.toFixed(1) + 'm of ground ' + lane + '. The figure is understated by roughly the same margin.';
+            if (beatMarket <= -3) return 'Started ' + ordinal(spRank) + ' in the market and finished ' + ordinal(fin) + '. No obvious excuse in the sectionals.';
+            return 'Finished about where the market expected off a ' + lane + ' trip. Little new information either way.';
+          })(),
+          bg: fin === 1 ? 'rgba(240,168,36,0.05)' : 'transparent',
+          rule: fin === 1 ? AMBER : (entry ? TEAL : 'transparent'),
+          open: st.open === no,
+          caret: st.open === no ? '▼' : '▶',
+          caretColor: st.open === no ? '#fafafa' : '#4c525c',
+          toggle: () => this.setState(s => ({ open: s.open === no ? null : no })),
+
+          noteMark: note ? '✎ ·' : '✎',
+          noteColor: note ? TEAL : '#4c525c',
+          noteBorder: note ? '#1e4a45' : '#22262e',
+          noteOpen: st.noteOpen === key,
+          noteMeta: note ? 'SAVED ' + note.added : 'NOT YET NOTED',
+          draft: st.draft,
+          noteClick: (e) => { e.stopPropagation(); this.openNote(key, note ? note.text : ''); },
+          noteType: (e) => this.setState({ draft: e.target.value }),
+          noteSave: (e) => { e.stopPropagation(); this.saveNote(key); },
+          noteClose: (e) => { e.stopPropagation(); this.setState({ noteOpen: null, promoteOpen: null }); },
+
+          bookedHere: !!entry,
+          bookedMeta: entry ? 'ADDED ' + entry.date : '',
+          bookedTags: entry ? entry.tags.map(t => ({ label: t, color: TAG_COLOR[t] || MUTED })) : [],
+          canPromote: !entry && !promoteOpen,
+          promoteOpen,
+          promoteReason: st.promoteReason,
+          promoteSource: '15 Jul · HV C 1650 G C4 · R2 · ' + ordinal(fin) + ' of 12 · fig ' + fig
+            + ' · SP ' + (winSp >= 10 ? Math.round(winSp) : winSp.toFixed(1))
+            + (trips.length ? ' · ' + trips.join(', ') : ''),
+          promoteOpenClick: (e) => {
+            e.stopPropagation();
+            const seed = note ? note.text
+              : (l400 <= 3 && fin > 4 ? 'Ran the ' + ordinal(l400) + ' fastest last 400m and finished ' + ordinal(fin) + '. The figure understates the run.'
+                : (trips.length ? 'Note the ' + trips.join(' and ') + ' in R2 on 15 Jul.' : ''));
+            const tags = l400 <= 3 && fin > 4 ? ['turn-of-foot'] : (trips.length ? ['incident'] : []);
+            this.openPromote(key, seed, tags);
+          },
+          promoteCancel: (e) => { e.stopPropagation(); this.setState({ promoteOpen: null, promoteTags: [], promoteReason: '' }); },
+          promoteConfirm: (e) => { e.stopPropagation(); this.confirmPromote(no); },
+          promoteType: (e) => this.setState({ promoteReason: e.target.value }),
+          tagPicker: BB_TAGS.map(([t, color]) => {
+            const on = st.promoteTags.indexOf(t) >= 0;
+            return {
+              label: t, go: (e) => { e.stopPropagation(); this.togglePromoteTag(t); },
+              color: on ? '#fafafa' : color,
+              border: on ? color : '#2b303a',
+              bg: on ? 'rgba(255,255,255,0.07)' : 'transparent',
+            };
+          }),
+          tagCount: st.promoteTags.length,
+          confirmLabel: st.promoteTags.length ? 'ADD TO BLACKBOOK' : 'PICK AT LEAST ONE TAG',
+          confirmColor: st.promoteTags.length ? TEAL : '#5b616b',
+          confirmBorder: st.promoteTags.length ? '#1e4a45' : '#2b303a',
+          confirmBg: st.promoteTags.length ? '#12211f' : 'transparent',
+        };
+      }),
+
+      dividends: R2_DIVIDENDS.map(([pool, combo, amount, head]) => ({
+        pool, combo, amount: amount.toFixed(amount >= 100 ? 0 : 1),
+        labelColor: head ? '#fafafa' : '#8b929e',
+        color: amount >= 1000 ? AMBER : '#fafafa',
+      })),
+
+      bets: {
+        any: R2_BETS.length > 0, none: R2_BETS.length === 0,
+        bg: betPl >= 0 ? 'rgba(53,179,126,0.05)' : 'rgba(224,99,127,0.05)',
+        rows: R2_BETS.map(b => ({
+          type: b.type, sel: b.sel, stake: money(b.stake),
+          acctColor: ACCT_COLOR[b.acct],
+          pl: (b.ret - b.stake >= 0 ? '+$' : '−$') + money(Math.abs(b.ret - b.stake)),
+          plColor: b.ret >= b.stake ? WIN_C : LOSS,
+        })),
+        pl: (betPl >= 0 ? '+$' : '−$') + money(Math.abs(betPl)),
+        plColor: betPl >= 0 ? WIN_C : LOSS,
+      },
+
+      bbRan: {
+        rows: bbRows, none: bbRows.length === 0,
+        missedAny: missed.length > 0,
+        missedNote: missed.length + ' of ' + bbRows.length + ' booked runners here were not backed. '
+          + (missed.some(m => m.verdict === 'THESIS HELD')
+            ? 'At least one of them placed — that is the expensive kind of miss and it is logged on the Blackbook page.'
+            : 'None of them placed, so nothing was left on the table this time.'),
+      },
+
+      quality: {
+        note: 'The winner ran ' + (winFig - 100) + ' above par and the first five are inside '
+          + spread + ' figure points, which is a tight, genuinely contested race rather than a soft one. '
+          + 'Two of the first five were caught wide throughout.',
+        fig: winFig, figColor: figColor(winFig),
+        spread: spread + ' pts',
+        spreadNote: spread <= 8 ? 'tight — real race' : 'strung out',
+      },
+
+      steward: {
+        count: R2_STEWARDS.length,
+        tagCount: R2_STEWARDS.reduce((a, s) => a + s[2].length, 0),
+        items: R2_STEWARDS.map(([subject, text, tags]) => ({
+          subject, text,
+          tags: tags.map(t => ({ label: t, color: COPPER, border: '#3d2a14', bg: 'rgba(200,121,47,0.08)' })),
+        })),
+      },
+    };
+  }
+}
+
+</script>
+</body>
+</html>

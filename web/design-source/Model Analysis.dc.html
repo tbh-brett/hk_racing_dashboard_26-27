@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; padding:0; background:#0e1117; }
+  * { box-sizing: border-box; }
+  a { color:#f0a824; text-decoration:none; }
+  a:hover { color:#ffc75a; }
+  ::-webkit-scrollbar { width:9px; height:9px; }
+  ::-webkit-scrollbar-track { background:#0e1117; }
+  ::-webkit-scrollbar-thumb { background:#2b303a; }
+  @keyframes tick { 0%,100% { opacity:1 } 50% { opacity:.35 } }
+</style>
+</helmet>
+<div style="min-height:100vh;background:#0e1117;color:#fafafa;font-family:'IBM Plex Sans',system-ui,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;-webkit-font-smoothing:antialiased">
+
+  <div style="display:flex;align-items:stretch;height:38px;border-bottom:1px solid #262a33;background:#12151b">
+    <div style="display:flex;align-items:center;gap:9px;padding:0 14px;border-right:1px solid #262a33">
+      <div style="width:9px;height:9px;background:#e63946"></div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:12px;letter-spacing:.16em">RACEDAY</div>
+    </div>
+    <nav style="display:flex;align-items:stretch">
+      <sc-for list="{{ pages }}" as="p" hint-placeholder-count="6">
+        <a href="{{ p.href }}" style="display:flex;align-items:center;padding:0 15px;font-size:12px;font-weight:500;letter-spacing:.03em;cursor:pointer;color:#8b929e;border-right:1px solid #1c202a;text-decoration:none" style-hover="color:#fafafa;background:#181c23">
+          <span style="color:{{ p.color }};border-bottom:2px solid {{ p.mark }};padding-bottom:1px">{{ p.name }}</span>
+        </a>
+      </sc-for>
+    </nav>
+    <div style="flex:1"></div>
+    <div style="display:flex;align-items:center;gap:16px;padding:0 14px;font-family:'IBM Plex Mono',monospace;font-size:12px;border-left:1px solid #262a33">
+      <span style="color:#8b929e">MEETING</span>
+      <span style="font-weight:600">WED 15 JUL 2026 · HAPPY VALLEY</span>
+      <span style="color:#2b303a">|</span>
+      <span style="display:flex;align-items:center;gap:6px;color:#8b929e"><span style="width:6px;height:6px;border-radius:50%;background:#35b37e;animation:tick 1.6s infinite"></span>LIVE 16:22</span>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:stretch;height:36px;border-bottom:1px solid #262a33">
+    <div style="display:flex;align-items:center;padding:0 12px 0 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e;letter-spacing:.1em">RACE</div>
+    <div style="display:flex;align-items:stretch">
+      <sc-for list="{{ races }}" as="r" hint-placeholder-count="11">
+        <div onClick="{{ r.go }}" style="display:flex;flex-direction:column;justify-content:center;align-items:center;width:52px;cursor:pointer;border-right:1px solid #1c202a;font-family:'IBM Plex Mono',monospace;background:{{ r.bg }};border-top:2px solid {{ r.mark }}" style-hover="background:#1a1d23">
+          <div style="font-size:13px;font-weight:600;line-height:1.1;color:{{ r.fg }}">{{ r.n }}</div>
+          <div style="font-size:9px;color:{{ r.sub }};letter-spacing:.04em">{{ r.label }}</div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="flex:1"></div>
+    <div style="display:flex;align-items:center;gap:10px;padding:0 14px;border-left:1px solid #262a33;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e">
+      <span>MODEL VIEW</span>
+      <div style="display:flex;border:1px solid #2b303a">
+        <div onClick="{{ setSarr }}" style="padding:2px 9px;cursor:pointer;color:{{ sarrColor }};background:{{ sarrBg }}">SARR</div>
+        <div onClick="{{ setFuse }}" style="padding:2px 9px;cursor:pointer;color:{{ fuseColor }};background:{{ fuseBg }}">FUSE</div>
+        <div onClick="{{ setBoth }}" style="padding:2px 9px;cursor:pointer;color:{{ bothColor }};background:{{ bothBg }}">BOTH</div>
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{ noCard }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;align-items:center;justify-content:center;height:calc(100vh - 74px);font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6f757f;letter-spacing:.08em">{{ noCardMsg }}</div>
+  </sc-if>
+
+  <sc-if value="{{ hasCard }}" hint-placeholder-val="{{ true }}">
+  <div style="padding:16px 14px 28px 14px">
+
+    <sc-if value="{{ showSarr }}" hint-placeholder-val="{{ true }}">
+    <div style="margin-bottom:{{ sarrMargin }}">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;letter-spacing:.06em">SARR</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e">SPEED-ADJUSTED RATING RANK · WHY EACH HORSE RANKED WHERE IT DID, ONE COLUMN PER WEIGHTED COMPONENT, WIDEST WEIGHT FIRST</span>
+      </div>
+      <div style="overflow-x:auto;border:1px solid #262a33">
+        <table style="width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace">
+          <thead>
+            <tr style="background:#12151b">
+              <sc-for list="{{ sarrCols }}" as="c" hint-placeholder-count="11">
+                <th onClick="{{ c.go }}" style="position:sticky;top:0;background:{{ c.bg }};z-index:2;padding:6px 8px;text-align:{{ c.a }};width:{{ c.w }};cursor:pointer;user-select:none;border-bottom:1px solid #2b303a;vertical-align:bottom" style-hover="background:#1a1d23">
+                  <div style="display:flex;flex-direction:column;gap:4px">
+                    <span style="font-size:10px;font-weight:500;letter-spacing:.08em;color:{{ c.fg }};white-space:nowrap">{{ c.t }}<span style="font-size:8px;color:{{ c.indColor }};margin-left:3px">{{ c.ind }}</span></span>
+                    <sc-if value="{{ c.hasWeight }}" hint-placeholder-val="{{ false }}">
+                      <span style="font-size:9px;color:#5b616b">×{{ c.weight }}</span>
+                      <div style="height:3px;background:#1c2027"><div style="height:3px;width:{{ c.barW }}%;background:{{ c.barColor }}"></div></div>
+                    </sc-if>
+                  </div>
+                </th>
+              </sc-for>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ sarrRows }}" as="r" hint-placeholder-count="12">
+              <tr style="border-bottom:1px solid #191d24;background:{{ r.bg }}" style-hover="background:#1a1d23">
+                <td style="padding:6px 8px;text-align:center;font-size:13px;font-weight:600">{{ r.no }}</td>
+                <td style="padding:6px 8px;font-size:12px;font-weight:600;white-space:nowrap;color:{{ r.nameColor }}">{{ r.name }}</td>
+                <sc-for list="{{ r.feats }}" as="f" hint-placeholder-count="8">
+                  <td style="padding:6px 8px;text-align:right;font-size:12px;font-weight:{{ f.weight }};color:{{ f.color }}">{{ f.v }}</td>
+                </sc-for>
+                <td style="padding:6px 8px;text-align:right;font-size:13px;font-weight:600;color:{{ r.scoreColor }}">{{ r.score }}</td>
+                <td style="padding:6px 8px;text-align:center;font-size:13px;font-weight:600;color:{{ r.rankColor }}">{{ r.rank }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:18px;padding:7px 2px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e;flex-wrap:wrap">
+        <span>FMRP CARRIES ~3× THE WEIGHT OF THE NEXT LARGEST TERM — THE HEADER BAR SHOWS IT, NOT JUST THE NUMBER</span>
+        <span>POSITIVE CONTRIBUTION (BRIGHT) HELPS THE SCORE, NEGATIVE (DIM) HURTS IT — REGARDLESS OF THE COMPONENT'S OWN SIGN</span>
+        <span style="margin-left:auto;color:#6f757f">MODEL AUC .727 · MARKET AUC .785 · CLICK ANY COLUMN TO SORT</span>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ showFuse }}" hint-placeholder-val="{{ false }}">
+    <div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;letter-spacing:.06em">FUSE</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e">THE BLEND'S COMPONENTS, SIDE BY SIDE — NOT JUST THE OUTPUT</span>
+      </div>
+      <div style="overflow-x:auto;border:1px solid #262a33">
+        <table style="width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace">
+          <thead>
+            <tr style="background:#12151b">
+              <sc-for list="{{ fuseCols }}" as="c" hint-placeholder-count="6">
+                <th onClick="{{ c.go }}" style="position:sticky;top:0;background:{{ c.bg }};z-index:2;font-size:10px;font-weight:500;letter-spacing:.08em;color:{{ c.fg }};text-align:{{ c.a }};padding:7px 8px;border-bottom:1px solid {{ c.rule }};white-space:nowrap;width:{{ c.w }};cursor:pointer;user-select:none" style-hover="color:#fafafa;background:#1a1d23">
+                  {{ c.t }}<span style="font-size:8px;color:{{ c.indColor }};margin-left:3px">{{ c.ind }}</span>
+                </th>
+              </sc-for>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ fuseRows }}" as="r" hint-placeholder-count="12">
+              <tr style="border-bottom:1px solid #191d24;background:{{ r.bg }}" style-hover="background:#1a1d23">
+                <td style="padding:6px 8px;text-align:center;font-size:13px;font-weight:600">{{ r.no }}</td>
+                <td style="padding:6px 8px;font-size:12px;font-weight:600;white-space:nowrap;color:{{ r.nameColor }}">{{ r.name }}</td>
+                <td style="padding:6px 8px;text-align:right;font-size:12px;color:#cfd3da">{{ r.fund }}%</td>
+                <td style="padding:6px 8px;text-align:right;font-size:12px;color:#6f757f">{{ r.mktRaw }}%</td>
+                <td style="padding:6px 8px;text-align:right;font-size:12px;color:#cfd3da">{{ r.mktDevig }}%</td>
+                <td style="padding:6px 6px">
+                  <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">
+                    <span style="font-size:13px;font-weight:600;color:#fafafa">{{ r.blended }}%</span>
+                    <div style="width:64px;height:7px;background:#191d24;display:flex">
+                      <div style="height:7px;background:#f0a824;width:{{ r.fundShare }}%"></div>
+                      <div style="height:7px;background:#3a4552;width:{{ r.mktShare }}%"></div>
+                    </div>
+                  </div>
+                </td>
+                <td style="padding:6px 8px;text-align:center;font-size:13px;font-weight:600;color:{{ r.rankColor }}">{{ r.rank }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:18px;padding:7px 2px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e;flex-wrap:wrap">
+        <span>BLENDED = {{ fundWeight }}% FUND + {{ mktWeight }}% MARKET (DE-VIGGED) — THE BAR SPLITS EACH ROW'S BLEND BY SOURCE</span>
+        <span>MARKET (RAW) CARRIES OVERROUND {{ overround }}%; DE-VIGGED DIVIDES IT OUT PROPORTIONALLY SO IMPLIED PROBABILITIES SUM TO 100%</span>
+        <span style="margin-left:auto;color:#6f757f">THE BLEND LEANS ON A NUMBER THE MARKET ALREADY PROVIDES — THAT'S THE FINDING THIS PAGE DOCUMENTS, NOT A LIMITATION IT HIDES</span>
+      </div>
+    </div>
+    </sc-if>
+
+  </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+const AMBER = '#f0a824', TEAL = '#2ec4b6', MUTED = '#8b929e';
+
+const RACES = [
+  [1,'1200',5,'15:15'],[2,'1650',4,'15:45'],[3,'1800',4,'16:45'],[4,'1200',3,'17:15'],
+  [5,'1650',4,'17:45'],[6,'1000',2,'18:15'],[7,'1800',4,'18:45'],[8,'1200',3,'19:15'],
+  [9,'2200',4,'19:45'],[10,'1650',5,'20:15'],[11,'1200',4,'20:45'],
+];
+
+// same 12 runners and odds as Race Day/Form Guide, so the three pages stay one race
+const FIELD = [
+  [10,'KYRUS TREASURE','3.0'],[2,'CASA ROCHESTER','4.9'],[12,'OCEAN IMPACT','6.1'],
+  [8,'FIREFOOT','7.5'],[4,'ROMANTIC LAOS','12'],[9,'NOBLE PURSUIT','15'],
+  [1,'HARMONY GALAXY','16'],[6,'STORM RUNNER','18'],[11,'NORTHERN BEAST','26'],
+  [3,'VOLCANIC SPARK','32'],[5,'SERANGOON','33'],[7,'FAST SPEED','51'],
+];
+
+// descending order of actual weight — the eye lands on what matters most first
+const FEATURES = [
+  { k: 'fmrp', t: 'FMRP', w: 0.290 },
+  { k: 'lsa', t: 'LSA', w: 0.091 },
+  { k: 'traj', t: 'TRAJ', w: -0.071 },
+  { k: 'esz', t: 'ESZ', w: 0.069 },
+  { k: 'wpr', t: 'WPR', w: 0.054 },
+  { k: 'style', t: 'STYLE', w: -0.027 },
+  { k: 'dist', t: 'DIST', w: -0.015 },
+  { k: 'rating', t: 'RATING', w: 0.014 },
+];
+const MAX_W = Math.max.apply(null, FEATURES.map(f => Math.abs(f.w)));
+
+function rng(seed) {
+  let s = 0; for (let i = 0; i < seed.length; i++) s = (s * 31 + seed.charCodeAt(i)) >>> 0;
+  return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+}
+function fmt3(v) {
+  const s = Math.abs(v).toFixed(3).replace(/^0\./, '.');
+  return (v > 0 ? '+' : '−') + s;
+}
+
+class Component extends DCLogic {
+  state = { race: 3, view: 'both', sortS: { key: 'score', dir: 'desc' }, sortF: { key: 'blended', dir: 'desc' } };
+
+  cycleS(key) {
+    this.setState(s => {
+      if (!s.sortS || s.sortS.key !== key) return { sortS: { key, dir: 'desc' } };
+      if (s.sortS.dir === 'desc') return { sortS: { key, dir: 'asc' } };
+      return { sortS: { key: 'score', dir: 'desc' } };
+    });
+  }
+  cycleF(key) {
+    this.setState(s => {
+      if (!s.sortF || s.sortF.key !== key) return { sortF: { key, dir: 'desc' } };
+      if (s.sortF.dir === 'desc') return { sortF: { key, dir: 'asc' } };
+      return { sortF: { key: 'blended', dir: 'desc' } };
+    });
+  }
+
+  data() {
+    if (this._data) return this._data;
+    this._data = FIELD.map(([no, name, odds]) => {
+      const feats = {};
+      let score = 0;
+      FEATURES.forEach(f => {
+        const rand = rng(name + f.k);
+        const raw = (rand() - 0.5) * 4;
+        const contrib = f.w * raw;
+        feats[f.k] = contrib;
+        score += contrib;
+      });
+      return { no, name, odds: Number(odds), feats, score };
+    });
+    const byScore = this._data.slice().sort((a, b) => b.score - a.score);
+    byScore.forEach((r, i) => { r.sarrRank = i + 1; });
+
+    const mktRaw = this._data.map(r => 1 / r.odds);
+    const sumRaw = mktRaw.reduce((a, b) => a + b, 0);
+    this._data.forEach((r, i) => {
+      r.mktRawP = mktRaw[i] / sumRaw * sumRaw;   // placeholder, replaced below
+      r.mktRawP = mktRaw[i];
+      r.devig = mktRaw[i] / sumRaw;
+    });
+    this._overround = sumRaw;
+    const expScore = this._data.map(r => Math.exp(r.score * 2.5));
+    const sumExp = expScore.reduce((a, b) => a + b, 0);
+    this._data.forEach((r, i) => { r.fund = expScore[i] / sumExp; });
+    this._data.forEach(r => { r.blended = 0.32 * r.fund + 0.68 * r.devig; });
+    const byBlend = this._data.slice().sort((a, b) => b.blended - a.blended);
+    byBlend.forEach((r, i) => { r.fuseRank = i + 1; });
+    return this._data;
+  }
+
+  renderVals() {
+    const race = this.state.race, view = this.state.view;
+    const data = this.data();
+
+    const sortRows = (rows, sort, getVal) => {
+      const arr = rows.slice();
+      arr.sort((a, b) => {
+        const va = getVal(a, sort.key), vb = getVal(b, sort.key);
+        const c = typeof va === 'string' ? va.localeCompare(vb) : va - vb;
+        return sort.dir === 'desc' ? -c : c;
+      });
+      return arr;
+    };
+
+    const sortS = this.state.sortS;
+    const sarrOrdered = sortRows(data, sortS, (r, k) => {
+      if (k === 'no') return r.no;
+      if (k === 'name') return r.name;
+      if (k === 'score') return r.score;
+      if (k === 'rank') return -r.sarrRank;
+      return r.feats[k];
+    });
+
+    const sortF = this.state.sortF;
+    const fuseOrdered = sortRows(data, sortF, (r, k) => {
+      if (k === 'no') return r.no;
+      if (k === 'name') return r.name;
+      if (k === 'fund') return r.fund;
+      if (k === 'mktRaw') return r.mktRawP;
+      if (k === 'devig') return r.devig;
+      if (k === 'blended') return r.blended;
+      if (k === 'rank') return -r.fuseRank;
+      return 0;
+    });
+
+    const sarrColsMeta = [
+      { t: 'NO', a: 'center', w: '34px', k: 'no' },
+      { t: 'HORSE', a: 'left', w: '150px', k: 'name' },
+    ].concat(FEATURES.map(f => ({ t: f.t, a: 'right', w: '68px', k: f.k, weight: f.w }))).concat([
+      { t: 'SCORE', a: 'right', w: '66px', k: 'score' },
+      { t: 'RANK', a: 'center', w: '46px', k: 'rank' },
+    ]);
+
+    return {
+      pages: [
+        ['Race Day', 'Race Day.dc.html'], ['Results', 'Results.dc.html'], ['Form Guide', 'Form Guide.dc.html'],
+        ['Lookup', 'Lookup.dc.html'], ['Bets', 'Bets.dc.html'], ['Blackbook', 'Blackbook.dc.html'],
+        ['Lab', 'Model Analysis.dc.html'],
+      ].map(([name, href], i) => ({
+        name, color: i === 6 ? '#fafafa' : 'inherit', mark: i === 6 ? '#e63946' : 'transparent', href,
+      })),
+
+      races: RACES.map(([n, dist]) => {
+        const cur = n === race, done = n < 3;
+        return {
+          n, label: dist, go: () => this.setState({ race: n }),
+          bg: cur ? '#1a1d23' : 'transparent', mark: cur ? '#e63946' : 'transparent',
+          fg: cur ? '#fafafa' : (done ? '#5b616b' : '#cfd3da'), sub: cur ? '#8b929e' : '#5b616b',
+        };
+      }),
+      hasCard: race === 3, noCard: race !== 3,
+      noCardMsg: 'R' + race + ' MODEL BREAKDOWN — NOT PART OF THIS DESIGN PASS · PRESS 3 FOR THE LIVE CARD',
+
+      view,
+      setSarr: () => this.setState({ view: 'sarr' }), setFuse: () => this.setState({ view: 'fuse' }), setBoth: () => this.setState({ view: 'both' }),
+      sarrColor: view === 'sarr' ? '#0e1117' : MUTED, sarrBg: view === 'sarr' ? '#fafafa' : 'transparent',
+      fuseColor: view === 'fuse' ? '#0e1117' : MUTED, fuseBg: view === 'fuse' ? '#fafafa' : 'transparent',
+      bothColor: view === 'both' ? '#0e1117' : MUTED, bothBg: view === 'both' ? '#fafafa' : 'transparent',
+      showSarr: view !== 'fuse', showFuse: view !== 'sarr',
+      sarrMargin: view === 'both' ? '26px' : '0',
+
+      sarrCols: sarrColsMeta.map(c => {
+        const on = sortS.key === c.k;
+        const barW = c.weight != null ? Math.max(6, Math.abs(c.weight) / MAX_W * 100) : 0;
+        return Object.assign({}, c, {
+          go: () => this.cycleS(c.k),
+          fg: on ? '#fafafa' : MUTED,
+          bg: on ? '#1a1d23' : '#12151b',
+          ind: on ? (sortS.dir === 'asc' ? '▲' : '▼') : '',
+          indColor: on ? AMBER : 'transparent',
+          hasWeight: c.weight != null,
+          weight: c.weight != null ? c.weight.toFixed(3) : '',
+          barW, barColor: c.weight != null ? (c.weight > 0 ? AMBER : '#5b7a94') : 'transparent',
+        });
+      }),
+      sarrRows: sarrOrdered.map(r => ({
+        no: r.no, name: r.name,
+        nameColor: r.name === 'FIREFOOT' || r.name === 'NOBLE PURSUIT' ? TEAL : '#fafafa',
+        feats: FEATURES.map(f => {
+          const v = r.feats[f.k];
+          return { v: fmt3(v), color: v > 0.02 ? '#fafafa' : (v < -0.02 ? '#6f757f' : '#8b929e'), weight: Math.abs(v) > 0.05 ? 600 : 400 };
+        }),
+        score: fmt3(r.score),
+        scoreColor: r.sarrRank <= 3 ? AMBER : '#fafafa',
+        rank: r.sarrRank, rankColor: r.sarrRank <= 3 ? AMBER : '#cfd3da',
+        bg: r.sarrRank <= 3 ? 'rgba(240,168,36,0.04)' : 'transparent',
+      })),
+
+      fuseCols: [
+        { t: 'NO', a: 'center', w: '34px', k: 'no' },
+        { t: 'HORSE', a: 'left', w: '150px', k: 'name' },
+        { t: 'FUND PROB', a: 'right', w: '90px', k: 'fund' },
+        { t: 'MKT PROB (RAW)', a: 'right', w: '110px', k: 'mktRaw' },
+        { t: 'MARKET (DE-VIGGED)', a: 'right', w: '130px', k: 'devig' },
+        { t: 'BLENDED (LIVE)', a: 'right', w: '160px', k: 'blended' },
+        { t: 'RANK', a: 'center', w: '46px', k: 'rank' },
+      ].map(c => {
+        const on = sortF.key === c.k;
+        return Object.assign({}, c, {
+          go: () => this.cycleF(c.k),
+          fg: on ? '#fafafa' : MUTED,
+          bg: on ? '#1a1d23' : '#12151b',
+          ind: on ? (sortF.dir === 'asc' ? '▲' : '▼') : '',
+          indColor: on ? AMBER : 'transparent',
+          rule: on ? AMBER : '#2b303a',
+        });
+      }),
+      fuseRows: fuseOrdered.map(r => ({
+        no: r.no, name: r.name,
+        nameColor: r.name === 'FIREFOOT' || r.name === 'NOBLE PURSUIT' ? TEAL : '#fafafa',
+        fund: (r.fund * 100).toFixed(1), mktRaw: (r.mktRawP * 100).toFixed(1), mktDevig: (r.devig * 100).toFixed(1),
+        blended: (r.blended * 100).toFixed(1),
+        fundShare: r.fund * 0.32 / r.blended * 100, mktShare: 100 - (r.fund * 0.32 / r.blended * 100),
+        rank: r.fuseRank, rankColor: r.fuseRank <= 3 ? AMBER : '#cfd3da',
+        bg: r.fuseRank <= 3 ? 'rgba(240,168,36,0.04)' : 'transparent',
+      })),
+      fundWeight: '32', mktWeight: '68',
+      overround: ((this._overround || 1) * 100).toFixed(0),
+    };
+  }
+}
+
+</script>
+</body>
+</html>

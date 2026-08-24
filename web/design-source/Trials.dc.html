@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; padding:0; background:#0e1117; }
+  * { box-sizing: border-box; }
+  a { color:#f0a824; text-decoration:none; }
+  a:hover { color:#ffc75a; }
+  ::-webkit-scrollbar { width:9px; height:9px; }
+  ::-webkit-scrollbar-track { background:#0e1117; }
+  ::-webkit-scrollbar-thumb { background:#2b303a; }
+  @keyframes tick { 0%,100% { opacity:1 } 50% { opacity:.35 } }
+</style>
+</helmet>
+<div style="min-height:100vh;background:#0e1117;color:#fafafa;font-family:'IBM Plex Sans',system-ui,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;-webkit-font-smoothing:antialiased">
+
+  <div style="display:flex;align-items:stretch;height:32px;border-bottom:1px solid #1c202a;background:#0b0e13;overflow-x:auto">
+    <div style="display:flex;align-items:center;gap:9px;padding:0 14px;border-right:1px solid #1c202a;flex:none">
+      <div style="width:9px;height:9px;background:#e63946;flex:none"></div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:12px;letter-spacing:.16em">RACEDAY</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;padding:0 16px;flex:none;min-width:max-content;font-family:'IBM Plex Mono',monospace;font-size:12px;white-space:nowrap">
+      <span style="font-weight:600">TRIALS</span>
+      <span style="color:#cfd3da">ST · HV</span>
+      <span style="color:#8b929e">{{ meta.batchCount }} batches · {{ meta.horseCount }} runs · last 21 days</span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:#8b929e"><span style="width:6px;height:6px;border-radius:50%;background:#35b37e;animation:tick 1.6s infinite;flex:none"></span>scrape current</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;padding:0 14px;border-left:1px solid #1c202a;flex:none;min-width:max-content;margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px">
+      <span style="color:#6f757f;letter-spacing:.1em">DATA</span>
+      <sc-for list="{{ freshness }}" as="f" hint-placeholder-count="4">
+        <span onClick="{{ f.go }}" style="display:flex;align-items:baseline;gap:4px;cursor:pointer;padding:1px 5px;border:1px solid {{ f.border }};background:{{ f.bg }};white-space:nowrap" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.07)">
+          <span style="color:#8b929e">{{ f.name }}</span>
+          <span style="color:{{ f.color }};font-weight:600">{{ f.mark }}</span>
+          <span style="color:{{ f.color }}">{{ f.age }}</span>
+        </span>
+      </sc-for>
+      <sc-if value="{{ refreshMsg }}" hint-placeholder-val="{{ false }}">
+        <span style="color:#2ec4b6;white-space:nowrap">{{ refreshMsg }}</span>
+      </sc-if>
+    </div>
+  </div>
+
+  <nav style="display:flex;align-items:stretch;height:34px;border-bottom:1px solid #262a33;background:#12151b">
+    <sc-for list="{{ pages }}" as="p" hint-placeholder-count="7">
+      <a href="{{ p.href }}" style="display:flex;align-items:center;padding:0 16px;font-size:12px;font-weight:500;letter-spacing:.03em;cursor:pointer;color:#8b929e;border-right:1px solid #1c202a;text-decoration:none" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.06)">
+        <span style="color:{{ p.color }};border-bottom:2px solid {{ p.mark }};padding-bottom:1px">{{ p.name }}</span>
+      </a>
+    </sc-for>
+  </nav>
+
+  <div style="display:flex;align-items:center;gap:0;height:34px;border-bottom:1px solid #262a33;background:#0e1117;padding:0 14px">
+    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2">
+      <span onClick="{{ t.go }}" style="display:flex;align-items:center;height:34px;padding:0 12px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:{{ t.fg }};border-bottom:2px solid {{ t.mark }}" style-hover="color:#fafafa">{{ t.label }}</span>
+    </sc-for>
+    <sc-if value="{{ isBrowse }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;align-items:center;gap:8px;margin-left:16px">
+        <input value="{{ search }}" onChange="{{ setSearch }}" placeholder="filter by horse" style="width:180px;background:#12151b;border:1px solid #2b303a;color:#fafafa;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:3px 7px" />
+        <sc-for list="{{ venueChips }}" as="v" hint-placeholder-count="3">
+          <span onClick="{{ v.go }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:2px 8px;cursor:pointer;color:{{ v.fg }};background:{{ v.bg }};border:1px solid {{ v.border }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ v.label }}</span>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{ isStandouts }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:center;gap:8px;margin-left:16px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.08em;color:#6f757f">QUALITY</span>
+        <sc-for list="{{ qualityChips }}" as="q" hint-placeholder-count="2">
+          <span onClick="{{ q.go }}" style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;padding:2px 9px;cursor:pointer;color:{{ q.fg }};background:{{ q.bg }};border:1px solid {{ q.border }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ q.label }}</span>
+        </sc-for>
+        <input value="{{ search }}" onChange="{{ setSearch }}" placeholder="filter by horse" style="width:160px;background:#12151b;border:1px solid #2b303a;color:#fafafa;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:3px 7px" />
+      </div>
+    </sc-if>
+    <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5b616b">{{ tabNote }}</span>
+  </div>
+
+  <sc-if value="{{ isBrowse }}" hint-placeholder-val="{{ true }}">
+  <div style="padding:12px 14px 22px 14px">
+    <sc-for list="{{ batches }}" as="b" hint-placeholder-count="4">
+      <div style="margin-bottom:16px;border:1px solid #262a33">
+        <div style="display:flex;align-items:baseline;gap:14px;padding:7px 12px;border-bottom:1px solid #262a33;background:#12151b;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;font-size:11px">
+          <span style="font-weight:600;font-size:12px">{{ b.date }}</span>
+          <span style="color:#cfd3da">{{ b.venue }} {{ b.course }} {{ b.dist }}m</span>
+          <span style="color:#8b929e">{{ b.going }}</span>
+          <span style="color:#6f757f">SPLITS {{ b.splits }}</span>
+          <span style="color:#6f757f">TIME <span style="color:#cfd3da;font-weight:600">{{ b.time }}</span></span>
+          <a href="{{ b.video }}" target="_blank" style="margin-left:auto;color:#c8792f;font-size:10px;letter-spacing:.06em">▶ REPLAY</a>
+        </div>
+        <div style="display:grid;grid-template-columns:34px 44px 168px 60px 96px 1fr 62px 60px 1.4fr 130px;align-items:center;height:22px;border-bottom:1px solid #1e232c;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.06em;color:#6f757f">
+          <div style="text-align:center">DR</div><div></div><div style="padding:0 8px">HORSE</div><div>GEAR</div><div style="padding:0 6px">JOCKEY</div>
+          <div style="padding:0 6px">POSITIONS</div><div style="text-align:right;padding-right:8px">MGN</div><div style="text-align:right;padding-right:8px">TIME</div>
+          <div style="padding:0 8px">COMMENT</div><div style="padding:0 8px">NEXT ACTUAL START</div>
+        </div>
+        <sc-for list="{{ b.horses }}" as="h" hint-placeholder-count="5">
+          <div style="display:grid;grid-template-columns:34px 44px 168px 60px 96px 1fr 62px 60px 1.4fr 130px;align-items:center;min-height:26px;border-bottom:1px solid #191d24">
+            <div style="text-align:center;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e">{{ h.draw }}</div>
+            <div style="text-align:center;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:{{ h.qColor }}">{{ h.quality }}</div>
+            <div style="padding:0 8px;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ h.name }}</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:{{ h.gearColor }}">{{ h.gearText }}</div>
+            <div style="padding:0 6px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ h.jockey }}</div>
+            <div style="padding:0 6px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#cfd3da">{{ h.posSeq }}</div>
+            <div style="text-align:right;padding-right:8px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e">{{ h.marginText }}</div>
+            <div style="text-align:right;padding-right:8px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#cfd3da">{{ h.time }}</div>
+            <div style="padding:0 8px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ h.comment }}</div>
+            <div style="padding:0 8px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:{{ h.nextColor }}">{{ h.nextText }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-for>
+    <sc-if value="{{ noBrowseResults }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:20px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4c525c">No trial runs match "{{ search }}".</div>
+    </sc-if>
+    <div style="display:flex;gap:18px;padding:9px 2px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f757f;flex-wrap:wrap">
+      <span><span style="color:#f0a824">++</span>/<span style="color:#cfd3da">+</span>/<span style="color:#8b929e">−</span> TRIAL QUALITY, FROM FINISH + MARGIN + COMMENT — SAME ENGINE AS THE FORM GUIDE'S TRIAL BAND</span>
+      <span>NEXT ACTUAL START SHOWS WHAT THE HORSE DID AT THE RACES AFTER THIS TRIAL, NOT ANOTHER TRIAL</span>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isStandouts }}" hint-placeholder-val="{{ false }}">
+  <div style="padding:12px 14px 22px 14px">
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #262a33;background:#12151b;margin-bottom:14px;flex-wrap:wrap">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#8b929e">{{ standoutCount }} TRIALS SHOWN</span>
+      <span style="font-size:12px;color:#cfd3da;flex:1;min-width:220px">One engine, two surfaces: the same finish + margin + comment rating used inline on a horse's own trial line, aggregated here as a live feed — not a separately curated list.</span>
+    </div>
+    <sc-for list="{{ standouts }}" as="s" hint-placeholder-count="4">
+      <div style="display:flex;align-items:stretch;border:1px solid #262a33;margin-bottom:12px;background:{{ s.cardBg }}">
+        <div style="width:250px;flex:none;padding:10px 12px;border-right:1px solid #262a33">
+          <div style="display:flex;align-items:baseline;gap:7px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;color:{{ s.qColor }}">{{ s.quality }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600">{{ s.name }}</span>
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e;margin-top:4px">{{ s.date }} · {{ s.venue }} {{ s.course }} {{ s.dist }}m · {{ s.going }}</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#cfd3da;margin-top:5px">{{ s.finishText }} · draw {{ s.draw }} · {{ s.jockey }}</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f757f;margin-top:5px;line-height:1.5">{{ s.comment }}</div>
+        </div>
+        <div style="width:298px;flex:none;padding:10px 12px;border-right:1px solid #262a33">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.09em;color:#6f757f;margin-bottom:6px">WHAT THE REST OF THE BATCH DID NEXT</div>
+          <sc-for list="{{ s.retro }}" as="q" hint-placeholder-count="4">
+            <div style="display:flex;align-items:center;gap:8px;height:18px;font-family:'IBM Plex Mono',monospace;font-size:11px">
+              <span style="color:#6f757f;width:14px">{{ q.p }}</span>
+              <span style="color:{{ q.nameColor }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">{{ q.name }}</span>
+              <span style="color:#5b616b">→</span>
+              <span style="width:60px;text-align:right;color:{{ q.nextColor }}">{{ q.next }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="flex:1;min-width:220px;padding:10px 12px">
+          <sc-if value="{{ s.booked }}" hint-placeholder-val="{{ false }}">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.09em;color:#2ec4b6">ALREADY IN BLACKBOOK</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f757f;margin-top:5px">{{ s.bookedStatus }} · added {{ s.bookedDate }}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">
+              <sc-for list="{{ s.bookedTags }}" as="t" hint-placeholder-count="2">
+                <span style="font-size:9px;padding:1px 5px;color:{{ t.color }};border:1px solid #2b303a">{{ t.label }}</span>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ s.canPromote }}" hint-placeholder-val="{{ true }}">
+            <span onClick="{{ s.promoteOpenClick }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;color:#2ec4b6;border:1px solid #1e4a45;background:#122624;padding:4px 10px;cursor:pointer" style-hover="box-shadow:inset 0 0 0 999px rgba(46,196,182,0.12)">+ ADD TO BLACKBOOK</span>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#5f7a78;margin-top:6px;line-height:1.4">reason and tags pre-filled from this trial record</div>
+          </sc-if>
+          <sc-if value="{{ s.promoteOpen }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.09em;color:#2ec4b6">ADD TO BLACKBOOK</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;margin-top:6px">REASON</div>
+              <textarea value="{{ s.promoteReason }}" onChange="{{ s.promoteType }}" rows="3" style="width:100%;margin-top:3px;background:#0b0e13;border:1px solid #24323a;color:#fafafa;font-family:'IBM Plex Sans',sans-serif;font-size:11px;padding:5px 6px;resize:vertical"></textarea>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;margin-top:6px">TAGS <span style="color:#4c525c">{{ s.tagCount }} SELECTED</span></div>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
+                <sc-for list="{{ s.tagPicker }}" as="tg" hint-placeholder-count="10">
+                  <span onClick="{{ tg.go }}" style="font-size:9px;padding:2px 6px;cursor:pointer;color:{{ tg.color }};background:{{ tg.bg }};border:1px solid {{ tg.border }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.06)">{{ tg.label }}</span>
+                </sc-for>
+              </div>
+              <div style="display:flex;align-items:center;gap:7px;margin-top:9px">
+                <span onClick="{{ s.promoteConfirm }}" style="flex:1;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.07em;padding:4px 0;cursor:pointer;color:{{ s.confirmColor }};border:1px solid {{ s.confirmBorder }};background:{{ s.confirmBg }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.05)">{{ s.confirmLabel }}</span>
+                <span onClick="{{ s.promoteCancel }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e;border:1px solid #2b303a;padding:4px 10px;cursor:pointer" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.06)">Cancel</span>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-for>
+    <sc-if value="{{ noStandouts }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:20px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4c525c">No trials clear this quality filter in the current slice.</div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const AMBER = '#f0a824', TEAL = '#2ec4b6', MUTED = '#8b929e', DIM = '#6f757f', WIN = '#35b37e', LOSS = '#e0637f';
+
+const TRIAL_COMMENTS = [
+  'Ran on nicely once clear.', 'Travelled strongly, urged along late.',
+  'Found little on a testing surface.', 'Workmanlike, in the market for the run.',
+  'Went straight to the front, too good.', 'Held up early, never able to improve.',
+  'Impressive turn of foot from midfield.', 'Eased down once safely clear.',
+];
+// same rule as the Form Guide's inline trial band — transparent, checkable against the comment by eye
+function trialQuality(t) {
+  let score = 0;
+  if (t.finPos === 1) score += 2; else if (t.finPos <= Math.ceil(t.field / 3)) score += 1; else score -= 1;
+  if (t.margin <= 0.3) score += 1; else if (t.margin >= 3) score -= 1;
+  if (/ran on|scored|strong|impressive|too good|smart|urged/i.test(t.comment)) score += 1;
+  if (/found little|workmanlike|never able|held up|eased/i.test(t.comment)) score -= 1;
+  return score >= 3 ? '++' : (score >= 1 ? '+' : '−');
+}
+function qColorOf(q) { return q === '++' ? AMBER : (q === '+' ? '#cfd3da' : MUTED); }
+function fmtT(sec) {
+  if (sec >= 60) { const m = Math.floor(sec / 60), s = sec - m * 60; return m + ':' + s.toFixed(2).padStart(5, '0'); }
+  return sec.toFixed(2);
+}
+function ordinal(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+
+// no(draw), name, gear, jockey, finPos, margin, commentIdx, nextStart({d,pos,field}) or null
+const BATCHES_RAW = [
+  { date: '21 May', venue: 'ST', course: 'AWT', dist: 1000, going: 'Good', splits: '24.1 / 22.6 / 11.6', video: '#',
+    horses: [
+      [3, 'ATOMIC FORCE', [], 'Z Purton', 2, 0.8, 1, { d: '28 May', pos: 5, field: 11 }],
+      [5, 'WELL SAID', [], 'H Bowman', 1, 0, 0, { d: '02 Jun', pos: 1, field: 10 }],
+      [2, 'SILVER STORM', ['B'], 'K Teetan', 4, 2.3, 5, { d: '30 May', pos: 9, field: 12 }],
+      [6, 'ICON PRIDE', [], 'L Ferraris', 3, 1.1, 3, { d: '30 May', pos: 8, field: 12 }],
+    ] },
+  { date: '05 Jun', venue: 'HV', course: 'Turf C', dist: 1200, going: 'Good', splits: '23.4 / 23.0 / 12.3 / 24.0', video: '#',
+    horses: [
+      [4, 'FORTUNE KEEPER', [], 'J Moreira', 1, 0, 0, { d: '13 Jun', pos: 2, field: 11 }],
+      [7, 'RAPID GLORY', [], 'A Atzeni', 2, 0.4, 1, { d: '13 Jun', pos: 6, field: 11 }],
+      [1, 'MIGHTY SUPREME', [], 'K C Leung', 5, 4.0, 2, null],
+      [9, 'WISE DECISION', ['TT'], 'B Avdulla', 4, 2.6, 3, { d: '14 Jun', pos: 10, field: 12 }],
+      [2, 'BRAVE LEGEND', [], 'C Y Ho', 3, 1.8, 7, { d: '13 Jun', pos: 7, field: 11 }],
+    ] },
+  { date: '11 Jun', venue: 'ST', course: 'AWT', dist: 1000, going: 'Good', splits: '24.4 / 22.8 / 11.4', video: '#',
+    horses: [
+      [6, 'HAPPY JOURNEY', [], 'M F Poon', 3, 1.5, 3, null],
+      [2, 'CIRCUIT PRINCE', [], 'K Teetan', 1, 0, 4, { d: '20 Jun', pos: 3, field: 10 }],
+      [8, 'ENDLESS DELIGHT', [], 'H Bowman', 2, 0.3, 6, { d: '19 Jun', pos: 4, field: 11 }],
+      [3, 'ROYAL ADVANCE', [], 'L Ferraris', 4, 2.1, 5, { d: '20 Jun', pos: 9, field: 10 }],
+      [5, 'GENEROUS GIFT', [], 'P N Wong', 5, 1.3, 3, { d: '19 Jun', pos: 8, field: 11 }],
+    ] },
+  { date: '18 Jun', venue: 'ST', course: 'AWT', dist: 1200, going: 'Good', splits: '23.9 / 23.1 / 12.0 / 24.2', video: '#',
+    horses: [
+      [4, 'GRAND DELIGHT', [], 'Z Purton', 2, 0.3, 6, { d: '30 Jun', pos: 3, field: 12 }],
+      [1, 'STAR OF DESTINY', [], 'J Moreira', 1, 0, 0, { d: '30 Jun', pos: 2, field: 12 }],
+      [8, 'ALWAYS B MIGHTY', [], 'K C Leung', 3, 1.4, 3, { d: '01 Jul', pos: 9, field: 11 }],
+      [2, 'MOMENT OF TRUTH', [], 'B Avdulla', 5, 3.2, 2, { d: '01 Jul', pos: 10, field: 11 }],
+      [10, 'WISE COUNSEL', ['B'], 'A Atzeni', 4, 2.4, 5, { d: '30 Jun', pos: 8, field: 12 }],
+      [6, 'NORTHERN CROWN', [], 'C Y Ho', 6, 4.5, 7, { d: '01 Jul', pos: 11, field: 11 }],
+    ] },
+  { date: '20 Jun', venue: 'ST', course: 'AWT', dist: 1200, going: 'Good', splits: '24.0 / 23.2 / 12.1 / 24.3', video: '#',
+    horses: [
+      [5, 'GOLDEN FORTUNE', [], 'K Teetan', 2, 0.2, 6, null],
+      [3, 'WELL SAID', [], 'H Bowman', 3, 1.6, 3, { d: '25 Jun', pos: 6, field: 11 }],
+      [9, 'ICON PRIDE', [], 'L Ferraris', 1, 0, 4, { d: '26 Jun', pos: 1, field: 12 }],
+      [1, 'SILVER STORM', ['B'], 'M F Poon', 2, 0.4, 1, { d: '25 Jun', pos: 5, field: 11 }],
+      [7, 'ROYAL CROWN', [], 'P N Wong', 5, 3.8, 2, { d: '26 Jun', pos: 11, field: 12 }],
+    ] },
+  { date: '25 Jun', venue: 'ST', course: 'AWT', dist: 1000, going: 'Good to Firm', splits: '24.0 / 22.5 / 11.5', video: '#',
+    horses: [
+      [2, 'HAPPY JOURNEY', [], 'M F Poon', 1, 0, 0, { d: '08 Jul', pos: 1, field: 11 }],
+      [6, 'FORTUNE KEEPER', [], 'J Moreira', 2, 0.3, 6, { d: '11 Jul', pos: 4, field: 12 }],
+      [4, 'BRAVE LEGEND', [], 'C Y Ho', 4, 2.8, 7, { d: '11 Jul', pos: 10, field: 11 }],
+      [1, 'CIRCUIT PRINCE', [], 'K Teetan', 3, 1.5, 3, { d: '10 Jul', pos: 8, field: 12 }],
+    ] },
+  { date: '02 Jul', venue: 'HV', course: 'Turf C+3', dist: 1200, going: 'Good', splits: '23.6 / 23.0 / 12.2 / 24.1', video: '#',
+    horses: [
+      [3, 'NOBLE DYNASTY', [], 'Z Purton', 2, 0.4, 1, null],
+      [7, 'RAPID GLORY', [], 'A Atzeni', 1, 0, 4, null],
+      [5, 'MIGHTY SUPREME', [], 'K C Leung', 3, 1.7, 3, null],
+      [1, 'WISE DECISION', ['TT'], 'B Avdulla', 5, 4.1, 2, null],
+      [9, 'ENDLESS DELIGHT', [], 'H Bowman', 4, 2.5, 5, null],
+    ] },
+  { date: '09 Jul', venue: 'ST', course: 'AWT', dist: 1200, going: 'Good', splits: '23.8 / 23.1 / 12.0 / 24.2', video: '#',
+    horses: [
+      [4, 'CHAMPION SUPREME', [], 'J Moreira', 1, 0, 4, null],
+      [8, 'STAR OF DESTINY', [], 'K Teetan', 3, 1.9, 3, null],
+      [2, 'GENEROUS GIFT', [], 'P N Wong', 2, 0.3, 6, null],
+      [10, 'ALWAYS B MIGHTY', [], 'K C Leung', 5, 3.6, 2, null],
+      [6, 'MOMENT OF TRUTH', [], 'B Avdulla', 4, 2.2, 5, null],
+      [1, 'ROYAL ADVANCE', [], 'L Ferraris', 6, 4.4, 7, null],
+    ] },
+  { date: '14 Jul', venue: 'ST', course: 'AWT', dist: 1000, going: 'Good', splits: '24.2 / 22.7 / 11.5', video: '#',
+    horses: [
+      [5, 'FLYING MOMENT', [], 'H Bowman', 2, 0.5, 6, null],
+      [2, 'WELL SAID', [], 'J Moreira', 1, 0, 0, null],
+      [7, 'SILVER STORM', ['B'], 'K Teetan', 3, 1.6, 3, null],
+      [3, 'ICON PRIDE', [], 'Z Purton', 4, 2.9, 5, null],
+    ] },
+];
+
+// pre-existing Blackbook entries — the same tag taxonomy, no separate trial-only book
+const BOOKED = {
+  'GRAND DELIGHT': { status: 'active', date: '22 Jun', tags: ['trial-ability', 'trial-profile'] },
+  'GOLDEN FORTUNE': { status: 'retired', date: '24 Jun', tags: ['trial-ability'] },
+  'HAPPY JOURNEY': { status: 'active', date: '28 Jun', tags: ['trial-improving'] },
+  'ATOMIC FORCE': { status: 'retired', date: '25 May', tags: ['trial-profile'] },
+};
+const BB_TAGS = [
+  ['trial-ability', '#8fb8d8'], ['trial-improving', '#8fd8c4'], ['trial-profile', '#c0a8d8'],
+  ['ability', '#9aa7b8'], ['improving', '#7fc8a9'], ['stable-change', '#b7a2e8'],
+  ['turn-of-foot', '#e8c04a'], ['incident', '#c8792f'], ['bad-conditions', '#7fa7c9'], ['strong-race', '#ff8a5c'],
+];
+const SUGGEST_TAGS = {
+  'ATOMIC FORCE': ['trial-profile'], 'GOLDEN FORTUNE': ['trial-ability'],
+  'GRAND DELIGHT': ['trial-ability', 'trial-profile'], 'HAPPY JOURNEY': ['trial-improving'],
+  'NOBLE DYNASTY': ['trial-ability'], 'CHAMPION SUPREME': ['trial-ability'], 'FLYING MOMENT': ['trial-ability'],
+};
+const SOURCES = [
+  { k: 'trial', name: 'Trial times', mins: 38, normal: 180, rows: '9 batches · 44 runs' },
+  { k: 'video', name: 'Video', mins: 51, normal: 180, rows: '9 replay links' },
+  { k: 'stewards', name: 'Stewards', mins: 210, normal: 720, rows: '2 notes' },
+  { k: 'results', name: 'Next starts', mins: 25, normal: 60, rows: '31 linked' },
+];
+function ageLabel(mins) {
+  if (mins == null) return '—';
+  if (mins < 60) return mins + 'm';
+  return Math.floor(mins / 60) + 'h' + (mins % 60 ? (mins % 60) + 'm' : '');
+}
+
+class Component extends DCLogic {
+  state = {
+    tab: 'browse', search: '', venueFilter: 'All', qualityFilter: ['++', '+'],
+    promoteOpen: null, promoteReason: '', promoteTags: [], sessionBooked: {}, refreshed: null,
+  };
+
+  openPromote(key, reason, tags) {
+    this.setState({ promoteOpen: key, promoteReason: reason, promoteTags: tags.slice() });
+  }
+  togglePromoteTag(t) {
+    this.setState(s => ({ promoteTags: s.promoteTags.indexOf(t) >= 0 ? s.promoteTags.filter(x => x !== t) : s.promoteTags.concat([t]) }));
+  }
+  confirmPromote(name, key) {
+    this.setState(s => {
+      if (!s.promoteTags.length) return {};
+      const sessionBooked = Object.assign({}, s.sessionBooked);
+      sessionBooked[name] = { status: 'active', date: '15 Jul', tags: s.promoteTags.slice() };
+      return { sessionBooked, promoteOpen: null, promoteTags: [], promoteReason: '' };
+    });
+  }
+
+  renderVals() {
+    const st = this.state;
+    const q = st.search.trim().toLowerCase();
+
+    const batches = BATCHES_RAW.map(b => {
+      const horses = b.horses.map(row => {
+        const [draw, name, gear, jockey, finPos, margin, commentIdx, next] = row;
+        const field = b.horses.length;
+        const comment = TRIAL_COMMENTS[commentIdx];
+        const quality = trialQuality({ finPos, field, margin, comment });
+        const dist800 = b.dist === 800, dist1000 = b.dist === 1000;
+        const base = dist800 ? 46 : (dist1000 ? 58.4 : 70.2);
+        const time = base + finPos * 0.18 + margin * 0.15;
+        return {
+          draw, name, quality, qColor: qColorOf(quality),
+          gearText: gear.length ? gear.join('+') : '—', gearColor: gear.length ? '#9b8cd0' : '#4c525c',
+          jockey, posSeq: [field, Math.max(1, finPos - 1), finPos].join(' '),
+          marginText: margin === 0 ? 'WON' : margin.toFixed(1) + 'L',
+          time: fmtT(time), comment,
+          finPos, field, margin,
+          nextText: next ? next.d + ' · ' + ordinal(next.pos) + '/' + next.field : 'no start since',
+          nextColor: next ? (next.pos === 1 ? AMBER : (next.pos <= 3 ? '#cfd3da' : MUTED)) : '#4c525c',
+          next,
+        };
+      });
+      return {
+        date: b.date, venue: b.venue, course: b.course, dist: b.dist, going: b.going,
+        splits: b.splits, time: fmtT((b.dist === 800 ? 46 : (b.dist === 1000 ? 58.4 : 70.2)) + 0.3), video: b.video,
+        horses: horses.filter(h => (st.venueFilter === 'All' || st.venueFilter === b.venue) && (!q || h.name.toLowerCase().indexOf(q) >= 0)),
+      };
+    }).filter(b => b.horses.length);
+
+    const venueChips = ['All', 'ST', 'HV'].map(v => ({
+      label: v, go: () => this.setState({ venueFilter: v }),
+      fg: st.venueFilter === v ? '#0e1117' : MUTED, bg: st.venueFilter === v ? '#cfd3da' : 'transparent',
+      border: st.venueFilter === v ? '#cfd3da' : '#2b303a',
+    }));
+
+    // Standouts: every trial run the same engine rated ++ or +, aggregated — not a curated list
+    let standoutsRaw = [];
+    BATCHES_RAW.forEach(b => {
+      const field = b.horses.length;
+      const ranked = b.horses.map(row => {
+        const [draw, name, gear, jockey, finPos, margin, commentIdx, next] = row;
+        const comment = TRIAL_COMMENTS[commentIdx];
+        return { draw, name, gear, jockey, finPos, margin, comment, next, quality: trialQuality({ finPos, field, margin, comment }) };
+      }).sort((a, c) => a.finPos - c.finPos);
+      ranked.forEach(h => {
+        if (h.quality === '−') return;
+        standoutsRaw.push({
+          b, h, retroPool: ranked,
+        });
+      });
+    });
+
+    standoutsRaw = standoutsRaw.filter(s => st.qualityFilter.indexOf(s.h.quality) >= 0
+      && (!q || s.h.name.toLowerCase().indexOf(q) >= 0));
+
+    const standouts = standoutsRaw.map(s => {
+      const b = s.b, h = s.h;
+      const key = b.date + '|' + h.name;
+      const bookedEntry = st.sessionBooked[h.name] || BOOKED[h.name];
+      const suggestedTags = SUGGEST_TAGS[h.name] || ['trial-ability'];
+      const promoteOpen = st.promoteOpen === key;
+      const reasonDefault = 'Trialled ' + h.quality + ' at ' + b.venue + ' ' + b.course + ' ' + b.dist + 'm, finished '
+        + ordinal(h.finPos) + ' of ' + b.horses.length + (h.margin === 0 ? '' : ' (' + h.margin.toFixed(1) + 'L)') + ' — ' + h.comment;
+      return {
+        name: h.name, quality: h.quality, qColor: qColorOf(h.quality),
+        date: b.date, venue: b.venue, course: b.course, dist: b.dist, going: b.going,
+        draw: h.draw, jockey: h.jockey, comment: h.comment,
+        finishText: ordinal(h.finPos) + ' of ' + b.horses.length + (h.margin === 0 ? ', won' : ', beaten ' + h.margin.toFixed(1) + 'L'),
+        cardBg: h.quality === '++' ? 'rgba(240,168,36,0.03)' : 'transparent',
+        retro: s.retroPool.slice(0, 5).map(r => ({
+          p: ordinal(r.finPos), name: r.name, nameColor: r.name === h.name ? '#fafafa' : '#cfd3da',
+          next: r.next ? ordinal(r.next.pos) + '/' + r.next.field + ' ' + r.next.d : 'no start since',
+          nextColor: !r.next ? '#4c525c' : (r.next.pos === 1 ? AMBER : (r.next.pos <= 3 ? '#cfd3da' : MUTED)),
+        })),
+        booked: !!bookedEntry, bookedStatus: bookedEntry ? bookedEntry.status.toUpperCase() : '', bookedDate: bookedEntry ? bookedEntry.date : '',
+        bookedTags: bookedEntry ? bookedEntry.tags.map(t => ({ label: t, color: (BB_TAGS.find(x => x[0] === t) || [, MUTED])[1] })) : [],
+        canPromote: !bookedEntry && !promoteOpen,
+        promoteOpen,
+        promoteOpenClick: () => this.openPromote(key, reasonDefault, suggestedTags),
+        promoteReason: st.promoteOpen === key ? st.promoteReason : reasonDefault,
+        promoteType: (e) => this.setState({ promoteReason: e.target.value }),
+        promoteCancel: () => this.setState({ promoteOpen: null, promoteTags: [], promoteReason: '' }),
+        promoteConfirm: () => this.confirmPromote(h.name, key),
+        tagPicker: BB_TAGS.map(([t, color]) => {
+          const on = st.promoteTags.indexOf(t) >= 0;
+          return { label: t, go: () => this.togglePromoteTag(t), color: on ? '#fafafa' : color, border: on ? color : '#2b303a', bg: on ? 'rgba(255,255,255,0.06)' : 'transparent' };
+        }),
+        tagCount: st.promoteTags.length,
+        confirmLabel: st.promoteTags.length ? 'ADD TO BLACKBOOK' : 'PICK AT LEAST ONE TAG',
+        confirmColor: st.promoteTags.length ? TEAL : '#5b616b',
+        confirmBorder: st.promoteTags.length ? '#1e4a45' : '#2b303a',
+        confirmBg: st.promoteTags.length ? '#12211f' : 'transparent',
+      };
+    });
+
+    const allBatches = BATCHES_RAW.reduce((a, b) => a + b.horses.length, 0);
+
+    return {
+      pages: [
+        ['Race Day', 'Race Day.dc.html'],
+        ['Form Guide', 'Form Guide.dc.html'],
+        ['Bets', 'Bets.dc.html'],
+        ['Blackbook', 'Blackbook.dc.html'],
+        ['Results', 'Results.dc.html'],
+        ['Lookup', 'Lookup.dc.html'],
+        ['Trials', 'Trials.dc.html'],
+      ].map(([name, href], i) => ({
+        name, color: i === 6 ? '#fafafa' : 'inherit', mark: i === 6 ? '#e63946' : 'transparent', href,
+      })),
+      meta: { batchCount: BATCHES_RAW.length, horseCount: allBatches },
+      freshness: SOURCES.map(s => {
+        const stale = s.mins > s.normal;
+        return {
+          name: s.name, mark: stale ? '⚠' : '✓', age: ageLabel(s.mins),
+          color: stale ? '#c8792f' : '#35b37e', border: stale ? '#3d2a14' : 'transparent', bg: stale ? 'rgba(200,121,47,0.10)' : 'transparent',
+          go: () => this.setState({ refreshed: s.k }),
+        };
+      }),
+      refreshMsg: st.refreshed ? (SOURCES.find(s => s.k === st.refreshed) || {}).name + ' refreshed · ' + (SOURCES.find(s => s.k === st.refreshed) || {}).rows : '',
+
+      tabs: [['Browse by Date', 'browse'], ['Standouts', 'standouts']].map(([label, k]) => ({
+        label, go: () => this.setState({ tab: k }),
+        fg: st.tab === k ? '#fafafa' : MUTED, mark: st.tab === k ? '#e63946' : 'transparent',
+      })),
+      isBrowse: st.tab === 'browse', isStandouts: st.tab === 'standouts',
+      tabNote: st.tab === 'browse'
+        ? 'batches most recent first · full run detail, not collapsed'
+        : 'add-to-blackbook reason and tags pre-fill from the trial record',
+
+      search: st.search, setSearch: (e) => this.setState({ search: e.target.value }),
+      venueChips,
+      batches, noBrowseResults: batches.length === 0,
+
+      qualityChips: ['++', '+'].map(qq => {
+        const on = st.qualityFilter.indexOf(qq) >= 0;
+        return {
+          label: qq, go: () => this.setState(s => ({ qualityFilter: s.qualityFilter.indexOf(qq) >= 0 ? s.qualityFilter.filter(x => x !== qq) : s.qualityFilter.concat([qq]) })),
+          fg: on ? '#0e1117' : qColorOf(qq), bg: on ? qColorOf(qq) : 'transparent', border: on ? qColorOf(qq) : '#2b303a',
+        };
+      }),
+      standoutCount: standouts.length,
+      standouts, noStandouts: standouts.length === 0,
+    };
+  }
+}
+
+</script>
+</body>
+</html>

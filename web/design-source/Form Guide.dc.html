@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; padding:0; background:#0e1117; }
+  * { box-sizing: border-box; }
+  a { color:#f0a824; text-decoration:none; }
+  a:hover { color:#ffc75a; }
+  ::-webkit-scrollbar { width:9px; height:9px; }
+  ::-webkit-scrollbar-track { background:#0e1117; }
+  ::-webkit-scrollbar-thumb { background:#2b303a; }
+  @keyframes tick { 0%,100% { opacity:1 } 50% { opacity:.35 } }
+</style>
+</helmet>
+<div style="min-height:100vh;background:#0e1117;color:#fafafa;font-family:'IBM Plex Sans',system-ui,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;-webkit-font-smoothing:antialiased">
+
+  <div style="display:flex;align-items:stretch;height:32px;border-bottom:1px solid #1c202a;background:#0b0e13;overflow-x:auto">
+    <div style="display:flex;align-items:center;gap:9px;padding:0 14px;border-right:1px solid #1c202a;flex:none">
+      <div style="width:9px;height:9px;background:#e63946;flex:none"></div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:12px;letter-spacing:.16em">RACEDAY</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;padding:0 16px;flex:none;min-width:max-content;font-family:'IBM Plex Mono',monospace;font-size:12px;white-space:nowrap">
+      <span style="font-weight:600">HV</span>
+      <span style="color:#cfd3da">15 Jul 2026</span>
+      <span style="color:#8b929e">11 races</span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:#8b929e"><span style="width:6px;height:6px;border-radius:50%;background:#35b37e;animation:tick 1.6s infinite;flex:none"></span>active meeting · 16:22</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;padding:0 14px;border-left:1px solid #1c202a;flex:none;min-width:max-content;margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px">
+      <span style="color:#6f757f;letter-spacing:.1em">DATA</span>
+      <sc-for list="{{ freshness }}" as="f" hint-placeholder-count="5">
+        <span onClick="{{ f.go }}" style="display:flex;align-items:baseline;gap:4px;cursor:pointer;padding:1px 5px;border:1px solid {{ f.border }};background:{{ f.bg }};white-space:nowrap" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.07)">
+          <span style="color:#8b929e">{{ f.name }}</span>
+          <span style="color:{{ f.color }};font-weight:600">{{ f.mark }}</span>
+          <span style="color:{{ f.color }}">{{ f.age }}</span>
+        </span>
+      </sc-for>
+      <sc-if value="{{ refreshMsg }}" hint-placeholder-val="{{ false }}">
+        <span style="color:#2ec4b6;white-space:nowrap">{{ refreshMsg }}</span>
+      </sc-if>
+    </div>
+  </div>
+
+  <nav style="display:flex;align-items:stretch;height:34px;border-bottom:1px solid #262a33;background:#12151b">
+    <sc-for list="{{ pages }}" as="p" hint-placeholder-count="6">
+      <a href="{{ p.href }}" style="display:flex;align-items:center;padding:0 16px;font-size:12px;font-weight:500;letter-spacing:.03em;cursor:pointer;color:#8b929e;border-right:1px solid #1c202a;text-decoration:none" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.06)">
+        <span style="color:{{ p.color }};border-bottom:2px solid {{ p.mark }};padding-bottom:1px">{{ p.name }}</span>
+      </a>
+    </sc-for>
+  </nav>
+
+  <div>
+    <div style="display:flex;align-items:stretch;height:36px;border-bottom:1px solid #262a33">
+      <div style="display:flex;align-items:center;padding:0 12px 0 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e;letter-spacing:.1em">RACE</div>
+      <div style="display:flex;align-items:stretch">
+        <sc-for list="{{ races }}" as="r" hint-placeholder-count="11">
+          <div onClick="{{ r.go }}" style="display:flex;flex-direction:column;justify-content:center;align-items:center;width:52px;cursor:pointer;border-right:1px solid #1c202a;font-family:'IBM Plex Mono',monospace;background:{{ r.bg }};border-top:2px solid {{ r.mark }}" style-hover="background:#1a1d23">
+            <div style="font-size:13px;font-weight:600;line-height:1.1;color:{{ r.fg }}">{{ r.n }}</div>
+            <div style="font-size:9px;color:{{ r.sub }};letter-spacing:.04em">{{ r.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;align-items:center;gap:10px;padding:0 14px;border-left:1px solid #262a33;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e">
+        <sc-if value="{{ sorted }}" hint-placeholder-val="{{ false }}">
+          <span onClick="{{ clearSort }}" style="cursor:pointer;color:#f0a824;border:1px solid #4a3a18;background:#241d0e;padding:1px 8px">SORTED {{ sortLabel }} <span style="color:#8b929e">× NUMBER</span></span>
+        </sc-if>
+        <span>{{ openCount }} EXPANDED</span>
+        <span onClick="{{ expandAll }}" style="cursor:pointer;border:1px solid #2b303a;padding:1px 8px" style-hover="color:#fafafa;background:#1a1d23">EXPAND ALL</span>
+        <span onClick="{{ collapseAll }}" style="cursor:pointer;border:1px solid #2b303a;padding:1px 8px" style-hover="color:#fafafa;background:#1a1d23">COLLAPSE ALL</span>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;border-bottom:1px solid #262a33;background:#1a1d23">
+      <div style="display:flex;align-items:baseline;gap:10px;padding:9px 14px;border-right:1px solid #262a33">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600">{{ hdr.no }}</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#8b929e">{{ hdr.time }}</span>
+      </div>
+      <div style="display:flex;gap:20px;padding:0 16px;font-family:'IBM Plex Mono',monospace;font-size:12px">
+        <div><span style="color:#8b929e">DIST </span>{{ hdr.dist }}</div>
+        <div><span style="color:#8b929e">CLASS </span>{{ hdr.cls }}</div>
+        <div><span style="color:#8b929e">GOING </span>{{ hdr.going }}</div>
+        <div><span style="color:#8b929e">COURSE </span>{{ hdr.course }}</div>
+        <div><span style="color:#8b929e">FIELD </span>{{ hdr.field }}</div>
+        <div style="display:flex;align-items:center;gap:7px">
+          <span style="color:#8b929e">RACE PACE</span>
+          <div style="display:flex;gap:2px">
+            <sc-for list="{{ paceScale }}" as="s" hint-placeholder-count="5">
+              <div style="width:9px;height:9px;background:{{ s.bg }}"></div>
+            </sc-for>
+          </div>
+          <span style="font-weight:600;color:{{ hdr.paceColor }}">{{ hdr.pace }}</span>
+        </div>
+      </div>
+      <div style="flex:1"></div>
+      <div style="padding:0 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e">FIGURE 100 = PAR · SIX RUNS, NEWEST LEFT · SLOPE TINT ON THE SEQUENCE IS THE TREND</div>
+    </div>
+
+    <div style="display:flex;align-items:stretch;min-height:calc(100vh - 110px)">
+      <div style="flex:1;min-width:0;overflow:auto">
+        <div style="display:grid;grid-template-columns:34px 182px 76px 26px 86px 80px 32px 52px 164px 1fr;align-items:center;height:26px;position:sticky;top:0;z-index:3;background:#12151b;border-bottom:1px solid #2b303a;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#8b929e">
+          <sc-for list="{{ cols }}" as="c" hint-placeholder-count="10">
+            <div onClick="{{ c.go }}" style="padding:0 {{ c.pad }};text-align:{{ c.a }};color:{{ c.fg }};background:{{ c.bg }};cursor:pointer;height:26px;line-height:26px;white-space:nowrap;user-select:none;border-bottom:1px solid {{ c.rule }}" style-hover="color:#fafafa;background:#1a1d23">{{ c.t }}<span style="font-size:8px;color:{{ c.indColor }};margin-left:4px">{{ c.ind }}</span></div>
+          </sc-for>
+        </div>
+
+        <sc-for list="{{ horses }}" as="h" hint-placeholder-count="12">
+          <div style="position:relative">
+            <div onClick="{{ h.toggle }}" onMouseEnter="{{ h.focus }}" style="display:grid;grid-template-columns:34px 182px 76px 26px 86px 80px 32px 52px 164px 1fr;align-items:center;height:30px;cursor:pointer;background:{{ h.bg }};border-bottom:1px solid #191d24;border-left:3px solid {{ h.mark }};font-family:'IBM Plex Mono',monospace" style-hover="background:#1c212a">
+              <div style="padding:0 6px;text-align:center;font-size:13px;font-weight:600">{{ h.no }}</div>
+              <div style="padding:0 8px;display:flex;align-items:baseline;gap:6px">
+                <span style="font-size:9px;color:{{ h.caretColor }};width:7px">{{ h.caret }}</span>
+                <span style="font-size:13px;font-weight:600;letter-spacing:.01em;white-space:nowrap;color:{{ h.nameColor }}">{{ h.name }}</span>
+              </div>
+              <div style="padding:0 8px">
+                <span style="display:inline-block;max-width:100%;box-sizing:border-box;font-size:10px;letter-spacing:0;padding:1px 4px;white-space:nowrap;overflow:hidden;color:{{ h.styleColor }};background:{{ h.styleBg }}">{{ h.style }}</span>
+              </div>
+              <div style="padding:0 4px;text-align:center;font-size:12px;color:#cfd3da">{{ h.draw }}</div>
+              <div style="padding:0 8px;font-size:12px;color:#cfd3da;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ h.jockey }}</div>
+              <div style="padding:0 8px;white-space:nowrap;background:{{ h.trBg }}">
+                <span style="font-size:11px;font-weight:{{ h.trWeight }};color:{{ h.trColor }};overflow:hidden;text-overflow:ellipsis">{{ h.trainer }}</span>
+              </div>
+              <div style="padding:0 6px;text-align:right;font-size:12px;color:#cfd3da">{{ h.wt }}</div>
+              <div style="padding:0 8px;text-align:right;font-size:14px;font-weight:600">{{ h.odds }}</div>
+              <div style="padding:0 8px">
+                <div style="display:flex;gap:3px;align-items:baseline">
+                  <sc-for list="{{ h.seq }}" as="f" hint-placeholder-count="6">
+                    <div style="width:22px;text-align:right;font-size:12px;font-weight:{{ f.weight }};color:{{ f.color }}">{{ f.v }}</div>
+                  </sc-for>
+                </div>
+                <div style="height:2px;margin-top:2px;background:{{ h.slopeTint }}"></div>
+              </div>
+              <div style="padding:0 8px;display:flex;gap:5px;overflow:hidden">
+                <sc-for list="{{ h.flags }}" as="g" hint-placeholder-count="2">
+                  <span onMouseEnter="{{ g.enter }}" onMouseLeave="{{ g.leave }}" style="font-size:10px;padding:0 5px;white-space:nowrap;color:{{ g.color }};border:1px solid {{ g.border }};line-height:15px;cursor:{{ g.cursor }}">{{ g.t }}</span>
+                </sc-for>
+              </div>
+            </div>
+
+            <sc-if value="{{ h.bbShow }}" hint-placeholder-val="{{ false }}">
+            <div style="position:fixed;left:{{ h.bbLeft }}px;top:{{ h.bbTop }}px;max-height:{{ h.bbMaxH }}px;overflow-y:auto;z-index:7;width:330px;background:#101a1a;border:1px solid #1e4a45;padding:8px 10px;box-shadow:0 8px 22px rgba(0,0,0,.65)">
+              <div style="display:flex;align-items:baseline;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.09em;color:#2ec4b6">HORSE NOTE · WHY BLACKBOOKED<span style="margin-left:auto;color:#5f7a78">{{ h.bbAdded }}</span></div>
+              <div style="font-size:12px;line-height:1.45;color:#cfd3da;margin-top:6px">{{ h.bbReason }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#5f7a78;margin-top:6px;letter-spacing:.06em">{{ h.bbTrace }}</div>
+            </div>
+            </sc-if>
+
+            <sc-if value="{{ h.open }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#0b0e13;border-bottom:1px solid #262a33">
+              <div style="min-height:52px;padding:5px 12px;display:flex;flex-direction:column;gap:4px;justify-content:center;border-bottom:1px solid #1e232c;background:#0e131a">
+                <sc-if value="{{ h.trialsAny }}" hint-placeholder-val="{{ false }}">
+                  <sc-for list="{{ h.trials }}" as="t" hint-placeholder-count="2">
+                    <div style="display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;font-size:10px">
+                      <span style="font-weight:700;padding:0 4px;color:{{ t.qColor }};border:1px solid {{ t.qBorder }};background:{{ t.qBg }}">{{ t.q }}</span>
+                      <span style="color:#6f757f;letter-spacing:.06em">TRIAL</span>
+                      <span style="color:#cfd3da">{{ t.date }}</span>
+                      <span style="color:#8b929e">{{ t.cond }}</span>
+                      <span style="color:#8b929e">{{ t.batch }}</span>
+                      <span style="color:{{ t.gearColor }}">{{ t.gear }}</span>
+                      <span style="color:#cfd3da">{{ t.jockey }}</span>
+                      <span style="color:#fafafa;font-weight:600">{{ t.finLabel }}</span>
+                      <span style="color:#8b929e">{{ t.posSeq }}</span>
+                      <span style="color:#8b929e">{{ t.margin }}</span>
+                      <span style="color:#8b929e">{{ t.time }}</span>
+                      <a href="{{ t.video }}" target="_blank" rel="noopener" style="color:#c8792f">▶</a>
+                      <span style="color:#cfd3da;font-style:italic">&ldquo;{{ t.comment }}&rdquo;</span>
+                      <span style="color:#5b616b">{{ t.othersStr }}</span>
+                    </div>
+                  </sc-for>
+                </sc-if>
+                <sc-if value="{{ h.trialsEmpty }}" hint-placeholder-val="{{ true }}">
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#4c525c;letter-spacing:.06em">NO RECENT TRIAL</div>
+                </sc-if>
+              </div>
+              <sc-if value="{{ h.h2hAny }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;gap:14px;padding:5px 12px;border-bottom:1px solid #1e232c;background:#141118;font-family:'IBM Plex Mono',monospace;font-size:10px;overflow-x:auto">
+                  <span style="color:#c9748f;letter-spacing:.1em;white-space:nowrap;flex:none">HEAD TO HEAD</span>
+                  <sc-for list="{{ h.h2h }}" as="p" hint-placeholder-count="1">
+                    <span style="display:flex;align-items:baseline;gap:7px;white-space:nowrap;flex:none">
+                      <span style="color:#cfd3da">v {{ p.other }}</span>
+                      <span style="color:#8b929e">{{ p.record }}</span>
+                      <span style="color:#6f757f">LAST {{ p.lastDate }} {{ p.lastCond }} · {{ p.lastLine }}</span>
+                      <span style="color:#8b929e">GAP {{ p.gapThen }} → {{ p.gapNow }}</span>
+                      <span style="color:{{ p.swingColor }};border:1px solid {{ p.swingBorder }};background:{{ p.swingBg }};padding:0 5px">{{ p.swingLabel }}</span>
+                      <span style="color:#6f757f">GATE {{ p.gate }}</span>
+                    </span>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <div style="display:grid;grid-template-columns:34px 182px 76px 26px 86px 80px 32px 52px 164px 1fr;align-items:center;height:22px;background:#12151b;border-bottom:1px solid #1e232c;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.09em;color:#6f757f">
+                <div style="padding:0 6px;text-align:center">RUN</div>
+                <div style="padding:0 8px">DATE · TRK CRS DIST GOING CL</div>
+                <div style="padding:0 8px">STYLE</div>
+                <div style="padding:0 4px;text-align:center">DR</div>
+                <div style="padding:0 8px">JOCKEY</div>
+                <div style="padding:0 8px">TRAINER</div>
+                <div style="padding:0 6px;text-align:right">WT</div>
+                <div style="padding:0 8px;text-align:right">FIN</div>
+                <div style="padding:0 8px">FIGURE · MARGIN · TIME · PLACE DIV</div>
+                <div style="padding:0 8px;display:flex;gap:6px">
+                  <span style="width:26px">PACE</span>
+                  <span style="width:140px">GEAR</span>
+                  <span style="width:66px">POSITIONS</span>
+                  <span style="flex:1">TRIP</span>
+                  <span style="width:50px;text-align:right">BB·NOTE·VID</span>
+                </div>
+              </div>
+              <sc-for list="{{ h.runs }}" as="u" hint-placeholder-count="6">
+                <div style="position:relative">
+                  <div onClick="{{ u.toggle }}" style="display:grid;grid-template-columns:34px 182px 76px 26px 86px 80px 32px 52px 164px 1fr;align-items:center;height:24px;cursor:pointer;background:{{ u.bg }};border-bottom:1px solid #161a21;font-family:'IBM Plex Mono',monospace;font-size:11px" style-hover="background:#151a21">
+                    <div style="padding:0 6px;text-align:center;color:#5b616b">{{ u.n }}</div>
+                    <div style="padding:0 8px;display:flex;align-items:baseline;gap:6px;white-space:nowrap">
+                      <span style="font-size:8px;color:{{ u.caretColor }};width:7px">{{ u.caret }}</span>
+                      <span style="color:#fafafa">{{ u.date }}</span>
+                      <span style="color:#8b929e">{{ u.cond }}</span>
+                    </div>
+                    <div style="padding:0 8px">
+                      <span style="display:inline-block;max-width:100%;box-sizing:border-box;font-size:9px;letter-spacing:0;padding:0 4px;white-space:nowrap;overflow:hidden;color:{{ u.styleColor }};background:{{ u.styleBg }}">{{ u.style }}</span>
+                    </div>
+                    <div style="padding:0 4px;text-align:center;color:#cfd3da">{{ u.dr }}</div>
+                    <div style="padding:0 8px;color:#cfd3da;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.jockey }}</div>
+                    <div style="padding:0 8px;white-space:nowrap;background:{{ u.trBg }}">
+                      <span style="font-weight:{{ u.trWeight }};color:{{ u.trColor }};overflow:hidden;text-overflow:ellipsis">{{ u.trainer }}</span>
+                    </div>
+                    <div style="padding:0 6px;text-align:right;color:#cfd3da">{{ u.wt }}</div>
+                    <div style="padding:0 8px;text-align:right;font-size:12px;font-weight:600;color:{{ u.finColor }}">{{ u.fin }}</div>
+                    <div style="padding:0 8px;display:flex;align-items:baseline;gap:8px">
+                      <span style="width:34px;text-align:right;font-size:12px;font-weight:600;color:{{ u.figColor }}">{{ u.fig }}</span>
+                      <span style="width:46px;text-align:right;color:{{ u.figColor }}">{{ u.len }}</span>
+                      <span style="width:54px;text-align:right;color:#8b929e">{{ u.time }}</span>
+                      <span style="width:52px;text-align:right;font-size:10px;color:{{ u.divColor }}" title="place dividend actually paid — not a pre-race price">{{ u.placeDiv }}</span>
+                    </div>
+                    <div style="padding:0 8px;display:flex;gap:6px;align-items:center;min-width:0">
+                      <span style="width:26px;display:flex;align-items:center;gap:4px;white-space:nowrap" title="{{ u.tempo }}">
+                        <span style="width:7px;height:7px;background:{{ u.tempoColor }};flex:none"></span>
+                        <span style="font-size:10px;color:{{ u.tempoColor }}">{{ u.tempoCode }}</span>
+                      </span>
+                      <span style="width:140px;display:flex;align-items:baseline;gap:4px;white-space:nowrap;overflow:hidden">
+                        <span style="color:{{ u.gearColor }};flex:none">{{ u.gear }}</span>
+                        <sc-for list="{{ u.gearBadges }}" as="b" hint-placeholder-count="1">
+                          <span style="font-size:9px;padding:0 3px;flex:none;color:{{ b.color }};border:1px solid {{ b.border }};background:{{ b.bg }};text-decoration:{{ b.deco }}">{{ b.t }}</span>
+                        </sc-for>
+                      </span>
+                      <span style="width:66px;font-size:10px;color:#cfd3da;letter-spacing:.04em;white-space:nowrap">{{ u.pos }}</span>
+                      <span style="flex:1;min-width:0;display:flex;align-items:center;gap:6px;overflow:hidden">
+                        <span style="font-size:10px;color:{{ u.tripColor }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.trip }}</span>
+                        <sc-if value="{{ u.vetAny }}" hint-placeholder-val="{{ false }}">
+                          <span onClick="{{ u.vetClick }}" style="flex:none;font-size:9px;padding:0 4px;cursor:pointer;white-space:nowrap;color:{{ u.vetColor }};border:1px solid {{ u.vetBorder }};background:{{ u.vetBg }};letter-spacing:.06em">{{ u.vetTag }}</span>
+                        </sc-if>
+                      </span>
+                      <span style="width:50px;flex:none;display:flex;align-items:center;justify-content:flex-end;gap:5px">
+                        <sc-if value="{{ u.bookedHere }}" hint-placeholder-val="{{ false }}">
+                          <span title="source run for a blackbook entry" style="width:6px;height:6px;background:#2ec4b6;flex:none"></span>
+                        </sc-if>
+                        <span onClick="{{ u.noteClick }}" style="width:16px;height:15px;line-height:14px;text-align:center;font-size:10px;cursor:pointer;color:{{ u.noteColor }};border:1px solid {{ u.noteBorder }};background:{{ u.noteBg }}" style-hover="color:#2ec4b6;border-color:#1e4a45">✎</span>
+                        <a href="{{ u.video }}" target="_blank" rel="noopener" onClick="{{ u.stop }}" style="width:16px;height:15px;line-height:14px;text-align:center;font-size:8px;color:{{ u.videoColor }};border:1px solid {{ u.videoBorder }}" style-hover="color:#fafafa;border-color:#4a5260">▶</a>
+                      </span>
+                    </div>
+                  </div>
+
+                  <sc-if value="{{ u.noteOpen }}" hint-placeholder-val="{{ false }}">
+                  <div style="position:fixed;left:{{ u.noteLeft }}px;top:{{ u.noteTop }}px;max-height:{{ u.noteMaxH }}px;overflow-y:auto;z-index:6;width:344px;background:#101a1a;border:1px solid #1e4a45;padding:8px 10px;box-shadow:0 8px 22px rgba(0,0,0,.65)">
+                    <div style="display:flex;align-items:baseline;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.09em;color:#2ec4b6">
+                      RUN NOTE
+                      <span style="color:#5f7a78">{{ u.noteMeta }}</span>
+                      <span onClick="{{ u.noteClose }}" style="margin-left:auto;color:#6f757f;cursor:pointer">✕</span>
+                    </div>
+                    <div style="font-size:12px;line-height:1.45;color:#cfd3da;margin-top:6px">{{ u.noteText }}</div>
+                    <div style="display:flex;gap:6px;margin-top:8px">
+                      <input value="{{ u.draft }}" onChange="{{ u.noteType }}" placeholder="note on this run" style="flex:1;min-width:0;background:#0b0e13;border:1px solid #24323a;color:#fafafa;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:3px 6px" />
+                      <span onClick="{{ u.noteSave }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#2ec4b6;border:1px solid #1e4a45;padding:3px 9px;cursor:pointer;white-space:nowrap" style-hover="background:#16211f;color:#fafafa">SAVE</span>
+                    </div>
+
+                    <div style="margin-top:9px;padding-top:8px;border-top:1px solid #1b2b2b">
+                      <sc-if value="{{ u.bookedHere }}" hint-placeholder-val="{{ false }}">
+                        <div style="display:flex;align-items:baseline;gap:7px;font-family:'IBM Plex Mono',monospace;font-size:10px;flex-wrap:wrap">
+                          <span style="color:#2ec4b6;letter-spacing:.06em">■ IN THE BLACKBOOK</span>
+                          <span style="color:#5f7a78">{{ u.bookedMeta }}</span>
+                          <sc-for list="{{ u.bookedTags }}" as="t" hint-placeholder-count="2">
+                            <span style="font-size:9px;padding:0 4px;color:{{ t.color }};border:1px solid #2b3a3a">{{ t.label }}</span>
+                          </sc-for>
+                        </div>
+                      </sc-if>
+                      <sc-if value="{{ u.canPromote }}" hint-placeholder-val="{{ true }}">
+                        <div style="display:flex;align-items:center;gap:8px">
+                          <span onClick="{{ u.promoteOpenClick }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;color:#2ec4b6;border:1px solid #1e4a45;background:#12211f;padding:3px 9px;cursor:pointer;white-space:nowrap" style-hover="color:#fafafa">+ ADD TO BLACKBOOK</span>
+                          <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#5f7a78;line-height:1.4">a note is a record · the book is a judgement</span>
+                        </div>
+                      </sc-if>
+                    </div>
+
+                    <sc-if value="{{ u.promoteOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="margin-top:9px;padding-top:8px;border-top:1px solid #1b2b2b">
+                      <div style="display:flex;align-items:baseline;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.09em;color:#2ec4b6">ADD TO BLACKBOOK<span style="color:#5f7a78;letter-spacing:0">pre-filled from this note — nothing to retype</span></div>
+                      <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;margin-top:7px;letter-spacing:.06em">HORSE</div>
+                      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:#fafafa">{{ u.promoteHorse }}</div>
+                      <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;margin-top:6px;letter-spacing:.06em">SOURCE RUN</div>
+                      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#cfd3da">{{ u.promoteSource }}</div>
+                      <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;margin-top:6px;letter-spacing:.06em">REASON</div>
+                      <textarea value="{{ u.promoteReason }}" onChange="{{ u.promoteType }}" rows="3" style="width:100%;margin-top:3px;background:#0b0e13;border:1px solid #24323a;color:#fafafa;font-family:'IBM Plex Sans',sans-serif;font-size:12px;line-height:1.45;padding:5px 6px;resize:vertical"></textarea>
+                      <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;margin-top:7px;letter-spacing:.06em">TAGS <span style="color:#4c525c">{{ u.tagCount }} SELECTED</span></div>
+                      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
+                        <sc-for list="{{ u.tagPicker }}" as="t" hint-placeholder-count="10">
+                          <span onClick="{{ t.go }}" style="font-family:'IBM Plex Mono',monospace;font-size:9px;padding:1px 5px;cursor:pointer;white-space:nowrap;color:{{ t.color }};border:1px solid {{ t.border }};background:{{ t.bg }}" style-hover="color:#fafafa">{{ t.label }}</span>
+                        </sc-for>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:7px;margin-top:9px">
+                        <span onClick="{{ u.promoteConfirm }}" style="flex:1;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.07em;padding:4px 0;cursor:pointer;color:{{ u.confirmColor }};border:1px solid {{ u.confirmBorder }};background:{{ u.confirmBg }}" style-hover="color:#fafafa">{{ u.confirmLabel }}</span>
+                        <span onClick="{{ u.promoteCancel }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e;border:1px solid #2b303a;padding:4px 10px;cursor:pointer" style-hover="color:#fafafa">CANCEL</span>
+                      </div>
+                    </div>
+                    </sc-if>
+                  </div>
+                  </sc-if>
+
+                  <sc-if value="{{ u.vetOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="padding:5px 12px 6px 46px;border-bottom:1px solid #161a21;background:{{ u.vetBg }};font-family:'IBM Plex Mono',monospace;font-size:10px;color:#cfd3da;line-height:1.5">
+                      <span style="color:{{ u.vetColor }};letter-spacing:.08em">VET · {{ u.vetKind }}</span>
+                      <span style="color:#6f757f"> FOLLOWING THIS RUN</span> · {{ u.vetDetail }}
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ u.open }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:stretch;border-bottom:1px solid #1e232c;background:#0e131a;border-left:2px solid #2b3a4a">
+                    <div style="flex:1;min-width:0;padding:9px 12px 10px 12px;border-right:1px solid #1e232c">
+                      <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#6f757f;margin-bottom:6px">SECTIONALS · POSITION AT EACH</div>
+                      <div style="display:flex;gap:4px">
+                        <sc-for list="{{ u.splits }}" as="s" hint-placeholder-count="5">
+                          <div style="flex:1;border:1px solid #232a34;background:#12171f;padding:4px 6px">
+                            <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;letter-spacing:.06em">{{ s.seg }}</div>
+                            <div style="display:flex;align-items:baseline;gap:6px;margin-top:2px">
+                              <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:{{ s.color }}">{{ s.t }}</span>
+                              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e">P{{ s.p }}</span>
+                            </div>
+                            <div style="height:3px;background:#1c2129;margin-top:4px"><div style="height:3px;background:{{ s.color }};width:{{ s.w }}%"></div></div>
+                          </div>
+                        </sc-for>
+                      </div>
+                      <div style="display:flex;gap:18px;margin-top:9px;font-family:'IBM Plex Mono',monospace;font-size:11px;flex-wrap:wrap">
+                        <div><span style="color:#6f757f">JUMP z </span><span style="color:{{ u.jumpColor }};font-weight:600">{{ u.jump }}</span><span style="color:#6f757f"> {{ u.jumpNote }}</span></div>
+                        <div><span style="color:#6f757f">LANE </span><span style="color:#cfd3da">{{ u.lane }}</span></div>
+                        <div><span style="color:#6f757f">GROUND LOST </span><span style="color:{{ u.lostColor }};font-weight:600">{{ u.lost }}</span></div>
+                        <div><span style="color:#6f757f">GEAR </span><span style="color:{{ u.gearColor }}">{{ u.gearLong }}</span></div>
+                        <div><span style="color:#6f757f">TRIAL </span><span style="color:#cfd3da">{{ u.trial }}</span></div>
+                      </div>
+                    </div>
+                    <div style="width:330px;flex:none;padding:9px 12px 10px 12px">
+                      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#6f757f">RACE QUALITY · TOP 5 AND WHAT THEY DID NEXT</span>
+                        <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;color:{{ u.qColor }};border:1px solid {{ u.qBorder }};background:{{ u.qBg }};padding:0 6px;letter-spacing:.08em">{{ u.quality }}</span>
+                      </div>
+                      <sc-for list="{{ u.retro }}" as="q" hint-placeholder-count="5">
+                        <div style="display:flex;align-items:center;gap:8px;height:19px;font-family:'IBM Plex Mono',monospace;font-size:11px">
+                          <span style="color:#6f757f;width:16px">{{ q.p }}</span>
+                          <span style="color:{{ q.nameColor }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">{{ q.name }}</span>
+                          <span style="color:#5b616b">→</span>
+                          <span style="width:22px;text-align:right;font-weight:600;color:{{ q.nextColor }}">{{ q.next }}</span>
+                          <span style="width:44px;text-align:right;color:#6f757f">{{ q.when }}</span>
+                          <div style="width:44px;height:6px;background:#1c2129;display:flex"><div style="height:6px;background:{{ q.nextColor }};width:{{ q.w }}%"></div></div>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+            </sc-if>
+          </div>
+        </sc-for>
+
+        <div style="display:flex;gap:18px;padding:9px 14px;border-top:1px solid #262a33;background:#12151b;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e;flex-wrap:wrap">
+          <span>CLICK A COLUMN TO SORT · CLICK HORSE FOR THE SIX-RUN GRID · CLICK RUN FOR SECTIONALS</span>
+          <span><span style="color:#f0a824">++</span>/<span style="color:#cfd3da">+</span>/<span style="color:#8b929e">−</span> TRIAL QUALITY, FROM FINISH + MARGIN + COMMENT</span>
+          <span style="color:#b7a2e8">■ TRAINER CHANGE</span>
+          <span style="color:#cbbcf5">1ST</span><span style="color:#9b8cd0">AGAIN · −REMOVED</span>
+          <span style="color:#c9748f">WEIGHT SWING</span>
+          <span style="color:#7f8a99">VET ROUTINE</span>
+          <span style="color:#e0637f">VET ! SIGNIFICANT</span>
+          <span>PAST RUNS SHOW THE PLACE <em style="font-style:normal;color:#cfd3da">DIVIDEND PAID</em>, NOT A PRE-RACE PLACE ODD</span>
+          <span style="color:#2ec4b6">✎ RUN NOTE</span>
+          <span style="color:#c8792f">▶ REPLAY</span>
+          <span>TIMES m:ss.xx · SPLITS ss.xx</span>
+          <span style="margin-left:auto;color:#6f757f">FIREFOOT history is source data; other runners' run detail is modelled from their supplied last-run figures</span>
+        </div>
+      </div>
+
+      <aside style="width:296px;flex:none;border-left:1px solid #262a33;background:#12151b">
+        <div style="padding:9px 12px;border-bottom:1px solid #262a33;display:flex;align-items:baseline;gap:8px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:600">{{ fit.no }}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;color:{{ fit.nameColor }}">{{ fit.name }}</span>
+          <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600">{{ fit.odds }}</span>
+        </div>
+        <div style="padding:8px 12px;border-bottom:1px solid #262a33">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#8b929e">HOW THIS HORSE FITS TODAY</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5b616b;margin-top:3px">HV · 1800m · C4 · GOOD · COURSE C · DRAW {{ fit.draw }}</div>
+        </div>
+        <sc-for list="{{ fit.cells }}" as="c" hint-placeholder-count="6">
+          <div style="padding:7px 12px;border-bottom:1px solid #191d24;opacity:{{ c.opacity }}">
+            <div style="display:flex;align-items:baseline;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11px">
+              <span style="color:{{ c.labelColor }};font-weight:600">{{ c.label }}</span>
+              <span style="margin-left:auto;color:{{ c.nColor }}">n={{ c.n }}</span>
+              <span style="color:{{ c.nColor }}">{{ c.wins }}W</span>
+              <span style="font-size:10px;color:{{ c.placeColor }}">{{ c.places }}P</span>
+              <span style="width:44px;text-align:right;font-size:12px;font-weight:600;color:{{ c.figColor }}">{{ c.fig }}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;margin-top:4px">
+              <div style="position:relative;flex:1;height:7px;background:#191d24">
+                <div style="position:absolute;left:{{ c.ciLo }}%;width:{{ c.ciW }}%;top:0;height:7px;background:{{ c.ciColor }}"></div>
+                <div style="position:absolute;left:{{ c.mid }}%;top:-2px;width:2px;height:11px;background:{{ c.markColor }}"></div>
+              </div>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:{{ c.nColor }};width:74px;text-align:right;white-space:nowrap">{{ c.note }}</span>
+            </div>
+          </div>
+        </sc-for>
+        <div style="padding:8px 12px;font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:1.6;color:#6f757f">
+          WINS ARE THE HEADLINE FIGURE; PLACE (TOP-3) RATE SITS QUIETER FOR CONTEXT. CELLS WITH n&lt;4 ARE DIMMED AND CARRY A WIDE INTERVAL. ACROSS 153 CONDITION CELLS, 8 CLEARED SIGNIFICANCE WHERE 7.0 WERE EXPECTED BY CHANCE — READ THIS PANEL AS FIT, NOT AS AN EDGE.
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showSlopeTint&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Density&quot;},&quot;thinSampleCutoff&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:4,&quot;min&quot;:2,&quot;max&quot;:10,&quot;step&quot;:1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Condition fit&quot;}}">
+const AMBER = '#f0a824', TEAL = '#2ec4b6', MUTED = '#8b929e', DIM = '#6f757f';
+const VIOLET = '#b7a2e8', VIOLET_RULE = '#4a3f6b', GEAR_C = '#9b8cd0', GEAR_FIRST = '#cbbcf5';
+
+const RACES = [
+  [1,'1200',5,'15:15'],[2,'1650',4,'15:45'],[3,'1800',4,'16:45'],[4,'1200',3,'17:15'],
+  [5,'1650',4,'17:45'],[6,'1000',2,'18:15'],[7,'1800',4,'18:45'],[8,'1200',3,'19:15'],
+  [9,'2200',4,'19:45'],[10,'1650',5,'20:15'],[11,'1200',4,'20:45'],
+];
+
+// no, name, draw, wt, jockey, odds, lastFig, style, flags, careerStarts, trainer, trainer at last run
+const FIELD = [
+  [10,'KYRUS TREASURE',6,123,'J Moreira','3.0',96.0,'On-Pace',[],26,'J Size','J Size'],
+  [2,'CASA ROCHESTER',2,133,'L Ferraris','4.9',104.7,'Midfield',['TRB'],31,'C Fownes','C Fownes'],
+  [12,'OCEAN IMPACT',9,120,'K Teetan','6.1',102.1,'Closer',['TRB'],18,'D Hall','A S Cruz'],
+  [8,'FIREFOOT',8,124,'J Orman','7.5',107.2,'Closer',['BB','TRB'],22,'D J Whyte','D J Whyte'],
+  [4,'ROMANTIC LAOS',3,128,'K C Leung','12',101.3,'Midfield',['TRB'],14,'F C Lor','F C Lor'],
+  [9,'NOBLE PURSUIT',1,121,'E C W Wong','15',103.4,'Leader',['BB','TRB'],20,'R Gibson','P F Yiu'],
+  [1,'HARMONY GALAXY',5,135,'B Avdulla','16',97.3,'Midfield',['LAY'],35,'A S Cruz','A S Cruz'],
+  [6,'STORM RUNNER',12,128,'A Atzeni','18',97.7,'Closer',['TRB'],12,'M Newnham','M Newnham'],
+  [11,'NORTHERN BEAST',10,120,'M F Poon','26',105.5,'On-Pace',['TRB','DIST'],16,'W Y So','K W Lui'],
+  [3,'VOLCANIC SPARK',11,129,'C Y Ho','32',98.2,'Leader',[],23,'P F Yiu','P F Yiu'],
+  [5,'SERANGOON',7,128,'H Bowman','33',97.7,'Midfield',['GOING'],29,'C H Yip','C H Yip'],
+  [7,'FAST SPEED',4,119,'P N Wong','51',86.0,'Closer',[],11,'K H Ting','K H Ting'],
+];
+
+const FLAG_META = {
+  BB:   { t: 'BLACKBOOK', color: TEAL,   border: '#1e4a45' },
+  TRB:  { t: 'TRIP',      color: '#c8792f', border: '#3d2a14' },
+  DIST: { t: 'DIST ↑',    color: '#7fa7c9', border: '#25384a' },
+  GOING:{ t: 'GOING ↔',   color: '#7fa7c9', border: '#25384a' },
+  LAY:  { t: '84d LAY',   color: MUTED,   border: '#2b303a' },
+};
+
+// horse-level note: why it went in the blackbook. Distinct from run notes, and traceable
+// to the run that triggered it — that run gets its note pre-filled rather than re-typed.
+const BB_NOTES = {
+  8: { reason: 'Closes hard once balanced. Hampered on the straight from the 300m and beaten a head — the figure understates the run. Third-up today.',
+       added: 'ADDED 05 JUL', run: 0, trace: 'TRIGGERED BY THE 04 JUL RUN — HAMPERED STRAIGHT' },
+  9: { reason: 'Strong turn of foot from the front. Market has abandoned it; the model still rates it the best horse in the race.',
+       added: 'ADDED 08 JUL', run: 0, trace: 'TRIGGERED BY THE 04 JUL RUN — HAMPERED STRAIGHT' },
+};
+
+const SOURCES = [
+  { k: 'card', name: 'Card', mins: 122, normal: 720, rows: '47 runners · 12 gear · 4 scratchings' },
+  { k: 'odds', name: 'Odds', mins: 47, normal: 15, rows: '132 win · 132 place · 2 matrices' },
+  { k: 'results', name: 'Results', mins: null, normal: 240, rows: '0 rows — nothing run yet today' },
+  { k: 'trials', name: 'Trials', mins: 4320, normal: 10080, rows: '38 trials · 38 comments' },
+  { k: 'vet', name: 'Vet', mins: 118, normal: 720, rows: '6 records · 2 significant' },
+];
+function ageLabel(mins) {
+  if (mins == null) return '—';
+  if (mins < 60) return mins + 'm';
+  if (mins < 1440) return Math.round(mins / 60) + 'h';
+  return Math.round(mins / 1440) + 'd';
+}
+
+// booking-reason taxonomy — the same ten the Blackbook page filters on
+const BB_TAGS = [
+  ['ability', '#9aa7b8'], ['improving', '#7fc8a9'], ['stable-change', '#b7a2e8'],
+  ['turn-of-foot', '#e8c04a'], ['incident', '#c8792f'], ['bad-conditions', '#7fa7c9'],
+  ['strong-race', '#ff8a5c'], ['trial-ability', '#8fb8d8'], ['trial-improving', '#8fd8c4'],
+  ['trial-profile', '#c0a8d8'],
+];
+
+// positional ordinal, front to back — never an alphabetical sort
+const STYLE_ORD = { 'Leader': 0, 'On-Pace': 1, 'Midfield': 2, 'Closer': 3 };
+const STYLES = ['Leader', 'On-Pace', 'Midfield', 'Closer'];
+// four distinct hues, not brightness steps on one hue — needs to read at a glance, not on close reading
+const STYLE_SKIN = [
+  { color: '#ff8a5c', bg: '#3a2013' },  // Leader — warm red-orange
+  { color: '#e8c04a', bg: '#3a3012' },  // On-Pace — warm gold, distinct from Leader
+  { color: '#9aa7b8', bg: '#1f2630' },  // Midfield — calm, deliberately the quietest
+  { color: '#4fb3e0', bg: '#12283a' },  // Closer — bold cool blue, as bold as Leader
+];
+
+// race-level tempo — one value per race, continuous blue → red
+const TEMPO = ['Very Slow', 'Slow', 'Neutral', 'Fast', 'Very Fast'];
+const TEMPO_SHORT = ['V SLOW', 'SLOW', 'NEUTRAL', 'FAST', 'V FAST'];
+const TEMPO_COLOR = ['#4a7fb5', '#6f9fbf', '#8b929e', '#d3843f', '#e0562f'];
+
+const GEAR_ITEMS = ['B', 'V', 'TT', 'H', 'XB'];
+const GEAR_LONG = { B: 'blinkers', V: 'visor', TT: 'tongue tie', H: 'hood', XB: 'cross bands' };
+
+// pairs from today's field who have met before — real weights and gates both days
+const PAIRS = [
+  { a: 12, b: 6, meets: 3, aWins: 2, bWins: 1,
+    last: { date: '08 FEB 26', cond: '1650 G', aDr: 5, aWt: 126, aFin: '2nd', bDr: 8, bWt: 126, bFin: '6th' } },
+  { a: 9, b: 3, meets: 2, aWins: 1, bWins: 1,
+    last: { date: '14 DEC 25', cond: '1800 GY', aDr: 3, aWt: 119, aFin: '4th', bDr: 6, bWt: 121, bFin: '2nd' } },
+  { a: 10, b: 2, meets: 2, aWins: 2, bWins: 0,
+    last: { date: '12 APR 26', cond: '1800 G', aDr: 4, aWt: 113, aFin: '1st', bDr: 9, bWt: 128, bFin: '5th' } },
+  { a: 8, b: 5, meets: 3, aWins: 2, bWins: 1,
+    last: { date: '21 JAN 26', cond: '1800 G', aDr: 2, aWt: 119, aFin: '3rd', bDr: 11, bWt: 124, bFin: '12th' } },
+];
+
+const COLS = [
+  { t: 'NO', k: 'no', a: 'center', pad: '6px' },
+  { t: 'HORSE', k: 'name', a: 'left', pad: '8px' },
+  { t: 'STYLE', k: 'style', a: 'left', pad: '8px' },
+  { t: 'DR', k: 'draw', a: 'center', pad: '4px' },
+  { t: 'JOCKEY', k: 'jockey', a: 'left', pad: '8px' },
+  { t: 'TRAINER', k: 'trainer', a: 'left', pad: '8px' },
+  { t: 'WT', k: 'wt', a: 'right', pad: '6px' },
+  { t: 'ODDS', k: 'odds', a: 'right', pad: '8px' },
+  { t: 'LAST 6 FIGURES', k: 'fig', a: 'left', pad: '8px' },
+  { t: 'FLAGS', k: 'flags', a: 'left', pad: '8px' },
+];
+
+// FIREFOOT — source data from the brief. style = where it sat; tempo = how the race was run.
+const FIREFOOT = [
+  { date: '04 Jul', trk: 'ST', crs: 'C+3', dist: 1800, going: 'GY', cl: 4, fin: 2,  dr: 12, wt: 123, time: '108.39', fig: 107, len: 7.7,  pos: '10 9 6 3 2', style: 'Closer',  tempo: 3, gear: ['B','TT'], trip: 'hampered straight',
+    splits: [['14.26',10],['22.48',9],['23.43',6],['23.85',3],['24.37',2]], jump: -0.42, lane: 'wide, 3–4 out', lost: 4.1, trial: '—',
+    retro: [['1','SPICY GRILL',3,'25 Jul'],['2','FIREFOOT',null,'today'],['3','MISTER MONACO',7,'18 Jul'],['4','DIAMOND SOARES',4,'11 Jul'],['5','ATOMIC FORCE',9,'25 Jul']] },
+  { date: '07 Jun', trk: 'ST', crs: 'AWT', dist: 1800, going: 'WS', cl: 5, fin: 1,  dr: 1,  wt: 130, time: '108.78', fig: 106, len: 6.8,  pos: '4 3 3 3 1',  style: 'On-Pace', tempo: 2, gear: ['B','TT'], trip: 'clear run',
+    splits: [['13.98',4],['22.91',3],['23.60',3],['24.02',3],['24.27',1]], jump: 0.61, lane: 'inside, saved', lost: 0.8, trial: '—',
+    retro: [['1','FIREFOOT',2,'04 Jul'],['2=','HAILTOTHEVICTORS',8,'24 Jun'],['2=','GOLDEN FORTUNE',2,'24 Jun'],['4','I EXCELLE',6,'04 Jul'],['5','HAPPYDEARHAPPYDEER',5,'01 Jul']] },
+  { date: '06 May', trk: 'ST', crs: 'AWT', dist: 1800, going: 'G',  cl: 4, fin: 2,  dr: 4,  wt: 116, time: '109.63', fig: 99,  len: -0.7, pos: '4 5 5 3 2',  style: 'Midfield', tempo: 1, gear: [], trip: '—',
+    splits: [['14.12',4],['23.30',5],['23.88',5],['24.05',3],['24.28',2]], jump: 0.18, lane: 'one out', lost: 1.6, trial: '—',
+    retro: [['1','SUPER TALENT',1,'28 May'],['2','FIREFOOT',2,'07 Jun'],['3','KING OPIE',3,'21 May'],['4','LUCKY PRIDE',5,'24 May'],['5','MR ANDERSON',11,'17 May']] },
+  { date: '19 Apr', trk: 'ST', crs: 'AWT', dist: 1800, going: 'G',  cl: 5, fin: 2,  dr: 5,  wt: 134, time: '110.08', fig: 102, len: 2.9,  pos: '6 7 8 2 2',  style: 'Closer',  tempo: 3, gear: ['B'], trip: 'checked 600m',
+    splits: [['14.40',6],['23.11',7],['24.02',8],['23.90',2],['24.65',2]], jump: -0.88, lane: 'two out', lost: 2.9, trial: '—',
+    retro: [['1','TRIPLE MOON',4,'10 May'],['2','FIREFOOT',2,'06 May'],['3','GENERAL WINNER',6,'03 May'],['4','GOOD FIT',1,'10 May'],['5','SOUND GUARD',7,'26 Apr']] },
+  { date: '01 Apr', trk: 'ST', crs: 'AWT', dist: 1800, going: 'G',  cl: 4, fin: 4,  dr: 8,  wt: 117, time: '108.68', fig: 105, len: 6.2,  pos: '9 9 8 8 4',  style: 'Closer',  tempo: 4, gear: [], trip: 'wide throughout',
+    splits: [['14.05',9],['22.66',9],['23.71',8],['24.06',8],['24.20',4]], jump: -0.61, lane: 'three out', lost: 5.4, trial: '—',
+    retro: [['1','ANGEL OF PEACE',2,'19 Apr'],['2','BRAVE POWER',5,'12 Apr'],['3','MIRACLE VICTORY',1,'26 Apr'],['4','FIREFOOT',2,'19 Apr'],['5','TOP HOPE',6,'12 Apr']] },
+  { date: '15 Mar', trk: 'ST', crs: 'AWT', dist: 1650, going: 'G',  cl: 4, fin: 8,  dr: 7,  wt: 120, time: '99.64',  fig: 101, len: 1.3,  pos: '11 12 10 8',  style: 'Closer',  tempo: 2, gear: [], trip: 'slow away',
+    splits: [['14.61',11],['23.02',12],['23.55',10],['24.10',8]], jump: -1.34, lane: 'two out', lost: 3.2, trial: 'trial 2nd, 28 Feb',
+    retro: [['1','SIGHT HERO',3,'05 Apr'],['2','GLORY STAR',4,'29 Mar'],['3','ROYAL RACER',8,'22 Mar'],['4','WINNING VIBE',2,'05 Apr'],['5','GOLD MOUNT',10,'29 Mar']] },
+];
+
+// Vet records attach to the RUN they followed, so they read in sequence with the trip tag.
+// Keyed horseNo:runIndex. Routine and significant are deliberately different weights.
+const RUN_VET = {
+  '12:0': ['routine', 'Passed post-race veterinary examination.'],
+  '1:1': ['significant', 'Bled from both nostrils; barred from racing pending an official trial. Cleared 02 Jul.'],
+  '5:2': ['routine', 'Passed post-race veterinary examination.'],
+  '11:0': ['significant', 'Lame right fore on returning to the stables; veterinary clearance issued 09 Jul.'],
+  '8:5': ['routine', 'Passed post-race veterinary examination.'],
+  '6:1': ['significant', 'Substantial blood in the trachea on endoscopic examination; 30-day spell ordered.'],
+};
+
+const TRKS = ['ST', 'HV'], CRSS = ['A', 'B', 'C', 'C+3', 'AWT'], GOINGS = ['G', 'GY', 'Y', 'WS'];
+const TRIPS = ['—', 'checked 800m', 'wide throughout', 'short of room', 'hampered straight', 'slow away', 'clear run'];
+const MONTHS = ['04 Jul', '20 Jun', '01 Jun', '11 May', '19 Apr', '22 Mar'];
+const HORSE_POOL = ['SPICY GRILL','MISTER MONACO','DIAMOND SOARES','ATOMIC FORCE','SUPER TALENT','KING OPIE','LUCKY PRIDE','TRIPLE MOON','GOOD FIT','SOUND GUARD','BRAVE POWER','TOP HOPE','GLORY STAR','ROYAL RACER','GOLD MOUNT','SIGHT HERO','WINNING VIBE','ANGEL OF PEACE'];
+const OLD_TRAINERS = ['K W Lui','A T Millard','C W Chang','T P Yung','D Ferraris'];
+const RIDERS = ['J Orman','K Teetan','M F Poon','C Y Ho','H Bowman','L Ferraris','K C Leung','E C W Wong','A Atzeni','B Avdulla','J Moreira','P N Wong'];
+const FIREFOOT_RIDERS = ['J Orman','J Orman','M F Poon','C Y Ho','J Orman','K C Leung'];
+
+function rng(seed) {
+  let s = 0; for (let i = 0; i < seed.length; i++) s = (s * 31 + seed.charCodeAt(i)) >>> 0;
+  return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+}
+function figColor(f) { return f >= 105 ? '#fafafa' : (f >= 100 ? '#cfd3da' : MUTED); }
+function figWeight(f) { return f >= 105 ? 600 : 400; }
+function gearStr(g) { return g.length ? g.join('+') : '—'; }
+// cumulative race times read m:ss.xx; sectional segments stay plain seconds
+function fmtRaceTime(v) {
+  const s = Number(v);
+  if (!isFinite(s)) return String(v);
+  if (s < 60) return s.toFixed(2);
+  const m = Math.floor(s / 60);
+  const rest = s - m * 60;
+  return m + ':' + (rest < 10 ? '0' : '') + rest.toFixed(2);
+}
+const MONTH_NUM = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
+function replayUrl(date, raceNo) {
+  const parts = String(date).split(' ');
+  const ymd = '2026' + (MONTH_NUM[parts[1]] || '07') + String(parts[0]).padStart(2, '0');
+  return 'https://racing.hkjc.com/contentAsset/videoplayer_v4/video-player-iframe_v4.html'
+    + '?type=replay-full&date=' + ymd + '&no=' + String(raceNo).padStart(2, '0')
+    + '&lang=eng&noPTbar=false&noLeading=false&videoParam=P';
+}
+function ordinal(n) {
+  const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+function trialVideoUrl(date) {
+  const parts = String(date).split(' ');
+  const ymd = '2026' + (MONTH_NUM[parts[1]] || '01') + String(parts[0]).padStart(2, '0');
+  return 'https://racing.hkjc.com/contentAsset/videoplayer_v4/video-player-iframe_v4.html?type=trial&date=' + ymd + '&lang=eng';
+}
+// transparent rule, not a black-box score — checkable against the comment by eye
+function trialQuality(t) {
+  let score = 0;
+  if (t.finPos === 1) score += 2; else if (t.finPos <= Math.ceil(t.field / 3)) score += 1; else score -= 1;
+  if (t.margin <= 0.3) score += 1; else if (t.margin >= 3) score -= 1;
+  if (/ran on|scored|strong|impressive|too good|smart|urged/i.test(t.comment)) score += 1;
+  if (/found little|workmanlike|never able|held up|eased/i.test(t.comment)) score -= 1;
+  return score >= 3 ? '++' : (score >= 1 ? '+' : '−');
+}
+const TRIAL_DATES = ['28 Feb', '12 Mar', '30 Mar', '19 Apr', '11 Jun', '24 Jun'];
+const TRIAL_COMMENTS = [
+  'Ran on nicely once clear.', 'Travelled strongly, urged along late.',
+  'Found little on a testing surface.', 'Workmanlike, in the market for the run.',
+  'Went straight to the front, too good.', 'Held up early, never able to improve.',
+  'Impressive turn of foot from midfield.', 'Eased down once safely clear.',
+];
+function makeTrials(h) {
+  const rand = rng(h[1] + 'trial');
+  if (rand() > 0.62) return [];
+  const count = rand() < 0.45 ? 2 : 1;
+  const dateIdx = Math.floor(rand() * (TRIAL_DATES.length - count));
+  const trials = [];
+  for (let i = 0; i < count; i++) {
+    const field = 4 + Math.floor(rand() * 5);
+    const finPos = 1 + Math.floor(rand() * field);
+    const margin = finPos === 1 ? 0 : Math.round(rand() * 4 * 10) / 10;
+    const dist = [800, 1000, 1200][Math.floor(rand() * 3)];
+    const otherCount = Math.min(2, field - 1);
+    const others = [];
+    for (let j = 0; j < otherCount; j++) {
+      others.push([HORSE_POOL[Math.floor(rand() * HORSE_POOL.length)], finPos === 1 ? j + 2 : (j === 0 ? 1 : 3)]);
+    }
+    const t = {
+      date: TRIAL_DATES[dateIdx + count - 1 - i], track: rand() < 0.5 ? 'ST' : 'CWB', dist,
+      going: GOINGS[Math.floor(rand() * GOINGS.length)],
+      batch: 1 + Math.floor(rand() * 3), draw: 1 + Math.floor(rand() * field),
+      gear: rand() < 0.3 ? [GEAR_ITEMS[Math.floor(rand() * GEAR_ITEMS.length)]] : [],
+      jockey: RIDERS[Math.floor(rand() * RIDERS.length)],
+      posSeq: [1 + Math.floor(rand() * field), 1 + Math.floor(rand() * field), finPos].join('-'),
+      finPos, field, margin,
+      time: dist === 800 ? 46 + rand() * 3 : (dist === 1000 ? 58 + rand() * 3 : 70 + rand() * 4),
+      comment: TRIAL_COMMENTS[Math.floor(rand() * TRIAL_COMMENTS.length)],
+      others,
+    };
+    t.quality = trialQuality(t);
+    trials.push(t);
+  }
+  return trials;
+}
+function signed(v) { return (v > 0 ? '+' : (v < 0 ? '−' : '')) + Math.abs(v); }
+function gateNote(then, now) {
+  const d = now - then;
+  return then + '→' + now + (d === 0 ? ' =' : (d > 0 ? ' +' + d + 'W' : ' −' + (-d) + 'IN'));
+}
+
+// trainer change is "this run vs the run immediately before it".
+// gear needs the FULL history: first-time-ever and worn-before-and-back are different facts.
+function markChanges(runs, prior) {
+  return runs.map((u, k) => {
+    const older = runs[k + 1];
+    const gear = u.gear || [];
+    const oldGear = older ? (older.gear || []) : null;
+    const history = runs.slice(k + 1).map(o => o.gear || []).concat(prior || []);
+    const wornBefore = (g) => history.some(set => set.indexOf(g) >= 0);
+    const added = oldGear ? gear.filter(g => oldGear.indexOf(g) < 0) : gear.filter(g => !wornBefore(g));
+    const removed = oldGear ? oldGear.filter(g => gear.indexOf(g) < 0) : [];
+    return Object.assign({}, u, {
+      gearAdded: added.map(g => ({ g, first: !wornBefore(g) })),
+      gearRemoved: removed,
+      gearChanged: !!oldGear && (added.length > 0 || removed.length > 0),
+      trainerChanged: !!older && older.trainer !== u.trainer,
+    });
+  });
+}
+
+function makeRuns(h) {
+  const todayTrainer = h[10], lastTrainer = h[11];
+  if (h[1] === 'FIREFOOT') {
+    const r = rng('FIREFOOT-replay');
+    // never carried gear before the six runs shown, so 19 Apr blinkers are genuinely first-time
+    return markChanges(FIREFOOT.map((u, k) => Object.assign({}, u, {
+      jockey: FIREFOOT_RIDERS[k], trainer: lastTrainer, raceNo: 1 + Math.floor(r() * 11),
+    })), []);
+  }
+  const rand = rng(h[1]);
+  const base = h[6];
+  const olderTrainer = rand() < 0.3 ? OLD_TRAINERS[Math.floor(rand() * OLD_TRAINERS.length)] : lastTrainer;
+  let gear = rand() < 0.45 ? ['B'] : [];
+  const prior = [gear.slice()];   // gear worn before the six runs shown
+  const gearByRun = [];   // oldest first
+  for (let k = 5; k >= 0; k--) {
+    if (rand() < 0.2) {
+      const item = GEAR_ITEMS[Math.floor(rand() * GEAR_ITEMS.length)];
+      gear = gear.indexOf(item) >= 0 ? gear.filter(g => g !== item) : gear.concat([item]);
+    }
+    gearByRun[k] = gear.slice();
+  }
+  const runs = MONTHS.map((date, k) => {
+    const fig = Math.round((base - k * 1.1 + (rand() - 0.5) * 7) * 10) / 10;
+    const fin = k === 0 ? 1 + Math.floor(rand() * 9) : 1 + Math.floor(rand() * 12);
+    const dist = k === 0 ? 1800 : [1650, 1800, 1800, 2000, 1650][Math.floor(rand() * 5)];
+    const pos = [];
+    let p = 2 + Math.floor(rand() * 9);
+    for (let j = 0; j < 5; j++) { pos.push(p); p = Math.max(1, Math.min(12, p + (fin < p ? -1 - Math.floor(rand() * 2) : Math.round((rand() - 0.5) * 2)))); }
+    pos[4] = fin;
+    const splits = [14 + rand(), 22 + rand() * 1.6, 23 + rand() * 1.2, 23.4 + rand() * 1.2, 24 + rand() * 1.1]
+      .map((t, j) => [t.toFixed(2), pos[j]]);
+    return {
+      date, trk: TRKS[Math.floor(rand() * 2)], crs: CRSS[Math.floor(rand() * CRSS.length)],
+      dist, going: GOINGS[Math.floor(rand() * GOINGS.length)], cl: 3 + Math.floor(rand() * 3),
+      fin, dr: 1 + Math.floor(rand() * 12), wt: 113 + Math.floor(rand() * 22),
+      jockey: k === 0 ? h[4] : (rand() < 0.55 ? h[4] : RIDERS[Math.floor(rand() * RIDERS.length)]),
+      trainer: k <= 3 ? lastTrainer : olderTrainer,
+      time: (dist === 1650 ? 99 + rand() * 1.4 : 108 + rand() * 2.4).toFixed(2),
+      fig, len: Math.round((fig - 100) * 0.9 * 10) / 10,
+      pos: pos.join(' '),
+      style: STYLES[Math.floor(rand() * 4)],
+      tempo: Math.floor(rand() * 5),
+      gear: gearByRun[k],
+      raceNo: 1 + Math.floor(rand() * 11),
+      trip: TRIPS[Math.floor(rand() * TRIPS.length)],
+      splits, jump: Math.round((rand() * 2 - 1) * 100) / 100,
+      lane: ['inside, saved', 'one out', 'two out', 'three out', 'wide, 3–4 out'][Math.floor(rand() * 5)],
+      lost: Math.round(rand() * 55) / 10,
+      trial: rand() > 0.75 ? 'trial ' + (1 + Math.floor(rand() * 5)) + 'th, ' + ['12 Feb','28 Feb','06 Mar'][Math.floor(rand() * 3)] : '—',
+      retro: [0, 1, 2, 3, 4].map(j => {
+        const nm = j === 1 ? h[1] : HORSE_POOL[Math.floor(rand() * HORSE_POOL.length)];
+        return [String(j + 1), nm, 1 + Math.floor(rand() * 11), MONTHS[Math.max(0, k - 1)]];
+      }),
+    };
+  });
+  return markChanges(runs, prior);
+}
+
+// career condition record, deterministic per horse
+function careerFit(h) {
+  const rand = rng(h[1] + 'fit');
+  const starts = h[9];
+  const runs = [];
+  for (let i = 0; i < starts; i++) {
+    const at1800 = rand() < (h[1] === 'FIREFOOT' ? 0.62 : 0.34);
+    const field = 8 + Math.floor(rand() * 6);
+    const finPos = 1 + Math.floor(rand() * field);
+    runs.push({
+      dist: at1800 ? 1800 : [1200, 1400, 1650, 2000, 2200][Math.floor(rand() * 5)],
+      crs: CRSS[Math.floor(rand() * CRSS.length)],
+      going: GOINGS[Math.floor(rand() * GOINGS.length)],
+      cl: 3 + Math.floor(rand() * 3),
+      fig: h[6] + (rand() - 0.5) * 12,
+      win: finPos === 1, place: finPos <= 3,
+    });
+  }
+  const cell = (label, pick) => {
+    const m = runs.filter(pick);
+    const n = m.length;
+    const wins = m.filter(r => r.win).length;
+    const places = m.filter(r => r.place).length;
+    const avg = n ? m.reduce((a, r) => a + r.fig, 0) / n : null;
+    return { label, n, wins, places, avg };
+  };
+  return [
+    cell('1800m', r => r.dist === 1800),
+    cell('COURSE C', r => r.crs === 'C' || r.crs === 'C+3'),
+    cell('GOING GOOD', r => r.going === 'G'),
+    cell('CLASS 4', r => r.cl === 4),
+    cell('1800m · CLASS 4', r => r.dist === 1800 && r.cl === 4),
+    cell(h[7].toUpperCase() + ' @ 1800m HV', r => r.dist === 1800 && (r.crs === 'C' || r.crs === 'C+3')),
+  ];
+}
+
+const SWING_SKIN = [
+  { color: '#7a6470', border: '#2a2333', bg: 'transparent' },
+  { color: '#c9748f', border: '#4a2733', bg: '#241419' },
+  { color: '#e0637f', border: '#5a2131', bg: '#2f1620' },
+  { color: '#ff5f7a', border: '#6d2033', bg: '#3a1723' },
+];
+
+class Component extends DCLogic {
+  state = {
+    race: 3, open: { 8: true, 9: true }, runs: { '8:1': true }, focus: 8, sort: null,
+    bbHover: null, bbPos: null, noteOpen: null, notePos: null, draft: '', vetOpen: null, refreshed: null,
+    promoteOpen: null, promoteReason: '', promoteTags: [],
+    // horses already in the book, with the run that triggered each
+    booked: {
+      8: { runKey: '8:0', tags: ['incident', 'turn-of-foot'], date: '05 JUL' },
+      9: { runKey: '9:0', tags: ['bad-conditions', 'turn-of-foot'], date: '08 JUL' },
+    },
+    notes: Object.keys(BB_NOTES).reduce((acc, no) => {
+      const b = BB_NOTES[no];
+      acc[no + ':' + b.run] = { text: b.reason, added: b.added.replace('ADDED ', ''), source: 'blackbook' };
+      return acc;
+    }, {}),
+  };
+
+  openNote(key, rect) {
+    this.setState(s => ({
+      noteOpen: s.noteOpen === key ? null : key,
+      notePos: s.noteOpen === key ? s.notePos : this.panelPos(rect, 344),
+      draft: (s.notes[key] && s.notes[key].text) || '',
+    }));
+  }
+  panelPos(rect, w) {
+    const margin = 8;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let left = rect.right - w;
+    if (left < margin) left = margin;
+    if (left + w > vw - margin) left = Math.max(margin, vw - margin - w);
+    const spaceBelow = vh - rect.bottom - margin, spaceAbove = rect.top - margin;
+    let top, maxHeight;
+    if (spaceBelow >= 140 || spaceBelow >= spaceAbove) {
+      top = rect.bottom + 6;
+      maxHeight = Math.max(80, vh - top - margin);
+    } else {
+      maxHeight = Math.max(80, spaceAbove - 6);
+      top = Math.max(margin, rect.top - 6 - maxHeight);
+    }
+    return { left, top, maxHeight };
+  }
+  saveNote(key) {
+    this.setState(s => {
+      const notes = Object.assign({}, s.notes);
+      const text = (s.draft || '').trim();
+      if (text) notes[key] = { text, added: '15 JUL', source: 'run' };
+      else delete notes[key];
+      return { notes, noteOpen: null, draft: '' };
+    });
+  }
+
+  // a note never auto-promotes — this is the one deliberate step, pre-filled so nothing is retyped
+  openPromote(key, text, tags) {
+    this.setState({ promoteOpen: key, promoteReason: text, promoteTags: tags });
+  }
+  togglePromoteTag(t) {
+    this.setState(s => ({ promoteTags: s.promoteTags.indexOf(t) >= 0 ? s.promoteTags.filter(x => x !== t) : s.promoteTags.concat([t]) }));
+  }
+  confirmPromote(no, key) {
+    this.setState(s => {
+      if (!s.promoteTags.length) return {};
+      const booked = Object.assign({}, s.booked);
+      booked[no] = { runKey: key, tags: s.promoteTags.slice(), date: '15 JUL' };
+      const notes = Object.assign({}, s.notes);
+      notes[key] = { text: s.promoteReason, added: '15 JUL', source: 'blackbook' };
+      return { booked, notes, promoteOpen: null, promoteTags: [], promoteReason: '' };
+    });
+  }
+
+  toggleHorse(no) {
+    this.setState(s => {
+      const open = Object.assign({}, s.open);
+      if (open[no]) delete open[no]; else open[no] = true;
+      return { open, focus: no };
+    });
+  }
+  toggleRun(key) {
+    this.setState(s => {
+      const runs = Object.assign({}, s.runs);
+      if (runs[key]) delete runs[key]; else runs[key] = true;
+      return { runs };
+    });
+  }
+  cycle(key) {
+    this.setState(s => {
+      if (!s.sort || s.sort.key !== key) return { sort: { key, dir: 'asc' } };
+      if (s.sort.dir === 'asc') return { sort: { key, dir: 'desc' } };
+      return { sort: null };
+    });
+  }
+
+  data() {
+    if (!this._data) this._data = FIELD.map(h => ({ h, runs: makeRuns(h), fit: careerFit(h), trials: makeTrials(h) }));
+    return this._data;
+  }
+
+  // swing = shift in the weight GAP between the pair, not either horse's own weight
+  pairsFor(no) {
+    if (!this._pairs) {
+      const byNo = {};
+      FIELD.forEach(h => { byNo[h[0]] = h; });
+      this._pairs = PAIRS.map(p => {
+        const A = byNo[p.a], B = byNo[p.b];
+        const gapThen = p.last.aWt - p.last.bWt;
+        const gapNow = A[3] - B[3];
+        const swing = Math.abs(gapNow - gapThen);
+        return {
+          A, B, meets: p.meets, aWins: p.aWins, bWins: p.bWins, last: p.last,
+          gapThen, gapNow, swing,
+          tier: swing >= 8 ? 3 : (swing >= 6 ? 2 : (swing >= 4 ? 1 : 0)),
+        };
+      }).sort((x, y) => (y.swing - x.swing) || (y.meets - x.meets));
+    }
+    return this._pairs.filter(p => p.A[0] === no || p.B[0] === no).map(p => {
+      const mine = p.A[0] === no;
+      const me = mine ? p.A : p.B, other = mine ? p.B : p.A;
+      const skin = SWING_SKIN[p.tier];
+      return {
+        other: other[0] + ' ' + other[1],
+        record: (mine ? p.aWins + '–' + p.bWins : p.bWins + '–' + p.aWins) + ' in ' + p.meets,
+        lastDate: p.last.date, lastCond: p.last.cond,
+        lastLine: (mine ? p.last.aFin + ' v ' + p.last.bFin : p.last.bFin + ' v ' + p.last.aFin),
+        gapThen: signed(mine ? p.gapThen : -p.gapThen),
+        gapNow: signed(mine ? p.gapNow : -p.gapNow),
+        swingLabel: 'SWING ' + p.swing + 'lb' + (p.tier ? ' ' + '●'.repeat(p.tier) : ''),
+        swingColor: skin.color, swingBorder: skin.border, swingBg: skin.bg,
+        gate: gateNote(mine ? p.last.aDr : p.last.bDr, me[2]),
+      };
+    });
+  }
+
+  renderVals() {
+    const race = this.state.race, open = this.state.open, sort = this.state.sort;
+    const data = this.data();
+    const focusRow = data.find(d => d.h[0] === this.state.focus) || data[3];
+    const m = RACES.find(r => r[0] === race) || RACES[2];
+    const tempoIdx = 3;   // R3 today: Fast
+
+    const seqOf = (runs) => runs.map(u => ({
+      v: u.fig.toFixed(0), color: figColor(u.fig), weight: figWeight(u.fig),
+      pColor: u.fig >= 105 ? '#14171c' : (u.fig >= 100 ? '#3c424a' : '#8d949c'),
+      pWeight: u.fig >= 105 ? 600 : 400,
+    }));
+
+    let horses = data.map(({ h, runs, trials }) => {
+      const no = h[0];
+      const figs = runs.map(u => u.fig).slice().reverse();   // oldest → newest
+      const slope = (figs[5] - figs[0]) + (figs[4] - figs[1]) * 0.5;
+      const ord = STYLE_ORD[h[7]];
+      const trNew = h[10] !== h[11];
+      const entry = this.state.booked[no];
+      const isBB = h[8].indexOf('BB') >= 0 || !!entry;
+      const flagKeys = h[8].indexOf('BB') < 0 && entry ? ['BB'].concat(h[8]) : h[8];
+      const seq = seqOf(runs);
+      // trend lives in the figure sequence itself: brightest endpoint + a slope rule under it
+      if (slope > 3) seq[0] = Object.assign({}, seq[0], { color: '#fafafa', weight: 600 });
+      else if (slope < -3) seq[0] = Object.assign({}, seq[0], { color: '#6f757f', weight: 400 });
+      const h2h = this.pairsFor(no);
+      const isOpen = !!open[no];
+      return {
+        no, name: h[1], draw: h[2], wt: h[3], jockey: h[4], odds: h[5], style: h[7],
+        seq,
+        slopeTint: (this.props.showSlopeTint ?? true)
+          ? (slope > 3 ? 'linear-gradient(90deg,#2b303a,#8d95a3)' : (slope < -3 ? 'linear-gradient(90deg,#8d95a3,#22262e)' : '#20242b'))
+          : 'transparent',
+        styleColor: STYLE_SKIN[ord].color, styleBg: STYLE_SKIN[ord].bg,
+        trainer: h[10], trNew,
+        trColor: trNew ? VIOLET : '#cfd3da',
+        trWeight: trNew ? 600 : 400,
+        trBg: trNew ? 'rgba(183,162,232,0.09)' : 'transparent',
+        flags: flagKeys.map(f => Object.assign({}, FLAG_META[f], {
+          cursor: f === 'BB' ? 'help' : 'default',
+          enter: f === 'BB' ? (e) => this.setState({ bbHover: no, bbPos: this.panelPos(e.currentTarget.getBoundingClientRect(), 330) }) : () => {},
+          leave: f === 'BB' ? () => this.setState({ bbHover: null }) : () => {},
+        })),
+        bbShow: this.state.bbHover === no && (!!BB_NOTES[no] || !!entry),
+        bbLeft: (this.state.bbPos || {}).left || 0,
+        bbTop: (this.state.bbPos || {}).top || 0,
+        bbMaxH: (this.state.bbPos || {}).maxHeight || 300,
+        bbReason: BB_NOTES[no] ? BB_NOTES[no].reason
+          : (entry && this.state.notes[entry.runKey] ? this.state.notes[entry.runKey].text : ''),
+        bbAdded: BB_NOTES[no] ? BB_NOTES[no].added : (entry ? 'ADDED ' + entry.date : ''),
+        bbTrace: BB_NOTES[no] ? BB_NOTES[no].trace
+          : (entry ? 'TAGS ' + entry.tags.join(' · ').toUpperCase() + ' — PROMOTED FROM A RUN NOTE' : ''),
+        flagText: flagKeys.map(f => FLAG_META[f].t).join(' · '),
+        trainerPrint: h[10],
+        trPrintColor: trNew ? '#14171c' : '#4b5158',
+        trWeight: trNew ? 600 : 400,
+        nameColor: isBB ? TEAL : '#fafafa',
+        caret: isOpen ? '▼' : '▶', caretColor: isOpen ? '#fafafa' : '#4c525c',
+        open: isOpen,
+        bg: this.state.focus === no ? '#1c212a' : 'transparent',
+        mark: this.state.focus === no ? '#fafafa' : (isBB ? TEAL : 'transparent'),
+        toggle: () => this.toggleHorse(no),
+        focus: () => this.setState({ focus: no }),
+        h2h, h2hAny: h2h.length > 0,
+        trialsAny: trials.length > 0, trialsEmpty: trials.length === 0,
+        trials: trials.map(t => ({
+          q: t.quality,
+          qColor: t.quality === '++' ? AMBER : (t.quality === '+' ? '#cfd3da' : MUTED),
+          qBorder: t.quality === '++' ? '#4a3a18' : '#2b303a',
+          qBg: t.quality === '++' ? '#241d0e' : 'transparent',
+          date: t.date, cond: t.track + ' ' + t.dist + 'm ' + t.going,
+          batch: 'B' + t.batch + ' DR' + t.draw,
+          gear: gearStr(t.gear), gearColor: t.gear.length ? GEAR_C : '#5b616b',
+          jockey: t.jockey,
+          finLabel: ordinal(t.finPos) + '/' + t.field,
+          posSeq: t.posSeq,
+          margin: t.finPos === 1 ? 'WON' : '−' + t.margin.toFixed(1) + 'L',
+          time: fmtRaceTime(t.time.toFixed(2)),
+          video: trialVideoUrl(t.date),
+          comment: t.comment,
+          othersStr: t.others.length ? 'ALSO ' + t.others.map(o => o[0] + ' ' + ordinal(o[1])).join(', ') : '',
+        })),
+        sortVals: { no, name: h[1], style: ord, draw: h[2], jockey: h[4], trainer: h[10], wt: h[3], odds: Number(h[5]), fig: h[6], flags: h[8].length },
+        runs: runs.map((u, k) => {
+          const key = no + ':' + k;
+          const ro = !!this.state.runs[key];
+          const maxSp = Math.max.apply(null, u.splits.map(s => Number(s[0])));
+          const minSp = Math.min.apply(null, u.splits.map(s => Number(s[0])));
+          const worst = Math.max.apply(null, u.retro.map(q => q[2] == null ? 0 : q[2]));
+          const nexts = u.retro.map(q => q[2]).filter(v => v != null);
+          const avgNext = nexts.reduce((a, b) => a + b, 0) / (nexts.length || 1);
+          const quality = avgNext <= 3.2 ? 'STRONG RACE' : (avgNext <= 5 ? 'FAIR RACE' : 'MODEST RACE');
+          const uOrd = STYLE_ORD[u.style];
+          const gearDelta = u.gearAdded.map(a => '+' + a.g + (a.first ? ' 1st' : ' again'))
+            .concat(u.gearRemoved.map(g => '−' + g)).join(', ');
+          const gearBadges = u.gearAdded.map(a => a.first
+            ? { t: a.g + ' 1ST', color: GEAR_FIRST, border: '#3f356b', bg: '#221c3a', deco: 'none' }
+            : { t: a.g + ' AGAIN', color: GEAR_C, border: '#2f2a44', bg: 'transparent', deco: 'none' })
+            .concat(u.gearRemoved.map(g => ({ t: '−' + g, color: '#9b8cd0', border: '#332c47', bg: '#191626', deco: 'line-through' })));
+          const noteKey = no + ':' + k;
+          const note = this.state.notes[noteKey];
+          const hasTrip = u.trip !== '—' && u.trip !== 'clear run';
+          const entry = this.state.booked[no];
+          const bookedHere = !!entry && entry.runKey === noteKey;
+          const vet = RUN_VET[noteKey];
+          const vetSig = !!vet && vet[0] === 'significant';
+          // dividend actually paid, not a price — only exists when the horse placed
+          const placeDiv = u.fin <= 3 ? (1.1 + (u.fin - 1) * 0.4 + (u.fig % 7) / 5).toFixed(1) : null;
+          const promoteOpen = this.state.promoteOpen === noteKey;
+          const canPromote = !bookedHere && !promoteOpen;
+          return {
+            n: k + 1, date: u.date,
+            cond: u.trk + ' ' + u.crs + ' ' + u.dist + ' ' + u.going + ' C' + u.cl,
+            dr: u.dr, wt: u.wt, jockey: u.jockey || h[4],
+            trainer: u.trainer, trChanged: u.trainerChanged,
+            trColor: u.trainerChanged ? VIOLET : '#cfd3da',
+            trWeight: u.trainerChanged ? 600 : 400,
+            trBg: u.trainerChanged ? 'rgba(183,162,232,0.09)' : 'transparent',
+            style: u.style, styleColor: STYLE_SKIN[uOrd].color, styleBg: STYLE_SKIN[uOrd].bg,
+            tempo: TEMPO_SHORT[u.tempo], tempoCode: ['VS', 'S', 'N', 'F', 'VF'][u.tempo], tempoColor: TEMPO_COLOR[u.tempo],
+            gear: gearStr(u.gear),
+            gearColor: u.gear.length ? (u.gearChanged ? GEAR_C : '#cfd3da') : '#5b616b',
+            gearBadges,
+            gearLong: (u.gear.length ? u.gear.map(g => GEAR_LONG[g]).join(', ') : 'none')
+              + (gearDelta ? ' (' + gearDelta + ')' : ''),
+            noteText: note ? note.text : 'No note on this run yet.',
+            noteMeta: note ? (note.source === 'blackbook' ? 'ADDED ' + note.added + ' · FROM BLACKBOOK ENTRY' : 'ADDED ' + note.added + ' · RE: THIS RUN') : 'RE: THIS RUN',
+            noteColor: note ? TEAL : '#3f4550',
+            noteBorder: note ? '#1e4a45' : '#22262e',
+            noteBg: note ? '#12211f' : 'transparent',
+            noteOpen: this.state.noteOpen === noteKey,
+            noteLeft: (this.state.notePos || {}).left || 0,
+            noteTop: (this.state.notePos || {}).top || 0,
+            noteMaxH: (this.state.notePos || {}).maxHeight || 300,
+            draft: this.state.draft,
+            noteType: (e) => this.setState({ draft: e.target.value }),
+            noteClick: (e) => { e.stopPropagation(); this.openNote(noteKey, e.currentTarget.getBoundingClientRect()); },
+            noteClose: (e) => { e.stopPropagation(); this.setState({ noteOpen: null, promoteOpen: null }); },
+            noteSave: (e) => { e.stopPropagation(); this.saveNote(noteKey); },
+            bookedHere, canPromote, promoteOpen,
+            bookedMeta: bookedHere ? 'ADDED ' + entry.date + ' FROM THIS RUN' : '',
+            bookedTags: bookedHere ? entry.tags.map(t => ({ label: t, color: (BB_TAGS.find(x => x[0] === t) || [, MUTED])[1] })) : [],
+            promoteOpenClick: (e) => {
+              e.stopPropagation();
+              this.openPromote(noteKey, note ? note.text : (u.trip !== '—' ? 'Note the ' + u.trip + ' on ' + u.date + '.' : ''),
+                u.trip === 'checked 800m' || u.trip === 'short of room' || u.trip === 'hampered straight' ? ['incident'] : []);
+            },
+            promoteCancel: (e) => { e.stopPropagation(); this.setState({ promoteOpen: null, promoteTags: [], promoteReason: '' }); },
+            promoteConfirm: (e) => { e.stopPropagation(); this.confirmPromote(no, noteKey); },
+            promoteType: (e) => this.setState({ promoteReason: e.target.value }),
+            promoteReason: this.state.promoteReason,
+            promoteHorse: no + ' ' + h[1],
+            promoteSource: u.date + ' · ' + u.trk + ' ' + u.crs + ' ' + u.dist + ' ' + u.going + ' C' + u.cl
+              + ' · ' + ordinal(u.fin) + ' · fig ' + u.fig.toFixed(0) + (u.trip !== '—' ? ' · ' + u.trip : ''),
+            tagPicker: BB_TAGS.map(([t, color]) => {
+              const on = this.state.promoteTags.indexOf(t) >= 0;
+              return {
+                label: t, go: (e) => { e.stopPropagation(); this.togglePromoteTag(t); },
+                color: on ? '#fafafa' : color,
+                border: on ? color : '#2b303a',
+                bg: on ? 'rgba(255,255,255,0.07)' : 'transparent',
+              };
+            }),
+            tagCount: this.state.promoteTags.length,
+            confirmLabel: this.state.promoteTags.length ? 'ADD TO BLACKBOOK' : 'PICK AT LEAST ONE TAG',
+            confirmColor: this.state.promoteTags.length ? TEAL : '#5b616b',
+            confirmBorder: this.state.promoteTags.length ? '#1e4a45' : '#2b303a',
+            confirmBg: this.state.promoteTags.length ? '#12211f' : 'transparent',
+            stop: (e) => e.stopPropagation(),
+            video: replayUrl(u.date, u.raceNo || 3),
+            videoColor: hasTrip ? '#c8792f' : '#4c525c',
+            videoBorder: hasTrip ? '#3d2a14' : '#22262e',
+            fin: u.fin, finColor: u.fin === 1 ? AMBER : (u.fin <= 3 ? '#fafafa' : MUTED),
+            fig: u.fig.toFixed(0), len: (u.len > 0 ? '+' : '') + u.len.toFixed(1) + 'L',
+            figColor: figColor(u.fig), time: fmtRaceTime(u.time), pos: u.pos,
+            placeDiv: placeDiv == null ? '—' : 'div ' + placeDiv,
+            divColor: placeDiv == null ? '#3f4550' : '#8b929e',
+            vetAny: !!vet,
+            vetTag: vet ? (vetSig ? 'VET !' : 'VET') : '',
+            vetKind: vet ? (vetSig ? 'SIGNIFICANT' : 'ROUTINE') : '',
+            vetDetail: vet ? vet[1] : '',
+            vetColor: vetSig ? '#e0637f' : '#7f8a99',
+            vetBorder: vetSig ? '#4a2027' : '#2b303a',
+            vetBg: vetSig ? 'rgba(224,99,127,0.09)' : 'rgba(127,138,153,0.07)',
+            vetOpen: this.state.vetOpen === noteKey,
+            vetClick: (e) => { e.stopPropagation(); this.setState(s => ({ vetOpen: s.vetOpen === noteKey ? null : noteKey })); },
+            trip: u.trip, tripColor: u.trip === '—' || u.trip === 'clear run' ? '#5b616b' : '#c8792f',
+            open: ro,
+            caret: ro ? '▼' : '▶', caretColor: ro ? '#7fa7c9' : '#3f4550',
+            bg: ro ? '#141a22' : 'transparent',
+            toggle: () => this.toggleRun(key),
+            splits: u.splits.map((s, j) => ({
+              seg: ['0–400', '400–800', '800–1200', '1200–1600', 'LAST 200'][j] || 'SEG ' + (j + 1),
+              t: s[0], p: s[1],
+              color: Number(s[0]) <= minSp + (maxSp - minSp) * 0.34 ? AMBER : '#cfd3da',
+              w: maxSp === minSp ? 50 : 100 - ((Number(s[0]) - minSp) / (maxSp - minSp)) * 84,
+            })),
+            jump: (u.jump > 0 ? '+' : '') + u.jump.toFixed(2),
+            jumpColor: u.jump > 0.3 ? AMBER : (u.jump < -0.5 ? MUTED : '#cfd3da'),
+            jumpNote: u.jump > 0.3 ? 'fast away' : (u.jump < -0.5 ? 'slow away' : 'even'),
+            lane: u.lane,
+            lost: u.lost.toFixed(1) + 'm',
+            lostColor: u.lost >= 3.5 ? '#c8792f' : '#cfd3da',
+            trial: u.trial,
+            quality,
+            qColor: quality === 'STRONG RACE' ? AMBER : (quality === 'FAIR RACE' ? '#cfd3da' : MUTED),
+            qBorder: quality === 'STRONG RACE' ? '#4a3a18' : '#2b303a',
+            qBg: quality === 'STRONG RACE' ? '#241d0e' : 'transparent',
+            retro: u.retro.map(q => ({
+              p: q[0], name: q[1],
+              nameColor: q[1] === h[1] ? TEAL : '#cfd3da',
+              next: q[2] == null ? '—' : q[2],
+              when: q[3],
+              nextColor: q[2] == null ? MUTED : (q[2] <= 2 ? AMBER : (q[2] <= 5 ? '#cfd3da' : MUTED)),
+              w: q[2] == null ? 0 : Math.max(6, 100 - (q[2] - 1) / (worst || 1) * 88),
+            })),
+          };
+        }),
+      };
+    });
+
+    horses = horses.slice().sort((a, b) => {
+      if (!sort) return a.no - b.no;
+      const va = a.sortVals[sort.key], vb = b.sortVals[sort.key];
+      let c = typeof va === 'string' ? va.localeCompare(vb) : va - vb;
+      if (c === 0 && sort.key === 'style') c = a.sortVals.odds - b.sortVals.odds;
+      if (c === 0) c = a.no - b.no;
+      return sort.dir === 'desc' ? -c : c;
+    });
+
+    const cutoff = this.props.thinSampleCutoff ?? 4;
+    const fitCells = focusRow.fit.map(c => {
+      const thin = c.n < cutoff;
+      const sr = c.n ? c.wins / c.n : 0;
+      const half = c.n ? Math.min(0.5, 1.1 / Math.sqrt(c.n)) : 0.5;
+      return {
+        label: c.label, n: c.n || '—', wins: c.wins, places: c.places,
+        fig: c.avg == null ? '—' : c.avg.toFixed(1),
+        opacity: thin ? 0.45 : 1,
+        labelColor: thin ? MUTED : '#fafafa',
+        nColor: thin ? '#5b616b' : MUTED,
+        placeColor: thin ? '#3f4550' : '#5b616b',
+        figColor: c.avg == null ? MUTED : (thin ? MUTED : figColor(c.avg)),
+        note: c.n === 0 ? 'no sample' : (thin ? 'thin, n=' + c.n : (sr * 100).toFixed(0) + '% SR'),
+        mid: Math.min(96, Math.max(2, sr * 100)),
+        ciLo: Math.max(0, (sr - half) * 100),
+        ciW: Math.min(100, half * 200),
+        ciColor: thin ? '#242832' : '#2b3a44',
+        markColor: thin ? MUTED : (sr > 0.18 ? AMBER : '#cfd3da'),
+        pColor: thin ? '#9aa0a8' : '#14171c',
+      };
+    });
+
+    return {
+      pages: [
+        ['Race Day', 'Race Day.dc.html'],
+        ['Form Guide', 'Form Guide.dc.html'],
+        ['Bets', 'Bets.dc.html'],
+        ['Blackbook', 'Blackbook.dc.html'],
+        ['Results', 'Results.dc.html'],
+        ['Lookup', 'Lookup.dc.html'],
+        ['Trials', 'Trials.dc.html'],
+      ].map(([name, href], i) => ({
+        name, color: i === 1 ? '#fafafa' : 'inherit', mark: i === 1 ? '#e63946' : 'transparent', href,
+      })),
+
+      freshness: SOURCES.map(s => {
+        const stale = s.mins == null ? false : s.mins > s.normal;
+        const missing = s.mins == null;
+        return {
+          name: s.name,
+          mark: missing ? '—' : (stale ? '⚠' : '✓'),
+          age: missing ? '' : ageLabel(s.mins),
+          color: missing ? '#6f757f' : (stale ? '#c8792f' : '#35b37e'),
+          border: stale ? '#3d2a14' : 'transparent',
+          bg: stale ? 'rgba(200,121,47,0.10)' : 'transparent',
+          go: () => this.setState({ refreshed: s.k }),
+        };
+      }),
+      refreshMsg: this.state.refreshed
+        ? (SOURCES.find(s => s.k === this.state.refreshed) || {}).name + ' refreshed · ' + (SOURCES.find(s => s.k === this.state.refreshed) || {}).rows
+        : '',
+      races: RACES.map(([n, dist]) => {
+        const cur = n === race, done = n < 3;
+        return {
+          n, label: dist, go: () => this.setState({ race: n }),
+          bg: cur ? '#1a1d23' : 'transparent', mark: cur ? '#e63946' : 'transparent',
+          fg: cur ? '#fafafa' : (done ? '#5b616b' : '#cfd3da'), sub: cur ? '#8b929e' : '#5b616b',
+        };
+      }),
+      hdr: {
+        no: 'R' + m[0], time: m[3], dist: m[1] + 'm', cls: String(m[2]), going: 'Good', course: 'C', field: '12',
+        pace: TEMPO[tempoIdx].toUpperCase(), paceColor: TEMPO_COLOR[tempoIdx],
+      },
+      paceScale: TEMPO.map((t, i) => ({ bg: i === tempoIdx ? TEMPO_COLOR[i] : '#1e232c' })),
+
+      cols: COLS.map(c => {
+        const on = sort && sort.key === c.k;
+        return Object.assign({}, c, {
+          go: () => this.cycle(c.k),
+          fg: on ? '#fafafa' : MUTED,
+          bg: on ? '#1a1d23' : 'transparent',
+          ind: on ? (sort.dir === 'asc' ? '▲' : '▼') : '',
+          indColor: on ? AMBER : 'transparent',
+          rule: on ? AMBER : 'transparent',
+        });
+      }),
+      sorted: !!sort,
+      sortLabel: sort ? ((COLS.find(c => c.k === sort.key) || {}).t + ' ' + (sort.dir === 'asc' ? 'ASC' : 'DESC')) : '',
+      clearSort: () => this.setState({ sort: null }),
+
+      openCount: Object.keys(open).length,
+      expandAll: () => { const o = {}; FIELD.forEach(h => { o[h[0]] = true; }); this.setState({ open: o }); },
+      collapseAll: () => this.setState({ open: {} }),
+
+      horses,
+      fit: {
+        no: focusRow.h[0], name: focusRow.h[1], odds: focusRow.h[5], draw: focusRow.h[2],
+        nameColor: focusRow.h[8].indexOf('BB') >= 0 ? TEAL : '#fafafa',
+        cells: fitCells,
+      },
+    };
+  }
+}
+
+</script>
+</body>
+</html>
