@@ -179,3 +179,88 @@ def test_no_file_over_600_lines() -> None:
     over = [f"{rel(f)}: {n} lines" for f in py_files()
             if (n := len(f.read_text(encoding="utf-8").splitlines())) > 600]
     assert not over, "hard cap is 600 lines:\n" + "\n".join(over)
+
+
+# ─── the design layer ─────────────────────────────────────────────────────────
+
+WEB_ASSETS = ROOT / "web" / "assets"
+TOKENS = WEB_ASSETS / "tokens.css"
+DESIGN_SOURCE = ROOT / "web" / "design-source"
+
+
+def web_sources() -> list[Path]:
+    """Ported page and asset files. design-source/ is the untouched export."""
+    if not WEB.is_dir():
+        return []
+    return [p for p in sorted(WEB.rglob("*"))
+            if p.suffix in {".html", ".css", ".js"}
+            and DESIGN_SOURCE not in p.parents
+            and p != TOKENS]
+
+
+def test_no_raw_hex_outside_tokens() -> None:
+    """One colour, one meaning, everywhere.
+
+    The design export carried 126 distinct hex values across 1,823 inline style
+    attributes with no classes -- 71 neutrals collapsing to 12 real steps. That
+    rule is only enforceable if colours have names, so tokens.css is the only
+    file allowed to contain one.
+    """
+    pat = re.compile(r"#[0-9a-fA-F]{3,8}\b")
+    offenders = []
+    for f in web_sources():
+        for i, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            if pat.search(line) and "tokens.css" not in line:
+                offenders.append(f"{f.relative_to(ROOT)}:{i}: raw hex -- use a token")
+    assert not offenders, "\n".join(offenders[:40])
+
+
+def test_tokens_file_exists_and_defines_the_palette() -> None:
+    assert TOKENS.is_file(), "web/assets/tokens.css is the single colour vocabulary"
+    src = TOKENS.read_text(encoding="utf-8")
+    required = [
+        "--bg", "--surface", "--text", "--edge", "--book", "--alert",
+        "--style-leader", "--style-onpace", "--style-midfield", "--style-closer",
+    ]
+    missing = [t for t in required if f"{t}:" not in src]
+    assert not missing, f"tokens.css missing: {missing}"
+
+
+def test_running_style_colours_are_distinct() -> None:
+    """Brief 05 §2: four distinct hues, not brightness steps.
+
+    The failure mode the brief names is four colours at one hue separated only
+    by lightness -- the eye reads that as one thing at four intensities, not as
+    four categories. Hue distance alone is the wrong test, because Midfield is
+    deliberately near-neutral ("the calmest of the four"): it sits 15 degrees
+    from Closer in hue but 53 points apart in saturation, and the two are
+    obviously different colours.
+
+    So measure separation in the hue-saturation plane, treating them as polar
+    coordinates. A brightness ramp collapses to ~0 there and fails; a genuinely
+    varied set does not.
+    """
+    import colorsys
+    from math import cos, sin, radians, hypot
+
+    src = TOKENS.read_text(encoding="utf-8")
+    pts = {}
+    for name in ("leader", "onpace", "midfield", "closer"):
+        m = re.search(rf"--style-{name}:\s*#([0-9a-fA-F]{{6}})", src)
+        assert m, f"--style-{name} not defined"
+        r, g, b = (int(m.group(1)[i:i + 2], 16) / 255 for i in (0, 2, 4))
+        h, _, s = colorsys.rgb_to_hls(r, g, b)
+        deg, sat = h * 360, s * 100
+        pts[name] = (sat * cos(radians(deg)), sat * sin(radians(deg)))
+
+    too_close = []
+    names = list(pts)
+    for i, a in enumerate(names):
+        for b in names[i + 1:]:
+            d = hypot(pts[a][0] - pts[b][0], pts[a][1] - pts[b][1])
+            if d < 25:
+                too_close.append(f"  {a} and {b}: separation {d:.0f} (need 25)")
+    assert not too_close, (
+        "running styles must be four distinct colours, not one hue at four "
+        "brightnesses:\n" + "\n".join(too_close)
+    )

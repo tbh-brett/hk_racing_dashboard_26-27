@@ -1,0 +1,110 @@
+/* tokens.css — the single colour and spacing vocabulary.
+ *
+ * Extracted from the Claude Design export in web/design-source/. That export
+ * carried 126 distinct hex values across 1,823 inline style attributes and no
+ * classes: 71 neutrals that collapse to 12 real steps, and 55 chromatic values
+ * of which 14 carry ten or more uses. The --surface step alone merged 29
+ * visually indistinguishable variants.
+ *
+ * The design brief's rule is "one colour, one meaning, everywhere". That is
+ * enforceable only if colours have names, so every colour lives here and
+ * nowhere else. A raw hex literal in a page file is a bug.
+ *
+ * CONFIDENCE: mappings marked (named) came from a const in the design source
+ * or from an explicit statement in a brief. Mappings marked (inferred) were
+ * read from usage context and are the ones worth checking.
+ */
+
+:root {
+  /* ── surfaces, darkest to lightest ─────────────────────────────────── */
+  --bg-deep:      #0b0e13;   /* top chrome strip                          */
+  --bg:           #0e1117;   /* page background            (brief: named) */
+  --surface:      #12151b;   /* nav, panels, table chrome                 */
+  --surface-2:    #1a1d23;   /* raised surface             (brief: named) */
+  --line:         #1c202a;   /* subtle divider; merges #1e232c            */
+  --line-2:       #262a33;   /* standard border                           */
+  --line-3:       #2b303a;   /* strong border                             */
+
+  /* ── text, dimmest to brightest ────────────────────────────────────── */
+  --text-faint:   #4c525c;   /* merges #5b616b                            */
+  --text-dim:     #6f757f;
+  --text-muted:   #8b929e;   /* the workhorse: 237 uses                   */
+  --text-2:       #cfd3da;
+  --text:         #fafafa;   /* primary                    (brief: named) */
+
+  /* ── semantic signals ──────────────────────────────────────────────────
+   * Brief 03 lists eight signals that must stay visually distinct. Each
+   * gets a foreground and, where it renders as a badge, a dark ground.     */
+  --edge:         #f0a824;   /* model edge                 (named: AMBER) */
+  --edge-ground:  #3d2a14;
+  --edge-ground-2:#4a3a18;
+
+  --book:         #2ec4b6;   /* blackbook                   (brief: teal) */
+  --book-ground:  #1e4a45;
+  --book-dim:     #5f7a78;
+
+  --alert:        #e63946;   /* accent; odds firming        (named: UP)   */
+  --win:          #35b37e;   /* a win / positive result     (named: WIN)  */
+  --loss:         #e0637f;   /* a losing result            (inferred)     */
+  --loss-dim:     #c9748f;   /* quieter loss tone          (inferred)     */
+  --incident:     #c8792f;   /* stewards / trip trouble  (named: COPPER)  */
+  --violet:       #b7a2e8;   /* (named: VIOLET) — role unconfirmed        */
+
+  /* ── running style: four DISTINCT hues, never brightness steps ─────────
+   * Brief 05 §2. The test is that Leader reads as different from Closer at
+   * six feet without reading the word. Ordinal order is positional:
+   * leader -> on-pace -> midfield -> closer. Never sort these alphabetically. */
+  --style-leader:        #ff8a5c;
+  --style-leader-ground: #3a2013;
+  --style-onpace:        #e8c04a;
+  --style-onpace-ground: #3a3012;
+  --style-midfield:      #9aa7b8;
+  --style-midfield-ground:#1f2630;
+  --style-closer:        #4fb3e0;
+  --style-closer-ground: #12283a;
+
+  /* ── type ──────────────────────────────────────────────────────────── */
+  --font: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --fs-xs: 9px;  --fs-sm: 11px;  --fs: 12px;  --fs-md: 13px;
+
+  /* ── spacing: one scale ────────────────────────────────────────────── */
+  --sp-1: 4px; --sp-2: 6px; --sp-3: 9px; --sp-4: 14px; --sp-5: 16px; --sp-6: 24px;
+
+  /* ── elevation, for the overlay layer ──────────────────────────────── */
+  --z-scrim: 24;
+  --z-panel: 26;
+  --shadow-panel: 0 26px 70px rgba(0, 0, 0, .7);
+}
+
+/* Numeric columns must align. Applied globally, as the briefs require. */
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--fs-md);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+* { box-sizing: border-box; }
+
+a { color: var(--edge); text-decoration: none; }
+a:hover { color: #ffc75a; }
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--line-3); }
+
+@keyframes tick { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
+
+/* Overlay layer. The scrim is deliberately translucent — brief 10 wants the
+   table dimly visible underneath while filters are adjusted, so the row count
+   can be watched changing. A solid blackout defeats the point. */
+.scrim { background: rgba(0, 0, 0, .45); }
+.panel {
+  background: var(--surface-2);
+  border: 1px solid var(--line-3);
+  box-shadow: var(--shadow-panel);
+}
