@@ -77,6 +77,21 @@ CREATE TABLE IF NOT EXISTS odds_snapshots (
   PRIMARY KEY (race_date, race_no, horse_no, captured_at)
 );
 
+-- Quinella and quinella-place matrices, timestamped like the win/place
+-- snapshots. Pair ranking is worth about +25 ROI points over taking
+-- combinations at random within the pool, so the market's own pair prices are
+-- the benchmark any model pair ranking has to be judged against.
+CREATE TABLE IF NOT EXISTS odds_pairs (
+  race_date   TEXT    NOT NULL,
+  race_no     INTEGER NOT NULL,
+  pool        TEXT    NOT NULL,     -- QIN | QPL
+  horse_a     INTEGER NOT NULL,
+  horse_b     INTEGER NOT NULL,     -- always stored with horse_a < horse_b
+  captured_at TEXT    NOT NULL,
+  odds        REAL,
+  PRIMARY KEY (race_date, race_no, pool, horse_a, horse_b, captured_at)
+);
+
 CREATE TABLE IF NOT EXISTS trials (
   trial_date        TEXT    NOT NULL,
   trial_no          INTEGER NOT NULL,

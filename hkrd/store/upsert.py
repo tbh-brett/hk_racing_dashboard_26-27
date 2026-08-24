@@ -16,7 +16,8 @@ from . import coerce
 
 __all__ = [
     "upsert_races", "upsert_runners", "upsert_dividends",
-    "upsert_comments", "upsert_odds_snapshots", "upsert_trials",
+    "upsert_comments", "upsert_odds_snapshots", "upsert_odds_pairs",
+    "upsert_trials",
 ]
 
 Row = dict[str, Any]
@@ -158,3 +159,21 @@ def upsert_trials(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
             "comment_text"]
     return _upsert(conn, "trials", cols,
                    ["trial_date", "trial_no", "horse_name"], prepared)
+
+
+def upsert_odds_pairs(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
+    """Quinella / quinella-place matrices. Append-only, like the win/place
+    snapshots: captured_at is part of the key and nothing deletes from here."""
+    prepared = [{
+        "race_date": coerce.to_date(r.get("race_date")),
+        "race_no": coerce.to_int(r.get("race_no"), field="race_no"),
+        "pool": (r.get("pool") or "").strip().upper(),
+        "horse_a": coerce.to_int(r.get("horse_a"), field="horse_a"),
+        "horse_b": coerce.to_int(r.get("horse_b"), field="horse_b"),
+        "captured_at": r.get("captured_at"),
+        "odds": coerce.to_odds(r.get("odds")),
+    } for r in rows]
+    cols = ["race_date", "race_no", "pool", "horse_a", "horse_b", "captured_at", "odds"]
+    return _upsert(conn, "odds_pairs", cols,
+                   ["race_date", "race_no", "pool", "horse_a", "horse_b", "captured_at"],
+                   prepared)
