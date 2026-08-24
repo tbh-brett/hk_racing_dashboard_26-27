@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# Secrets — never commit. Supabase connection string lives here.
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Data stores. The old repo committed these and its .git reached 229 MB.
+# The database is rebuildable from scrape; it does not belong in git.
+*.db
+*.sqlite
+*.sqlite3
+*.xlsx
+*.pkl
+
+# Scraped artefacts — these go in tables, not files (AGENTS.md, Data rules)
+reports/
+cache/
+racecards/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# pytest
+.pytest_cache/

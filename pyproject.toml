@@ -1,0 +1,32 @@
+[project]
+name = "hkrd"
+version = "0.1.0"
+description = "Hong Kong racing analytics — dashboard and derive pipeline"
+requires-python = ">=3.11"
+
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "scipy>=1.11",
+    "psycopg[binary]>=3.1",   # Postgres driver — store/ only
+    "requests>=2.31",
+    "beautifulsoup4>=4.12",
+]
+
+[project.optional-dependencies]
+ui  = ["streamlit>=1.35"]
+pdf = ["reportlab>=4.0"]
+# openpyxl is needed ONLY by jobs/migrate_legacy.py, which runs once.
+# It must never appear on a hot path — see AGENTS.md, Data rules.
+migrate = ["openpyxl>=3.1"]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["hkrd*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
