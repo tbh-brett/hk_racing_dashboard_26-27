@@ -39,6 +39,60 @@ def parse(f: Path) -> ast.Module:
     return ast.parse(f.read_text(encoding="utf-8"))
 
 
+def code_only(f: Path) -> str:
+    """Source with comments and docstrings blanked out.
+
+    The pattern guards below hunt for forbidden constructs. Documenting one --
+    naming `p / sum(p) * 3` in a docstring so the next reader knows why the
+    module exists -- is the opposite of committing it, and must not trip the
+    guard.
+
+    Only comments and DOCSTRINGS are removed, never ordinary string literals:
+    the lbw and horse_id guards match column names, which live inside strings
+    like df["lbw"]. Blanking every literal would silently defang them, which is
+    a worse failure than the false positive being fixed. Blanking rather than
+    deleting keeps line numbers intact.
+    """
+    import io
+    import tokenize
+
+    src = f.read_text(encoding="utf-8")
+    out = src.splitlines(keepends=True)
+
+    def blank(r1: int, c1: int, r2: int, c2: int) -> None:
+        for row in range(r1 - 1, min(r2, len(out))):
+            line = out[row]
+            a = c1 if row == r1 - 1 else 0
+            b = c2 if row == r2 - 1 else len(line.rstrip("\n"))
+            out[row] = line[:a] + " " * max(0, b - a) + line[b:]
+
+    try:
+        for tok in tokenize.generate_tokens(io.StringIO(src).readline):
+            if tok.type == tokenize.COMMENT:
+                blank(*tok.start, *tok.end)
+    except (tokenize.TokenError, IndentationError):
+        return src
+
+    # Docstrings: a bare string expression opening a module, class or function.
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        return "".join(out)
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Module, ast.ClassDef,
+                                 ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        body = getattr(node, "body", [])
+        if not body:
+            continue
+        first = body[0]
+        if (isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant)
+                and isinstance(first.value.value, str)):
+            blank(first.lineno, first.col_offset,
+                  first.end_lineno or first.lineno, first.end_col_offset or 0)
+    return "".join(out)
+
+
 def imported_roots(node: ast.AST) -> list[str]:
     if isinstance(node, ast.Import):
         return [a.name.split(".")[0] for a in node.names]
@@ -142,34 +196,34 @@ def test_no_silent_except() -> None:
 def test_no_to_numeric_on_lbw() -> None:
     """pd.to_numeric drops 79.1% of lbw values — they are fractions like '3-1/4'."""
     pat = re.compile(r"to_numeric\s*\([^)]*lbw", re.I)
-    bad = [rel(f) for f in py_files() if pat.search(f.read_text(encoding="utf-8"))]
+    bad = [rel(f) for f in py_files() if pat.search(code_only(f))]
     assert not bad, f"pd.to_numeric on lbw: {bad}"
 
 
 def test_no_linear_place_probability() -> None:
     """p / sum(p) * 3 overstates the banker by ~34 points. Use Harville-Henery."""
     pat = re.compile(r"/\s*(np\.)?sum\([^)]*\)\s*\*\s*3\b")
-    bad = [rel(f) for f in py_files() if pat.search(f.read_text(encoding="utf-8"))]
+    bad = [rel(f) for f in py_files() if pat.search(code_only(f))]
     assert not bad, f"linear place-probability transform: {bad}"
 
 
 def test_no_join_on_horse_id() -> None:
     """horse_id is 0% populated from July 2026 and degrading from April. Join horse_name."""
     pat = re.compile(r"(on|by|left_on|right_on)\s*=\s*[\"']horse_id[\"']|JOIN[^\n]*horse_id", re.I)
-    bad = [rel(f) for f in py_files() if pat.search(f.read_text(encoding="utf-8"))]
+    bad = [rel(f) for f in py_files() if pat.search(code_only(f))]
     assert not bad, f"join on horse_id: {bad}"
 
 
 def test_no_read_excel_outside_migrate_legacy() -> None:
     """read_excel cost 15.33s per form-guide call for data already in the database."""
     bad = [rel(f) for f in py_files()
-           if "read_excel" in f.read_text(encoding="utf-8") and rel(f) != LEGACY_READER]
+           if "read_excel" in code_only(f) and rel(f) != LEGACY_READER]
     assert not bad, f"read_excel outside {LEGACY_READER}: {bad}"
 
 
 def test_no_snapshot_pruning() -> None:
     """Odds history must never be deleted — 17 meetings survived a full season."""
-    bad = [rel(f) for f in py_files() if "prune_old_snapshots" in f.read_text(encoding="utf-8")]
+    bad = [rel(f) for f in py_files() if "prune_old_snapshots" in code_only(f)]
     assert not bad, f"snapshot pruning: {bad}"
 
 
