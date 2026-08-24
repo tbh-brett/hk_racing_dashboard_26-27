@@ -165,6 +165,15 @@ actually lost is `lbws` (per-section margins) from May.
 |---|---|
 | **A1 — security** | The My Bets password is live in `dashboard.py:17770` on a public repo, alongside two account statements and a 1,078-row bet log. Deferred by decision; still live. |
 | **B2 — odds pruning** | `prune_old_snapshots` is still called at `scrape_hkjc_live_odds.py:500` in the old repo. Every meeting that passes loses data permanently. Independent of this rebuild. |
-| **C1 — where does Lab go?** | Design brief 08 dropped Lab from the nav; brief 05 then specified its first content (SARR component breakdown, FUSE blend). Nav currently resolves to seven items with Lab unhomed. |
-| **C2 — Trials `RESULT` column** | Empty on every row. Populate with the horse's next start, or remove. |
 | **Repo hosting** | GitHub writes are refused for this account — the git proxy 403s and the app integration cannot create repos or push. Needs GitHub reconnected before any of this reaches a remote. |
+
+---
+
+## Settled since
+
+**C1 — where does Lab go?** The Claude Design export answers it: Model Analysis
+is its own artboard, so the nav is eight items and Lab has a home. Built.
+
+**C2 — the Trials `RESULT` column.** Empty at source, not merely unwired in the
+interface: the trials scrape's own `result` field is blank on every row across
+159 files. Finishing position derives from the last running position instead.
