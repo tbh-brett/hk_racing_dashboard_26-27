@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Race Day</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/pages.css">
+<link rel="stylesheet" href="../assets/raceday.css">
+</head>
+<body>
+
+<div class="chrome-meeting">
+  <div class="brand"><span class="dot"></span>RACEDAY</div>
+  <div class="meeting" id="meeting-context">—</div>
+  <div class="freshness" id="freshness"></div>
+</div>
+
+<nav class="chrome-nav" id="nav"></nav>
+
+<main class="page">
+  <header class="page-head">
+    <h1>Race Day</h1>
+    <div class="controls">
+      <select id="meeting-select" aria-label="Meeting"></select>
+    </div>
+  </header>
+
+  <!-- Race buttons, not a dropdown: moving between races is the most frequent
+       action on this page and must cost one click. -->
+  <div class="race-strip" id="race-strip"></div>
+
+  <div class="race-bar" id="race-bar"></div>
+
+  <div class="fg-head card-head" role="row">
+    <span class="c-no">No</span>
+    <span class="c-horse">Horse</span>
+    <span class="c-draw">Dr</span>
+    <span class="c-wt">Wt</span>
+    <span class="c-jockey">Jockey</span>
+    <span class="c-odds" title="Win odds. Place beneath, smaller.">Odds</span>
+    <span class="c-move">Move</span>
+    <span class="c-rank" title="Model rank vs market rank">SARR / Mkt</span>
+    <span class="c-fig">Last figure</span>
+    <span class="c-style">Style</span>
+    <span class="c-flags">Last run</span>
+  </div>
+
+  <div id="card"></div>
+</main>
+
+<script type="module" src="../assets/race-day.js"></script>
+</body>
+</html>

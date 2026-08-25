@@ -11,11 +11,22 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from hkrd.query import formguide as fg_q, market as market_q, model, race as race_q
+from hkrd.query import (formguide as fg_q, market as market_q, model,
+                        race as race_q, raceday as raceday_q)
 
 WEB = Path(__file__).resolve().parent.parent.parent / "web"
 
 app = FastAPI(title="hkrd", version="0.1.0")
+
+
+@app.on_event("startup")
+def _warm() -> None:
+    """Pay numpy's import cost at startup rather than on the first request.
+
+    1,008ms cold against 5.6ms warm, and on race day the first request is the
+    one that matters most.
+    """
+    market_q.warm()
 
 
 @app.get("/api/health")
@@ -92,6 +103,25 @@ def condition_fit(name: str, distance: int | None = None, course: str | None = N
 @app.get("/api/head-to-head/{horse_a}/{horse_b}")
 def head_to_head(horse_a: str, horse_b: str, before: str | None = None) -> dict:
     return fg_q.head_to_head(horse_a, horse_b, before=before)
+
+
+# ── race day ─────────────────────────────────────────────────────────────────
+
+@app.get("/api/raceday/{date}/{race_no}")
+def race_card(date: str, race_no: int) -> dict:
+    """One race assembled for the card: prices, movement, models, last run."""
+    card = raceday_q.build_card(date, race_no)
+    if not card["runners"]:
+        raise HTTPException(404, f"no race {race_no} on {date}")
+    return card
+
+
+@app.get("/api/raceday/{date}")
+def meeting_card(date: str) -> dict:
+    summary = raceday_q.meeting_summary(date)
+    if not summary["races"]:
+        raise HTTPException(404, f"no meeting on {date}")
+    return summary
 
 
 # ── market ───────────────────────────────────────────────────────────────────

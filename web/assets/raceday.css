@@ -1,0 +1,98 @@
+/* raceday.css — the card.
+ *
+ * Density is correct here: twelve runners with ten attributes each should fit
+ * on one screen without scrolling. The old dashboard did not feel bad because
+ * it was dense; it felt bad because 152 places invented their own styling.
+ */
+
+:root {
+  --card-grid: 40px minmax(150px, 1.3fr) 32px 44px minmax(88px, 0.9fr)
+               62px 96px 84px minmax(150px, 1fr) 78px minmax(150px, 1fr);
+}
+
+.card-head, .card-row {
+  display: grid;
+  grid-template-columns: var(--card-grid);
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 30px;
+  padding: 0 var(--sp-3);
+}
+.card-row {
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  font-size: var(--fs);
+}
+.card-row:hover { background: var(--surface-2); }
+
+.c-no, .c-draw, .c-wt { font-family: var(--font-mono); text-align: right; }
+.c-horse { color: var(--text); font-weight: 500; white-space: nowrap;
+           overflow: hidden; text-overflow: ellipsis; }
+.c-jockey { color: var(--text-dim); white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; }
+
+/* Win primary, place beneath in the same cell. Place odds cannot be derived
+   from win odds -- there is no fixed relationship, it depends on how
+   concentrated the market is -- so the real number is shown or nothing is. */
+.c-odds { font-family: var(--font-mono); text-align: right; line-height: 1.15; }
+.c-odds .win { color: var(--text); }
+.c-odds .place { display: block; font-size: var(--fs-sm); color: var(--text-dim); }
+
+/* Movement gets direction AND magnitude. It is the most informative thing on
+   the row and the old dashboard did not show it at all. */
+.move { display: flex; align-items: baseline; gap: var(--sp-1);
+        font-family: var(--font-mono); font-size: var(--fs-sm); }
+.move .arrow { font-size: var(--fs); }
+.move.shortened { color: var(--win); }
+.move.drifted { color: var(--loss); }
+.move.flat { color: var(--text-faint); }
+.move.none { color: var(--text-faint); }
+
+/* Where the model and the market disagree is the interesting part. */
+.rank { display: flex; align-items: baseline; gap: 3px;
+        font-family: var(--font-mono); font-size: var(--fs-sm); }
+.rank .model { color: var(--text-2); }
+.rank .sep { color: var(--text-faint); }
+.rank .mkt { color: var(--text-dim); }
+.rank .edge { color: var(--edge); font-weight: 600; }
+
+.fig { font-family: var(--font-mono); font-size: var(--fs-sm); }
+.fig .v { color: var(--text-2); font-weight: 600; }
+.fig .ctx { color: var(--text-dim); }
+.fig .none { color: var(--text-faint); }
+
+.lastrun { display: flex; gap: var(--sp-1); align-items: baseline;
+           font-size: var(--fs-sm); overflow: hidden; }
+.lastrun .pl { font-family: var(--font-mono); color: var(--text-2); }
+.lastrun .days { font-family: var(--font-mono); color: var(--text-faint); }
+
+/* ── race strip and bar ─────────────────────────────────────────────────── */
+
+.race-strip { display: flex; gap: 2px; margin-bottom: var(--sp-3); flex-wrap: wrap; }
+.race-btn {
+  font-family: var(--font-mono); font-size: var(--fs);
+  background: var(--surface); color: var(--text-dim);
+  border: 1px solid var(--line-2); padding: 3px 10px; cursor: pointer;
+}
+.race-btn:hover { background: var(--line-2); color: var(--text); }
+.race-btn[aria-pressed="true"] {
+  background: var(--surface-2); color: var(--text);
+  border-color: var(--alert); box-shadow: inset 0 -2px 0 var(--alert);
+}
+
+.race-bar {
+  display: flex; align-items: center; gap: var(--sp-5); flex-wrap: wrap;
+  padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-3);
+  background: var(--surface); border: 1px solid var(--line-2);
+  font-family: var(--font-mono); font-size: var(--fs);
+}
+.race-bar .cond { color: var(--text-2); }
+.conc { display: flex; align-items: baseline; gap: var(--sp-2); }
+.conc .k { font-size: var(--fs-xs); letter-spacing: .1em; text-transform: uppercase;
+           color: var(--text-dim); }
+.conc .band-strong { color: var(--win); }
+.conc .band-moderate { color: var(--edge); }
+.conc .band-weak { color: var(--text-dim); }
+/* A price captured hours before the off is not the price the coverage rule was
+   measured on, and must not read as though it were. */
+.conc .stale { color: var(--loss); font-size: var(--fs-sm); }

@@ -22,13 +22,19 @@ from hkrd.derive.probability import devig
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["concentration", "band", "price_movement", "odds_coverage",
-           "latest_prices", "snapshot_age_hours", "STALE_AFTER_HOURS"]
+           "latest_prices", "snapshot_age_hours", "STALE_AFTER_HOURS",
+           "MIN_WINDOW_MINUTES", "warm"]
 
 # A price captured well before the off is not the price the rule was measured
 # on. Concentration moves from a mean of 0.539 in the morning to 0.637 at post
 # time, so a figure computed from a stale snapshot understates it and
 # under-covers exactly the races a top-3 box performs best in.
 STALE_AFTER_HOURS = 3.0
+
+# Two captures closer together than this observed nothing. Reporting 0%
+# movement from them claims the market held steady, which is a different
+# and unsupported statement.
+MIN_WINDOW_MINUTES = 20.0
 
 
 def snapshot_age_hours(race_date: str, captured_at: str | None) -> float | None:
@@ -120,6 +126,18 @@ def concentration(date: str, race_no: int, *, at: str = "latest",
     return out
 
 
+def _window_minutes(first: str | None, last: str | None) -> float | None:
+    """Minutes between two captures, or None if either cannot be read."""
+    if not first or not last:
+        return None
+    try:
+        a = datetime.fromisoformat(first)
+        b = datetime.fromisoformat(last)
+    except ValueError:
+        return None
+    return round((b - a).total_seconds() / 60.0, 1)
+
+
 def price_movement(date: str, race_no: int, *,
                    conn: Connection | None = None) -> list[dict[str, Any]]:
     """First captured price against the last, per runner.
@@ -145,11 +163,22 @@ def price_movement(date: str, race_no: int, *,
             "  AND a.captured_at = ? AND b.captured_at = ? "
             "  AND a.win_odds IS NOT NULL AND b.win_odds IS NOT NULL",
             (date, race_no, bounds["f"], bounds["l"])).fetchall()
+        # How much time the two captures actually span. Without this a pair of
+        # snapshots taken 77 seconds apart reports 0% movement on every runner,
+        # which reads as "the market did not move" when it means "nothing was
+        # observed". The real archive is full of exactly that case.
+        window = _window_minutes(bounds["f"], bounds["l"])
+        # An unreadable timestamp means the window is unknown, not that it was
+        # wide. Treating unknown as observed would let a bad capture masquerade
+        # as evidence of a steady market.
+        observed = window is not None and window >= MIN_WINDOW_MINUTES
+
         out = []
         for r in rows:
             change = (r["late"] - r["early"]) / r["early"]
             out.append({"horse_no": r["horse_no"], "early": r["early"],
                         "late": r["late"], "change_pct": round(100 * change, 1),
+                        "window_minutes": window, "observed": observed,
                         "direction": "shortened" if change < -0.02
                         else "drifted" if change > 0.02 else "flat"})
         return sorted(out, key=lambda x: x["change_pct"])
@@ -196,3 +225,16 @@ def odds_coverage(*, conn: Connection | None = None) -> dict[str, Any]:
     finally:
         if own:
             conn.close()
+
+
+def warm() -> None:
+    """Pay the numeric import cost up front.
+
+    Measured: the first concentration figure took 1,008ms cold and 5.6ms warm,
+    all of the difference being numpy's import. On race day the first request is
+    the one that matters most, so the API calls this at startup.
+
+    It lives here rather than in the router because api/ reaches data through
+    query/ and must not import derive/ itself.
+    """
+    devig([2.0, 3.0, 4.0])

@@ -129,3 +129,36 @@ def test_coverage_distinguishes_partial_from_complete(db):
 def test_snapshot_age_is_none_when_unparseable():
     assert market.snapshot_age_hours("2026-07-15", None) is None
     assert market.snapshot_age_hours("2026-07-15", "not a time") is None
+
+
+# ── observed movement vs no window ───────────────────────────────────────────
+
+def test_captures_too_close_together_report_nothing_observed(tmp_path):
+    """The real archive is full of this: the 15 July meeting has two captures
+    per race, 77 seconds apart. Reporting 0% movement from them would claim the
+    market held steady, which is a different and unsupported statement."""
+    db = tmp_path / "w.db"
+    conn = get_conn(db)
+    init_db(conn)
+    with transaction(conn):
+        upsert.upsert_races(conn, [{"race_date": "2026-07-15", "race_no": 1,
+                                    "venue": "HV", "distance": 1650}])
+        for ts in ("2026-07-15T16:30:01", "2026-07-15T16:31:18"):
+            upsert.upsert_odds_snapshots(conn, [
+                {"race_date": "2026-07-15", "race_no": 1, "horse_no": 1,
+                 "captured_at": ts, "win_odds": 4.0},
+                {"race_date": "2026-07-15", "race_no": 1, "horse_no": 2,
+                 "captured_at": ts, "win_odds": 6.0}])
+    moves = market.price_movement("2026-07-15", 1, conn=conn)
+    conn.close()
+    assert moves
+    assert all(m["observed"] is False for m in moves)
+    assert moves[0]["window_minutes"] < market.MIN_WINDOW_MINUTES
+
+
+def test_a_real_window_reports_observed_movement(db):
+    conn = get_conn(db)
+    moves = market.price_movement("2026-07-15", 1, conn=conn)
+    conn.close()
+    assert all(m["observed"] is True for m in moves)
+    assert moves[0]["window_minutes"] > market.MIN_WINDOW_MINUTES

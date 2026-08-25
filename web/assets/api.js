@@ -30,6 +30,10 @@ export const api = {
   meeting: (date) => get(`/meeting/${date}`),
   race: (date, no) => get(`/race/${date}/${no}`),
   horse: (name, limit = 6) => get(`/horse/${encodeURIComponent(name)}?limit=${limit}`),
+  raceCard: (date, no) => get(`/raceday/${date}/${no}`),
+  raceDayMeeting: (date) => get(`/raceday/${date}`),
+  concentration: (date, no) => get(`/market/concentration/${date}/${no}`),
+  coverage: () => get('/market/coverage'),
   formGuide: (date, no, history = 6) =>
     get(`/formguide/${date}/${no}?history=${history}`),
   raceQuality: (date, no) => get(`/race-quality/${date}/${no}`),
