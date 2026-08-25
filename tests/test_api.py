@@ -111,3 +111,87 @@ def test_rebuild_is_idempotent_through_the_api(client):
     second = client.post("/api/jobs/rebuild-et?window_months=0").json()["rows_written"]
     assert first == second
     assert client.get("/api/model/et/summary").json()["rows"] == first
+
+
+# ── blackbook ────────────────────────────────────────────────────────────────
+
+@pytest.fixture()
+def booked(client, tmp_path):
+    """HORSE 0 booked partway through the fixture's 90 meetings."""
+    import json
+
+    from hkrd.jobs import import_blackbook
+    src = tmp_path / "bb.json"
+    src.write_text(json.dumps({"entries": [
+        {"id": "bb_1", "horse_name": "HORSE 0", "added_date": "2025-06-01",
+         "status": "active", "confidence": "high", "tags": ["traffic"],
+         "reasoning": "blocked at the 300", "source_race": "2025-05-28 R1"}],
+        "tag_definitions": {"traffic": "blocked run last start"}}), encoding="utf-8")
+    import_blackbook.run(src, db=tmp_path / "api.db")
+    return client
+
+
+def test_blackbook_list_carries_the_derived_record(booked):
+    body = booked.get("/api/blackbook").json()
+    assert body["count"] == 1
+    entry = body["entries"][0]
+    # The fixture runs HORSE 0 every four days for 90 meetings, so a booking in
+    # June has a substantial record behind it -- none of it hand-logged.
+    assert entry["runs_since"] > 0
+    assert entry["wins_since"] == entry["runs_since"]   # HORSE 0 always wins
+    assert entry["tags"] == ["traffic"]
+
+
+def test_blackbook_filters_reach_the_query(booked):
+    assert booked.get("/api/blackbook?tag=traffic").json()["count"] == 1
+    assert booked.get("/api/blackbook?tag=nope").json()["count"] == 0
+    assert booked.get("/api/blackbook?status=retired").json()["count"] == 0
+
+
+def test_blackbook_tags_route_is_not_shadowed_by_the_entry_route(booked):
+    """/api/blackbook/tags must not be read as an entry id of "tags"."""
+    body = booked.get("/api/blackbook/tags").json()
+    assert [t["tag"] for t in body["tags"]] == ["traffic"]
+
+
+def test_a_missing_blackbook_entry_is_404(booked):
+    assert booked.get("/api/blackbook/bb_nope").status_code == 404
+
+
+def test_the_race_card_flags_its_booked_runners(booked):
+    card = booked.get("/api/raceday/2025-06-13/1").json()
+    booked_rows = [r for r in card["runners"] if r["blackbook"]]
+    assert [r["horse_name"] for r in booked_rows] == ["HORSE 0"]
+    assert booked_rows[0]["blackbook"]["live_at_race"] is True
+    # The band and the rows are built from one query, so they cannot disagree.
+    assert ([b["horse_name"] for b in card["blackbook"]]
+            == [r["horse_name"] for r in booked_rows])
+
+
+def test_the_meeting_band_reports_no_movement_rather_than_zero(booked):
+    """The fixture has no odds snapshots. A 0% would read as a steady market."""
+    body = booked.get("/api/raceday/2025-06-13/blackbook").json()
+    assert body["count"] == 1
+    assert body["entries"][0]["change_pct"] is None
+    assert body["entries"][0]["observed"] is False
+
+
+def test_the_band_marks_a_booking_made_after_an_archived_meeting(booked):
+    """HORSE 0 runs at every meeting, including ones months before it was
+    booked. The band still lists it — it IS in the book — but must not imply
+    the thesis was live that day."""
+    before = booked.get("/api/raceday/2025-01-04/blackbook").json()
+    after = booked.get("/api/raceday/2025-06-13/blackbook").json()
+    assert before["entries"][0]["booked_before_race"] is False
+    assert after["entries"][0]["booked_before_race"] is True
+
+
+def test_a_meeting_with_nothing_booked_is_empty_not_an_error(booked, tmp_path):
+    from hkrd.store.connect import get_conn, transaction
+    conn = get_conn(tmp_path / "api.db")
+    with transaction(conn):
+        conn.execute("DELETE FROM blackbook_tags")
+        conn.execute("DELETE FROM blackbook")
+    conn.close()
+    body = booked.get("/api/raceday/2025-01-04/blackbook").json()
+    assert body == {"race_date": "2025-01-04", "entries": [], "count": 0}

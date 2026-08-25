@@ -107,6 +107,60 @@ CREATE TABLE IF NOT EXISTS trials (
   PRIMARY KEY (trial_date, trial_no, horse_name)
 );
 
+-- ── blackbook ────────────────────────────────────────────────────────────────
+--
+-- A hypothesis tracker, not a list of favourites: every entry is a claim that
+-- this horse will run better than its public form suggests, for a stated
+-- reason. The page's job is to show whether those claims pay off.
+
+CREATE TABLE IF NOT EXISTS blackbook (
+  id           TEXT PRIMARY KEY,     -- bb_0001 in the legacy export
+  horse_name   TEXT NOT NULL,        -- the join key, as everywhere else
+  added_date   TEXT NOT NULL,
+  expiry_date  TEXT,
+  status       TEXT NOT NULL,        -- active | expired | won_out | retired
+  reasoning    TEXT,
+  confidence   TEXT,                 -- low | medium | high
+  source_race  TEXT,                 -- 'YYYY-MM-DD Rn', the run that prompted it
+  source_date  TEXT,
+  source_race_no INTEGER,
+  -- 'memo' when the user typed a date, 'matched' when it was recovered from the
+  -- horse's own runs. The page must be able to tell the two apart.
+  source_date_from TEXT,
+  pref_distance TEXT,
+  pref_surface  TEXT,
+  pref_jockey   TEXT
+);
+
+CREATE TABLE IF NOT EXISTS blackbook_tags (
+  id  TEXT NOT NULL,
+  tag TEXT NOT NULL,
+  PRIMARY KEY (id, tag),
+  FOREIGN KEY (id) REFERENCES blackbook(id)
+);
+
+-- Hand-written observations about a run since booking. Kept separate from the
+-- runs themselves, which are derived: 171 of 196 legacy entries had no
+-- recorded performance at all, because logging one relied on remembering to.
+CREATE TABLE IF NOT EXISTS blackbook_notes (
+  id          TEXT    NOT NULL,
+  race_date   TEXT    NOT NULL,
+  race_no     INTEGER,
+  finish      TEXT,
+  model_rank  INTEGER,
+  verdict     TEXT,                  -- VALIDATED | PARTIAL | MISSED
+  notes       TEXT,
+  PRIMARY KEY (id, race_date, race_no),
+  FOREIGN KEY (id) REFERENCES blackbook(id)
+);
+
+CREATE TABLE IF NOT EXISTS blackbook_tag_definitions (
+  tag        TEXT PRIMARY KEY,
+  definition TEXT
+);
+
+CREATE INDEX IF NOT EXISTS ix_blackbook_horse ON blackbook(horse_name, status);
+
 -- ── derived ──────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS runner_pace (

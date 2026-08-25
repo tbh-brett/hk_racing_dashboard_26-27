@@ -32,6 +32,10 @@ export const api = {
   horse: (name, limit = 6) => get(`/horse/${encodeURIComponent(name)}?limit=${limit}`),
   raceCard: (date, no) => get(`/raceday/${date}/${no}`),
   raceDayMeeting: (date) => get(`/raceday/${date}`),
+  meetingBlackbook: (date) => get(`/raceday/${date}/blackbook`),
+  blackbook: (q = '') => get(`/blackbook${q}`),
+  blackbookEntry: (id) => get(`/blackbook/${encodeURIComponent(id)}`),
+  blackbookTags: () => get('/blackbook/tags'),
   concentration: (date, no) => get(`/market/concentration/${date}/${no}`),
   coverage: () => get('/market/coverage'),
   formGuide: (date, no, history = 6) =>

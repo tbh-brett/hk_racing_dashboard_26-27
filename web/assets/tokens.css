@@ -54,6 +54,9 @@
   /* Band grounds, read off the Race Day artboard. */
   --book-band:    #12181a;   /* blackbook band                             */
   --book-rule:    #1e2a2a;
+  --book-rule-2:  #1a2423;   /* the quieter rule inside the expanded grid  */
+  --book-hover:   #16211f;
+  --book-here:    #16211f;   /* the race currently on screen               */
   --h2h-band:     #131218;   /* head-to-head band                          */
   --h2h-rule:     #2a2333;
   --h2h-dim:      #7a6470;

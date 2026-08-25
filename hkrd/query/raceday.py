@@ -20,11 +20,12 @@ from __future__ import annotations
 from typing import Any
 
 from hkrd.derive.probability import devig
-from hkrd.query import formguide as fg_q, market as market_q
+from hkrd.query import blackbook as bb_q, formguide as fg_q, market as market_q
 from hkrd.query.race import get_horse_form, get_race
 from hkrd.store.connect import Connection, get_conn
 
-__all__ = ["build_card", "meeting_summary", "spark_points"]
+__all__ = ["build_card", "meeting_blackbook", "meeting_summary",
+           "spark_points"]
 
 # Routine stewards' notes are stored but never surfaced as a flag. A passed
 # veterinary examination rendering like a real finding is how a badge becomes
@@ -76,6 +77,8 @@ def build_card(date: str, race_no: int, *,
             return {"race_date": date, "race_no": race_no, "runners": []}
 
         conc = market_q.concentration(date, race_no, conn=conn)
+        booked = {b["horse_name"]: b
+                  for b in bb_q.for_race(date, race_no, conn=conn)}
         moves = {m["horse_no"]: m
                  for m in market_q.price_movement(date, race_no, conn=conn)}
 
@@ -112,7 +115,20 @@ def build_card(date: str, race_no: int, *,
             trainer_changed = bool(
                 last and last.trainer and r.trainer and last.trainer != r.trainer)
             row = r.to_dict()
+            book = booked.get(r.horse_name)
             row.update({
+                # The band above the card lists these; the row carries the flag
+                # so the marker and the band cannot disagree.
+                "blackbook": {
+                    "id": book["id"], "status": book["status"],
+                    "confidence": book["confidence"],
+                    "added_date": book["added_date"],
+                    "reasoning": book["reasoning"],
+                    "live_at_race": bool(book["live_at_race"]),
+                    "booked_before_race": bool(book["booked_before_race"]),
+                    "tags": sorted((book["tag_csv"] or "").split(","))
+                            if book["tag_csv"] else [],
+                } if book else None,
                 "win_pct": win_pct.get(r.horse_no),
                 "spark": pts, "spark_dot": [dot_x, dot_y],
                 "spark_points_n": len(series.get(r.horse_no, [])),
@@ -143,6 +159,11 @@ def build_card(date: str, race_no: int, *,
             "overround": overround,
             "place_ratio_range": _place_ratio_range(race.runners),
             "head_to_head": _pairs_meeting_again(conn, date, race.runners),
+            "blackbook": [
+                {**{k: v for k, v in b.items() if k != "tag_csv"},
+                 "tags": sorted((b["tag_csv"] or "").split(","))
+                         if b["tag_csv"] else []}
+                for b in booked.values()],
             "runners": runners,
         }
     finally:
@@ -158,6 +179,56 @@ def _days_between(earlier: str, later: str) -> int | None:
     except ValueError:
         return None
     return (b - a).days
+
+
+def meeting_blackbook(date: str, *, conn: Connection | None = None
+                      ) -> dict[str, Any]:
+    """Every booked horse declared across the meeting, for the sticky band.
+
+    The band is meeting-wide by design: the entries in OTHER races are what
+    make it worth keeping on screen, since they are the ones you would
+    otherwise miss. Each carries its race so the chip can jump there.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        entries = bb_q.declared_on(date, conn=conn)
+        if not entries:
+            return {"race_date": date, "entries": [], "count": 0}
+
+        off = {r["race_no"]: r["off_time"] for r in conn.execute(
+            "SELECT race_no, off_time FROM races WHERE race_date = ?", (date,))}
+        # One movement query per race that actually has a booked runner, not
+        # one per runner and not one for the whole card.
+        moves: dict[int, dict[int, dict]] = {}
+        for race_no in sorted({e["race_no"] for e in entries}):
+            moves[race_no] = {m["horse_no"]: m for m in
+                              market_q.price_movement(date, race_no, conn=conn)}
+
+        out = []
+        for e in entries:
+            move = moves.get(e["race_no"], {}).get(e["horse_no"])
+            out.append({
+                "id": e["id"], "race_no": e["race_no"],
+                "horse_no": e["horse_no"], "horse_name": e["horse_name"],
+                "draw": e["draw"], "win_odds": e["win_odds"],
+                "off_time": off.get(e["race_no"]),
+                "status": e["status"], "confidence": e["confidence"],
+                "added_date": e["added_date"],
+                "reasoning": e["reasoning"],
+                "live_at_race": bool(e["live_at_race"]),
+                "booked_before_race": bool(e["booked_before_race"]),
+                "tags": sorted((e["tag_csv"] or "").split(","))
+                        if e["tag_csv"] else [],
+                # None, not 0. A runner with one captured price has no movement
+                # to report, and 0% would read as a market that held steady.
+                "change_pct": move["change_pct"] if move else None,
+                "observed": bool(move and move["observed"]),
+            })
+        return {"race_date": date, "entries": out, "count": len(out)}
+    finally:
+        if own:
+            conn.close()
 
 
 def meeting_summary(date: str, *, conn: Connection | None = None) -> dict[str, Any]:

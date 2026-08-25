@@ -34,6 +34,7 @@ const svg = (tag, attrs) => {
 const state = {
   date: null, race: 1, summary: null, card: null,
   selected: 0, sort: null, sortDir: 1, bbOpen: false, h2hOpen: true,
+  blackbook: null, blackbookError: null,
 };
 
 const COLS = [
@@ -81,7 +82,7 @@ function renderStrip() {
     b.setAttribute('aria-pressed', String(r.race_no === state.race));
     b.title = `${r.distance ?? DASH}m · ${r.field_size} runners`
       + (r.band ? ` · ${r.band}` : '');
-    b.addEventListener('click', () => { state.race = r.race_no; loadRace(); });
+    b.addEventListener('click', () => selectRace(r.race_no));
     return b;
   }));
   const withOdds = races.filter((r) => r.concentration !== null).length;
@@ -91,22 +92,103 @@ function renderStrip() {
 
 /* ── bands ───────────────────────────────────────────────────────────────── */
 
+/** Movement as the band renders it: an arrow, a percentage, and a colour.
+ *  A runner with one captured price gets a dash — never a 0% that would read
+ *  as a market holding steady. */
+function bbMove(e) {
+  if (e.change_pct === null || e.change_pct === undefined || !e.observed) {
+    return { text: DASH, cls: 'mv-none' };
+  }
+  const up = e.change_pct > 0;
+  return {
+    text: `${up ? '▲ +' : '▼ −'}${Math.abs(e.change_pct).toFixed(0)}%`,
+    cls: up ? 'mv-drifted' : 'mv-shortened',
+  };
+}
+
+/** The reason the horse is booked, shortened to fit one line. The tags are the
+ *  fallback when no prose was written — a booking with neither says so. */
+function bbNote(e) {
+  if (e.reasoning) return e.reasoning;
+  if (e.tags?.length) return e.tags.join(' · ').replace(/_/g, ' ');
+  return 'no reason recorded';
+}
+
 function renderBlackbookBand() {
   const host = $('band-bb');
+  const all = state.blackbook?.entries ?? [];
+  const here = all.filter((e) => e.race_no === state.race);
+  const rest = all.filter((e) => e.race_no !== state.race);
+
   const row = el('div', 'band-row');
   const tag = el('div', 'band-tag');
   tag.append(el('span', 'dot'));
   tag.append(document.createTextNode('BLACKBOOK'));
-  tag.append(el('span', 'n', '0'));
+  tag.append(el('span', 'n', String(all.length)));
   tag.append(el('span', 'sub', 'TODAY'));
   row.append(tag);
 
   const body = el('div', 'band-body');
-  // Blackbook storage does not exist yet. The band says so plainly rather
-  // than rendering an empty strip that reads as "nothing is booked".
-  body.append(el('div', 'band-empty', 'NO BLACKBOOK STORAGE YET'));
+  if (state.blackbookError) {
+    body.append(el('div', 'band-empty',
+      `BLACKBOOK UNAVAILABLE — ${state.blackbookError}`));
+  } else if (!here.length) {
+    body.append(el('div', 'band-empty',
+      all.length ? 'NONE IN THIS RACE' : 'NONE BOOKED TODAY'));
+  } else {
+    here.forEach((e) => {
+      const item = el('div', 'band-item');
+      if (!e.booked_before_race) item.classList.add('bb-stale');
+      item.append(el('span', 'name', `${e.horse_no} ${e.horse_name}`));
+      item.append(el('span', null, num(e.win_odds)));
+      const mv = bbMove(e);
+      item.append(el('span', `pct ${mv.cls}`, mv.text));
+      item.append(el('span', 'note', bbNote(e)));
+      body.append(item);
+    });
+  }
   row.append(body);
+
+  if (rest.length) {
+    const strip = el('div', 'band-rest');
+    rest.forEach((e) => {
+      const chip = el('button', 'band-chip');
+      if (!e.booked_before_race) chip.classList.add('bb-stale');
+      chip.append(el('span', 'r', `R${e.race_no}`));
+      chip.append(el('span', 'name', `${e.horse_no} ${e.horse_name}`));
+      const mv = bbMove(e);
+      chip.append(el('span', `pct ${mv.cls}`, mv.text));
+      chip.addEventListener('click', () => selectRace(e.race_no));
+      strip.append(chip);
+    });
+    row.append(strip);
+  }
+
+  const toggle = el('button', 'band-toggle',
+    state.bbOpen ? 'COLLAPSE ▴' : `ALL ${all.length} ▾`);
+  toggle.addEventListener('click', () => { state.bbOpen = !state.bbOpen; render(); });
+  row.append(toggle);
   host.replaceChildren(row);
+
+  if (!state.bbOpen || !all.length) return;
+  const grid = el('div', 'bb-grid');
+  all.forEach((e) => {
+    const cell = el('button', 'bb-cell');
+    if (e.race_no === state.race) cell.classList.add('here');
+    if (!e.booked_before_race) cell.classList.add('bb-stale');
+    const line = el('div', 'line');
+    line.append(el('span', 'r', `R${e.race_no}`));
+    line.append(el('span', 'off', e.off_time ?? DASH));
+    line.append(el('span', 'name', `${e.horse_no} ${e.horse_name}`));
+    line.append(el('span', 'odds', num(e.win_odds)));
+    const mv = bbMove(e);
+    line.append(el('span', `mv pct ${mv.cls}`, mv.text));
+    cell.append(line);
+    cell.append(el('div', 'note', bbNote(e)));
+    cell.addEventListener('click', () => selectRace(e.race_no));
+    grid.append(cell);
+  });
+  host.append(grid);
 }
 
 function swingLabel(p) {
@@ -261,7 +343,7 @@ function sortRunners(runners) {
       case 'edge': return r.rank_delta ?? 0;
       case 'fig': return -(r.last_run?.figure ?? 0);
       case 'last': return r.last_run?.days_ago ?? 9e9;
-      case 'bb': return 0;
+      case 'bb': return r.blackbook ? 0 : 1;
       default: return 0;
     }
   };
@@ -349,7 +431,9 @@ function cardRow(r, index) {
 
   const name = el('td');
   const box = el('div', 'horse');
-  box.append(el('span', 'nm', r.horse_name));
+  const nm = el('span', 'nm', r.horse_name);
+  if (r.blackbook) nm.classList.add('booked');
+  box.append(nm);
   const trip = (r.last_run?.tags ?? [])[0];
   if (trip) box.append(el('span', 'trip', trip.replace(/_/g, ' ')));
   name.append(box);
@@ -410,7 +494,21 @@ function cardRow(r, index) {
 
   tr.append(el('td', null, lr
     ? `${lr.place ?? DASH} · ${lr.days_ago}d` : DASH));
-  tr.append(el('td', 'c-num', ''));
+
+  const bb = el('td', 'c-num');
+  if (r.blackbook) {
+    const dot = el('span', 'bb-dot');
+    // A booking made after this race was never a live thesis over it. The dot
+    // is hollow in that case rather than absent, so an archived card does not
+    // silently under-report what is in the book.
+    if (r.blackbook.booked_before_race === false) dot.classList.add('later');
+    dot.title = [r.blackbook.reasoning,
+                 r.blackbook.tags?.join(' · ').replace(/_/g, ' '),
+                 `booked ${r.blackbook.added_date} · ${r.blackbook.status}`]
+      .filter(Boolean).join('\n');
+    bb.append(dot);
+  }
+  tr.append(bb);
   return tr;
 }
 
@@ -540,6 +638,12 @@ function render() {
   renderDetail();
 }
 
+function selectRace(no) {
+  if (no === state.race) return;
+  state.race = no;
+  loadRace();
+}
+
 async function loadRace() {
   try {
     state.card = await api.raceCard(state.date, state.race);
@@ -556,6 +660,16 @@ async function loadMeeting() {
   state.date = document.querySelector('#meeting-picker')?.value ?? state.date;
   state.summary = await api.raceDayMeeting(state.date);
   state.race = state.summary.races[0]?.race_no ?? 1;
+  // Meeting-wide, so it is fetched once per meeting rather than per race.
+  // A failure here must not take the card down with it: the band reports the
+  // problem in its own strip and the rest of the page still works.
+  try {
+    state.blackbook = await api.meetingBlackbook(state.date);
+    state.blackbookError = null;
+  } catch (e) {
+    state.blackbook = null;
+    state.blackbookError = e.message;
+  }
   await loadRace();
 }
 
@@ -569,8 +683,7 @@ function onKey(e) {
   } else if (/^[1-9]$/.test(e.key)) {
     const no = Number(e.key);
     if ((state.summary?.races ?? []).some((r) => r.race_no === no)) {
-      state.race = no;
-      loadRace();
+      selectRace(no);
     }
   }
 }

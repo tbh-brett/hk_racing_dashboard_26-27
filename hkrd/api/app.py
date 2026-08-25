@@ -11,8 +11,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from hkrd.query import (formguide as fg_q, market as market_q, model,
-                        race as race_q, raceday as raceday_q)
+from hkrd.query import (blackbook as bb_q, formguide as fg_q,
+                        market as market_q, model, race as race_q,
+                        raceday as raceday_q)
 
 WEB = Path(__file__).resolve().parent.parent.parent / "web"
 
@@ -107,6 +108,12 @@ def head_to_head(horse_a: str, horse_b: str, before: str | None = None) -> dict:
 
 # ── race day ─────────────────────────────────────────────────────────────────
 
+@app.get("/api/raceday/{date}/blackbook")
+def meeting_blackbook(date: str) -> dict:
+    """The sticky band's data: booked horses across the whole meeting."""
+    return raceday_q.meeting_blackbook(date)
+
+
 @app.get("/api/raceday/{date}/{race_no}")
 def race_card(date: str, race_no: int) -> dict:
     """One race assembled for the card: prices, movement, models, last run."""
@@ -122,6 +129,38 @@ def meeting_card(date: str) -> dict:
     if not summary["races"]:
         raise HTTPException(404, f"no meeting on {date}")
     return summary
+
+
+# ── blackbook ────────────────────────────────────────────────────────────────
+
+@app.get("/api/blackbook")
+def blackbook_list(status: str | None = None, tag: str | None = None) -> dict:
+    """The list view. `runs_since` and `record since` are derived from the
+    runners table, not from what anyone remembered to log."""
+    entries = bb_q.list_entries(status=status, tag=tag)
+    return {"entries": entries, "count": len(entries),
+            "filters": {"status": status, "tag": tag}}
+
+
+@app.get("/api/blackbook/tags")
+def blackbook_tags() -> dict:
+    return {"tags": bb_q.tag_performance()}
+
+
+@app.get("/api/blackbook/declared/{date}")
+def blackbook_declared(date: str) -> dict:
+    """Booked horses declared across one meeting."""
+    rows = bb_q.declared_on(date)
+    return {"race_date": date, "entries": rows, "count": len(rows)}
+
+
+@app.get("/api/blackbook/{entry_id}")
+def blackbook_entry(entry_id: str) -> dict:
+    entry = bb_q.entry_detail(entry_id)
+    if entry is None:
+        raise HTTPException(404, f"no blackbook entry {entry_id}")
+    return entry
+
 
 
 # ── market ───────────────────────────────────────────────────────────────────

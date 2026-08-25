@@ -81,6 +81,61 @@
 .band-h2h .band-toggle { color: var(--loss-dim); border-left: 1px solid var(--h2h-rule); }
 .band-toggle:hover { color: var(--text); }
 
+.horse .nm.booked { color: var(--book); }
+.bb-dot {
+  display: inline-block; width: 6px; height: 6px; background: var(--book);
+}
+.bb-dot.later { background: none; box-shadow: inset 0 0 0 1px var(--book-dim); }
+
+/* The chips for OTHER races. These are the reason the band is worth keeping on
+   screen — the entries in the race you are already looking at are on the card
+   anyway. */
+.band-rest {
+  display: flex; align-items: center; max-width: 44%; overflow-x: auto;
+  border-left: 1px solid var(--book-rule);
+}
+.band-chip {
+  display: flex; align-items: baseline; gap: 6px; padding: 5px 10px;
+  border-right: 1px solid var(--book-rule); cursor: pointer; flex: none;
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+  background: none; border-top: 0; border-bottom: 0; border-left: 0;
+  color: var(--text);
+}
+.band-chip:hover { background: var(--book-hover); }
+.band-chip .r { color: var(--book); }
+.band-chip .name { font-weight: 600; white-space: nowrap; }
+
+.bb-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--book-rule);
+  max-height: 172px; overflow-y: auto;
+}
+.bb-cell {
+  padding: 6px 12px; text-align: left; cursor: pointer; background: none;
+  border: 0; border-right: 1px solid var(--book-rule);
+  border-bottom: 1px solid var(--book-rule-2);
+  border-left: 2px solid transparent; color: var(--text);
+}
+.bb-cell:hover { background: var(--book-hover); }
+.bb-cell.here { background: var(--book-here); border-left-color: var(--book); }
+.bb-cell .line {
+  display: flex; align-items: baseline; gap: 8px;
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+}
+.bb-cell .r { color: var(--book); width: 24px; }
+.bb-cell .off { color: var(--book-dim); }
+.bb-cell .name { font-size: var(--fs); font-weight: 600; white-space: nowrap; }
+.bb-cell .odds { margin-left: auto; font-size: var(--fs); font-weight: 600; }
+.bb-cell .mv { width: 52px; text-align: right; }
+.bb-cell .note {
+  font-size: var(--fs-sm); color: var(--text-muted); margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* A booking made after the race it is shown against was never a live thesis
+   that day. It is still listed, but it must not read like one. */
+.bb-stale { opacity: .55; }
+.bb-stale .name { font-weight: 400; }
+
 .h2h-grid {
   display: grid; grid-template-columns: repeat(4, 1fr);
   border-top: 1px solid var(--h2h-rule);
