@@ -10,6 +10,8 @@
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/tokens.css">
 <link rel="stylesheet" href="../assets/pages.css">
+<link rel="stylesheet" href="../assets/raceday.css">
+<link rel="stylesheet" href="../assets/model.css">
 </head>
 <body>
 
@@ -21,22 +23,57 @@
 
 <nav class="chrome-nav" id="nav"></nav>
 
-<main class="page">
-  <header class="page-head">
-    <h1>Model Analysis</h1>
-    <div class="controls">
-      <select id="meeting-select" aria-label="Meeting"></select>
-      <select id="race-select" aria-label="Race"></select>
-      <button id="rebuild-et" class="btn">Rebuild ET</button>
-    </div>
-  </header>
+<div class="race-strip">
+  <div class="label">RACE</div>
+  <div class="race-chips" id="race-chips"></div>
+  <div class="strip-right">
+    <select id="meeting-select" aria-label="Meeting"></select>
+    <span class="sep">|</span>
+    <span>MODEL VIEW</span>
+    <div class="seg" id="view-toggle" role="group" aria-label="Model view"></div>
+  </div>
+</div>
 
+<main class="model-page">
   <div id="job-result" class="job-result" hidden></div>
 
-  <section class="panel">
-    <div class="panel-head">
-      <h2>ET — expected time</h2>
-      <span class="muted" id="et-version"></span>
+  <section class="model-section" id="sec-sarr">
+    <div class="section-head">
+      <span class="title">SARR</span>
+      <span class="sub">SPEED-ADJUSTED RATING RANK · WHY EACH HORSE RANKED WHERE IT DID,
+        ONE COLUMN PER WEIGHTED COMPONENT, WIDEST WEIGHT FIRST</span>
+    </div>
+    <div class="table-scroll">
+      <table class="model-grid" id="sarr-table">
+        <thead><tr id="sarr-head"></tr></thead>
+        <tbody id="sarr-body"></tbody>
+      </table>
+    </div>
+    <div class="section-foot" id="sarr-foot"></div>
+  </section>
+
+  <section class="model-section" id="sec-blend">
+    <div class="section-head">
+      <span class="title">BLEND</span>
+      <span class="sub">THE BLEND'S COMPONENTS, SIDE BY SIDE — NOT JUST THE OUTPUT</span>
+      <div class="weight-picker" id="weight-picker" role="group"
+           aria-label="Weight on the fundamental stream"></div>
+    </div>
+    <div class="table-scroll">
+      <table class="model-grid" id="blend-table">
+        <thead><tr id="blend-head"></tr></thead>
+        <tbody id="blend-body"></tbody>
+      </table>
+    </div>
+    <div class="section-foot" id="blend-foot"></div>
+  </section>
+
+  <section class="model-section" id="sec-et">
+    <div class="section-head">
+      <span class="title">ET</span>
+      <span class="sub">EXPECTED TIME · WHAT THE FIGURE IS MADE OF, AND HOW MUCH
+        EVIDENCE SITS BEHIND IT</span>
+      <button id="rebuild-et" class="btn">REBUILD ET</button>
     </div>
 
     <p class="note">
@@ -47,30 +84,36 @@
     </p>
 
     <div class="stat-row" id="et-summary"></div>
-
     <div class="invariants" id="et-invariants"></div>
 
     <div class="table-scroll">
-      <table class="grid" id="et-table">
+      <table class="model-grid" id="et-table">
         <thead>
           <tr>
-            <th class="num">No</th><th>Horse</th><th class="num">Pl</th>
-            <th class="num">Time</th><th class="num">Figure</th>
-            <th class="num" title="Was this a fast time for these conditions?">vs par</th>
-            <th class="num" title="Did this horse outrun the field it was in?">vs race</th>
-            <th class="num">n<sub>eff</sub></th><th>Confidence</th><th>Level</th>
+            <th class="centre" style="width:34px">NO</th>
+            <th class="left" style="width:200px">HORSE</th>
+            <th class="centre" style="width:40px">PL</th>
+            <th style="width:80px">TIME</th>
+            <th style="width:76px">FIGURE</th>
+            <th style="width:80px"
+                title="Was this a fast time for these conditions?">VS PAR</th>
+            <th style="width:82px"
+                title="Did this horse outrun the field it was in?">VS RACE</th>
+            <th style="width:60px">N<sub>EFF</sub></th>
+            <th class="left" style="width:110px">CONFIDENCE</th>
+            <th class="left">LEVEL</th>
           </tr>
         </thead>
         <tbody id="et-body"></tbody>
       </table>
     </div>
 
-    <p class="note quiet">
-      <strong>vs par</strong> and <strong>vs race</strong> answer different questions and
-      are shown separately — the v4 model conflated them. A par time is a property of the
-      race: every runner above shares one, and if that count is ever not 1 the model is
-      wrong regardless of its accuracy.
-    </p>
+    <div class="section-foot">
+      <span>VS PAR AND VS RACE ANSWER DIFFERENT QUESTIONS AND ARE SHOWN SEPARATELY —
+        THE V4 MODEL CONFLATED THEM</span>
+      <span class="right">A PAR IS A PROPERTY OF THE RACE: EVERY RUNNER SHARES ONE, AND
+        IF THAT COUNT IS EVER NOT 1 THE MODEL IS WRONG WHATEVER ITS ACCURACY</span>
+    </div>
   </section>
 </main>
 

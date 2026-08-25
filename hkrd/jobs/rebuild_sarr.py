@@ -46,6 +46,7 @@ class SarrReport:
     runs_loaded: int = 0
     races_scored: int = 0
     rows_written: int = 0
+    component_rows: int = 0
     skipped_no_history: int = 0
     skipped_no_distance: int = 0
     errors: list[str] = field(default_factory=list)
@@ -55,6 +56,7 @@ class SarrReport:
             f"  runs loaded        {self.runs_loaded:>7,}",
             f"  races scored       {self.races_scored:>7,}",
             f"  runner_sarr rows   {self.rows_written:>7,}",
+            f"  component rows     {self.component_rows:>7,}",
             f"  skipped, no prior history {self.skipped_no_history:>7,}",
             f"  skipped, no distance      {self.skipped_no_distance:>7,}",
         ]
@@ -86,6 +88,7 @@ def rebuild(db: Path | None = None, *, min_prior: int = 2) -> SarrReport:
             recs.sort(key=lambda r: (r["race_date"], r["race_no"]), reverse=True)
 
         rows: list[tuple] = []
+        component_rows: list[tuple] = []
         for (date, race_no), race in runs.groupby(["race_date", "race_no"]):
             med_rating = pd.to_numeric(race["rating"], errors="coerce").median()
             scored: list[tuple[int, float]] = []
@@ -107,10 +110,15 @@ def rebuild(db: Path | None = None, *, min_prior: int = 2) -> SarrReport:
                 if profile is None:
                     report.skipped_no_history += 1
                     continue
-                value = sarr.score(profile, rec["distance"], rec["venue"], med_rating)
+                parts = sarr.contributions(
+                    profile, rec["distance"], rec["venue"], med_rating)
+                value = sum(parts.values())
                 if value is None or pd.isna(value):
                     continue
                 scored.append((rec["horse_no"], float(value), len(prior)))
+                component_rows.extend(
+                    (date, race_no, rec["horse_no"], k, float(v))
+                    for k, v in parts.items())
 
             if not scored:
                 continue
@@ -130,7 +138,18 @@ def rebuild(db: Path | None = None, *, min_prior: int = 2) -> SarrReport:
                 "sarr = excluded.sarr, sarr_rank = excluded.sarr_rank, "
                 "n_prior = excluded.n_prior, derive_version = excluded.derive_version",
                 rows)
+            # Only for the runners that scored -- a race skipped for a missing
+            # distance must not leave orphaned components behind from a
+            # previous run.
+            scored_keys = {(r[0], r[1], r[2]) for r in rows}
+            kept = [c for c in component_rows if (c[0], c[1], c[2]) in scored_keys]
+            conn.executemany(
+                "INSERT INTO runner_sarr_component (race_date, race_no, "
+                "horse_no, component, contribution) VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT (race_date, race_no, horse_no, component) "
+                "DO UPDATE SET contribution = excluded.contribution", kept)
         report.rows_written = len(rows)
+        report.component_rows = len(kept)
     finally:
         conn.close()
     return report

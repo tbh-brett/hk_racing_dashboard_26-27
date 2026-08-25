@@ -1,0 +1,130 @@
+/* model.css — Model Analysis, ported from web/design-source/Model Analysis.dc.html.
+ *
+ * The artboard's own furniture: a race strip with a view toggle, then stacked
+ * sections each carrying its table and a footer of standing facts. Column
+ * headers carry the component's weight as a bar, which is the design's central
+ * idea — one term does most of the work and a flat table hides that.
+ */
+
+.model-page { padding: 16px 14px 28px; }
+
+/* ── the strip's right-hand controls ─────────────────────────────────────── */
+
+.strip-right .sep { color: var(--line-2); }
+.seg { display: flex; border: 1px solid var(--line-3); }
+.seg button {
+  padding: 2px 9px; cursor: pointer; border: 0; background: transparent;
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
+  letter-spacing: .06em;
+}
+.seg button:hover { color: var(--text); }
+.seg button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+
+/* ── sections ────────────────────────────────────────────────────────────── */
+
+.model-section { margin-bottom: 26px; }
+.model-section[hidden] { display: none; }
+.section-head {
+  display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.section-head .title {
+  font-family: var(--font-mono); font-size: var(--fs-md); font-weight: 600;
+  letter-spacing: .06em;
+}
+.section-head .sub {
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
+}
+.section-head .btn, .section-head .weight-picker { margin-left: auto; }
+
+.model-page .table-scroll { border: 1px solid var(--line-2); overflow-x: auto; }
+.model-grid {
+  width: 100%; border-collapse: collapse; font-family: var(--font-mono);
+  table-layout: fixed;
+}
+/* The artboard's widths. Fixed layout, so one column per table carries no
+   width and takes the remainder: HORSE in SARR, where 13 columns leave little
+   slack, and BLENDED in the blend, where the split bar can use it. */
+#sarr-table  { min-width: 1080px; }
+#blend-table { min-width: 900px; }
+#et-table    { min-width: 940px; }
+.model-grid th {
+  position: sticky; top: 0; z-index: 2; background: var(--surface);
+  padding: 6px 8px; vertical-align: bottom; cursor: pointer; user-select: none;
+  border-bottom: 1px solid var(--line-3); text-align: right;
+  font-size: var(--fs-xs); font-weight: 500; letter-spacing: .08em;
+  color: var(--text-muted); white-space: nowrap;
+}
+.model-grid th:hover { background: var(--surface-2); }
+.model-grid th[aria-sort] { background: var(--surface-2); color: var(--text); }
+.model-grid th .ind { font-size: 8px; color: var(--edge); margin-left: 3px; }
+.model-grid th .stack { display: flex; flex-direction: column; gap: 4px; }
+.model-grid th.left { text-align: left; }
+.model-grid th.centre { text-align: center; }
+
+/* Two bars, deliberately not one. The upper is the fitted coefficient; the
+   lower is how much the term actually moves scores across every scored runner.
+   They disagree — `draw` has the widest coefficient and contributes nothing —
+   and a page about why a model ranked a horse has to show the second. */
+.wbar { display: flex; flex-direction: column; gap: 2px; }
+.wbar .k {
+  display: flex; justify-content: space-between; gap: 6px;
+  font-size: 9px; color: var(--text-faint);
+}
+.wbar .track { height: 3px; background: var(--line); }
+.wbar .fill { height: 3px; display: block; }
+.wbar .fill.weight { background: var(--edge); }
+.wbar .fill.weight.neg { background: var(--cool); }
+.wbar .fill.influence { background: var(--text-dim); }
+.wbar.inert .k, .wbar.inert .fill { opacity: .45; }
+
+.model-grid td {
+  padding: 6px 8px; text-align: right; font-size: var(--fs);
+  border-bottom: 1px solid var(--line);
+}
+.model-grid td.left { text-align: left; }
+.model-grid td.centre { text-align: center; }
+.model-grid tbody tr:hover { background: var(--surface-2); }
+.model-grid tr.top3 { background: var(--edge-wash); }
+.model-grid .no { font-size: var(--fs-md); font-weight: 600; }
+.model-grid .horse { font-weight: 600; white-space: nowrap; }
+.model-grid .horse.booked { color: var(--book); }
+.model-grid .score, .model-grid .rank { font-size: var(--fs-md); font-weight: 600; }
+.model-grid tr.top3 .score, .model-grid tr.top3 .rank { color: var(--edge); }
+
+/* A contribution that helps the score reads bright, one that hurts reads dim —
+   regardless of the component's own sign, because SARR is lower-is-better and
+   the reader should not have to invert it in their head. */
+.c-helps { color: var(--text); font-weight: 600; }
+.c-hurts { color: var(--text-muted); }
+.c-flat { color: var(--text-faint); }
+.c-none { color: var(--text-faint); }
+
+/* ── the blend's split bar ───────────────────────────────────────────────── */
+
+.blend-cell { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.blend-cell .v { font-size: var(--fs-md); font-weight: 600; color: var(--text); }
+.split { width: 64px; height: 7px; background: var(--line); display: flex; flex: none; }
+.split.grow { flex: 1 1 auto; width: auto; min-width: 64px; max-width: 180px; }
+.split .fund { height: 7px; background: var(--edge); }
+.split .mkt { height: 7px; background: var(--cool-dim); }
+
+.weight-picker { display: flex; align-items: center; gap: 6px; }
+.weight-picker .lab {
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
+  letter-spacing: .06em;
+}
+.weight-picker .seg button { min-width: 42px; }
+
+.section-foot {
+  display: flex; gap: 18px; padding: 7px 2px; flex-wrap: wrap;
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
+}
+.section-foot .right { margin-left: auto; color: var(--text-faint); }
+.section-foot .warn { color: var(--edge); }
+
+.model-empty {
+  display: flex; align-items: center; justify-content: center; padding: 60px 0;
+  font-family: var(--font-mono); font-size: var(--fs); color: var(--text-faint);
+  letter-spacing: .08em;
+}

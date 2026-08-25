@@ -208,6 +208,21 @@ CREATE TABLE IF NOT EXISTS runner_sarr (
   PRIMARY KEY (race_date, race_no, horse_no)
 );
 
+-- What the score is made of. Long rather than nine columns, because the term
+-- list is a property of the model and not of the table: adding one must not
+-- need a migration. Written by the same call that produces the score, so the
+-- components on screen always sum to the number beside them.
+CREATE TABLE IF NOT EXISTS runner_sarr_component (
+  race_date    TEXT    NOT NULL,
+  race_no      INTEGER NOT NULL,
+  horse_no     INTEGER NOT NULL,
+  component    TEXT    NOT NULL,   -- fmrp | lsa | traj | esz | wpr | style | ...
+  contribution REAL    NOT NULL,   -- signed, already multiplied by the weight
+  PRIMARY KEY (race_date, race_no, horse_no, component),
+  FOREIGN KEY (race_date, race_no, horse_no)
+    REFERENCES runner_sarr(race_date, race_no, horse_no)
+);
+
 CREATE TABLE IF NOT EXISTS runner_tags (
   race_date  TEXT    NOT NULL,
   race_no    INTEGER NOT NULL,

@@ -201,8 +201,30 @@ def build_profile(runs: list[dict], today_dist, today_venue,
     }
 
 
-def score(profile: dict, distance, venue, med_rating, draw_score=0.0) -> float:
-    """The SARR composite. Lower is better.
+# The order the Model Analysis page shows them in: widest weight first, so the
+# eye lands on the term that actually moves the score. `draw` carries no weight
+# entry because it is applied as a flat 0.3 multiplier rather than a fitted
+# coefficient -- and nothing currently supplies a draw score, which the page
+# says rather than hiding a column that is always zero.
+COMPONENTS = ("fmrp", "lsa", "traj", "esz", "wpr", "style", "dist", "rating",
+              "draw")
+COMPONENT_WEIGHTS = {
+    "fmrp": WEIGHTS["f_fmrp"], "lsa": WEIGHTS["f_lsa"],
+    "traj": WEIGHTS["f_traj"], "esz": WEIGHTS["f_esz"],
+    "wpr": WEIGHTS["f_wpr"], "style": WEIGHTS["f_style"],
+    "dist": WEIGHTS["f_dist"], "rating": WEIGHTS["f_rating"],
+    "draw": 0.3,
+}
+
+
+def contributions(profile: dict, distance, venue, med_rating,
+                  draw_score=0.0) -> dict[str, float]:
+    """Each term's signed contribution to the composite, keyed by component.
+
+    The page that shows these exists to answer "why did this horse rank here",
+    so the components and the score come from ONE function: score() sums this,
+    which makes it impossible for the columns on screen to fail to add up to
+    the number beside them.
 
     The rating term degrades to 0 when rating is unavailable rather than
     poisoning the whole score with NaN. This matters: `rating` is 100% null
@@ -221,14 +243,21 @@ def score(profile: dict, distance, venue, med_rating, draw_score=0.0) -> float:
     if pr is None:
         pr = profile["place_rate"]
 
-    return (
-        WEIGHTS["f_fmrp"] * nan0(profile["fmrp"])
-        + WEIGHTS["f_lsa"] * nan0(profile["lsa"])
-        + WEIGHTS["f_esz"] * nan0(profile["esz"])
-        + WEIGHTS["f_style"] * get_style_fit(profile["style"], distance, venue)
-        + WEIGHTS["f_rating"] * f_rating
-        + WEIGHTS["f_traj"] * nan0(profile["traj"])
-        + WEIGHTS["f_wpr"] * (-pr * 5)
-        + WEIGHTS["f_dist"] * abs(nan0(profile["avg_ssi"]) - IDEAL_SSI.get(int(distance), -0.20))
-        + nan0(draw_score) * 0.3
-    )
+    return {
+        "fmrp": WEIGHTS["f_fmrp"] * nan0(profile["fmrp"]),
+        "lsa": WEIGHTS["f_lsa"] * nan0(profile["lsa"]),
+        "esz": WEIGHTS["f_esz"] * nan0(profile["esz"]),
+        "style": WEIGHTS["f_style"] * get_style_fit(profile["style"], distance, venue),
+        "rating": WEIGHTS["f_rating"] * f_rating,
+        "traj": WEIGHTS["f_traj"] * nan0(profile["traj"]),
+        "wpr": WEIGHTS["f_wpr"] * (-pr * 5),
+        "dist": WEIGHTS["f_dist"] * abs(
+            nan0(profile["avg_ssi"]) - IDEAL_SSI.get(int(distance), -0.20)),
+        "draw": nan0(draw_score) * 0.3,
+    }
+
+
+def score(profile: dict, distance, venue, med_rating, draw_score=0.0) -> float:
+    """The SARR composite. Lower is better."""
+    return sum(contributions(profile, distance, venue, med_rating,
+                             draw_score).values())

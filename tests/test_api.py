@@ -195,3 +195,28 @@ def test_a_meeting_with_nothing_booked_is_empty_not_an_error(booked, tmp_path):
     conn.close()
     body = booked.get("/api/raceday/2025-01-04/blackbook").json()
     assert body == {"race_date": "2025-01-04", "entries": [], "count": 0}
+
+
+# ── model analysis ───────────────────────────────────────────────────────────
+
+def test_sarr_route_is_404_when_the_race_does_not_exist(client):
+    assert client.get("/api/model/sarr/1999-01-01/1").status_code == 404
+
+
+def test_blend_route_accepts_a_weight(client):
+    """The page lets the reader move the weight, which is what makes the
+    fitted value checkable rather than asserted."""
+    a = client.get("/api/model/blend/2025-06-13/1").json()
+    b = client.get("/api/model/blend/2025-06-13/1?weight=0.5").json()
+    assert a["weight"] == 0.0
+    assert b["weight"] == 0.5
+    assert a["calibration"]["fitted_weight"] == 0.0
+
+
+def test_blend_route_publishes_the_calibration_it_used(client):
+    """The page prints these figures verbatim; they must come from the model,
+    not be retyped into the front end."""
+    cal = client.get("/api/model/blend/2025-06-13/1").json()["calibration"]
+    assert cal["log_loss"]["market"] < cal["log_loss"]["fundamental"]
+    assert cal["log_loss_by_weight"]["0.00"] <= min(
+        cal["log_loss_by_weight"].values())

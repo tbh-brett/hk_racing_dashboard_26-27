@@ -200,6 +200,25 @@ def et_race(date: str, race_no: int) -> dict:
     return out
 
 
+@app.get("/api/model/sarr/{date}/{race_no}")
+def sarr_race(date: str, race_no: int) -> dict:
+    """Per-runner SARR components — why each horse ranked where it did."""
+    out = model.sarr_breakdown(date, race_no)
+    if not out["runners"] and not out["unscored"]:
+        raise HTTPException(404, f"no race {race_no} on {date}")
+    return out
+
+
+@app.get("/api/model/blend/{date}/{race_no}")
+def blend_race(date: str, race_no: int, weight: float | None = None) -> dict:
+    """The blend's components side by side. `weight` is the share carried by
+    the fundamental stream; omit it for the fitted value (0.00)."""
+    out = model.blend_breakdown(date, race_no, weight=weight)
+    if not out["runners"]:
+        raise HTTPException(404, f"no race {race_no} on {date}")
+    return out
+
+
 @app.get("/api/model/et/summary")
 def et_summary() -> dict:
     return model.et_reference_summary()

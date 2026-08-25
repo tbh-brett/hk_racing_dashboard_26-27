@@ -43,6 +43,9 @@ export const api = {
   raceQuality: (date, no) => get(`/race-quality/${date}/${no}`),
   etRace: (date, no) => get(`/model/et/${date}/${no}`),
   etSummary: () => get('/model/et/summary'),
+  sarrRace: (date, no) => get(`/model/sarr/${date}/${no}`),
+  blendRace: (date, no, weight) => get(
+    `/model/blend/${date}/${no}` + (weight === undefined ? '' : `?weight=${weight}`)),
   status: () => get('/status'),
   rebuildEt: (months = 24) => post(`/jobs/rebuild-et?window_months=${months}`),
 };

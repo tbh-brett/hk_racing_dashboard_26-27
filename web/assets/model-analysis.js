@@ -1,9 +1,14 @@
-/* Model Analysis — ET section.
+/* Model Analysis — ported from web/design-source/Model Analysis.dc.html.
  *
- * Design brief 05 §5: show why each model produced the figure it did, not just
- * the figure. The page is meant to double as documentation of the model's own
- * limitations, which is why the invariant checks are on screen rather than
- * hidden in a test suite.
+ * The artboard's structure: a race strip carrying a MODEL VIEW toggle, then
+ * stacked sections, each a sortable table with a footer of standing facts.
+ * Its two sections are SARR and the blend; ET is a third, added at the user's
+ * request after the artboard was drawn, and it keeps the same grammar.
+ *
+ * Design brief 05 §5: show WHY each model ranked each horse where it did. The
+ * page doubles as documentation of each model's own limitations, which is why
+ * the blend's fitted weight — zero on the fundamental stream — is on screen
+ * rather than buried in a commit message.
  */
 import { api, num, signed } from './api.js';
 
@@ -14,7 +19,11 @@ const NAV = [
   ['Trials', 'trials.html'], ['Model Analysis', 'model-analysis.html'],
 ];
 
+const VIEWS = [['sarr', 'SARR'], ['blend', 'BLEND'], ['et', 'ET'], ['all', 'ALL']];
+const WEIGHTS = [0, 0.1, 0.32, 1];
+
 const $ = (id) => document.getElementById(id);
+const DASH = '—';
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
@@ -22,11 +31,19 @@ const el = (tag, cls, text) => {
   return n;
 };
 
-function renderNav(current) {
+const state = {
+  date: null, race: 1, races: [], view: 'all', weight: null,
+  sarr: null, blend: null, et: null,
+  sortS: { key: 'rank', dir: 1 }, sortB: { key: 'blended', dir: -1 },
+};
+
+/* ── chrome ──────────────────────────────────────────────────────────────── */
+
+function renderNav() {
   $('nav').replaceChildren(...NAV.map(([name, href]) => {
     const a = el('a', null, name);
     a.href = href;
-    if (href === current) a.setAttribute('aria-current', 'page');
+    if (href === 'model-analysis.html') a.setAttribute('aria-current', 'page');
     return a;
   }));
 }
@@ -38,7 +55,7 @@ async function renderFreshness() {
       const box = el('span', 'src');
       box.append(el('span', 'name', table.replace('runner_', '')));
       box.append(el('span', info.current ? 'ok' : 'stale',
-        info.rows ? (info.current ? '✓' : '⚠') : '—'));
+        info.rows ? (info.current ? '✓' : '⚠') : DASH));
       box.title = `${info.rows.toLocaleString()} rows, through ${info.through ?? 'never'}`;
       return box;
     }));
@@ -49,7 +66,335 @@ async function renderFreshness() {
   }
 }
 
-async function renderSummary() {
+function renderViewToggle() {
+  $('view-toggle').replaceChildren(...VIEWS.map(([key, label]) => {
+    const b = el('button', null, label);
+    b.setAttribute('aria-pressed', String(state.view === key));
+    b.addEventListener('click', () => { state.view = key; render(); });
+    return b;
+  }));
+}
+
+function renderStrip() {
+  $('race-chips').replaceChildren(...state.races.map((r) => {
+    const b = el('button', 'race-chip', `R${r.race_no}`);
+    b.setAttribute('aria-pressed', String(r.race_no === state.race));
+    b.title = `${r.distance ?? DASH}m · ${r.field_size} runners`;
+    b.addEventListener('click', () => {
+      if (r.race_no === state.race) return;
+      state.race = r.race_no;
+      loadRace();
+    });
+    return b;
+  }));
+}
+
+/* ── shared table furniture ──────────────────────────────────────────────── */
+
+/** A sortable header cell. `body` lets a column add a weight bar under its
+ *  label without every column growing the same shape. */
+function headCell(col, sort, onSort, body) {
+  const th = el('th', col.align ?? '');
+  if (col.width) th.style.width = col.width;
+  if (sort.key === col.key) {
+    th.setAttribute('aria-sort', sort.dir > 0 ? 'ascending' : 'descending');
+  }
+  const stack = el('div', 'stack');
+  const label = el('span', null, col.label);
+  if (sort.key === col.key) {
+    label.append(el('span', 'ind', sort.dir > 0 ? '▲' : '▼'));
+  }
+  stack.append(label);
+  if (body) stack.append(body);
+  th.append(stack);
+  th.title = col.title ?? '';
+  th.addEventListener('click', () => onSort(col.key));
+  return th;
+}
+
+function sortRows(rows, sort, value) {
+  return [...rows].sort((a, b) => {
+    const x = value(a, sort.key);
+    const y = value(b, sort.key);
+    // Nulls sort last in both directions: a missing figure is not a small one.
+    if (x === null || x === undefined) return 1;
+    if (y === null || y === undefined) return -1;
+    const c = typeof x === 'string' ? x.localeCompare(y) : x - y;
+    return c * sort.dir;
+  });
+}
+
+function cycle(sort, key, fallback) {
+  if (sort.key !== key) return { key, dir: -1 };
+  if (sort.dir === -1) return { key, dir: 1 };
+  return { ...fallback };
+}
+
+/* ── SARR ────────────────────────────────────────────────────────────────── */
+
+/** The two bars under a component's header. The upper is the fitted
+ *  coefficient — what the model intends the term to be worth. The lower is
+ *  mean |contribution| across every scored runner — what it is actually worth.
+ *  They are separate because they disagree, and the disagreement is the point. */
+function weightBars(c) {
+  const box = el('div', `wbar${c.inert ? ' inert' : ''}`);
+  const k1 = el('div', 'k');
+  k1.append(el('span', null, `×${c.weight.toFixed(3)}`));
+  box.append(k1);
+  const t1 = el('div', 'track');
+  const f1 = el('span', `fill weight${c.weight < 0 ? ' neg' : ''}`);
+  f1.style.width = `${Math.max(4, c.weight_share * 100)}%`;
+  t1.append(f1);
+  box.append(t1);
+
+  const k2 = el('div', 'k');
+  k2.append(el('span', null, c.inert ? 'inert' : `±${c.mean_abs.toFixed(3)}`));
+  box.append(k2);
+  const t2 = el('div', 'track');
+  const f2 = el('span', 'fill influence');
+  f2.style.width = `${Math.max(c.influence_share > 0 ? 4 : 0,
+                               c.influence_share * 100)}%`;
+  t2.append(f2);
+  box.append(t2);
+
+  box.title = `weight ${c.weight.toFixed(4)} · realised mean |contribution| `
+    + `${c.mean_abs.toFixed(4)} over ${c.rows.toLocaleString()} scored runners`
+    + (c.inert ? ' · contributes nothing: no draw score is supplied' : '');
+  return box;
+}
+
+function renderSarr() {
+  const data = state.sarr;
+  const head = $('sarr-head');
+  const body = $('sarr-body');
+  if (!data || !data.runners.length) {
+    head.replaceChildren();
+    body.replaceChildren(el('tr', null, ''));
+    body.firstChild.append(el('td', 'model-empty',
+      data ? 'NO SARR SCORES FOR THIS RACE' : 'LOADING'));
+    body.firstChild.firstChild.colSpan = 12;
+    $('sarr-foot').replaceChildren(el('span', null,
+      data?.unscored?.length
+        ? `NOT SCORED: ${data.unscored.join(', ')}` : ''));
+    return;
+  }
+
+  const cols = [
+    { key: 'no', label: 'NO', align: 'centre', width: '34px' },
+    // no width: HORSE absorbs the slack
+    { key: 'name', label: 'HORSE', align: 'left' },
+    ...data.components.map((c) => ({
+      key: c.component, label: c.component.toUpperCase(), comp: c, width: '78px' })),
+    { key: 'score', label: 'SCORE', width: '66px' },
+    { key: 'rank', label: 'RANK', align: 'centre', width: '46px' },
+  ];
+  const onSort = (key) => {
+    state.sortS = cycle(state.sortS, key, { key: 'rank', dir: 1 });
+    renderSarr();
+  };
+  head.replaceChildren(...cols.map((c) =>
+    headCell(c, state.sortS, onSort, c.comp ? weightBars(c.comp) : null)));
+
+  const value = (r, k) => {
+    if (k === 'no') return r.horse_no;
+    if (k === 'name') return r.horse_name;
+    if (k === 'score') return r.sarr;
+    if (k === 'rank') return r.sarr_rank;
+    return r.components[k];
+  };
+
+  body.replaceChildren(...sortRows(data.runners, state.sortS, value).map((r) => {
+    const tr = el('tr', r.sarr_rank <= 3 ? 'top3' : null);
+    tr.append(el('td', 'centre no', String(r.horse_no ?? DASH)));
+    tr.append(el('td', 'left horse', r.horse_name));
+    data.components.forEach((c) => {
+      const v = r.components[c.component];
+      if (v === null || v === undefined) {
+        tr.append(el('td', 'c-none', DASH));
+        return;
+      }
+      // SARR is lower-is-better, so a NEGATIVE contribution helps. Colouring
+      // by sign alone would read backwards.
+      const cls = v < -0.02 ? 'c-helps' : v > 0.02 ? 'c-hurts' : 'c-flat';
+      tr.append(el('td', cls, fmt3(v)));
+    });
+    const sc = el('td', 'score', fmt3(r.sarr));
+    if (!r.components_sum_to_score) {
+      sc.classList.add('c-hurts');
+      sc.title = 'components do not sum to this score — rebuild runner_sarr';
+    }
+    tr.append(sc);
+    const rk = el('td', 'centre rank', String(r.sarr_rank ?? DASH));
+    rk.title = `${r.n_prior} prior runs`;
+    tr.append(rk);
+    return tr;
+  }));
+
+  // The footer states what the header bars show, and where they disagree.
+  const inert = data.components.filter((c) => c.inert).map((c) => c.component);
+  const byWeight = [...data.components].sort((a, b) => b.weight_share - a.weight_share)[0];
+  const byInfluence = [...data.components].sort((a, b) => b.influence_share - a.influence_share)[0];
+  const foot = $('sarr-foot');
+  foot.replaceChildren();
+  foot.append(el('span', null,
+    'EACH HEADER CARRIES TWO BARS: THE FITTED COEFFICIENT, AND WHAT THE TERM '
+    + 'ACTUALLY MOVES ACROSS EVERY SCORED RUNNER'));
+  if (byWeight.component !== byInfluence.component) {
+    foot.append(el('span', 'warn',
+      `WIDEST COEFFICIENT IS ${byWeight.component.toUpperCase()}, LARGEST REALISED `
+      + `INFLUENCE IS ${byInfluence.component.toUpperCase()} — THEY ARE NOT THE SAME TERM`));
+  }
+  if (inert.length) {
+    foot.append(el('span', 'warn',
+      `${inert.join(', ').toUpperCase()} CONTRIBUTES NOTHING: NO DRAW SCORE IS SUPPLIED`));
+  }
+  if (data.unscored.length) {
+    foot.append(el('span', 'warn',
+      `NOT SCORED: ${data.unscored.join(', ')}`));
+  }
+  foot.append(el('span', 'right',
+    'LOWER SARR IS BETTER · BRIGHT HELPS THE SCORE, DIM HURTS IT · '
+    + 'MODEL AUC .727 · MARKET AUC .785 · CLICK ANY COLUMN TO SORT'));
+}
+
+/** Three decimals, signed, with the leading zero dropped — the artboard's
+ *  format, which keeps eight numeric columns readable at 12px. */
+function fmt3(v) {
+  if (v === null || v === undefined) return DASH;
+  const s = Math.abs(v).toFixed(3).replace(/^0\./, '.');
+  return (v > 0 ? '+' : v < 0 ? '−' : ' ') + s;
+}
+
+/* ── the blend ───────────────────────────────────────────────────────────── */
+
+function renderWeightPicker() {
+  const cal = state.blend?.calibration;
+  const fitted = cal?.fitted_weight ?? 0;
+  const host = $('weight-picker');
+  host.replaceChildren(el('span', 'lab', 'FUND WEIGHT'));
+  const seg = el('div', 'seg');
+  WEIGHTS.forEach((w) => {
+    const b = el('button', null, w.toFixed(2));
+    const active = (state.weight ?? fitted) === w;
+    b.setAttribute('aria-pressed', String(active));
+    b.title = w === fitted ? 'the fitted weight'
+      : `test log loss ${cal?.log_loss_by_weight?.[w.toFixed(2)] ?? '—'}`;
+    b.addEventListener('click', () => { state.weight = w; loadBlend(); });
+    seg.append(b);
+  });
+  host.append(seg);
+}
+
+function renderBlend() {
+  const data = state.blend;
+  const head = $('blend-head');
+  const body = $('blend-body');
+  if (!data || !data.runners.length) {
+    head.replaceChildren();
+    body.replaceChildren(el('tr', null, ''));
+    body.firstChild.append(el('td', 'model-empty', data ? 'NO RUNNERS' : 'LOADING'));
+    body.firstChild.firstChild.colSpan = 7;
+    return;
+  }
+  renderWeightPicker();
+
+  const cols = [
+    { key: 'no', label: 'NO', align: 'centre', width: '34px' },
+    { key: 'name', label: 'HORSE', align: 'left', width: '190px' },
+    { key: 'fund', label: 'FUND PROB', width: '110px',
+      title: 'SARR mapped to a win probability' },
+    { key: 'raw', label: 'MKT PROB (RAW)', width: '130px',
+      title: '1/odds, not normalised — the gap to 100% IS the overround' },
+    { key: 'devig', label: 'MARKET (DE-VIGGED)', width: '150px' },
+    // no width: BLENDED absorbs the slack, and the split bar uses it
+    { key: 'blended', label: 'BLENDED (LIVE)' },
+    { key: 'rank', label: 'RANK', align: 'centre', width: '46px' },
+  ];
+  const onSort = (key) => {
+    state.sortB = cycle(state.sortB, key, { key: 'blended', dir: -1 });
+    renderBlend();
+  };
+  head.replaceChildren(...cols.map((c) => headCell(c, state.sortB, onSort)));
+
+  const value = (r, k) => ({
+    no: r.horse_no, name: r.horse_name, fund: r.fundamental,
+    raw: r.market_raw, devig: r.market_devig, blended: r.blended,
+    rank: r.blend_rank === undefined ? null : -r.blend_rank,
+  }[k]);
+
+  body.replaceChildren(...sortRows(data.runners, state.sortB, value).map((r) => {
+    const tr = el('tr', r.blend_rank <= 3 ? 'top3' : null);
+    tr.append(el('td', 'centre no', String(r.horse_no ?? DASH)));
+    tr.append(el('td', 'left horse', r.horse_name));
+    tr.append(el('td', null, pct(r.fundamental)));
+    tr.append(el('td', 'c-hurts', pct(r.market_raw)));
+    tr.append(el('td', null, pct(r.market_devig)));
+
+    const bl = el('td');
+    if (r.blended === null) {
+      bl.append(el('span', 'c-none', DASH));
+    } else {
+      const box = el('div', 'blend-cell');
+      box.append(el('span', 'v', pct(r.blended)));
+      // How much of THIS row's blend came from each stream. At the fitted
+      // weight the amber half is empty, which is the finding made visible.
+      const fundShare = data.weight && r.blended
+        ? Math.max(0, Math.min(100, data.weight * r.fundamental / r.blended * 100))
+        : 0;
+      const split = el('div', 'split grow');
+      const f = el('span', 'fund');
+      f.style.width = `${fundShare}%`;
+      const m = el('span', 'mkt');
+      m.style.width = `${100 - fundShare}%`;
+      split.append(f, m);
+      split.title = `${fundShare.toFixed(0)}% fundamental · `
+        + `${(100 - fundShare).toFixed(0)}% market`;
+      box.append(split);
+      bl.append(box);
+    }
+    tr.append(bl);
+    tr.append(el('td', 'centre rank', String(r.blend_rank ?? DASH)));
+    return tr;
+  }));
+
+  const cal = data.calibration;
+  const foot = $('blend-foot');
+  foot.replaceChildren();
+  foot.append(el('span', null,
+    `BLENDED = ${(data.weight * 100).toFixed(0)}% FUND + `
+    + `${((1 - data.weight) * 100).toFixed(0)}% MARKET (DE-VIGGED) — `
+    + 'THE BAR SPLITS EACH ROW BY SOURCE'));
+  if (data.overround !== null) {
+    foot.append(el('span', null,
+      `MARKET (RAW) CARRIES OVERROUND ${data.overround}%; DE-VIGGING DIVIDES IT `
+      + 'OUT PROPORTIONALLY SO THE COLUMN SUMS TO 100%'));
+  }
+  if (data.missing.unpriced || data.missing.unscored) {
+    foot.append(el('span', 'warn',
+      `${data.missing.unpriced} UNPRICED · ${data.missing.unscored} UNSCORED — `
+      + 'BOTH STREAMS NEED THE WHOLE FIELD, SO THE SHORT ONE IS BLANK'));
+  }
+  foot.append(el('span', 'warn',
+    (data.weight === cal.fitted_weight
+      ? `FITTED WEIGHT ON THE FUNDAMENTAL IS ${cal.fitted_weight.toFixed(2)}: `
+      : `YOU ARE VIEWING ${data.weight.toFixed(2)}; THE FITTED WEIGHT IS `
+        + `${cal.fitted_weight.toFixed(2)}: `)
+    + `OVER ${cal.test_races} WALK-FORWARD RACES THE MARKET ALONE SCORES `
+    + `${cal.log_loss.market} AND EVERY POSITIVE WEIGHT IS WORSE `
+    + `(0.10 → ${cal.log_loss_by_weight['0.10']}, `
+    + `1.00 → ${cal.log_loss_by_weight['1.00']})`));
+  foot.append(el('span', 'right',
+    'THE BLEND LEANS ON A NUMBER THE MARKET ALREADY PROVIDES — THAT IS THE '
+    + 'FINDING THIS PAGE DOCUMENTS, NOT A LIMITATION IT HIDES'));
+}
+
+function pct(v) {
+  return v === null || v === undefined ? DASH : `${v.toFixed(1)}%`;
+}
+
+/* ── ET ──────────────────────────────────────────────────────────────────── */
+
+async function renderEtSummary() {
   const s = await api.etSummary();
   const conf = s.confidence ?? {};
   const stats = [
@@ -58,17 +403,22 @@ async function renderSummary() {
     ['high conf', (conf.high ?? 0).toLocaleString()],
     ['medium', (conf.medium ?? 0).toLocaleString()],
     ['low', (conf.low ?? 0).toLocaleString()],
-    ['through', s.last_date ?? '—'],
+    ['through', s.last_date ?? DASH],
   ];
   $('et-summary').replaceChildren(...stats.map(([k, v]) => {
-    const s2 = el('div', 'stat');
-    s2.append(el('span', 'v', v), el('span', 'k', k));
-    return s2;
+    const box = el('div', 'stat');
+    box.append(el('span', 'v', v), el('span', 'k', k));
+    return box;
   }));
-  $('et-version').textContent = s.version ? `version ${s.version}` : '';
 }
 
-function renderInvariants(data) {
+function renderEt() {
+  const data = state.et;
+  const body = $('et-body');
+  if (!data) {
+    body.replaceChildren(el('tr', null, ''));
+    return;
+  }
   /* A par is a property of a race, not a runner. v4 used weight_band as a
      lookup key and handed runners in one race pars up to 1.98s apart, which is
      what made it rate a beaten horse fastest in 28 of 51 races. */
@@ -76,38 +426,31 @@ function renderInvariants(data) {
   const rows = data.runners.filter((r) => r.finish_time != null && r.figure != null);
   const sorted = [...rows].sort((a, b) => a.finish_time - b.finish_time);
   const monotonic = sorted.every((r, i) => i === 0 || sorted[i - 1].figure >= r.figure);
-
-  const checks = [
+  $('et-invariants').replaceChildren(...[
     [onePar, `one par per race (${data.distinct_pars} distinct)`],
     [monotonic, 'faster time → better figure'],
-  ];
-  $('et-invariants').replaceChildren(...checks.map(([ok, label]) =>
+  ].map(([ok, label]) =>
     el('span', `inv ${ok ? 'pass' : 'fail'}`, `${ok ? '✓' : '✕'} ${label}`)));
-}
 
-function confClass(c) {
-  return c ? `conf-${c}` : 'thin';
-}
-
-function renderTable(data) {
-  const body = $('et-body');
   if (!data.runners.length) {
-    body.replaceChildren(el('tr', null, 'no runners'));
+    body.replaceChildren(el('tr', null, ''));
+    body.firstChild.append(el('td', 'model-empty', 'NO ET FIGURES FOR THIS RACE'));
+    body.firstChild.firstChild.colSpan = 10;
     return;
   }
   body.replaceChildren(...data.runners.map((r) => {
     const tr = el('tr');
     const cells = [
-      ['num', r.horse_no ?? '—'],
-      ['name', r.horse_name ?? '—'],
-      ['num', r.place ?? '—'],
-      ['num', fmtTime(r.finish_time)],
-      ['num', num(r.figure, 1)],
-      ['num', signed(r.len_vs_par)],
-      ['num', signed(r.len_vs_race)],
-      ['num', r.et_n_eff ?? '—'],
-      [confClass(r.confidence), r.confidence ?? '—'],
-      ['thin', r.et_level ?? '—'],
+      ['centre', r.horse_no ?? DASH],
+      ['left horse', r.horse_name ?? DASH],
+      ['centre', r.place ?? DASH],
+      ['', fmtTime(r.finish_time)],
+      ['', num(r.figure, 1)],
+      ['', signed(r.len_vs_par)],
+      ['', signed(r.len_vs_race)],
+      ['', r.et_n_eff ?? DASH],
+      [`left ${r.confidence ? `conf-${r.confidence}` : 'thin'}`, r.confidence ?? DASH],
+      ['left thin', r.et_level ?? DASH],
     ];
     cells.forEach(([cls, text], i) => {
       const td = el('td', cls, String(text));
@@ -121,51 +464,67 @@ function renderTable(data) {
   }));
 }
 
-/* Cumulative race times get m:ss.xx; a sectional split stays plain seconds. */
 function fmtTime(seconds) {
-  if (seconds === null || seconds === undefined) return '—';
+  if (seconds === null || seconds === undefined) return DASH;
   const m = Math.floor(seconds / 60);
   const s = seconds - m * 60;
   return m >= 1 ? `${m}:${s.toFixed(2).padStart(5, '0')}` : s.toFixed(2);
 }
 
+/* ── loading ─────────────────────────────────────────────────────────────── */
+
+function render() {
+  renderViewToggle();
+  renderStrip();
+  const show = (id, on) => { $(id).hidden = !on; };
+  show('sec-sarr', state.view === 'sarr' || state.view === 'all');
+  show('sec-blend', state.view === 'blend' || state.view === 'all');
+  show('sec-et', state.view === 'et' || state.view === 'all');
+  renderSarr();
+  renderBlend();
+  renderEt();
+}
+
+/** Each section reports its own failure. One section erroring must not blank
+ *  the other two — that is how a page ends up looking like there is no data
+ *  when one endpoint is down. */
+async function settle(promise, onError) {
+  try { return await promise; } catch (e) { onError(e); return null; }
+}
+
+async function loadBlend() {
+  state.blend = await settle(
+    api.blendRace(state.date, state.race, state.weight ?? undefined),
+    (e) => { $('blend-foot').replaceChildren(el('span', 'warn', `blend: ${e.message}`)); });
+  renderBlend();
+}
+
 async function loadRace() {
-  const date = $('meeting-select').value;
-  const no = $('race-select').value;
-  if (!date || !no) return;
-  try {
-    const data = await api.etRace(date, Number(no));
-    renderInvariants(data);
-    renderTable(data);
-  } catch (e) {
-    $('et-body').replaceChildren(el('tr', null, `failed to load: ${e.message}`));
-  }
+  const [sarr, et] = await Promise.all([
+    settle(api.sarrRace(state.date, state.race),
+      (e) => { $('sarr-foot').replaceChildren(el('span', 'warn', `sarr: ${e.message}`)); }),
+    settle(api.etRace(state.date, state.race),
+      (e) => { $('et-body').replaceChildren(el('tr', null, `failed to load: ${e.message}`)); }),
+  ]);
+  state.sarr = sarr;
+  state.et = et;
+  await loadBlend();
+  render();
 }
 
-async function loadMeetings() {
-  const meetings = await api.meetings(60);
-  $('meeting-select').replaceChildren(...meetings.map((m) => {
-    const o = el('option', null, `${m.race_date} · ${m.venue ?? ''} · ${m.races}R`);
-    o.value = m.race_date;
-    return o;
-  }));
-  if (meetings.length) await loadRaces(meetings[0].races);
-}
-
-async function loadRaces(count) {
-  const n = count ?? 11;
-  $('race-select').replaceChildren(...Array.from({ length: n }, (_, i) => {
-    const o = el('option', null, `Race ${i + 1}`);
-    o.value = String(i + 1);
-    return o;
-  }));
+async function loadMeeting() {
+  state.date = $('meeting-select').value;
+  const summary = await api.raceDayMeeting(state.date);
+  state.races = summary.races;
+  state.race = summary.races[0]?.race_no ?? 1;
+  await loadRace();
 }
 
 async function onRebuild() {
   const btn = $('rebuild-et');
   const out = $('job-result');
   btn.disabled = true;
-  btn.textContent = 'Rebuilding…';
+  btn.textContent = 'REBUILDING…';
   out.hidden = false;
   out.className = 'job-result';
   out.textContent = 'Rebuilding ET references…';
@@ -174,27 +533,44 @@ async function onRebuild() {
     /* Report counts, never a bare "done": a zero has to be visible immediately. */
     out.className = 'job-result ok';
     out.textContent =
-      `${r.rows_written.toLocaleString()} runner_et rows from ${r.runs_loaded.toLocaleString()} runs · ` +
-      `window ${r.window?.[0]} to ${r.window?.[1]} · ` +
-      `${r.sec_per_length?.toFixed(4)} sec/length`;
-    await Promise.all([renderSummary(), renderFreshness(), loadRace()]);
+      `${r.rows_written.toLocaleString()} runner_et rows from ${r.runs_loaded.toLocaleString()} runs · `
+      + `window ${r.window?.[0]} to ${r.window?.[1]} · `
+      + `${r.sec_per_length?.toFixed(4)} sec/length`;
+    await Promise.all([renderEtSummary(), renderFreshness(), loadRace()]);
   } catch (e) {
     out.className = 'job-result err';
     out.textContent = `rebuild failed: ${e.message}`;
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Rebuild ET';
+    btn.textContent = 'REBUILD ET';
   }
 }
 
+function onKey(e) {
+  if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
+  if (!/^[1-9]$/.test(e.key)) return;
+  const no = Number(e.key);
+  if (!state.races.some((r) => r.race_no === no) || no === state.race) return;
+  state.race = no;
+  loadRace();
+}
+
 async function init() {
-  renderNav('model-analysis.html');
+  renderNav();
+  renderViewToggle();
   $('rebuild-et').addEventListener('click', onRebuild);
-  $('meeting-select').addEventListener('change', loadRace);
-  $('race-select').addEventListener('change', loadRace);
-  await Promise.all([renderFreshness(), renderSummary().catch(() => {})]);
-  await loadMeetings();
-  await loadRace();
+  $('meeting-select').addEventListener('change', loadMeeting);
+  document.addEventListener('keydown', onKey);
+
+  await Promise.all([renderFreshness(), settle(renderEtSummary(), () => {})]);
+
+  const meetings = await api.meetings(60);
+  $('meeting-select').replaceChildren(...meetings.map((m) => {
+    const o = el('option', null, `${m.race_date} · ${m.venue ?? ''} · ${m.races}R`);
+    o.value = m.race_date;
+    return o;
+  }));
+  if (meetings.length) await loadMeeting();
 }
 
 init();

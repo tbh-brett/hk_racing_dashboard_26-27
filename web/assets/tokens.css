@@ -36,6 +36,9 @@
    * Brief 03 lists eight signals that must stay visually distinct. Each
    * gets a foreground and, where it renders as a badge, a dark ground.     */
   --edge:         #f0a824;   /* model edge                 (named: AMBER) */
+  --edge-wash:    rgba(240, 168, 36, .04);  /* top-3 row tint, off the artboard */
+  --cool:         #5b7a94;   /* a NEGATIVE fitted coefficient              */
+  --cool-dim:     #3a4552;   /* the market's share of a blend              */
   --edge-ground:  #3d2a14;
   --edge-ground-2:#4a3a18;
 
