@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -22,11 +22,19 @@ app = FastAPI(title="hkrd", version="0.1.0")
 
 @app.on_event("startup")
 def _warm() -> None:
-    """Pay numpy's import cost at startup rather than on the first request.
+    """Bring the schema up to date, then pay numpy's import cost.
 
-    1,008ms cold against 5.6ms warm, and on race day the first request is the
-    one that matters most.
+    The schema step is what makes a table added in a later release reach a
+    database that predates it — otherwise the page reading it 500s, which is
+    the silent-failure class this rebuild exists to remove. Every statement is
+    CREATE ... IF NOT EXISTS, so it is a no-op on a current database.
+
+    The warm-up is 1,008ms cold against 5.6ms warm, and on race day the first
+    request is the one that matters most.
     """
+    from hkrd.jobs import init_store
+
+    init_store.run()
     market_q.warm()
 
 
@@ -75,6 +83,65 @@ def form_guide(date: str, race_no: int, history: int = 6) -> dict:
     if not guide.race.runners:
         raise HTTPException(404, f"no race {race_no} on {date}")
     return guide.to_dict()
+
+
+@app.get("/api/pace/{date}/{race_no}")
+def projected_pace(date: str, race_no: int) -> dict:
+    """How fast this race is likely to be run, from the field's running styles.
+
+    A projection, never a measurement: a race that has not been run has no
+    sectionals. The count of unclassified runners rides along so a thin read
+    cannot pass for a confident one.
+    """
+    out = fg_q.projected_pace(date, race_no)
+    if not out["field_size"]:
+        raise HTTPException(404, f"no race {race_no} on {date}")
+    return out
+
+
+@app.get("/api/notes")
+def run_notes(horses: str) -> dict:
+    """Run notes for a comma-separated list of horses — one call per card."""
+    return {"notes": fg_q.notes_for_horses(horses.split(","))}
+
+
+@app.post("/api/notes")
+def save_run_note(body: dict = Body(...)) -> dict:
+    """Write a note on one run. This never creates a blackbook entry.
+
+    Design brief 06 Part 0: most notes are records, not theses, and
+    auto-promotion would fill the book with noise. Promotion is /api/blackbook.
+    """
+    from hkrd.jobs import write_notes
+
+    try:
+        return write_notes.save_note(
+            body["horse_name"], body["race_date"], int(body["race_no"]),
+            body.get("note", ""))
+    except KeyError as exc:
+        raise HTTPException(422, f"missing field: {exc.args[0]}") from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.post("/api/blackbook")
+def create_blackbook_entry(body: dict = Body(...)) -> dict:
+    """Promote a run to a blackbook entry — the deliberate step."""
+    from hkrd.jobs import write_notes
+
+    try:
+        return write_notes.promote_to_blackbook(
+            body["horse_name"],
+            reasoning=body.get("reasoning", ""),
+            source_date=body.get("source_date"),
+            source_race_no=(int(body["source_race_no"])
+                            if body.get("source_race_no") is not None else None),
+            tags=body.get("tags") or [],
+            confidence=body.get("confidence", "medium"))
+    except KeyError as exc:
+        raise HTTPException(422, f"missing field: {exc.args[0]}") from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
 
 
 @app.get("/api/race-quality/{date}/{race_no}")

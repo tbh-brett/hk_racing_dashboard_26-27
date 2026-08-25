@@ -20,7 +20,8 @@ from hkrd.query.race import get_horse_form, get_race
 from hkrd.query.types import FormGuide, RunnerLine
 from hkrd.store.connect import Connection, get_conn
 
-__all__ = ["build_form_guide", "race_quality", "condition_fit", "head_to_head",
+__all__ = ["build_form_guide", "projected_pace", "race_quality",
+           "condition_fit", "head_to_head", "notes_for_horses",
            "ConditionCell"]
 
 
@@ -39,6 +40,80 @@ def build_form_guide(date: str, race_no: int, *, history: int = 6,
                 for r in race.runners
             },
         )
+    finally:
+        if own:
+            conn.close()
+
+
+# ── projected race pace ──────────────────────────────────────────────────────
+
+# The five steps the header bar draws. Pressure is leaders plus half the
+# on-pacers, over field size: one confirmed leader in a field of twelve is a
+# soft lead, three is a contested one.
+_PACE_BANDS = (
+    (0.10, "CRAWL"), (0.20, "SLOW"), (0.32, "EVEN"), (0.45, "STRONG"),
+    (1.01, "HOT"),
+)
+
+
+def projected_pace(date: str, race_no: int, *,
+                   conn: Connection | None = None) -> dict[str, Any]:
+    """How fast this race is likely to be run, from who is in it.
+
+    A race that has not been run has no sectionals, so its pace cannot be
+    measured -- only projected from the field's running styles. That is
+    standard pace handicapping and it is stated as a projection, never as a
+    figure.
+
+    The projection is only as good as its coverage, so the number of runners
+    with no established style travels with it. A field where half the runners
+    have never been classified has a pace estimate worth very little, and the
+    header has to be able to say so.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        rows = conn.execute("""
+            SELECT r.horse_no, r.horse_name,
+                   (SELECT p.pace_style
+                      FROM runners h
+                      JOIN runner_pace p USING (race_date, race_no, horse_no)
+                     WHERE h.horse_name = r.horse_name AND h.race_date < ?
+                       AND p.pace_style IS NOT NULL
+                     ORDER BY h.race_date DESC, h.race_no DESC LIMIT 1) style
+            FROM runners r
+            WHERE r.race_date = ? AND r.race_no = ?
+            ORDER BY r.horse_no
+        """, (date, date, race_no)).fetchall()
+        if not rows:
+            return {"race_date": date, "race_no": race_no, "band": None,
+                    "pressure": None, "field_size": 0, "unknown": 0,
+                    "counts": {}, "confident": False}
+
+        counts: dict[str, int] = {}
+        for r in rows:
+            counts[r["style"] or "Unknown"] = counts.get(r["style"] or "Unknown", 0) + 1
+        unknown = counts.get("Unknown", 0)
+        known = len(rows) - unknown
+
+        pressure = None
+        band = None
+        if known:
+            # Over KNOWN runners, not the whole field: an unclassified runner is
+            # missing evidence, and counting it as "not a leader" would make
+            # every thin field look slow.
+            pressure = round(
+                (counts.get("Leader", 0) + 0.5 * counts.get("On-Pace", 0)) / known, 3)
+            band = next(name for limit, name in _PACE_BANDS if pressure < limit)
+
+        return {
+            "race_date": date, "race_no": race_no,
+            "band": band, "pressure": pressure,
+            "field_size": len(rows), "unknown": unknown, "counts": counts,
+            # Half the field unclassified is not a pace read, it is a guess.
+            "confident": known >= max(4, len(rows) * 0.6),
+            "leaders": [r["horse_name"] for r in rows if r["style"] == "Leader"],
+        }
     finally:
         if own:
             conn.close()
@@ -227,3 +302,32 @@ def weight_swing(last_gap: int | None, today_gap: int | None) -> int | None:
     if last_gap is None or today_gap is None:
         return None
     return abs(today_gap - last_gap)
+
+
+# ── run notes ────────────────────────────────────────────────────────────────
+
+def notes_for_horses(horse_names: list[str], *,
+                     conn: Connection | None = None) -> dict[str, list[dict]]:
+    """Every run note for a set of horses, keyed by horse.
+
+    One query for the whole card rather than one per runner: a twelve-runner
+    field expanded is twelve round trips otherwise, and the page opens rows
+    faster than that.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        names = [n.strip().upper() for n in horse_names if n]
+        if not names:
+            return {}
+        marks = ",".join("?" * len(names))
+        out: dict[str, list[dict]] = {}
+        for r in conn.execute(
+                f"SELECT horse_name, race_date, race_no, note, written_at "
+                f"FROM run_notes WHERE horse_name IN ({marks}) "
+                f"ORDER BY race_date DESC, race_no DESC", names):
+            out.setdefault(r["horse_name"], []).append(dict(r))
+        return out
+    finally:
+        if own:
+            conn.close()

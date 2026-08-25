@@ -220,3 +220,52 @@ def test_blend_route_publishes_the_calibration_it_used(client):
     assert cal["log_loss"]["market"] < cal["log_loss"]["fundamental"]
     assert cal["log_loss_by_weight"]["0.00"] <= min(
         cal["log_loss_by_weight"].values())
+
+
+# ── form guide writes ────────────────────────────────────────────────────────
+
+def test_a_note_is_saved_and_read_back_for_the_card(client):
+    body = client.post("/api/notes", json={
+        "horse_name": "HORSE 0", "race_date": "2025-06-13", "race_no": 1,
+        "note": "held up, no room from the 400"}).json()
+    assert body["note"] == "held up, no room from the 400"
+
+    read = client.get("/api/notes?horses=HORSE 0,HORSE 1").json()["notes"]
+    assert list(read) == ["HORSE 0"]
+    assert read["HORSE 0"][0]["race_no"] == 1
+
+
+def test_saving_a_note_does_not_create_a_blackbook_entry(client):
+    """Design brief 06 Part 0. Promotion is a separate, deliberate call."""
+    before = client.get("/api/blackbook").json()["count"]
+    client.post("/api/notes", json={
+        "horse_name": "HORSE 2", "race_date": "2025-06-13", "race_no": 1,
+        "note": "ordinary run"})
+    assert client.get("/api/blackbook").json()["count"] == before
+
+
+def test_an_empty_note_is_a_422_not_a_blank_row(client):
+    r = client.post("/api/notes", json={
+        "horse_name": "HORSE 0", "race_date": "2025-06-13", "race_no": 1,
+        "note": ""})
+    assert r.status_code == 422
+
+
+def test_promotion_creates_an_entry_the_list_then_shows(client):
+    entry = client.post("/api/blackbook", json={
+        "horse_name": "HORSE 4", "reasoning": "blocked at the 300",
+        "source_date": "2025-06-13", "source_race_no": 1,
+        "tags": ["traffic"]}).json()
+    assert entry["source_race"] == "2025-06-13 R1"
+
+    listed = client.get("/api/blackbook?tag=traffic").json()
+    assert entry["id"] in [e["id"] for e in listed["entries"]]
+
+
+def test_the_projected_pace_route_reports_its_own_coverage(client):
+    """The fixture records no running styles, so there is no read — and the
+    route has to say so rather than return a band."""
+    body = client.get("/api/pace/2025-06-13/1").json()
+    assert body["band"] is None
+    assert body["unknown"] == body["field_size"] == 8
+    assert body["confident"] is False

@@ -53,6 +53,37 @@
   --incident:     #c8792f;   /* stewards / trip trouble  (named: COPPER)  */
   --violet:       #b7a2e8;   /* trainer change (confirmed by the artboard) */
   --violet-ground:#191626;
+  --gear:         #9b8cd0;   /* gear carried again        (named: GEAR_C)  */
+  --gear-first:   #cbbcf5;   /* gear applied for the first time            */
+
+  /* ── running style, front of the field to the back ──────────────────────
+   * Warm at the front, cool at the back, so the chips read as an order rather
+   * than four unrelated labels. Off the Form Guide artboard.
+   */
+  --style-leader:   #e8975c;
+  --style-leader-g: #2a1a10;
+  --style-onpace:   #e8c04a;
+  --style-onpace-g: #2a2410;
+  --style-mid:      #8fb8d8;
+  --style-mid-g:    #16222b;
+  --style-closer:   #7fc8a9;
+  --style-closer-g: #142520;
+
+  /* ── Form Guide surfaces, off the artboard ───────────────────────────── */
+  --cond:           #7fa7c9;   /* a condition change: distance, going       */
+  --cond-rule:      #25384a;
+  --detail:         #0e131a;   /* ground under an expanded horse            */
+  --detail-rule:    #2b3a4a;
+  --run-hover:      #151a21;
+  --run-open:       #131820;
+  --box:            #12171f;   /* a sectional cell                          */
+  --box-rule:       #232a34;
+  --meter:          #1c2129;   /* the ground behind a small bar             */
+  --ci:             #24313d;   /* a confidence interval                     */
+  --pop:            #101a1a;   /* popover ground                            */
+  --pop-rule:       #1b2b2b;
+  --pop-field:      #24323a;
+  --pop-act:        #12211f;
 
   /* Band grounds, read off the Race Day artboard. */
   --book-band:    #12181a;   /* blackbook band                             */

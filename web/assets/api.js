@@ -18,11 +18,17 @@ async function get(path) {
   return res.json();
 }
 
-async function post(path) {
-  const res = await fetch(`${BASE}${path}`, { method: 'POST' });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.detail ?? `${res.status} ${res.statusText}`);
-  return body;
+async function post(path, body) {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    ...(body === undefined ? {} : {
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  });
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(out.detail ?? `${res.status} ${res.statusText}`);
+  return out;
 }
 
 export const api = {
@@ -41,6 +47,15 @@ export const api = {
   formGuide: (date, no, history = 6) =>
     get(`/formguide/${date}/${no}?history=${history}`),
   raceQuality: (date, no) => get(`/race-quality/${date}/${no}`),
+  projectedPace: (date, no) => get(`/pace/${date}/${no}`),
+  conditionFit: (name, q = '') =>
+    get(`/condition-fit/${encodeURIComponent(name)}${q}`),
+  headToHead: (a, b, before) => get(
+    `/head-to-head/${encodeURIComponent(a)}/${encodeURIComponent(b)}`
+    + (before ? `?before=${before}` : '')),
+  notes: (horses) => get(`/notes?horses=${encodeURIComponent(horses.join(','))}`),
+  saveNote: (body) => post('/notes', body),
+  createBlackbookEntry: (body) => post('/blackbook', body),
   etRace: (date, no) => get(`/model/et/${date}/${no}`),
   etSummary: () => get('/model/et/summary'),
   sarrRace: (date, no) => get(`/model/sarr/${date}/${no}`),

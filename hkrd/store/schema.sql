@@ -154,6 +154,19 @@ CREATE TABLE IF NOT EXISTS blackbook_notes (
   FOREIGN KEY (id) REFERENCES blackbook(id)
 );
 
+-- An observation about ONE run. Design brief 06 Part 0 keeps this distinct from
+-- a blackbook entry: a note is a record of what happened, an entry is a
+-- judgement that the horse is worth following. Most notes are records, so a
+-- note must never auto-create an entry — promotion is a deliberate step.
+CREATE TABLE IF NOT EXISTS run_notes (
+  horse_name TEXT    NOT NULL,
+  race_date  TEXT    NOT NULL,
+  race_no    INTEGER NOT NULL,
+  note       TEXT    NOT NULL,
+  written_at TEXT    NOT NULL,
+  PRIMARY KEY (horse_name, race_date, race_no)
+);
+
 CREATE TABLE IF NOT EXISTS blackbook_tag_definitions (
   tag        TEXT PRIMARY KEY,
   definition TEXT

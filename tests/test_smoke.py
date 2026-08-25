@@ -323,3 +323,64 @@ def test_running_style_colours_are_distinct() -> None:
         "running styles must be four distinct colours, not one hue at four "
         "brightnesses:\n" + "\n".join(too_close)
     )
+
+
+def test_page_stylesheets_do_not_share_a_top_level_class() -> None:
+    """A class two page stylesheets both style unqualified is a live collision.
+
+    raceday.css styled `.detail` as a 256px fixed aside. formguide.css used the
+    same name for the block under an expanded horse, and the Form Guide loaded
+    raceday.css for the race strip — so every expanded horse silently rendered
+    256px wide. Nothing errored; the page was simply wrong.
+
+    Only the LEADING class of a selector counts. `.band-item .name` and
+    `.fit-cell .name` are scoped by their ancestor and cannot collide; `.detail`
+    and `.detail` can. Shared rules belong in pages.css, which is exempt.
+    """
+    page_sheets = ["raceday.css", "formguide.css", "model.css"]
+    seen: dict[str, list[str]] = {}
+    for sheet in page_sheets:
+        path = WEB_ASSETS / sheet
+        if not path.is_file():
+            continue
+        src = re.sub(r"/\*.*?\*/", "", path.read_text(encoding="utf-8"), flags=re.S)
+        for block in re.findall(r"([^{}]+)\{", src):
+            for selector in block.split(","):
+                head = selector.strip().split()[0] if selector.strip() else ""
+                m = re.match(r"^\.([a-z][a-z0-9-]*)", head)
+                if m and sheet not in seen.setdefault(m.group(1), []):
+                    seen[m.group(1)].append(sheet)
+
+    clashes = sorted(f"  .{name}: {' and '.join(sheets)}"
+                     for name, sheets in seen.items() if len(sheets) > 1)
+    assert not clashes, (
+        "these classes are styled unqualified in more than one page "
+        "stylesheet; move them to pages.css or rename:\n" + "\n".join(clashes)
+    )
+
+
+def test_no_rule_paints_text_on_its_own_colour() -> None:
+    """color and background-color set to the same value make text invisible.
+
+    Written twice in one sitting, from grouping a text selector and a bar-fill
+    selector into one rule: `.t.fast, .bar i.fast { color: X; background: X }`
+    gives the bar its fill and the number a ground it vanishes into. Nothing
+    errors — the value is simply not on screen.
+    """
+    offenders = []
+    for sheet in sorted(WEB_ASSETS.glob("*.css")):
+        src = re.sub(r"/\*.*?\*/", "", sheet.read_text(encoding="utf-8"), flags=re.S)
+        for selector, block in re.findall(r"([^{}]+)\{([^{}]*)\}", src):
+            decls = dict(
+                (k.strip(), v.strip())
+                for k, _, v in (d.partition(":") for d in block.split(";")) if v)
+            fg = decls.get("color")
+            bg = decls.get("background") or decls.get("background-color")
+            # A shorthand `background` can carry more than a colour; compare the
+            # first token, which is where a bare colour would sit.
+            if fg and bg and fg == bg.split()[0] and fg not in ("inherit", "currentColor"):
+                offenders.append(f"  {sheet.name}: {selector.strip()} — {fg}")
+    assert not offenders, (
+        "these rules paint text on a ground of its own colour:\n"
+        + "\n".join(offenders)
+    )

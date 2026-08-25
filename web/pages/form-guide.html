@@ -22,35 +22,36 @@
 
 <nav class="chrome-nav" id="nav"></nav>
 
-<main class="page">
-  <header class="page-head">
-    <h1>Form Guide</h1>
-    <div class="controls">
-      <select id="meeting-select" aria-label="Meeting"></select>
-      <select id="race-select" aria-label="Race"></select>
-      <button id="expand-all" class="btn">Expand all</button>
-    </div>
-  </header>
+<div class="race-strip">
+  <div class="label">RACE</div>
+  <div class="race-chips" id="race-chips"></div>
+  <div class="strip-right">
+    <select id="meeting-select" aria-label="Meeting"></select>
+    <span id="sort-state"></span>
+    <span id="open-count">0 EXPANDED</span>
+    <button class="strip-btn" id="expand-all">EXPAND ALL</button>
+    <button class="strip-btn" id="collapse-all">COLLAPSE ALL</button>
+  </div>
+</div>
 
-  <div class="race-context" id="race-context"></div>
+<!-- The race header bar. Everything that is a property of the race and not of
+     any runner lives here, so the grid below is only about horses. -->
+<div class="race-hdr" id="race-hdr"></div>
 
-  <!-- One column grid, shared by every state. A collapsed row and an expanded
-       row line up on their left-hand columns so the eye tracks straight down. -->
-  <div class="fg-head" role="row">
-    <span class="c-no">No</span>
-    <span class="c-horse">Horse</span>
-    <span class="c-draw">Dr</span>
-    <span class="c-wt">Wt</span>
-    <span class="c-jockey">Jockey</span>
-    <span class="c-trainer">Trainer</span>
-    <span class="c-style">Style</span>
-    <span class="c-odds">Odds</span>
-    <span class="c-seq">Last 6 figures</span>
-    <span class="c-flags">Flags</span>
+<div class="fg-body">
+  <div class="fg-main">
+    <!-- One grid template, shared by the card header, every horse row and every
+         run row, so a collapsed row and an expanded one line up column for
+         column and the eye tracks straight down. -->
+    <div class="fg-head" id="fg-head" role="row"></div>
+    <div id="runners"></div>
+    <div class="fg-foot" id="fg-foot"></div>
   </div>
 
-  <div id="runners"></div>
-</main>
+  <aside class="fit-aside" id="fit-aside"></aside>
+</div>
+
+<div class="popover" id="popover" hidden></div>
 
 <script type="module" src="../assets/form-guide.js"></script>
 </body>
