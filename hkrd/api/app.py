@@ -11,9 +11,9 @@ from fastapi import Body, FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from hkrd.query import (blackbook as bb_q, formguide as fg_q,
-                        market as market_q, model, race as race_q,
-                        raceday as raceday_q)
+from hkrd.query import (bets as bets_q, blackbook as bb_q,
+                        formguide as fg_q, market as market_q, model,
+                        race as race_q, raceday as raceday_q)
 
 WEB = Path(__file__).resolve().parent.parent.parent / "web"
 
@@ -256,6 +256,17 @@ def set_blackbook_status(entry_id: str, body: dict = Body(...)) -> dict:
         raise HTTPException(422, str(exc)) from exc
 
 
+@app.get("/api/blackbook/backed-vs-missed")
+def blackbook_backed_vs_missed(entry_id: str | None = None) -> dict:
+    """What was backed, what was not, and how each did.
+
+    Design brief 06 calls this "the single most important feature on the page":
+    without it only the hits are visible. It is a join over the bets ledger, so
+    nothing has to be logged by hand.
+    """
+    return bets_q.backed_and_missed(entry_id=entry_id)
+
+
 @app.get("/api/blackbook/declared/{date}")
 def blackbook_declared(date: str) -> dict:
     """Booked horses declared across one meeting."""
@@ -268,7 +279,34 @@ def blackbook_entry(entry_id: str) -> dict:
     entry = bb_q.entry_detail(entry_id)
     if entry is None:
         raise HTTPException(404, f"no blackbook entry {entry_id}")
+    entry.update(bb_q.entry_bets(entry_id))
     return entry
+
+
+# ── bets ─────────────────────────────────────────────────────────────────────
+
+@app.get("/api/bets")
+def bets_ledger(date: str | None = None, account: str | None = None,
+                limit: int = 500) -> dict:
+    rows = bets_q.ledger(date=date, account=account, limit=limit)
+    return {"bets": rows, "count": len(rows)}
+
+
+@app.get("/api/bets/summary")
+def bets_summary(account: str | None = None) -> dict:
+    return bets_q.summary(account=account)
+
+
+@app.get("/api/bets/race/{date}/{race_no}")
+def bets_for_race(date: str, race_no: int) -> dict:
+    return {"race_date": date, "race_no": race_no,
+            "bets": bets_q.bets_for_race(date, race_no)}
+
+
+@app.get("/api/bets/horse/{name}")
+def bets_for_horse(name: str, since: str | None = None) -> dict:
+    return {"horse_name": name.upper(),
+            "bets": bets_q.bets_for_horse(name, since=since)}
 
 
 

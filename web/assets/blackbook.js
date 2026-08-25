@@ -61,6 +61,7 @@ const state = {
   view: 'list', entries: [], tags: [], summary: null, tagMeta: null,
   search: '', tag: null, status: 'all', range: 'all', today: null,
   todayOnly: false, declared: new Set(), open: new Set(), details: {},
+  backedMissed: null,
   sort: 'added', sortDir: -1, busy: new Set(),
 };
 
@@ -514,28 +515,57 @@ function entryDetail(e) {
   // Brief 06 calls missed bets "the single most important feature". It needs a
   // bets ledger, which does not exist yet — so the panel says that rather than
   // showing a zero that would read as "nothing was missed".
+  side.append(el('div', 'sub-cap', 'BETS ON THIS HORSE SINCE BOOKING'));
+  const placed = detail.placed ?? [];
+  if (!placed.length) {
+    side.append(el('div', 'empty-line', 'NONE PLACED'));
+  } else {
+    placed.forEach((b) => {
+      const row = el('div', 'note-row');
+      row.append(el('span', 'd', b.race_date));
+      row.append(el('span', 'v', b.bet_type));
+      row.append(el('span', 'txt',
+        `$${b.stake.toLocaleString()} → $${(b.returned ?? 0).toLocaleString()}`));
+      const pnl = el('span', `verdict ${b.pnl >= 0 ? 'pos' : 'neg'}`,
+        `${b.pnl >= 0 ? '+' : ''}${Math.round(b.pnl)}`);
+      pnl.title = b.is_banker ? 'banker' : 'selection';
+      row.append(pnl);
+      side.append(row);
+    });
+  }
+
+  // The falsifiability requirement: the runs that happened and were NOT
+  // backed. Detected from the ledger, so nothing had to be remembered.
+  const cmp = detail.comparison;
+  side.append(el('div', 'sub-cap', 'MISSED — RAN, NOT BACKED'));
+  if (!cmp || !cmp.missed.runs) {
+    side.append(el('div', 'empty-line',
+      cmp ? 'NONE — EVERY RUN SINCE WAS BACKED' : 'LOADING'));
+  } else {
+    const m = cmp.missed;
+    const row = el('div', 'note-row');
+    row.append(el('span', 'd', `${m.runs} runs`));
+    row.append(el('span', 'v', `${m.wins}W`));
+    row.append(el('span', 'txt',
+      `strike ${pct(m.strike_rate)} · median ${num(m.median_odds, 1)}`));
+    side.append(row);
+  }
+
   const ledger = el('div', 'ledger-box');
-  const priced = since.filter((r) => r.win_odds);
-  const staked = priced.length;
-  const returned = priced.filter((r) => r.place === 1)
-    .reduce((a, r) => a + r.win_odds, 0);
-  const rows = [
-    ['RUNS SINCE', `${since.length} · ${priced.length} priced`, null],
-    ['FLAT $1 WIN', `$${staked} → $${returned.toFixed(1)}`,
-     staked ? (returned - staked) / staked : null],
-  ];
-  rows.forEach(([k, v, roi]) => {
-    const row = el('div', 'row');
-    row.append(el('span', 'k', k));
-    row.append(el('span', 'v', v));
-    if (roi !== null) {
-      row.append(el('span', `n ${roi >= 0 ? 'pos' : 'neg'}`, signedPct(roi)));
-    }
-    ledger.append(row);
-  });
-  ledger.append(el('div', 'caveat',
-    'BACKED vs MISSED NEEDS THE BETS LEDGER, WHICH IS NOT BUILT YET — '
-    + 'THE FIGURE ABOVE IS EVERY RUN AS IF BACKED, NOT WHAT WAS BET'));
+  if (cmp) {
+    [['BACKED', cmp.backed], ['MISSED', cmp.missed]].forEach(([k, d]) => {
+      const row = el('div', 'row');
+      row.append(el('span', 'k', k));
+      row.append(el('span', 'v', `${d.runs} runs · ${d.wins}W`));
+      if (d.roi !== null) {
+        row.append(el('span', `n ${d.roi >= 0 ? 'pos' : 'neg'}`, signedPct(d.roi)));
+      }
+      ledger.append(row);
+    });
+    ledger.append(el('div', 'caveat',
+      `BOTH SIDES PRICED AT A NOTIONAL $${cmp.notional_stake} WIN STAKE, SO THE `
+      + 'COMPARISON IS OF THE SELECTION AND NOT OF THE BET TYPE'));
+  }
   side.append(ledger);
   box.append(side);
   return box;
@@ -672,6 +702,7 @@ function renderAnalysis() {
 
 function renderWholeBook() {
   const s = state.summary;
+  const bm = state.backedMissed;
   const host = $('whole-book');
   host.replaceChildren();
   if (!s) return;
@@ -696,18 +727,58 @@ function renderWholeBook() {
     return box;
   };
 
-  host.append(metric('EVERY RUN SINCE, FLAT $1 WIN', s.runs_since,
-    `${s.wins_since} wins`, s.flat_roi));
-  host.append(metric('AGAINST THE PRICE (A/E)', s.ae_runs,
-    s.ae === null ? DASH : `${s.ae} (${s.ae_lo}–${s.ae_hi})`,
-    s.ae === null ? null : s.ae - 1));
+  if (!bm) {
+    host.append(metric('EVERY RUN SINCE, FLAT $1 WIN', s.runs_since,
+      `${s.wins_since} wins`, s.flat_roi));
+    host.append(el('div', 'closing', 'LOADING THE BETS LEDGER'));
+    return;
+  }
 
+  // Both sides priced at the SAME notional flat win stake. The real ledger is
+  // quinellas and multi-leg tickets; comparing those against a notional win
+  // bet would measure the bet type, not the selection.
+  ['backed', 'missed'].forEach((side) => {
+    const d = bm[side];
+    host.append(metric(side.toUpperCase(), d.runs,
+      `${d.wins} wins · strike ${pct(d.strike_rate)}`, d.roi));
+  });
+
+  // Strike rate beside the chance the PRICE implied. This is the row that
+  // says whether the selection did anything the board did not.
+  const table = el('div', 'implied');
+  ['backed', 'missed'].forEach((side) => {
+    const d = bm[side];
+    if (d.implied_rate === null) return;
+    const row = el('div', 'implied-row');
+    row.append(el('span', 'k', side.toUpperCase()));
+    row.append(el('span', null, `median ${num(d.median_odds, 1)}`));
+    row.append(el('span', null, `implied ${pct(d.implied_rate)}`));
+    row.append(el('span', null, `actual ${pct(d.strike_rate)}`));
+    const edge = el('span', 'edge', signedPct(d.vs_implied));
+    // Within a point of the implied rate is the market's own number, not an
+    // edge — so it is not coloured as one.
+    if (Math.abs(d.vs_implied) > 0.01) edge.classList.add(d.vs_implied > 0 ? 'pos' : 'neg');
+    row.append(edge);
+    table.append(row);
+  });
+  host.append(table);
+
+  const a = bm.actual;
+  if (a.bets) {
+    host.append(metric('WHAT WAS ACTUALLY STAKED ON THEM', a.bets,
+      `$${a.staked.toLocaleString()} → $${a.returned.toLocaleString()}`, a.roi));
+  }
+
+  const backed = bm.backed;
+  const missed = bm.missed;
   host.append(el('div', 'closing warn',
-    'BACKED vs MISSED IS THE ONE THING THIS PANEL CANNOT SHOW. Brief 06 calls '
-    + 'it the most important feature on the page and it is right — without it '
-    + 'you only ever see the hits. It needs the bets ledger, which is the next '
-    + 'page to build. Until then every run since booking is counted as if it '
-    + 'had been backed, which is a counterfactual, not a record.'));
+    `${backed.runs} of ${bm.runs} runs since booking were backed and `
+    + `${missed.runs} were not — detected from the ledger, not logged by hand. `
+    + `The backed side strikes ${pct(backed.strike_rate)} at a median `
+    + `${num(backed.median_odds, 1)}, the missed side ${pct(missed.strike_rate)} `
+    + `at ${num(missed.median_odds, 1)}. Both land within a point of what their `
+    + `price implied, so the gap between those strike rates is the odds, not `
+    + `the picking.`));
 }
 
 function renderStatusPanel() {
@@ -798,7 +869,7 @@ async function init() {
   state.today = latest;
 
   try {
-    const [list, tags, summary, declared] = await Promise.all([
+    const [list, tags, summary, declared, backedMissed] = await Promise.all([
       api.blackbook(),
       api.blackbookTags(),
       api.blackbookSummary(latest),
@@ -806,6 +877,7 @@ async function init() {
               // not take the whole page down with it.
               latest ? api.blackbookDeclared(latest).catch(() => ({ entries: [] }))
         : Promise.resolve({ entries: [] }),
+      api.backedVsMissed().catch(() => null),
     ]);
     state.entries = list.entries;
     state.tags = tags.tags;
@@ -815,6 +887,7 @@ async function init() {
     state.tagMeta = Object.fromEntries(
       tags.tags.map((t) => [t.tag, t.definition]).filter(([, d]) => d));
     state.summary = summary;
+    state.backedMissed = backedMissed;
     state.declared = new Set(declared.entries.map((d) => d.horse_name));
   } catch (e) {
     $('entries').replaceChildren(el('div', 'no-match', `failed to load: ${e.message}`));

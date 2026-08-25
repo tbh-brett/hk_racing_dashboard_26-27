@@ -107,6 +107,50 @@ CREATE TABLE IF NOT EXISTS trials (
   PRIMARY KEY (trial_date, trial_no, horse_name)
 );
 
+-- ── bets ─────────────────────────────────────────────────────────────────────
+--
+-- The ledger. Design brief 06 Part 1 calls missed bets "the single most
+-- important feature" of the Blackbook: without knowing what was BACKED you
+-- only ever see the hits, and the book reads as a scrapbook. That comparison
+-- is a join from a blackbook horse to these rows, which is why selections are
+-- normalised rather than left as a JSON list.
+
+CREATE TABLE IF NOT EXISTS bets (
+  bet_id        TEXT PRIMARY KEY,       -- stable id from the legacy log
+  bookie_ref    TEXT,                   -- statement reference, for dedup
+  account       TEXT,                   -- personal | joint | client
+  race_date     TEXT NOT NULL,
+  venue         TEXT,
+  race_no       INTEGER,                -- NULL for an all-up, which spans races
+  bet_type      TEXT NOT NULL,          -- WIN | PLACE | QIN | QPL | ALLUP_* ...
+  all_up_formula TEXT,
+  stake         REAL NOT NULL,
+  returned      REAL,                   -- NULL while unsettled, 0 when it lost
+  pnl           REAL,
+  status        TEXT NOT NULL,          -- open | settled | void
+  hit           INTEGER,                -- 1 | 0 | NULL while open
+  settle_method TEXT,                   -- dividend | bookie_statement
+  placed_at     TEXT,
+  settled_at    TEXT,
+  source        TEXT NOT NULL,          -- legacy_log | statement | manual
+  notes         TEXT
+);
+
+-- One row per horse backed, per leg. This is the table the Blackbook joins to,
+-- so a bet on six horses is six rows rather than a list nothing can query.
+CREATE TABLE IF NOT EXISTS bet_selections (
+  bet_id    TEXT    NOT NULL,
+  race_no   INTEGER NOT NULL,           -- the LEG's race, not the bet's
+  horse_no  INTEGER NOT NULL,
+  leg_no    INTEGER NOT NULL DEFAULT 0, -- 0 for a single-race bet
+  is_banker INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (bet_id, race_no, horse_no, leg_no),
+  FOREIGN KEY (bet_id) REFERENCES bets(bet_id)
+);
+
+CREATE INDEX IF NOT EXISTS ix_bets_date ON bets(race_date, race_no);
+CREATE INDEX IF NOT EXISTS ix_bet_sel_race ON bet_selections(race_no, horse_no);
+
 -- ── blackbook ────────────────────────────────────────────────────────────────
 --
 -- A hypothesis tracker, not a list of favourites: every entry is a claim that

@@ -357,6 +357,23 @@
 .panel-body .status-row .track i { display: block; height: 9px; }
 .panel-body .status-row .n { width: 26px; text-align: right; color: var(--text-2); font-weight: 600; }
 .panel-body .status-row .note { width: 92px; text-align: right; font-size: var(--fs-xs); color: var(--text-dim); }
+/* Strike rate beside the chance the price implied. The row that says whether
+   the selection did anything the board did not. */
+.implied {
+  border-top: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2);
+  margin: 4px 0 9px; padding: 4px 0;
+}
+.implied-row {
+  display: flex; align-items: baseline; gap: 10px; height: 20px;
+  font-size: var(--fs-sm); color: var(--text-muted);
+}
+.implied-row .k { width: 58px; color: var(--text-2); letter-spacing: .06em; }
+.implied-row .edge {
+  margin-left: auto; font-weight: 600; color: var(--text-faint);
+}
+.implied-row .edge.pos { color: var(--win); }
+.implied-row .edge.neg { color: var(--loss); }
+
 .panel-body .closing {
   line-height: 1.6; border-top: 1px solid var(--line-2); margin-top: 8px;
   padding-top: 8px; color: var(--text-muted);

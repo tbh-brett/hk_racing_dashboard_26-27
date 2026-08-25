@@ -29,7 +29,8 @@ from typing import Any
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["list_entries", "entry_detail", "for_race", "declared_on",
-           "tag_performance", "tag_definitions", "book_summary"]
+           "tag_performance", "tag_definitions", "book_summary",
+           "entry_bets"]
 
 # HK pays three places in fields of seven or more, two in smaller fields. Using
 # a flat top-3 would credit the book with places that never paid.
@@ -422,11 +423,35 @@ def book_summary(*, today: str | None = None,
                          if priced else None),
             **_actual_over_expected(row["expected_wins"], row["wins"] or 0,
                                     row["ae_runs"] or 0),
-            # There is no bets ledger yet, so backed-versus-missed cannot be
-            # split. Saying so is the point: brief 06 calls missed bets "the
-            # single most important feature", and a page that showed 0 backed
-            # would be asserting something it has not been told.
-            "bets_ledger": False,
+            # The ledger exists now, so backed-versus-missed is a join
+            # rather than something the user had to remember to log --
+            # brief 06: "the user shouldn't have to remember to record an
+            # absence."
+            "bets_ledger": conn.execute(
+                "SELECT count(*) FROM bets").fetchone()[0] > 0,
+        }
+    finally:
+        if own:
+            conn.close()
+
+
+def entry_bets(entry_id: str, *, conn: Connection | None = None) -> dict[str, Any]:
+    """One entry's bets and misses. Imported here rather than at module import
+    so query/blackbook and query/bets stay independently loadable."""
+    from hkrd.query import bets as bets_q
+
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        row = conn.execute(
+            "SELECT horse_name, added_date FROM blackbook WHERE id = ?",
+            (entry_id,)).fetchone()
+        if not row:
+            return {}
+        return {
+            "placed": bets_q.bets_for_horse(row["horse_name"],
+                                            since=row["added_date"], conn=conn),
+            "comparison": bets_q.backed_and_missed(entry_id=entry_id, conn=conn),
         }
     finally:
         if own:

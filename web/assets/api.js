@@ -45,6 +45,11 @@ export const api = {
   blackbookEntry: (id) => get(`/blackbook/${encodeURIComponent(id)}`),
   blackbookTags: () => get('/blackbook/tags'),
   blackbookDeclared: (date) => get(`/blackbook/declared/${date}`),
+  backedVsMissed: (entryId) => get(
+    `/blackbook/backed-vs-missed${entryId ? `?entry_id=${entryId}` : ''}`),
+  bets: (q = '') => get(`/bets${q}`),
+  betsSummary: () => get('/bets/summary'),
+  betsForRace: (date, no) => get(`/bets/race/${date}/${no}`),
   blackbookSummary: (today) => get(
     `/blackbook/summary${today ? `?today=${today}` : ''}`),
   setBlackbookStatus: (id, status) => post(
