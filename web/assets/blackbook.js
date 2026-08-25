@@ -11,6 +11,8 @@
  * is the page.
  */
 import { api, num, signed } from './api.js';
+import { context } from './context.js';
+import { install as installPalette } from './palette.js';
 
 const NAV = [
   ['Race Day', 'raceday.html'], ['Form Guide', 'form-guide.html'],
@@ -71,26 +73,6 @@ function renderNav() {
     if (href === 'blackbook.html') a.setAttribute('aria-current', 'page');
     return a;
   }));
-}
-
-async function renderFreshness() {
-  try {
-    const s = await api.status();
-    $('freshness').replaceChildren(...Object.entries(s.tables).map(([table, info]) => {
-      const box = el('span', 'src');
-      box.append(el('span', 'name', table.replace('runner_', '')));
-      box.append(el('span', info.current ? 'ok' : 'stale',
-        info.rows ? (info.current ? '✓' : '⚠') : DASH));
-      box.title = `${info.rows.toLocaleString()} rows, through ${info.through ?? 'never'}`;
-      return box;
-    }));
-    $('meeting-context').textContent = s.latest_meeting
-      ? `latest meeting · ${s.latest_meeting}` : 'no meetings loaded';
-    return s.latest_meeting;
-  } catch (e) {
-    $('freshness').textContent = `status unavailable: ${e.message}`;
-    return null;
-  }
 }
 
 function renderViewToggle() {
@@ -807,7 +789,12 @@ async function init() {
     render();
   });
 
-  const latest = await renderFreshness();
+  installPalette();
+  context.onChange(() => { state.today = context.date; render(); });
+  await context.init();
+  // The book is meeting-independent, but "running today" is not — it follows
+  // whichever meeting Layer 1 is on.
+  const latest = context.date;
   state.today = latest;
 
   try {

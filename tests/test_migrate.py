@@ -37,7 +37,11 @@ BASE = {
     "horse_number": "8", "place": "2", "finish_time_seconds": "108.39",
     "lbw": "3-1/4", "draw": "8", "going": "G", "running_positions": "10 9 6 3 2",
     "distance": "1800", "actual_weight": "124", "win_odds": "7.5",
-    "race_course": "HV", "race_class": "4", "race_track": "C", "track_type": "Turf",
+    # Taken from the real hkjc.db, NOT from the migration's own mapping:
+    # race_track is ST | HV (the venue), race_course is A | C+3 | AWT (the rail
+    # configuration). An earlier fixture had these the wrong way round, which
+    # is why the whole suite passed over a swap that broke SARR.
+    "race_track": "HV", "race_class": "4", "race_course": "C", "track_type": "Turf",
 }
 
 
@@ -97,3 +101,48 @@ def test_source_database_is_never_modified(tmp_path):
     before = src.read_bytes()
     migrate_legacy.migrate(src, tmp_path / "out.db")
     assert src.read_bytes() == before
+
+
+
+def test_the_venue_and_course_columns_do_not_get_swapped(tmp_path):
+    """race_track (ST|HV) becomes venue; race_course (A|C+3|AWT) becomes course.
+
+    They were mapped the wrong way round for all 1,712 legacy races. Nothing
+    errored: SARR's Happy Valley style modifier simply never fired across 648
+    HV races, and its venue-mismatch weight penalised a change of RAIL rather
+    than of TRACK. Fixing it moved 23.5% of rankings and the top pick in 139
+    races.
+    """
+    src = _legacy_db(tmp_path, [
+        {**BASE, "race_track": "ST", "race_course": "A+3"},
+        {**BASE, "race_number": "4", "race_track": "ST", "race_course": "AWT",
+         "track_type": "All Weather Track"},
+    ])
+    migrate_legacy.migrate(src, tmp_path / "out.db")
+
+    conn = get_conn(tmp_path / "out.db")
+    rows = [dict(r) for r in conn.execute(
+        "SELECT race_no, venue, course, surface FROM races ORDER BY race_no")]
+    conn.close()
+    assert [r["venue"] for r in rows] == ["ST", "ST"]
+    assert [r["course"] for r in rows] == ["A+3", "AWT"]
+    # AWT is a surface as well as a rail setting, and must not pool with turf.
+    assert [r["surface"] for r in rows] == ["Turf", "AWT"]
+
+
+def test_a_swapped_source_is_refused_rather_than_stored(tmp_path):
+    """The store checks the domain, so this class of bug cannot land silently
+    again — whatever a future loader believes it is mapping."""
+    import pytest
+
+    from hkrd.store import upsert
+    from hkrd.store.connect import init_db, transaction
+
+    conn = get_conn(tmp_path / "guard.db")
+    init_db(conn)
+    with pytest.raises(ValueError, match="swapped"):
+        with transaction(conn):
+            upsert.upsert_races(conn, [{
+                "race_date": "2026-07-15", "race_no": 1,
+                "venue": "C+3", "course": "HV", "surface": "Turf"}])
+    conn.close()

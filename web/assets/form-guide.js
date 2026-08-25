@@ -10,6 +10,8 @@
  * one run's sectionals and the quality of the race it came from.
  */
 import { api, num, signed } from './api.js';
+import { context } from './context.js';
+import { install as installPalette } from './palette.js';
 
 const NAV = [
   ['Race Day', 'raceday.html'], ['Form Guide', 'form-guide.html'],
@@ -70,24 +72,6 @@ function renderNav() {
   }));
 }
 
-async function renderFreshness() {
-  try {
-    const s = await api.status();
-    $('freshness').replaceChildren(...Object.entries(s.tables).map(([table, info]) => {
-      const box = el('span', 'src');
-      box.append(el('span', 'name', table.replace('runner_', '')));
-      box.append(el('span', info.current ? 'ok' : 'stale',
-        info.rows ? (info.current ? '✓' : '⚠') : DASH));
-      box.title = `${info.rows.toLocaleString()} rows, through ${info.through ?? 'never'}`;
-      return box;
-    }));
-    $('meeting-context').textContent = s.latest_meeting
-      ? `latest meeting · ${s.latest_meeting}` : 'no meetings loaded';
-  } catch (e) {
-    $('freshness').textContent = `status unavailable: ${e.message}`;
-  }
-}
-
 function renderStrip() {
   $('race-chips').replaceChildren(...state.races.map((r) => {
     const b = el('button', 'race-chip', `R${r.race_no}`);
@@ -112,10 +96,11 @@ function renderStrip() {
   $('open-count').textContent = `${state.open.size} EXPANDED`;
 }
 
-/* The five-step scale the artboard draws. A projection from the field's
-   running styles, so it is labelled one — a race not yet run has no
-   sectionals and cannot have a measured pace. */
-const PACE_STEPS = ['CRAWL', 'SLOW', 'EVEN', 'STRONG', 'HOT'];
+/* Design note 03 §7: one value for the whole race, five steps, blue to red,
+   and a different axis from a horse's running style. Measured from sectionals
+   where the race has been run; projected from the field's styles where it has
+   not, and said to be a projection either way it goes. */
+const PACE_STEPS = ['Very Slow', 'Slow', 'Neutral', 'Fast', 'Very Fast'];
 
 function renderRaceHeader() {
   const race = state.guide?.race;
@@ -142,17 +127,27 @@ function renderRaceHeader() {
   const p = state.pace;
   const pace = el('div', `pace${p && !p.confident ? ' unsure' : ''}`);
   pace.append(el('k', null, 'RACE PACE'));
-  const scale = el('div', 'pace-scale');
   const step = p?.band ? PACE_STEPS.indexOf(p.band) : -1;
-  PACE_STEPS.forEach((_, i) => scale.append(el('i', i <= step ? 'on' : null)));
+  const scale = el('div', 'pace-scale');
+  PACE_STEPS.forEach((_, i) => {
+    const cell = el('i', `p${i + 1}${i === step ? ' on' : ''}`);
+    cell.title = PACE_STEPS[i];
+    scale.append(cell);
+  });
   pace.append(scale);
-  pace.append(el('span', 'pace-name', p?.band ?? 'NO READ'));
+  pace.append(el('span', `pace-name${step >= 0 ? ` p${step + 1}` : ''}`,
+    p?.band ?? 'no read'));
+  // Measured and projected are different claims and the header says which.
+  if (p?.band) pace.append(el('span', 'qual', p.measured ? 'measured' : 'projected'));
   if (p) {
-    pace.title = p.band
-      ? `projected from ${p.field_size - p.unknown} of ${p.field_size} classified `
-        + `runners · pressure ${p.pressure} · leaders: ${p.leaders.join(', ') || 'none'}`
-        + (p.confident ? '' : ' · too few classified to read confidently')
-      : 'no runner in this race has an established running style';
+    pace.title = !p.band
+      ? 'no runner in this race has an established running style'
+      : p.measured
+        ? `measured: this race's early sectional is ${p.z >= 0 ? '+' : ''}${p.z} sd `
+          + `against ${p.peers} races at ${state.guide?.race?.distance}m`
+        : `projected from ${p.field_size - p.unknown} of ${p.field_size} classified `
+          + `runners · pressure ${p.pressure} · leaders: ${p.leaders.join(', ') || 'none'}`
+          + (p.confident ? '' : ' · too few classified to read confidently');
   }
   facts.append(pace);
 
@@ -462,7 +457,7 @@ function runRow(runner, run, index) {
   tempo.title = run.pace_style ? `ran as ${run.pace_style}` : 'no running style on record';
   trail.append(tempo);
 
-  trail.append(el('span', 'gear', run.gear || DASH));
+  trail.append(gearCell(run, prev));
   trail.append(el('span', 'pos', (run.running_positions ?? []).join(' ') || DASH));
 
   const trip = el('span', 'trip',
@@ -487,6 +482,47 @@ function runRow(runner, run, index) {
 
   row.append(trail);
   return row;
+}
+
+/** Gear, and what changed about it since the run before.
+ *
+ * Design note 03 §3: flag any run where gear differs from the previous run,
+ * and mark FIRST-TIME gear distinctly — it is "one of the more reliable public
+ * signals bettors watch for". Comparing against the immediately preceding run
+ * is what makes it a signal; against some earlier run it is noise.
+ */
+function gearCell(run, prev) {
+  const cell = el('span', 'gear');
+  const now = (run.gear || '').trim();
+  cell.append(document.createTextNode(now || DASH));
+
+  // No previous run on record is not the same as no gear before — a horse's
+  // first appearance in the archive cannot support a first-time claim.
+  if (!prev) return cell;
+
+  const before = new Set((prev.gear || '').split('/').map((g) => g.trim()).filter(Boolean));
+  const after = new Set(now.split('/').map((g) => g.trim()).filter(Boolean));
+  const added = [...after].filter((g) => !before.has(g));
+  const removed = [...before].filter((g) => !after.has(g));
+
+  const firstHere = state.guide?.gear_first?.[run.horse_name]
+    ?.[`${run.race_date}:${run.race_no}`] ?? [];
+  added.forEach((g) => {
+    // First-time over the whole record, not just the six runs on screen.
+    const firstEver = firstHere.includes(g);
+    const chip = el('span', `gear-flag${firstEver ? ' first' : ''}`,
+      `${g}${firstEver ? ' 1ST' : ''}`);
+    chip.title = firstEver
+      ? `${g} applied for the first time on record`
+      : `${g} back on, off last start`;
+    cell.append(chip);
+  });
+  removed.forEach((g) => {
+    const chip = el('span', 'gear-flag off', g);
+    chip.title = `${g} removed since last start`;
+    cell.append(chip);
+  });
+  return cell;
 }
 
 function noteFor(horseName, run) {
@@ -1003,9 +1039,7 @@ async function loadH2H(runner) {
 }
 
 function selectRace(no) {
-  if (no === state.race) return;
-  state.race = no;
-  loadRace();
+  context.setRace(no);
 }
 
 async function loadRace() {
@@ -1019,7 +1053,7 @@ async function loadRace() {
   try {
     const [guide, pace] = await Promise.all([
       api.formGuide(state.date, state.race, 6),
-      api.projectedPace(state.date, state.race).catch(() => null),
+      api.racePace(state.date, state.race).catch(() => null),
     ]);
     state.guide = guide;
     state.pace = pace;
@@ -1045,11 +1079,16 @@ async function loadRace() {
   render();
 }
 
-async function loadMeeting() {
-  state.date = $('meeting-select').value;
-  const summary = await api.raceDayMeeting(state.date);
-  state.races = summary.races;
-  state.race = summary.races[0]?.race_no ?? 1;
+/* Layer 1 owns the meeting; the page reacts to it. */
+async function onContext(_ctx, what) {
+  state.date = context.date;
+  state.races = context.races;
+  state.race = context.race;
+  if (what === 'date') {
+    state.guide = null;
+    render();
+    return;
+  }
   await loadRace();
 }
 
@@ -1064,6 +1103,7 @@ function onKey(e) {
 
 async function init() {
   renderNav();
+  installPalette();
   $('expand-all').addEventListener('click', () => {
     (state.guide?.race?.runners ?? []).forEach((r) => {
       state.open.add(r.horse_no);
@@ -1076,17 +1116,12 @@ async function init() {
     state.openRuns.clear();
     render();
   });
-  $('meeting-select').addEventListener('change', loadMeeting);
   document.addEventListener('keydown', onKey);
 
-  await Promise.all([renderFreshness(), loadTags()]);
-  const meetings = await api.meetings(60);
-  $('meeting-select').replaceChildren(...meetings.map((m) => {
-    const o = el('option', null, `${m.race_date} · ${m.venue ?? ''} · ${m.races}R`);
-    o.value = m.race_date;
-    return o;
-  }));
-  if (meetings.length) await loadMeeting();
+  await loadTags();
+  context.onChange(onContext);
+  await context.init();
+  await onContext(context, 'meeting');
 }
 
 init();

@@ -12,7 +12,8 @@ from hkrd.store.coerce import parse_running_positions, parse_section_times
 from hkrd.store.connect import Connection, get_conn
 from hkrd.query.types import RaceLine, RunnerLine
 
-__all__ = ["get_race", "get_meeting", "get_horse_form", "list_meetings"]
+__all__ = ["get_race", "get_meeting", "get_horse_form", "list_meetings",
+           "list_horses"]
 
 # Derived tables are LEFT JOINed: a runner with no ET row still returns, with a
 # null figure. A missing derived value must never make a runner disappear.
@@ -178,6 +179,38 @@ def list_meetings(*, limit: int = 50,
             (limit,)).fetchall()
         return [{"race_date": r["race_date"], "venue": r["venue"],
                  "races": r["races"]} for r in rows]
+    finally:
+        if own:
+            conn.close()
+
+
+def list_horses(*, limit: int = 400, query: str | None = None,
+                conn: Connection | None = None) -> list[dict]:
+    """The horse index behind the command palette.
+
+    retain_discard.md §3.3: six items in the nav, everything else reachable by
+    typing. A horse is one of the things worth typing, so it needs to be
+    addressable without a page of its own.
+
+    Ordered by most recent run, not alphabetically -- the horse you want is
+    almost always one that has run lately, and 1,967 names sorted A-Z puts the
+    answer nowhere near the top.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        sql = """
+            SELECT horse_name, count(*) runs, max(race_date) last_run
+            FROM runners
+            WHERE horse_name IS NOT NULL AND horse_name != ''
+        """
+        params: list = []
+        if query:
+            sql += " AND horse_name LIKE ?"
+            params.append(f"%{query.strip().upper()}%")
+        sql += " GROUP BY horse_name ORDER BY last_run DESC, runs DESC LIMIT ?"
+        params.append(limit)
+        return [dict(r) for r in conn.execute(sql, params)]
     finally:
         if own:
             conn.close()

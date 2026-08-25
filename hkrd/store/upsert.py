@@ -45,6 +45,27 @@ def _upsert(
     return len(rows)
 
 
+# HK has two tracks and a small set of rail configurations. They are stored in
+# separate columns and the values do not overlap, so a swap is detectable --
+# and worth detecting: the legacy migration had them the wrong way round for
+# all 1,712 races. SARR's Happy Valley style modifier never fired once, and its
+# venue-mismatch weight penalised a change of RAIL rather than a change of
+# TRACK, moving 23.5% of rankings and the top pick in 139 races. Nothing
+# errored; every page just quietly said COURSE HV.
+VENUES = frozenset({"ST", "HV"})
+
+
+def _check_venue(row: dict) -> None:
+    venue, course = row.get("venue"), row.get("course")
+    if venue and venue not in VENUES:
+        raise ValueError(
+            f"venue must be one of {sorted(VENUES)}, got {venue!r} "
+            f"(course is {course!r} -- are the two columns swapped?)")
+    if course and course in VENUES:
+        raise ValueError(
+            f"course holds a venue code {course!r} -- the columns are swapped")
+
+
 def upsert_races(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
     prepared = [{
         "race_date": coerce.to_date(r.get("race_date")),
@@ -58,6 +79,8 @@ def upsert_races(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
         "race_name": r.get("race_name"),
         "off_time": r.get("off_time"),
     } for r in rows]
+    for row in prepared:
+        _check_venue(row)
     cols = ["race_date", "race_no", "venue", "course", "surface", "going",
             "distance", "race_class", "race_name", "off_time"]
     return _upsert(conn, "races", cols, ["race_date", "race_no"], prepared)

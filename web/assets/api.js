@@ -34,6 +34,8 @@ async function post(path, body) {
 export const api = {
   meetings: (limit = 50) => get(`/meetings?limit=${limit}`),
   meeting: (date) => get(`/meeting/${date}`),
+  horses: (limit = 400, q) => get(
+    `/horses?limit=${limit}` + (q ? `&q=${encodeURIComponent(q)}` : '')),
   race: (date, no) => get(`/race/${date}/${no}`),
   horse: (name, limit = 6) => get(`/horse/${encodeURIComponent(name)}?limit=${limit}`),
   raceCard: (date, no) => get(`/raceday/${date}/${no}`),
@@ -52,7 +54,7 @@ export const api = {
   formGuide: (date, no, history = 6) =>
     get(`/formguide/${date}/${no}?history=${history}`),
   raceQuality: (date, no) => get(`/race-quality/${date}/${no}`),
-  projectedPace: (date, no) => get(`/pace/${date}/${no}`),
+  racePace: (date, no) => get(`/pace/${date}/${no}`),
   conditionFit: (name, q = '') =>
     get(`/condition-fit/${encodeURIComponent(name)}${q}`),
   headToHead: (a, b, before) => get(

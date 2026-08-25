@@ -18,10 +18,35 @@
   font-weight: 600; letter-spacing: .16em;
 }
 .chrome-meeting .dot { width: 9px; height: 9px; background: var(--alert); }
-.chrome-meeting .meeting {
-  display: flex; align-items: center; gap: var(--sp-5);
-  padding: 0 var(--sp-5); color: var(--text-2);
+/* Layer 1 carries venue · date · race count · status and nothing else. The
+   meeting is a button because it is the ONE place the meeting is chosen —
+   it opens the palette rather than being a per-page <select>. */
+.chrome-meeting .meeting-ctx {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: 0 var(--sp-5); border-right: 1px solid var(--line);
+  background: none; border-top: 0; border-bottom: 0; border-left: 0;
+  color: var(--text-2); font: inherit; cursor: pointer; white-space: nowrap;
 }
+.chrome-meeting .meeting-ctx:hover { background: var(--surface); color: var(--text); }
+.chrome-meeting .meeting-ctx .venue { font-weight: 600; color: var(--text); }
+.chrome-meeting .meeting-ctx .sep { color: var(--line-3); }
+.chrome-meeting .meeting-ctx .races { color: var(--text-muted); }
+.chrome-meeting .meeting-state {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: 0 var(--sp-4); color: var(--text-muted); font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+.chrome-meeting .pip {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--text-faint);
+}
+.chrome-meeting .pip.live { background: var(--win); animation: tick 1.6s infinite; }
+@keyframes tick { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.chrome-meeting .palette-hint {
+  display: flex; align-items: center; padding: 0 var(--sp-4); cursor: pointer;
+  border-left: 1px solid var(--line); color: var(--text-faint);
+  font-size: var(--fs-sm); letter-spacing: .08em;
+}
+.chrome-meeting .palette-hint:hover { color: var(--text); background: var(--surface); }
 .chrome-meeting .freshness {
   display: flex; align-items: center; gap: var(--sp-2);
   margin-left: auto; padding: 0 var(--sp-4);
@@ -185,3 +210,64 @@ select:hover, .btn:hover { background: var(--line-2); color: var(--text); }
 .style-midfield { color: var(--style-mid); background: var(--style-mid-g); }
 .style-closer   { color: var(--style-closer); background: var(--style-closer-g); }
 .style-unknown  { color: var(--text-faint); background: var(--line); }
+
+
+/* ── command palette ─────────────────────────────────────────────────────────
+ *
+ * retain_discard.md §3.3, the Linear reference: a short nav, and every meeting,
+ * race, horse and page reachable by typing. It is also the app's only meeting
+ * picker — brief 01 requires the meeting to be chosen once, so choosing it is
+ * not a control that repeats on every page.
+ */
+
+.palette-scrim {
+  position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, .55);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 12vh;
+}
+.palette-scrim[hidden] { display: none; }
+.palette {
+  width: min(680px, 92vw); background: var(--surface);
+  border: 1px solid var(--line-3); box-shadow: 0 18px 48px rgba(0, 0, 0, .6);
+  display: flex; flex-direction: column; max-height: 62vh;
+}
+.palette-head {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: 0 var(--sp-4); border-bottom: 1px solid var(--line-2);
+}
+.palette-head .glyph { color: var(--text-faint); }
+.palette-head input {
+  flex: 1; min-width: 0; background: none; border: 0; outline: none;
+  color: var(--text); font-family: var(--font-mono); font-size: var(--fs-md);
+  padding: 11px 0;
+}
+.palette-head .esc {
+  font-family: var(--font-mono); font-size: var(--fs-xs);
+  color: var(--text-faint); border: 1px solid var(--line-3); padding: 1px 5px;
+}
+.palette-list { overflow-y: auto; }
+.palette-row {
+  display: flex; align-items: baseline; gap: var(--sp-3); width: 100%;
+  padding: 6px var(--sp-4); background: none; border: 0; cursor: pointer;
+  font-family: var(--font-mono); font-size: var(--fs); color: var(--text-2);
+  text-align: left;
+}
+.palette-row.on { background: var(--surface-2); color: var(--text); }
+.palette-row .kind {
+  font-size: 9px; letter-spacing: .1em; width: 58px; flex: none;
+  color: var(--text-faint);
+}
+.palette-row .k-race { color: var(--edge); }
+.palette-row .k-meeting { color: var(--text-muted); }
+.palette-row .k-horse { color: var(--book); }
+.palette-row .k-page { color: var(--violet); }
+.palette-row .label {
+  flex: 1; min-width: 0; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; font-weight: 600;
+}
+.palette-row .hint { color: var(--text-faint); font-size: var(--fs-sm); white-space: nowrap; }
+.palette-empty, .palette-foot {
+  padding: 10px var(--sp-4); font-family: var(--font-mono);
+  font-size: var(--fs-sm); color: var(--text-faint);
+}
+.palette-foot { border-top: 1px solid var(--line-2); }

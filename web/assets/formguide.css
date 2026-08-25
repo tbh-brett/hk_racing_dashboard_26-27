@@ -39,14 +39,39 @@
 .race-hdr .off { font-size: var(--fs); color: var(--text-muted); }
 .race-hdr .facts { display: flex; gap: 20px; padding: 0 16px; font-size: var(--fs); }
 .race-hdr .facts k { color: var(--text-muted); font-style: normal; }
+/* Five steps, blue through red, Very Slow to Very Fast (design note 03 §7).
+   The lit step is the race's band; the others stay as scale so the reader sees
+   where in the range it sits rather than only what it is called. */
 .race-hdr .pace { display: flex; align-items: center; gap: 7px; }
 .race-hdr .pace-scale { display: flex; gap: 2px; }
-.race-hdr .pace-scale i { width: 9px; height: 9px; background: var(--line); }
-.race-hdr .pace-scale i.on { background: var(--edge); }
-.race-hdr .pace-name { font-weight: 600; color: var(--edge); }
-/* Half the field unclassified is not a pace read, it is a guess. */
+.race-hdr .pace-scale i {
+  width: 9px; height: 9px; background: var(--line); opacity: .35;
+}
+.race-hdr .pace-scale i.p1 { background: var(--pace-1); }
+.race-hdr .pace-scale i.p2 { background: var(--pace-2); }
+.race-hdr .pace-scale i.p3 { background: var(--pace-3); }
+.race-hdr .pace-scale i.p4 { background: var(--pace-4); }
+.race-hdr .pace-scale i.p5 { background: var(--pace-5); }
+.race-hdr .pace-scale i.on { opacity: 1; box-shadow: 0 0 0 1px var(--text-2); }
+.race-hdr .pace-name { font-weight: 600; }
+.race-hdr .pace-name.p1 { color: var(--pace-1); }
+.race-hdr .pace-name.p2 { color: var(--pace-2); }
+.race-hdr .pace-name.p3 { color: var(--pace-3); }
+.race-hdr .pace-name.p4 { color: var(--pace-4); }
+.race-hdr .pace-name.p5 { color: var(--pace-5); }
+/* A projection is not a measurement, and half a field unclassified is not even
+   a projection — both are said, not implied. */
+.race-hdr .pace .qual { color: var(--text-faint); font-size: var(--fs-xs); }
 .race-hdr .pace.unsure .pace-name { color: var(--text-muted); }
-.race-hdr .pace.unsure .pace-scale i.on { background: var(--text-faint); }
+
+/* Gear that changed since the previous run, and gear applied for the first
+   time — design note 03 §3 asks for both, and the second distinctly. */
+.gear-flag {
+  font-size: 9px; padding: 0 3px; margin-left: 4px; white-space: nowrap;
+  color: var(--gear); border: 1px solid var(--violet-ground);
+}
+.gear-flag.first { color: var(--gear-first); border-color: var(--gear); }
+.gear-flag.off { color: var(--text-faint); text-decoration: line-through; }
 .race-hdr .note {
   margin-left: auto; padding: 0 14px; font-size: var(--fs-sm);
   color: var(--text-muted);

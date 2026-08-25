@@ -11,6 +11,8 @@
  * rather than buried in a commit message.
  */
 import { api, num, signed } from './api.js';
+import { context } from './context.js';
+import { install as installPalette } from './palette.js';
 
 const NAV = [
   ['Race Day', 'raceday.html'], ['Form Guide', 'form-guide.html'],
@@ -48,24 +50,6 @@ function renderNav() {
   }));
 }
 
-async function renderFreshness() {
-  try {
-    const s = await api.status();
-    $('freshness').replaceChildren(...Object.entries(s.tables).map(([table, info]) => {
-      const box = el('span', 'src');
-      box.append(el('span', 'name', table.replace('runner_', '')));
-      box.append(el('span', info.current ? 'ok' : 'stale',
-        info.rows ? (info.current ? '✓' : '⚠') : DASH));
-      box.title = `${info.rows.toLocaleString()} rows, through ${info.through ?? 'never'}`;
-      return box;
-    }));
-    $('meeting-context').textContent = s.latest_meeting
-      ? `latest meeting · ${s.latest_meeting}` : 'no meetings loaded';
-  } catch (e) {
-    $('freshness').textContent = `status unavailable: ${e.message}`;
-  }
-}
-
 function renderViewToggle() {
   $('view-toggle').replaceChildren(...VIEWS.map(([key, label]) => {
     const b = el('button', null, label);
@@ -80,11 +64,7 @@ function renderStrip() {
     const b = el('button', 'race-chip', `R${r.race_no}`);
     b.setAttribute('aria-pressed', String(r.race_no === state.race));
     b.title = `${r.distance ?? DASH}m · ${r.field_size} runners`;
-    b.addEventListener('click', () => {
-      if (r.race_no === state.race) return;
-      state.race = r.race_no;
-      loadRace();
-    });
+    b.addEventListener('click', () => context.setRace(r.race_no));
     return b;
   }));
 }
@@ -394,22 +374,20 @@ function pct(v) {
 
 /* ── ET ──────────────────────────────────────────────────────────────────── */
 
+/* Brief 01 lists "big hero numbers and dashboard-y KPI tiles" under Explicitly
+   Avoid. Coverage is real information and stays; it reads as one dense line in
+   the same grammar as every other footer on the page, not six tiles. */
 async function renderEtSummary() {
   const s = await api.etSummary();
   const conf = s.confidence ?? {};
-  const stats = [
-    ['rows', s.rows.toLocaleString()],
-    ['coverage', `${(s.coverage * 100).toFixed(1)}%`],
-    ['high conf', (conf.high ?? 0).toLocaleString()],
-    ['medium', (conf.medium ?? 0).toLocaleString()],
-    ['low', (conf.low ?? 0).toLocaleString()],
-    ['through', s.last_date ?? DASH],
-  ];
-  $('et-summary').replaceChildren(...stats.map(([k, v]) => {
-    const box = el('div', 'stat');
-    box.append(el('span', 'v', v), el('span', 'k', k));
-    return box;
-  }));
+  const host = $('et-summary');
+  host.replaceChildren();
+  const part = (text, cls) => host.append(el('span', cls ?? null, text));
+  part(`${s.rows.toLocaleString()} ROWS · ${(s.coverage * 100).toFixed(1)}% OF RUNNERS`);
+  part(`CONFIDENCE ${(conf.high ?? 0).toLocaleString()} HIGH · `
+    + `${(conf.medium ?? 0).toLocaleString()} MEDIUM · `
+    + `${(conf.low ?? 0).toLocaleString()} LOW`);
+  part(`THROUGH ${s.last_date ?? DASH}`, 'right');
 }
 
 function renderEt() {
@@ -512,11 +490,17 @@ async function loadRace() {
   render();
 }
 
-async function loadMeeting() {
-  state.date = $('meeting-select').value;
-  const summary = await api.raceDayMeeting(state.date);
-  state.races = summary.races;
-  state.race = summary.races[0]?.race_no ?? 1;
+async function onContext(_ctx, what) {
+  state.date = context.date;
+  state.races = context.races;
+  state.race = context.race;
+  if (what === 'date') {
+    state.sarr = null;
+    state.blend = null;
+    state.et = null;
+    render();
+    return;
+  }
   await loadRace();
 }
 
@@ -536,7 +520,11 @@ async function onRebuild() {
       `${r.rows_written.toLocaleString()} runner_et rows from ${r.runs_loaded.toLocaleString()} runs · `
       + `window ${r.window?.[0]} to ${r.window?.[1]} · `
       + `${r.sec_per_length?.toFixed(4)} sec/length`;
-    await Promise.all([renderEtSummary(), renderFreshness(), loadRace()]);
+    // The rebuild changes what Layer 1's freshness chips report, so it
+    // re-renders the global strip rather than a page-local copy.
+    context.status = await api.status().catch(() => context.status);
+    context.render();
+    await Promise.all([renderEtSummary(), loadRace()]);
   } catch (e) {
     out.className = 'job-result err';
     out.textContent = `rebuild failed: ${e.message}`;
@@ -550,27 +538,20 @@ function onKey(e) {
   if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
   if (!/^[1-9]$/.test(e.key)) return;
   const no = Number(e.key);
-  if (!state.races.some((r) => r.race_no === no) || no === state.race) return;
-  state.race = no;
-  loadRace();
+  context.setRace(no);
 }
 
 async function init() {
   renderNav();
   renderViewToggle();
+  installPalette();
   $('rebuild-et').addEventListener('click', onRebuild);
-  $('meeting-select').addEventListener('change', loadMeeting);
   document.addEventListener('keydown', onKey);
 
-  await Promise.all([renderFreshness(), settle(renderEtSummary(), () => {})]);
-
-  const meetings = await api.meetings(60);
-  $('meeting-select').replaceChildren(...meetings.map((m) => {
-    const o = el('option', null, `${m.race_date} · ${m.venue ?? ''} · ${m.races}R`);
-    o.value = m.race_date;
-    return o;
-  }));
-  if (meetings.length) await loadMeeting();
+  await settle(renderEtSummary(), () => {});
+  context.onChange(onContext);
+  await context.init();
+  await onContext(context, 'meeting');
 }
 
 init();

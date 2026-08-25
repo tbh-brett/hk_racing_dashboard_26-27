@@ -262,7 +262,7 @@ def test_promotion_creates_an_entry_the_list_then_shows(client):
     assert entry["id"] in [e["id"] for e in listed["entries"]]
 
 
-def test_the_projected_pace_route_reports_its_own_coverage(client):
+def test_the_pace_route_reports_its_own_coverage(client):
     """The fixture records no running styles, so there is no read — and the
     route has to say so rather than return a band."""
     body = client.get("/api/pace/2025-06-13/1").json()

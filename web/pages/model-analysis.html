@@ -14,11 +14,9 @@
 </head>
 <body>
 
-<div class="chrome-meeting">
-  <div class="brand"><span class="dot"></span>RACEDAY</div>
-  <div class="meeting" id="meeting-context">—</div>
-  <div class="freshness" id="freshness"></div>
-</div>
+<!-- Layer 1. Rendered by context.js and identical on every page; no page
+     writes into it. See design brief 08 §1. -->
+<div class="chrome-meeting"></div>
 
 <nav class="chrome-nav" id="nav"></nav>
 
@@ -26,7 +24,6 @@
   <div class="label">RACE</div>
   <div class="race-chips" id="race-chips"></div>
   <div class="strip-right">
-    <select id="meeting-select" aria-label="Meeting"></select>
     <span class="sep">|</span>
     <span>MODEL VIEW</span>
     <div class="seg" id="view-toggle" role="group" aria-label="Model view"></div>
@@ -82,7 +79,7 @@
       selection rules on it.
     </p>
 
-    <div class="stat-row" id="et-summary"></div>
+    <div class="section-foot" id="et-summary"></div>
     <div class="invariants" id="et-invariants"></div>
 
     <div class="table-scroll">

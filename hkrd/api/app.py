@@ -48,6 +48,12 @@ def meetings(limit: int = 50) -> list[dict]:
     return race_q.list_meetings(limit=limit)
 
 
+@app.get("/api/horses")
+def horses(limit: int = 400, q: str | None = None) -> dict:
+    """The horse index the command palette searches."""
+    return {"horses": race_q.list_horses(limit=limit, query=q)}
+
+
 @app.get("/api/meeting/{date}")
 def meeting(date: str) -> dict:
     races = race_q.get_meeting(date)
@@ -82,18 +88,23 @@ def form_guide(date: str, race_no: int, history: int = 6) -> dict:
     guide = fg_q.build_form_guide(date, race_no, history=history)
     if not guide.race.runners:
         raise HTTPException(404, f"no race {race_no} on {date}")
-    return guide.to_dict()
+    out = guide.to_dict()
+    # When each piece of gear first appeared, over the WHOLE record rather than
+    # the six runs shown — otherwise a blinker first worn eight runs back reads
+    # as first-time. Design note 03 §3.
+    out["gear_first"] = fg_q.gear_timeline(
+        [r.horse_name for r in guide.race.runners], before=date)
+    return out
 
 
 @app.get("/api/pace/{date}/{race_no}")
-def projected_pace(date: str, race_no: int) -> dict:
-    """How fast this race is likely to be run, from the field's running styles.
+def race_pace(date: str, race_no: int) -> dict:
+    """One pace value for the whole race, on the Very Slow → Very Fast scale.
 
-    A projection, never a measurement: a race that has not been run has no
-    sectionals. The count of unclassified runners rides along so a thin read
-    cannot pass for a confident one.
+    Measured from the race's own sectionals where it has been run; projected
+    from the field's running styles where it has not, and flagged as such.
     """
-    out = fg_q.projected_pace(date, race_no)
+    out = fg_q.race_pace(date, race_no)
     if not out["field_size"]:
         raise HTTPException(404, f"no race {race_no} on {date}")
     return out

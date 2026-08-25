@@ -9,6 +9,8 @@
  * (AUC .785 against .727), which the footer states outright.
  */
 import { api, num } from './api.js';
+import { context } from './context.js';
+import { install as installPalette } from './palette.js';
 
 const NAV = [
   ['Race Day', 'raceday.html'], ['Form Guide', 'form-guide.html'],
@@ -56,21 +58,6 @@ function renderNav() {
     if (href === 'raceday.html') a.setAttribute('aria-current', 'page');
     return a;
   }));
-}
-
-async function renderFreshness() {
-  try {
-    const s = await api.status();
-    $('meeting-context').textContent = s.latest_meeting
-      ? `latest meeting · ${s.latest_meeting}` : 'no meetings loaded';
-    $('freshness').replaceChildren(...Object.entries(s.tables).map(([t, i]) => {
-      const b = el('span', 'src');
-      b.append(el('span', 'name', t.replace('runner_', '')));
-      b.append(el('span', i.current ? 'ok' : 'stale', i.rows ? (i.current ? '✓' : '⚠') : DASH));
-      b.title = `${i.rows.toLocaleString()} rows, through ${i.through ?? 'never'}`;
-      return b;
-    }));
-  } catch { /* informational */ }
 }
 
 /* ── race strip ──────────────────────────────────────────────────────────── */
@@ -639,9 +626,9 @@ function render() {
 }
 
 function selectRace(no) {
-  if (no === state.race) return;
-  state.race = no;
-  loadRace();
+  // Routed through context so the URL and every other page-level reader stay
+  // in step; context calls back into onContext.
+  context.setRace(no);
 }
 
 async function loadRace() {
@@ -656,24 +643,33 @@ async function loadRace() {
   render();
 }
 
-async function loadMeeting() {
-  state.date = document.querySelector('#meeting-picker')?.value ?? state.date;
-  state.summary = await api.raceDayMeeting(state.date);
-  state.race = state.summary.races[0]?.race_no ?? 1;
-  // Meeting-wide, so it is fetched once per meeting rather than per race.
-  // A failure here must not take the card down with it: the band reports the
-  // problem in its own strip and the rest of the page still works.
-  try {
-    state.blackbook = await api.meetingBlackbook(state.date);
-    state.blackbookError = null;
-  } catch (e) {
+/* The page no longer owns the meeting. It reads context and re-renders when
+   context changes — brief 01: "chosen once. Every part of the page obeys it." */
+async function onContext(_ctx, what) {
+  state.date = context.date;
+  state.summary = context.summary;
+  state.race = context.race;
+  if (what === 'date') {                    // a new meeting is loading
+    state.card = null;
     state.blackbook = null;
-    state.blackbookError = e.message;
+    render();
+    return;
+  }
+  if (what === 'meeting') {
+    try {
+      state.blackbook = await api.meetingBlackbook(state.date);
+      state.blackbookError = null;
+    } catch (e) {
+      state.blackbook = null;
+      state.blackbookError = e.message;
+    }
   }
   await loadRace();
 }
 
 function onKey(e) {
+  // The palette is an input; a digit typed into it is a search, not a race.
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
   const rows = sortRunners(state.card?.runners ?? []);
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
     e.preventDefault();
@@ -690,20 +686,11 @@ function onKey(e) {
 
 async function init() {
   renderNav();
-  renderFreshness();
-  const meetings = await api.meetings(60);
-  const picker = el('select');
-  picker.id = 'meeting-picker';
-  picker.replaceChildren(...meetings.map((m) => {
-    const o = el('option', null, `${m.race_date} · ${m.venue ?? ''} · ${m.races}R`);
-    o.value = m.race_date;
-    return o;
-  }));
-  picker.addEventListener('change', loadMeeting);
-  $('strip-right').before(picker);
-  state.date = meetings[0]?.race_date;
+  installPalette();
   document.addEventListener('keydown', onKey);
-  await loadMeeting();
+  context.onChange(onContext);
+  await context.init();
+  await onContext(context, 'meeting');
 }
 
 init();

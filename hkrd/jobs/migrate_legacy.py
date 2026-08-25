@@ -103,7 +103,13 @@ def split_rows(rows: list[sqlite3.Row]) -> tuple[list[dict], list[dict], Migrati
         if key not in races:
             races[key] = {
                 "race_date": race_date, "race_no": race_no,
-                "venue": r["race_course"], "course": r["race_track"],
+                # race_track is ST | HV (the VENUE); race_course is A | C+3 |
+                # AWT (the rail configuration). These were mapped the wrong way
+                # round, which put a course code in `venue` for all 1,712 races
+                # -- so SARR's Happy Valley style modifier never fired once
+                # across 648 HV races, and every "COURSE HV" on screen was the
+                # venue wearing the course's label.
+                "venue": r["race_track"], "course": r["race_course"],
                 "surface": _surface(r["race_course"], r["track_type"]),
                 "going": r["going"], "distance": r["distance"],
                 "race_class": r["race_class"], "race_name": None, "off_time": None,

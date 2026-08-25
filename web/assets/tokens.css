@@ -91,6 +91,18 @@
   --miss-ground:    #241419;   /* a review prompt, a missed engagement      */
   --market-tick:    #3a4150;   /* the 1.00 mark on an A/E interval          */
 
+  /* ── race pace, blue → red ───────────────────────────────────────────────
+   * Design note 03 §7: pace is a CONTINUOUS scale for the whole race, and is
+   * deliberately unrelated to the style badges — those are a 4-way ordinal for
+   * a horse. Sharing a hue family would merge two axes the brief spends a page
+   * separating.
+   */
+  --pace-1:         #5b8dd6;   /* Very Slow                                 */
+  --pace-2:         #7fa7c9;   /* Slow                                      */
+  --pace-3:         #8b929e;   /* Neutral                                   */
+  --pace-4:         #d98b5c;   /* Fast                                      */
+  --pace-5:         #d95c5c;   /* Very Fast                                 */
+
   /* Band grounds, read off the Race Day artboard. */
   --book-band:    #12181a;   /* blackbook band                             */
   --book-rule:    #1e2a2a;
