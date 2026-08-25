@@ -106,14 +106,23 @@ def bets_for_horse(horse_name: str, *, since: str | None = None,
                    conn: Connection | None = None) -> list[dict[str, Any]]:
     """Every bet that included this horse. The join is on the runner row, so a
     horse is matched by its number IN ITS RACE rather than by a name typed onto
-    a betting slip."""
+    a betting slip.
+
+    `race_no` is the LEG's race, not the ticket's. An all-up carries no race
+    number of its own -- its 29 rows here have `bets.race_no` NULL -- so keying
+    off the ticket would strand every all-up leg away from the run it was
+    actually on. `legs` says how many races the ticket spanned, because a
+    three-leg all-up's stake is not money on this horse alone.
+    """
     own = conn is None
     conn = conn or get_conn()
     try:
         sql = """
-            SELECT b.bet_id, b.race_date, b.race_no, b.bet_type, b.stake,
+            SELECT b.bet_id, b.race_date, s.race_no, b.bet_type, b.stake,
                    b.returned, b.pnl, b.hit, b.status, b.account,
-                   s.is_banker, s.leg_no, r.place, r.win_odds
+                   s.is_banker, s.leg_no, r.place, r.win_odds,
+                   (SELECT count(DISTINCT l.race_no) FROM bet_selections l
+                     WHERE l.bet_id = b.bet_id) legs
             FROM bets b
             JOIN bet_selections s ON s.bet_id = b.bet_id
             JOIN runners r ON r.race_date = b.race_date
@@ -124,7 +133,7 @@ def bets_for_horse(horse_name: str, *, since: str | None = None,
         if since:
             sql += " AND b.race_date > ?"
             params.append(since)
-        return _rows(conn, sql + " ORDER BY b.race_date DESC", params)
+        return _rows(conn, sql + " ORDER BY b.race_date DESC, s.race_no", params)
     finally:
         if own:
             conn.close()

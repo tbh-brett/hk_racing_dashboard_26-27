@@ -410,22 +410,106 @@ def book_summary(*, today: str | None = None,
 
 
 def entry_bets(entry_id: str, *, conn: Connection | None = None) -> dict[str, Any]:
-    """One entry's bets and misses. Imported here rather than at module import
-    so query/blackbook and query/bets stay independently loadable."""
+    """One entry's money, run by run, with the balance carried forward.
+
+    The panel this feeds shows what was ACTUALLY staked and returned, not a
+    notional flat bet on every run — a horse's single run can attract eight
+    tickets at different stakes, so a fixed-stake figure describes a bet that
+    was never placed.
+
+    A run with no tickets stays in the timeline, marked. That is the honest way
+    to show a missed chance: the run happened, here is what it did, and there
+    is no money against it. Nothing is invented about what a bet would have
+    returned, because no bet was made.
+
+    A multi-leg ticket is counted in full against the leg this horse was on.
+    An all-up cannot be divided between its legs, and a horse runs once a
+    meeting so it is never counted twice within one entry -- but the money was
+    riding on other horses too, so `multi_leg_bets` says how many and the page
+    prints it.
+
+    Unlike `entry_record`, this timeline KEEPS the run the entry was written
+    from, flagged `is_source`. That run is not a test of the thesis, so it is
+    excluded there -- but the money on it was real, and dropping it stranded
+    133 tickets across the book, 8 of them on one entry whose panel then read
+    "no bets" against a horse that had been backed eight times.
+    """
     from hkrd.query import bets as bets_q
 
     own = conn is None
     conn = conn or get_conn()
     try:
-        row = conn.execute(
-            "SELECT horse_name, added_date FROM blackbook WHERE id = ?",
-            (entry_id,)).fetchone()
-        if not row:
+        entry = conn.execute(
+            "SELECT horse_name, added_date, source_date, source_race_no "
+            "FROM blackbook WHERE id = ?", (entry_id,)).fetchone()
+        if not entry:
             return {}
+
+        runs = [dict(r) for r in conn.execute("""
+            SELECT r.race_date, r.race_no, r.place, r.place_code, r.win_odds,
+                   a.venue, a.distance, a.going,
+                   (? IS NOT NULL AND r.race_date = ? AND r.race_no = ?) is_source,
+                   (SELECT count(*) FROM runners f
+                     WHERE f.race_date = r.race_date
+                       AND f.race_no = r.race_no) field_size
+            FROM runners r
+            JOIN races a ON a.race_date = r.race_date AND a.race_no = r.race_no
+            WHERE r.horse_name = ? AND r.race_date > ?
+            ORDER BY r.race_date, r.race_no
+        """, (entry["source_date"], entry["source_date"],
+              entry["source_race_no"], entry["horse_name"],
+              entry["added_date"]))]
+
+        placed = bets_q.bets_for_horse(entry["horse_name"],
+                                       since=entry["added_date"], conn=conn)
+        by_run: dict[tuple[str, int], list[dict]] = {}
+        for b in placed:
+            by_run.setdefault((b["race_date"], b["race_no"]), []).append(b)
+
+        balance = 0.0
+        staked = returned = 0.0
+        backed_runs = won_runs = multi_leg = 0
+        for run in runs:
+            tickets = by_run.get((run["race_date"], run["race_no"]), [])
+            run["bets"] = tickets
+            run["staked"] = round(sum(t["stake"] for t in tickets), 2)
+            run["returned"] = round(sum(t["returned"] or 0 for t in tickets), 2)
+            run["pnl"] = round(run["returned"] - run["staked"], 2)
+            run["backed"] = bool(tickets)
+            run["is_source"] = bool(run["is_source"])
+            balance += run["pnl"]
+            run["balance"] = round(balance, 2)
+            staked += run["staked"]
+            returned += run["returned"]
+            if tickets:
+                backed_runs += 1
+                if run["returned"] > 0:
+                    won_runs += 1
+            multi_leg += sum(1 for t in tickets if (t.get("legs") or 1) > 1)
+
+        # Bets on this horse from BEFORE it was booked are not part of the
+        # entry's record, and bets on a run the archive has no row for would
+        # otherwise vanish — count them rather than dropping them silently.
+        matched = {(b["race_date"], b["race_no"]) for r in runs
+                   for b in r["bets"]}
+        orphaned = [b for b in placed
+                    if (b["race_date"], b["race_no"]) not in matched]
+
         return {
-            "placed": bets_q.bets_for_horse(row["horse_name"],
-                                            since=row["added_date"], conn=conn),
-            "comparison": bets_q.backed_and_missed(entry_id=entry_id, conn=conn),
+            "runs_since": runs,
+            "totals": {
+                "runs": len(runs),
+                "backed_runs": backed_runs,
+                "missed_runs": len(runs) - backed_runs,
+                "bets": sum(len(r["bets"]) for r in runs),
+                "winning_runs": won_runs,
+                "staked": round(staked, 2),
+                "returned": round(returned, 2),
+                "pnl": round(returned - staked, 2),
+                "roi": round((returned - staked) / staked, 3) if staked else None,
+                "multi_leg_bets": multi_leg,
+            },
+            "unmatched_bets": len(orphaned),
         }
     finally:
         if own:

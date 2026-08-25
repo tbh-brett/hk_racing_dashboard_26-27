@@ -260,6 +260,50 @@
 .verdict-VALIDATED { color: var(--win); }
 .verdict-PARTIAL { color: var(--edge); }
 .verdict-MISSED { color: var(--loss); }
+/* One run's money, with the balance carried forward. A run with no tickets
+   stays in the sequence and is marked — that is the missed chance, shown as
+   the absence it is rather than as an invented return. */
+.bet-run { padding: 5px 12px 6px; border-bottom: 1px solid var(--line); }
+.bet-run .line {
+  display: flex; align-items: baseline; gap: 8px;
+  font-family: var(--font-mono); font-size: var(--fs-sm); white-space: nowrap;
+}
+.bet-run .d { color: var(--text-2); }
+.bet-run .pl { color: var(--text-muted); }
+.bet-run .sp { color: var(--text-faint); }
+.bet-run .stake { margin-left: auto; color: var(--text-muted); }
+.bet-run .pnl { width: 52px; text-align: right; font-weight: 600; }
+.bet-run .bal {
+  width: 62px; text-align: right; font-weight: 600;
+  border-left: 1px solid var(--line-2); padding-left: 8px;
+}
+.bet-run .not-backed {
+  margin-left: auto; font-size: var(--fs-xs); letter-spacing: .06em;
+  color: var(--loss-dim);
+}
+.bet-run.missed { background: var(--miss-ground); }
+.bet-run .tickets {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;
+}
+.bet-run .ticket {
+  display: inline-flex; align-items: baseline; gap: 4px;
+  font-family: var(--font-mono); font-size: 9px; padding: 0 4px;
+  color: var(--text-muted); border: 1px solid var(--line-2);
+}
+.bet-run .ticket .ty { color: var(--text-faint); }
+.bet-run .ticket .won { color: var(--win); font-weight: 600; }
+/* An all-up spanning other races. Its stake cannot be split between legs, so
+   the whole ticket sits against this one — marked, because the money was on
+   other horses too. */
+.bet-run .ticket.multi { border-color: var(--edge-ground-2); }
+.bet-run .ticket .legs { color: var(--edge); }
+/* The run the entry was written from. Not a test of the thesis, so the record
+   above leaves it out — but the money on it was real, so it stays here. */
+.bet-run.source { border-left: 2px solid var(--line-2); }
+.bet-run.source .d::after {
+  content: ' ◂'; color: var(--text-faint);
+}
+
 .ledger-box {
   margin: 8px 12px 10px; padding: 6px 8px; border: 1px solid var(--pop-field);
   background: var(--thesis); font-family: var(--font-mono); font-size: var(--fs-xs);

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -57,6 +58,20 @@ def _race_date(value: str | None) -> str | None:
     return to_date(text)
 
 
+# The log's own `_bookie_ref` field was stripped before it was written, so the
+# statement reference survives only inside the note: "Imported from bookie
+# statement (ref 2209)." Recovering it fills `bookie_ref`, which is what stops
+# a later import of the same statement from writing the bet a second time.
+_REF_IN_NOTE = re.compile(r"\(ref\s+(\w+)\)")
+
+
+def _bookie_ref(row: dict) -> str | None:
+    if row.get("_bookie_ref"):
+        return str(row["_bookie_ref"])
+    found = _REF_IN_NOTE.search(row.get("notes") or "")
+    return found.group(1) if found else None
+
+
 def run(src: Path, *, db: Path | None = None, account: str = "personal",
         source: str = "legacy_log") -> BetsReport:
     report = BetsReport()
@@ -80,7 +95,7 @@ def run(src: Path, *, db: Path | None = None, account: str = "personal",
                 legs = r.get("legs") or []
 
                 bets.append((
-                    r["bet_id"], r.get("_bookie_ref"), account, date,
+                    r["bet_id"], _bookie_ref(r), account, date,
                     r.get("venue"),
                     # An all-up spans races, so it has no single race number.
                     # A Quartet multi-banker does not span races and keeps its.
@@ -140,7 +155,13 @@ def run(src: Path, *, db: Path | None = None, account: str = "personal",
                 "ON CONFLICT (bet_id) DO UPDATE SET "
                 "returned = excluded.returned, pnl = excluded.pnl, "
                 "status = excluded.status, hit = excluded.hit, "
-                "settled_at = excluded.settled_at, notes = excluded.notes", bets)
+                "settled_at = excluded.settled_at, notes = excluded.notes, "
+                # The log is the record for its own rows. Leaving
+                # settle_method behind let a later statement import read a
+                # stale 'statement_apportioned' as permission to overwrite a
+                # return the log had settled properly.
+                "settle_method = excluded.settle_method, "
+                "bookie_ref = excluded.bookie_ref", bets)
             conn.executemany(
                 "INSERT INTO bet_selections (bet_id, race_no, horse_no, leg_no, "
                 "is_banker) VALUES (?, ?, ?, ?, ?) "

@@ -421,6 +421,29 @@ def status() -> dict:
     return model.model_status()
 
 
+@app.post("/api/jobs/import-statement")
+def import_statement_job(body: dict = Body(...)) -> JSONResponse:
+    """Read an account statement and add its bets to the ledger.
+
+    Reports counts rather than succeeding silently — a bet missing from the
+    ledger reads as a bet never placed, and the Blackbook would then call that
+    run a missed chance.
+    """
+    from hkrd.jobs import import_statement
+
+    src = Path(body.get("path", "")).expanduser()
+    if not src.exists():
+        raise HTTPException(404, f"not found: {src}")
+    report = import_statement.run(src, account=body.get("account", "personal"))
+    payload = {
+        "files": report.files, "bets": report.bets,
+        "new_bets": report.new_bets, "selections": report.selections,
+        "cash_movements": report.cash_movements,
+        "unparsed": report.unparsed, "errors": report.errors,
+    }
+    return JSONResponse(payload, status_code=200 if not report.errors else 500)
+
+
 @app.post("/api/jobs/rebuild-et")
 def rebuild_et_job(window_months: int = 24) -> JSONResponse:
     """Rebuild ET references and runner_et.

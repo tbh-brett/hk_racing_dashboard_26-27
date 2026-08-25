@@ -164,6 +164,24 @@ def test_a_tag_in_use_with_no_definition_is_reported_not_invented(tmp_path, db):
     assert report.errors == []
 
 
+def _bet(conn, bet_id, date, race_no, *horses, stake=100.0, returned=0.0,
+         bet_type="QIN", legs=None):
+    """One ticket in the ledger. `legs` names the races an all-up spanned —
+    (race_no, horse_no) pairs — so a multi-race ticket can be written the way
+    the statement importer writes one."""
+    conn.execute(
+        "INSERT INTO bets (bet_id, race_date, race_no, bet_type, stake, "
+        "returned, pnl, status, hit, source) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (bet_id, date, None if legs else race_no, bet_type, stake, returned,
+         returned - stake, "settled", 1 if returned > 0 else 0, "statement"))
+    picks = ([(race_no, h) for h in horses] if not legs else legs)
+    for i, (rn, hn) in enumerate(picks, start=1):
+        conn.execute(
+            "INSERT INTO bet_selections (bet_id, race_no, horse_no, leg_no, "
+            "is_banker) VALUES (?,?,?,?,0)",
+            (bet_id, rn, hn, i if legs else 0))
+
+
 # ── the derived record ───────────────────────────────────────────────────────
 
 @pytest.fixture()
@@ -405,14 +423,17 @@ def test_the_book_summary_counts_resolution_not_size(booked):
     assert s["status"]["won_out"] == 1
 
 
-def test_the_summary_says_there_is_no_bets_ledger(booked):
-    """Brief 06 calls missed bets the most important feature on the page. It
-    needs a ledger that does not exist, and a zero would read as "nothing was
-    missed" — so the flag is explicit."""
+def test_the_summary_reports_whether_there_is_a_bets_ledger_at_all(booked):
+    """Brief 06 calls missed bets the most important feature on the page. With
+    no bets loaded a zero would read as "nothing was missed", so the flag says
+    which it is rather than leaving the page to guess."""
     conn = get_conn(booked)
+    assert bb.book_summary(conn=conn)["bets_ledger"] is False
+    with transaction(conn):
+        _bet(conn, "b1", "2026-05-01", 1, 1, stake=100.0, returned=0.0)
     s = bb.book_summary(conn=conn)
     conn.close()
-    assert s["bets_ledger"] is False
+    assert s["bets_ledger"] is True
 
 
 def test_declared_today_is_counted_only_when_a_date_is_given(booked):
@@ -421,3 +442,150 @@ def test_declared_today_is_counted_only_when_a_date_is_given(booked):
     s = bb.book_summary(today="2026-05-01", conn=conn)
     conn.close()
     assert s["declared_today"] == 1 and s["today"] == "2026-05-01"
+
+
+# ── the money actually staked ────────────────────────────────────────────────
+#
+# Brief 06 asks for what was really bet on a booked horse, not a notional flat
+# stake on every run since. A single run here attracted eight tickets at four
+# different sizes; a fixed-stake ROI would describe a bet nobody placed.
+
+@pytest.fixture()
+def backed(booked):
+    """FAST ONE is horse 1 in every race. Booked 2026-04-10 off 2026-04-01 R1.
+    Runs after the booking: 05-01 (won), 06-01 (3rd), 07-01 (7th).
+
+    Money: two tickets on 05-01, one of which paid; nothing at all on 06-01;
+    one leg of a two-race all-up on 07-01."""
+    conn = get_conn(booked)
+    with transaction(conn):
+        # A second race on the last day, so the all-up genuinely spans two.
+        upsert.upsert_races(conn, [
+            {"race_date": "2026-07-01", "race_no": 2, "venue": "HV",
+             "course": "C", "surface": "Turf", "going": "G", "distance": 1200}])
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-07-01", "race_no": 2, "horse_no": 4,
+             "horse_name": "OTHER ONE", "place": "1", "win_odds": 8.0,
+             "draw": 4}])
+        _bet(conn, "won_a", "2026-05-01", 1, 1, 2, stake=100.0, returned=450.0)
+        _bet(conn, "lost_a", "2026-05-01", 1, 1, 3, stake=60.0, returned=0.0)
+        _bet(conn, "allup", "2026-07-01", 1, stake=240.0, returned=0.0,
+             bet_type="ALLUP_QQP", legs=[(1, 1), (2, 4)])
+    conn.close()
+    return booked
+
+
+def test_the_panel_shows_what_was_staked_not_a_notional_flat_bet(backed):
+    conn = get_conn(backed)
+    d = bb.entry_bets("bb_1", conn=conn)
+    conn.close()
+    t = d["totals"]
+    assert t["staked"] == 400.0        # 100 + 60 + 240, the real money
+    assert t["returned"] == 450.0
+    assert t["pnl"] == 50.0
+    assert t["roi"] == round(50.0 / 400.0, 3)
+    assert t["bets"] == 3 and t["backed_runs"] == 2 and t["winning_runs"] == 1
+
+
+def test_a_run_with_no_ticket_stays_in_the_timeline_marked(backed):
+    """That is the honest way to show a missed chance: the run happened, and
+    there is no money against it. Nothing is invented about what a bet would
+    have returned, because no bet was made."""
+    conn = get_conn(backed)
+    d = bb.entry_bets("bb_1", conn=conn)
+    conn.close()
+    june = next(r for r in d["runs_since"] if r["race_date"] == "2026-06-01")
+    assert june["backed"] is False
+    assert june["bets"] == [] and june["staked"] == 0 and june["pnl"] == 0
+    assert d["totals"]["missed_runs"] == 1
+    # It is in the sequence, not dropped from it.
+    assert [r["race_date"] for r in d["runs_since"]] == [
+        "2026-05-01", "2026-06-01", "2026-07-01"]
+
+
+def test_the_balance_is_carried_forward_run_by_run(backed):
+    """Accumulation, not four unrelated results."""
+    conn = get_conn(backed)
+    d = bb.entry_bets("bb_1", conn=conn)
+    conn.close()
+    assert [r["balance"] for r in d["runs_since"]] == [290.0, 290.0, 50.0]
+    # A run with no bet moves nothing.
+    assert d["runs_since"][1]["balance"] == d["runs_since"][0]["balance"]
+
+
+def test_an_all_up_leg_is_matched_to_the_race_it_was_on(backed):
+    """An all-up carries no race number of its own — 29 real ones have
+    `bets.race_no` NULL — so keying off the ticket would strand every leg away
+    from the run it was actually on."""
+    conn = get_conn(backed)
+    d = bb.entry_bets("bb_1", conn=conn)
+    conn.close()
+    july = next(r for r in d["runs_since"] if r["race_date"] == "2026-07-01")
+    assert july["backed"] is True
+    assert [b["bet_id"] for b in july["bets"]] == ["allup"]
+    assert july["staked"] == 240.0
+    assert d["unmatched_bets"] == 0
+
+
+def test_a_multi_leg_ticket_is_counted_in_full_and_said_to_be_one(backed):
+    """It cannot be divided between its legs, so the whole stake sits against
+    this horse — but the money was riding on other horses too, and the count
+    is what the page prints to say so."""
+    conn = get_conn(backed)
+    d = bb.entry_bets("bb_1", conn=conn)
+    conn.close()
+    assert d["totals"]["multi_leg_bets"] == 1
+    july = next(r for r in d["runs_since"] if r["race_date"] == "2026-07-01")
+    assert july["bets"][0]["legs"] == 2
+
+
+def test_the_source_run_keeps_its_money_even_though_it_tests_nothing(tmp_path, db):
+    """`entry_record` drops the run an entry was written from, because it is
+    not a test of the thesis. Dropping it from the MONEY stranded 133 real
+    tickets, eight of them on one entry whose panel then read "no bets"
+    against a horse that had been backed eight times.
+
+    Seventy-two real entries name a source race that ran AFTER the day they
+    were booked, which is the case this covers."""
+    src = _write(tmp_path, _export([
+        {"id": "bb_9", "horse_name": "FAST ONE", "added_date": "2026-04-10",
+         "status": "active", "tags": ["traffic"],
+         "source_race": "2026-05-01 R1"}]))
+    import_blackbook.run(src, db=db)
+    conn = get_conn(db)
+    with transaction(conn):
+        _bet(conn, "on_source", "2026-05-01", 1, 1, stake=80.0, returned=0.0)
+    record = bb.entry_detail("bb_9", conn=conn)
+    money = bb.entry_bets("bb_9", conn=conn)
+    conn.close()
+    assert "2026-05-01" not in [r["race_date"] for r in record["runs"]]
+    flagged = [r for r in money["runs_since"] if r["is_source"]]
+    assert len(flagged) == 1 and flagged[0]["race_date"] == "2026-05-01"
+    assert flagged[0]["staked"] == 80.0
+    assert money["totals"]["staked"] == 80.0 and money["unmatched_bets"] == 0
+
+
+def test_a_bet_placed_before_the_booking_is_not_the_entry_s_money(booked):
+    """The book takes credit for what it caused, not for what came before it."""
+    conn = get_conn(booked)
+    with transaction(conn):
+        _bet(conn, "early", "2026-03-01", 1, 1, stake=500.0, returned=0.0)
+    d = bb.entry_bets("bb_1", conn=conn)
+    conn.close()
+    assert d["totals"]["bets"] == 0 and d["totals"]["staked"] == 0
+    assert d["totals"]["roi"] is None
+
+
+def test_an_entry_with_no_bets_reports_zero_rather_than_an_roi(booked):
+    conn = get_conn(booked)
+    d = bb.entry_bets("bb_1", conn=conn)
+    conn.close()
+    assert d["totals"]["runs"] == 3 and d["totals"]["backed_runs"] == 0
+    assert d["totals"]["missed_runs"] == 3
+    assert d["totals"]["roi"] is None      # not 0.0, which would read as break-even
+
+
+def test_a_missing_entry_gives_nothing_not_an_empty_ledger(booked):
+    conn = get_conn(booked)
+    assert bb.entry_bets("bb_nope", conn=conn) == {}
+    conn.close()

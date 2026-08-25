@@ -23,6 +23,7 @@ const NAV = [
 
 const $ = (id) => document.getElementById(id);
 const DASH = '—';
+const MINUS = '\u2212';  // true minus sign, not a hyphen: aligns with digits
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
@@ -512,59 +513,97 @@ function entryDetail(e) {
     });
   }
 
-  // Brief 06 calls missed bets "the single most important feature". It needs a
-  // bets ledger, which does not exist yet — so the panel says that rather than
-  // showing a zero that would read as "nothing was missed".
-  side.append(el('div', 'sub-cap', 'BETS ON THIS HORSE SINCE BOOKING'));
-  const placed = detail.placed ?? [];
-  if (!placed.length) {
-    side.append(el('div', 'empty-line', 'NONE PLACED'));
+  // Brief 06 calls missed bets "the single most important feature", so a run
+  // with no ticket against it stays in the timeline marked NOT BACKED rather
+  // than being dropped — a missing row would read as "nothing was missed".
+  // Real money, run by run, with the balance carried forward. Not a notional
+  // flat stake: one run here attracted eight tickets at four different sizes,
+  // so a fixed-stake figure would describe a bet that was never placed.
+  const money = detail.totals;
+  side.append(el('div', 'sub-cap', 'BETS SINCE BOOKING · RUNNING BALANCE'));
+
+  if (!money) {
+    side.append(el('div', 'empty-line', 'LOADING'));
+  } else if (!money.runs) {
+    side.append(el('div', 'empty-line', 'NO RUNS SINCE BOOKING'));
   } else {
-    placed.forEach((b) => {
-      const row = el('div', 'note-row');
-      row.append(el('span', 'd', b.race_date));
-      row.append(el('span', 'v', b.bet_type));
-      row.append(el('span', 'txt',
-        `$${b.stake.toLocaleString()} → $${(b.returned ?? 0).toLocaleString()}`));
-      const pnl = el('span', `verdict ${b.pnl >= 0 ? 'pos' : 'neg'}`,
-        `${b.pnl >= 0 ? '+' : ''}${Math.round(b.pnl)}`);
-      pnl.title = b.is_banker ? 'banker' : 'selection';
-      row.append(pnl);
+    (detail.runs_since ?? []).forEach((r) => {
+      const row = el('div',
+        `bet-run${r.backed ? '' : ' missed'}${r.is_source ? ' source' : ''}`);
+      if (r.is_source) {
+        row.title = 'The run this entry was written from. It does not test the '
+          + 'thesis, so the record above leaves it out — but the money on it '
+          + 'was real.';
+      }
+      const head = el('div', 'line');
+      head.append(el('span', 'd', r.race_date));
+      head.append(el('span', 'pl', `R${r.race_no} · ${r.place ?? r.place_code ?? DASH}`));
+      head.append(el('span', 'sp', r.win_odds ? num(r.win_odds, 1) : DASH));
+      if (r.backed) {
+        head.append(el('span', 'stake', `$${r.staked.toLocaleString()}`));
+        head.append(el('span', `pnl ${r.pnl >= 0 ? 'pos' : 'neg'}`,
+          `${r.pnl >= 0 ? '+' : ''}${Math.round(r.pnl)}`));
+      } else {
+        // A missed chance is a run with no money against it. Shown in the same
+        // timeline, not as a counterfactual — no bet was placed, so there is
+        // no return to claim.
+        head.append(el('span', 'not-backed', 'NOT BACKED'));
+      }
+      head.append(el('span', `bal ${r.balance >= 0 ? 'pos' : 'neg'}`,
+        `${r.balance >= 0 ? '+' : ''}${Math.round(r.balance)}`));
+      row.append(head);
+
+      if (r.backed) {
+        const tickets = el('div', 'tickets');
+        r.bets.forEach((b) => {
+          const multi = (b.legs ?? 1) > 1;
+          const t = el('span', `ticket${multi ? ' multi' : ''}`);
+          t.append(el('span', 'ty', b.bet_type.replace('_BANKER', '·B')));
+          t.append(el('span', null, `$${b.stake}`));
+          if (multi) t.append(el('span', 'legs', `${b.legs}L`));
+          if (b.returned > 0) t.append(el('span', 'won', `→$${Math.round(b.returned)}`));
+          t.title = `${b.bet_type}${b.is_banker ? ' · banker' : ''}`
+            + (multi ? ` · ${b.legs}-leg ticket, whole stake shown here` : '')
+            + ` · staked $${b.stake} · returned $${b.returned ?? 0}`;
+          tickets.append(t);
+        });
+        row.append(tickets);
+      }
       side.append(row);
     });
   }
 
-  // The falsifiability requirement: the runs that happened and were NOT
-  // backed. Detected from the ledger, so nothing had to be remembered.
-  const cmp = detail.comparison;
-  side.append(el('div', 'sub-cap', 'MISSED — RAN, NOT BACKED'));
-  if (!cmp || !cmp.missed.runs) {
-    side.append(el('div', 'empty-line',
-      cmp ? 'NONE — EVERY RUN SINCE WAS BACKED' : 'LOADING'));
-  } else {
-    const m = cmp.missed;
-    const row = el('div', 'note-row');
-    row.append(el('span', 'd', `${m.runs} runs`));
-    row.append(el('span', 'v', `${m.wins}W`));
-    row.append(el('span', 'txt',
-      `strike ${pct(m.strike_rate)} · median ${num(m.median_odds, 1)}`));
-    side.append(row);
-  }
-
   const ledger = el('div', 'ledger-box');
-  if (cmp) {
-    [['BACKED', cmp.backed], ['MISSED', cmp.missed]].forEach(([k, d]) => {
-      const row = el('div', 'row');
-      row.append(el('span', 'k', k));
-      row.append(el('span', 'v', `${d.runs} runs · ${d.wins}W`));
-      if (d.roi !== null) {
-        row.append(el('span', `n ${d.roi >= 0 ? 'pos' : 'neg'}`, signedPct(d.roi)));
-      }
-      ledger.append(row);
-    });
-    ledger.append(el('div', 'caveat',
-      `BOTH SIDES PRICED AT A NOTIONAL $${cmp.notional_stake} WIN STAKE, SO THE `
-      + 'COMPARISON IS OF THE SELECTION AND NOT OF THE BET TYPE'));
+  if (money) {
+    const row = (k, v, cls) => {
+      const line = el('div', 'row');
+      line.append(el('span', 'k', k));
+      line.append(el('span', 'v', v));
+      if (cls) line.append(el('span', `n ${cls[0]}`, cls[1]));
+      ledger.append(line);
+    };
+    row('STAKED', `$${money.staked.toLocaleString()} over ${money.bets} tickets`);
+    row('RETURNED', `$${money.returned.toLocaleString()}`,
+      money.roi === null ? null
+        : [money.pnl >= 0 ? 'pos' : 'neg',
+           `${money.pnl >= 0 ? '+' : MINUS}$${Math.abs(Math.round(money.pnl)).toLocaleString()}`]);
+    row('RUNS', `${money.backed_runs} backed · ${money.missed_runs} not backed`);
+    if (money.roi !== null) {
+      ledger.append(el('div', 'caveat',
+        `ROI ${signedPct(money.roi)} on money actually staked — not a notional `
+        + 'flat bet on every run.'));
+    }
+    if (money.multi_leg_bets) {
+      ledger.append(el('div', 'caveat',
+        `${money.multi_leg_bets} of these are all-up tickets spanning other `
+        + 'races. An all-up cannot be split between its legs, so the whole '
+        + 'stake is counted here — the money was riding on other horses too.'));
+    }
+    if (detail.unmatched_bets) {
+      ledger.append(el('div', 'caveat',
+        `${detail.unmatched_bets} bet(s) on this horse fall outside the runs `
+        + 'above and are not counted here.'));
+    }
   }
   side.append(ledger);
   box.append(side);
