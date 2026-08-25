@@ -23,7 +23,7 @@ from itertools import permutations
 import numpy as np
 
 __all__ = ["devig", "place_probability", "pair_probability", "exacta_probability",
-           "HENERY_LAMBDA", "ProbabilityError"]
+           "actual_over_expected", "HENERY_LAMBDA", "ProbabilityError"]
 
 # Fitted on HK data; the literature's usual range is 0.76-0.88.
 HENERY_LAMBDA = 0.81
@@ -151,3 +151,32 @@ def exacta_probability(
                 continue
             out[(i, j)] = float(p[i] * damped[j] / denom)
     return out
+
+
+# ──────────────────────────────────────────────────────────────────────────
+
+def actual_over_expected(expected: float | None, wins: int, runs: int) -> dict:
+    """A/E — actual wins over the wins the market implied, with an interval.
+
+    The one figure on this page that says whether a tag beats the price rather
+    than merely wins sometimes. A tag can have a fine strike rate purely by
+    booking short-priced horses; A/E divides that out. 1.00 IS the market.
+
+    The interval is the Poisson one, A/E ± 1.96·sqrt(A)/E: wins are a count, and
+    at the counts here (a dozen or two per tag) a normal interval on the RATE
+    understates how wide the honest range is. With no wins at all the upper
+    bound is the 95% Poisson bound of 3.0 events, not zero — a tag that has not
+    won yet has not been shown to fail.
+    """
+    if not expected or runs == 0:
+        return {"ae": None, "ae_lo": None, "ae_hi": None, "ae_runs": runs,
+                "expected_wins": round(expected, 2) if expected else None}
+    ae = wins / expected
+    half = 1.96 * (wins ** 0.5) / expected
+    return {
+        "ae": round(ae, 2),
+        "ae_lo": round(max(0.0, ae - half), 2),
+        "ae_hi": round(ae + half if wins else 3.0 / expected, 2),
+        "ae_runs": runs,
+        "expected_wins": round(expected, 2),
+    }

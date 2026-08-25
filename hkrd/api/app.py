@@ -7,13 +7,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from hkrd.query import (bets as bets_q, blackbook as bb_q,
-                        formguide as fg_q, market as market_q, model,
-                        race as race_q, raceday as raceday_q)
+                        formguide as fg_q, lookup as lookup_q,
+                        market as market_q, model, race as race_q,
+                        raceday as raceday_q)
 
 WEB = Path(__file__).resolve().parent.parent.parent / "web"
 
@@ -182,6 +183,50 @@ def condition_fit(name: str, distance: int | None = None, course: str | None = N
 @app.get("/api/head-to-head/{horse_a}/{horse_b}")
 def head_to_head(horse_a: str, horse_b: str, before: str | None = None) -> dict:
     return fg_q.head_to_head(horse_a, horse_b, before=before)
+
+
+# ── lookup ───────────────────────────────────────────────────────────────────
+
+# Declared once so the route signature and the query layer cannot drift apart.
+def _lookup_filters(request: Request) -> dict:
+    known = {k for group in lookup_q.FILTERS.values() for k in group}
+    out: dict = {}
+    for key, value in request.query_params.items():
+        if key not in known or value == "":
+            continue
+        out[key] = (value.lower() in ("1", "true", "yes")
+                    if key in ("placed", "won")
+                    else int(value) if value.lstrip("-").isdigit()
+                    else value)
+    return out
+
+
+@app.get("/api/lookup")
+def lookup(request: Request, source: str = "race", limit: int = 500,
+           order: str = "recent") -> dict:
+    """Filtered runs, as the same RunnerLine every other page renders."""
+    filters = _lookup_filters(request)
+    try:
+        runs = lookup_q.search_runs(source=source, limit=limit, order=order,
+                                    **filters)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return {"runs": [r.to_dict() for r in runs], "count": len(runs),
+            "filters": filters, "source": source,
+            "truncated": len(runs) >= limit}
+
+
+@app.get("/api/lookup/insight")
+def lookup_insight(request: Request, source: str = "race") -> dict:
+    """What the slice shows, with its own weakness beside it — n on every
+    figure, and the count that would look notable by chance."""
+    return lookup_q.insight(source=source, **_lookup_filters(request))
+
+
+@app.get("/api/lookup/filters")
+def lookup_filters() -> dict:
+    """The filter vocabulary, so the page renders it from one definition."""
+    return {"groups": lookup_q.FILTERS, "sources": list(lookup_q.SOURCES)}
 
 
 # ── race day ─────────────────────────────────────────────────────────────────

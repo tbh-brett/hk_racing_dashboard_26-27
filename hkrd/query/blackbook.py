@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from hkrd.derive.probability import actual_over_expected
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["list_entries", "entry_detail", "for_race", "declared_on",
@@ -311,7 +312,7 @@ def tag_performance(*, conn: Connection | None = None) -> list[dict[str, Any]]:
             d["priced_runs"] = priced
             d["thin"] = runs < 20
             d["definition"] = defs.get(d["tag"])
-            d.update(_actual_over_expected(d.pop("expected_wins"),
+            d.update(actual_over_expected(d.pop("expected_wins"),
                                            d["wins"], d.pop("ae_runs")))
             out.append(d)
         for tag, n in booked.items():
@@ -321,7 +322,7 @@ def tag_performance(*, conn: Connection | None = None) -> list[dict[str, Any]]:
                             "strike_rate": None, "place_rate": None,
                             "roi_win": None, "priced_runs": 0, "thin": True,
                             "definition": defs.get(tag),
-                            **_actual_over_expected(None, 0, 0)})
+                            **actual_over_expected(None, 0, 0)})
         return out
     finally:
         if own:
@@ -337,33 +338,6 @@ def tag_definitions(*, conn: Connection | None = None) -> dict[str, str]:
     finally:
         if own:
             conn.close()
-
-
-def _actual_over_expected(expected: float | None, wins: int, runs: int) -> dict:
-    """A/E — actual wins over the wins the market implied, with an interval.
-
-    The one figure on this page that says whether a tag beats the price rather
-    than merely wins sometimes. A tag can have a fine strike rate purely by
-    booking short-priced horses; A/E divides that out. 1.00 IS the market.
-
-    The interval is the Poisson one, A/E ± 1.96·sqrt(A)/E: wins are a count, and
-    at the counts here (a dozen or two per tag) a normal interval on the RATE
-    understates how wide the honest range is. With no wins at all the upper
-    bound is the 95% Poisson bound of 3.0 events, not zero — a tag that has not
-    won yet has not been shown to fail.
-    """
-    if not expected or runs == 0:
-        return {"ae": None, "ae_lo": None, "ae_hi": None, "ae_runs": runs,
-                "expected_wins": round(expected, 2) if expected else None}
-    ae = wins / expected
-    half = 1.96 * (wins ** 0.5) / expected
-    return {
-        "ae": round(ae, 2),
-        "ae_lo": round(max(0.0, ae - half), 2),
-        "ae_hi": round(ae + half if wins else 3.0 / expected, 2),
-        "ae_runs": runs,
-        "expected_wins": round(expected, 2),
-    }
 
 
 def book_summary(*, today: str | None = None,
@@ -421,7 +395,7 @@ def book_summary(*, today: str | None = None,
             "wins_since": row["wins"] or 0,
             "flat_roi": (round(((row["returned"] or 0) - priced) / priced, 3)
                          if priced else None),
-            **_actual_over_expected(row["expected_wins"], row["wins"] or 0,
+            **actual_over_expected(row["expected_wins"], row["wins"] or 0,
                                     row["ae_runs"] or 0),
             # The ledger exists now, so backed-versus-missed is a join
             # rather than something the user had to remember to log --

@@ -50,6 +50,9 @@ export const api = {
   bets: (q = '') => get(`/bets${q}`),
   betsSummary: () => get('/bets/summary'),
   betsForRace: (date, no) => get(`/bets/race/${date}/${no}`),
+  lookup: (q) => get(`/lookup?${q}`),
+  lookupInsight: (q) => get(`/lookup/insight?${q}`),
+  lookupFilters: () => get('/lookup/filters'),
   blackbookSummary: (today) => get(
     `/blackbook/summary${today ? `?today=${today}` : ''}`),
   setBlackbookStatus: (id, status) => post(
