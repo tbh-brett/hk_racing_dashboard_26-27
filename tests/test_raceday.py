@@ -121,3 +121,95 @@ def test_meeting_summary_bands_every_race(db):
     assert race["field_size"] == 3
     assert race["band"] in {"weak", "moderate", "strong"}
     assert "stale" in race
+
+
+# ── artboard support: sparklines, win %, head to head ────────────────────────
+
+def test_spark_points_maps_a_series_to_a_polyline():
+    pts, dot_x, dot_y = raceday.spark_points([10.0, 8.0, 4.0])
+    coords = [p.split(",") for p in pts.split(" ")]
+    assert len(coords) == 3
+    # A shortening price is drawn rising, so money arriving reads as upward.
+    ys = [float(c[1]) for c in coords]
+    assert ys[0] > ys[-1]
+    assert (dot_x, dot_y) == (float(coords[-1][0]), float(coords[-1][1]))
+
+
+def test_spark_points_of_a_single_capture_is_not_a_spike():
+    """One price has no shape. Inventing one would read as movement."""
+    pts, _, _ = raceday.spark_points([5.0])
+    assert len(pts.split(" ")) == 1
+
+
+def test_spark_points_handles_an_empty_series():
+    assert raceday.spark_points([]) == ("", 0.0, 9.0)
+
+
+def test_win_percentages_are_the_devigged_market(db):
+    """The market's own estimate, shown beside its price -- not a model's."""
+    conn = get_conn(db)
+    card = raceday.build_card("2026-07-15", 1, conn=conn)
+    conn.close()
+    pcts = [r["win_pct"] for r in card["runners"] if r["win_pct"] is not None]
+    assert len(pcts) == 3
+    assert sum(pcts) == pytest.approx(100.0, abs=0.5)
+
+
+def test_overround_is_the_book_percentage_over_a_hundred(db):
+    """Computed from whatever is priced, so a partial field underrounds.
+
+    The fixture prices three runners at 3.0, 6.0 and 20.0, which sums to 0.55
+    of a book and therefore reports -45%. That is arithmetically right and
+    worth seeing: a negative overround means the field is not fully priced,
+    which is itself information. On the real 15 July card, with every runner
+    priced, it reads 22.1%.
+    """
+    conn = get_conn(db)
+    card = raceday.build_card("2026-07-15", 1, conn=conn)
+    conn.close()
+    expected = 100 * ((1 / 3.0 + 1 / 6.0 + 1 / 20.0) - 1)
+    assert card["overround"] == pytest.approx(expected, abs=0.05)
+
+
+def test_place_ratio_range_is_measured_not_assumed(db):
+    """Place odds cannot be derived from win odds -- the "one third" rule is
+    structurally invalid, and showing the real spread keeps that obvious."""
+    conn = get_conn(db)
+    card = raceday.build_card("2026-07-15", 1, conn=conn)
+    conn.close()
+    # This fixture has no place odds stored on runners, so it reports nothing
+    # rather than inventing a ratio.
+    assert card["place_ratio_range"] is None
+
+
+def test_head_to_head_pairs_are_sorted_by_weight_swing(db):
+    conn = get_conn(db)
+    card = raceday.build_card("2026-07-15", 1, conn=conn)
+    conn.close()
+    pairs = card["head_to_head"]
+    swings = [p["swing"] or 0 for p in pairs]
+    assert swings == sorted(swings, reverse=True)
+
+
+def test_swing_tiers_escalate_at_four_six_and_eight_pounds(db):
+    """Most pairs clear none of them, which is correct rather than a bug."""
+    conn = get_conn(db)
+    card = raceday.build_card("2026-07-15", 1, conn=conn)
+    conn.close()
+    for p in card["head_to_head"]:
+        s = p["swing"]
+        if s is None:
+            continue
+        expected = 3 if s >= 8 else 2 if s >= 6 else 1 if s >= 4 else 0
+        assert p["swing_tier"] == expected
+
+
+def test_a_trainer_change_is_measured_against_one_run_back(db):
+    """Today versus the immediately preceding run is what signals a stable
+    move -- not today versus some earlier trainer."""
+    conn = get_conn(db)
+    card = raceday.build_card("2026-07-15", 1, conn=conn)
+    conn.close()
+    for r in card["runners"]:
+        assert r["trainer_changed"] is False    # same trainer in the fixture
+        assert r["trainer_prev"] is None

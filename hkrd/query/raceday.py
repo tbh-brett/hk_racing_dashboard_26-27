@@ -19,16 +19,50 @@ from __future__ import annotations
 
 from typing import Any
 
-from hkrd.query import market as market_q
+from hkrd.derive.probability import devig
+from hkrd.query import formguide as fg_q, market as market_q
 from hkrd.query.race import get_horse_form, get_race
 from hkrd.store.connect import Connection, get_conn
 
-__all__ = ["build_card", "meeting_summary"]
+__all__ = ["build_card", "meeting_summary", "spark_points"]
 
 # Routine stewards' notes are stored but never surfaced as a flag. A passed
 # veterinary examination rendering like a real finding is how a badge becomes
 # noise and gets ignored.
 _ROUTINE = {"sampling", "vet_routine", "no_report", "jumped_fairly"}
+
+
+def spark_points(series: list[float], *, width: int = 66, height: int = 18
+                 ) -> tuple[str, float, float]:
+    """An odds series as an SVG polyline, plus the final point.
+
+    The design draws the shape of the money per runner in the row. With one
+    price there is no shape, so it returns a flat line rather than a
+    misleading spike.
+    """
+    if not series:
+        return "", 0.0, height / 2
+    lo, hi = min(series), max(series)
+    span = (hi - lo) or 1.0
+    step = width / max(len(series) - 1, 1)
+    pts = []
+    for i, v in enumerate(series):
+        x = i * step
+        # Shorter price = money arriving = drawn higher.
+        y = height - 2 - ((hi - v) / span) * (height - 4)
+        pts.append((round(x, 1), round(y, 1)))
+    return (" ".join(f"{x},{y}" for x, y in pts), pts[-1][0], pts[-1][1])
+
+
+def _odds_series(conn: Connection, date: str, race_no: int) -> dict[int, list[float]]:
+    rows = conn.execute(
+        "SELECT horse_no, win_odds FROM odds_snapshots "
+        "WHERE race_date = ? AND race_no = ? AND win_odds IS NOT NULL "
+        "ORDER BY horse_no, captured_at", (date, race_no)).fetchall()
+    out: dict[int, list[float]] = {}
+    for r in rows:
+        out.setdefault(r["horse_no"], []).append(r["win_odds"])
+    return out
 
 
 def build_card(date: str, race_no: int, *,
@@ -51,13 +85,39 @@ def build_card(date: str, race_no: int, *,
                         key=lambda r: r.win_odds)
         market_rank = {r.horse_no: i + 1 for i, r in enumerate(priced)}
 
+        series = _odds_series(conn, date, race_no)
+
+        # De-vigged win probability, shown as a percentage beside the price.
+        # The market's own estimate, not a model's.
+        priced_odds = [r.win_odds for r in race.runners if r.win_odds]
+        win_pct: dict[int, float] = {}
+        overround = None
+        if priced_odds:
+            probs = devig(priced_odds)
+            for r, p in zip((x for x in race.runners if x.win_odds), probs):
+                win_pct[r.horse_no] = round(100 * float(p), 1)
+            # Over 100% is the bookmaker's margin. A NEGATIVE value means the
+            # field is not fully priced -- scratchings, or a pre-market
+            # capture -- which is worth seeing rather than hiding.
+            overround = round(100 * (sum(1 / o for o in priced_odds) - 1), 1)
+
         runners: list[dict[str, Any]] = []
         for r in race.runners:
             prior = get_horse_form(r.horse_name, limit=1, before=date, conn=conn)
             last = prior[0] if prior else None
             m_rank = market_rank.get(r.horse_no)
+            pts, dot_x, dot_y = spark_points(series.get(r.horse_no, []))
+            # A trainer change since the horse's last run is a real signal, and
+            # the comparison that matters is today against ONE run back.
+            trainer_changed = bool(
+                last and last.trainer and r.trainer and last.trainer != r.trainer)
             row = r.to_dict()
             row.update({
+                "win_pct": win_pct.get(r.horse_no),
+                "spark": pts, "spark_dot": [dot_x, dot_y],
+                "spark_points_n": len(series.get(r.horse_no, [])),
+                "trainer_changed": trainer_changed,
+                "trainer_prev": last.trainer if trainer_changed else None,
                 "market_rank": m_rank,
                 "movement": moves.get(r.horse_no),
                 # Negative means the model likes it more than the market does.
@@ -80,6 +140,9 @@ def build_card(date: str, race_no: int, *,
             "going": race.going, "distance": race.distance,
             "race_class": race.race_class, "field_size": race.field_size,
             "concentration": conc,
+            "overround": overround,
+            "place_ratio_range": _place_ratio_range(race.runners),
+            "head_to_head": _pairs_meeting_again(conn, date, race.runners),
             "runners": runners,
         }
     finally:
@@ -124,3 +187,57 @@ def meeting_summary(date: str, *, conn: Connection | None = None) -> dict[str, A
     finally:
         if own:
             conn.close()
+
+
+def _place_ratio_range(runners) -> str | None:
+    """The spread of place-to-win ratios actually on this card.
+
+    Place odds cannot be derived from win odds: there is no fixed
+    relationship, it depends on how concentrated the market is. The common
+    "a third of the win odds" rule is structurally invalid, and showing the
+    real range is how that stays obvious.
+    """
+    ratios = [r.place_odds / r.win_odds for r in runners
+              if r.place_odds and r.win_odds]
+    if len(ratios) < 2:
+        return None
+    return f"{min(ratios):.2f}–{max(ratios):.2f}"
+
+
+def _pairs_meeting_again(conn: Connection, date: str, runners,
+                         limit: int = 8) -> list[dict[str, Any]]:
+    """Runners in today's field who have met before.
+
+    Sorted by weight swing, because the swing is the gap BETWEEN them and a
+    pair both going up 5lb has not changed relative to one another.
+    """
+    out: list[dict[str, Any]] = []
+    for i, a in enumerate(runners):
+        for b in runners[i + 1:]:
+            h2h = fg_q.head_to_head(a.horse_name, b.horse_name,
+                                    before=date, conn=conn)
+            if not h2h["meetings"]:
+                continue
+            today_gap = (a.actual_weight - b.actual_weight
+                         if a.actual_weight and b.actual_weight else None)
+            swing = fg_q.weight_swing(h2h["last_weight_gap"], today_gap)
+            last = h2h["meetings"][0]
+            out.append({
+                "a_no": a.horse_no, "a_name": a.horse_name,
+                "b_no": b.horse_no, "b_name": b.horse_name,
+                "record": f"{h2h['record']['a']}-{h2h['record']['b']}",
+                "meetings": len(h2h["meetings"]),
+                "last_date": last["race_date"],
+                "last_cond": f"{last['distance']}m {last['going']}",
+                "last_line": f"{last['pa']} v {last['pb']}",
+                "gap_then": h2h["last_weight_gap"], "gap_now": today_gap,
+                "swing": swing,
+                # Escalating tiers at 4, 6 and 8 lb. Most pairs clear none of
+                # them, which is correct rather than a bug.
+                "swing_tier": (3 if swing is not None and swing >= 8
+                               else 2 if swing is not None and swing >= 6
+                               else 1 if swing is not None and swing >= 4 else 0),
+                "a_gate": last["da"], "b_gate": last["db"],
+            })
+    out.sort(key=lambda p: (-(p["swing"] or 0), -p["meetings"]))
+    return out[:limit]

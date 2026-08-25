@@ -22,36 +22,27 @@
 
 <nav class="chrome-nav" id="nav"></nav>
 
-<main class="page">
-  <header class="page-head">
-    <h1>Race Day</h1>
-    <div class="controls">
-      <select id="meeting-select" aria-label="Meeting"></select>
-    </div>
-  </header>
+<div class="race-strip">
+  <div class="label">RACE</div>
+  <div class="race-chips" id="race-chips"></div>
+  <div class="strip-right" id="strip-right"></div>
+</div>
 
-  <!-- Race buttons, not a dropdown: moving between races is the most frequent
-       action on this page and must cost one click. -->
-  <div class="race-strip" id="race-strip"></div>
+<div class="band band-bb" id="band-bb"></div>
+<div class="band band-h2h" id="band-h2h"></div>
 
-  <div class="race-bar" id="race-bar"></div>
+<div class="race-bar" id="race-bar"></div>
 
-  <div class="fg-head card-head" role="row">
-    <span class="c-no">No</span>
-    <span class="c-horse">Horse</span>
-    <span class="c-draw">Dr</span>
-    <span class="c-wt">Wt</span>
-    <span class="c-jockey">Jockey</span>
-    <span class="c-odds" title="Win odds. Place beneath, smaller.">Odds</span>
-    <span class="c-move">Move</span>
-    <span class="c-rank" title="Model rank vs market rank">SARR / Mkt</span>
-    <span class="c-fig">Last figure</span>
-    <span class="c-style">Style</span>
-    <span class="c-flags">Last run</span>
+<div class="card-wrap">
+  <div class="card-scroll">
+    <table class="card">
+      <thead><tr id="card-head"></tr></thead>
+      <tbody id="card-body"></tbody>
+    </table>
+    <div class="card-foot" id="card-foot"></div>
   </div>
-
-  <div id="card"></div>
-</main>
+  <aside class="detail" id="detail"></aside>
+</div>
 
 <script type="module" src="../assets/race-day.js"></script>
 </body>

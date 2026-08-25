@@ -48,7 +48,16 @@
   --loss:         #e0637f;   /* a losing result            (inferred)     */
   --loss-dim:     #c9748f;   /* quieter loss tone          (inferred)     */
   --incident:     #c8792f;   /* stewards / trip trouble  (named: COPPER)  */
-  --violet:       #b7a2e8;   /* (named: VIOLET) — role unconfirmed        */
+  --violet:       #b7a2e8;   /* trainer change (confirmed by the artboard) */
+  --violet-ground:#191626;
+
+  /* Band grounds, read off the Race Day artboard. */
+  --book-band:    #12181a;   /* blackbook band                             */
+  --book-rule:    #1e2a2a;
+  --h2h-band:     #131218;   /* head-to-head band                          */
+  --h2h-rule:     #2a2333;
+  --h2h-dim:      #7a6470;
+  --row-hover:    #1c212a;
 
   /* ── running style: four DISTINCT hues, never brightness steps ─────────
    * Brief 05 §2. The test is that Leader reads as different from Closer at
