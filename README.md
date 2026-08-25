@@ -6,6 +6,64 @@ Rebuild of the previous Streamlit dashboard (`tbh-brett/hk_race_dashboard`), whi
 **Read `AGENTS.md` first.** It is the working contract, and `tests/test_smoke.py` enforces
 the parts of it that can be checked mechanically.
 
+## Running it locally
+
+You need this repo and the old one (`hk_race_dashboard`) side by side — the old
+repo holds `hkjc.db`, `reports/`, `cache/live_odds` and `blackbook.json`, which
+is where all the data comes from.
+
+```bash
+git clone https://github.com/tbh-brett/hk_racing_dashboard_26-27
+cd hk_racing_dashboard_26-27
+git checkout claude/racing-dashboard-review-t78ucx
+
+python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
+pip install -e ".[dev,migrate]"
+
+# Build the database. One command, about 20 seconds, safe to re-run.
+python -m hkrd.jobs.bootstrap --legacy ../hk_race_dashboard
+
+# Start it.
+python -m hkrd.serve
+```
+
+Then open **http://127.0.0.1:8000** — it lands on Race Day. The API's own docs
+are at `/docs`.
+
+`bootstrap` prints what landed at each step, so a source file that is missing
+says so rather than leaving a quietly empty table:
+
+```
+  migrate      1,712 races · 21,280 runners
+  reports      10,775 comments · 8,021 dividends · 7,750 trials
+  odds         4,366 snapshots · 48,313 pairs
+  bets         1,078 bets · 4,116 selections
+  blackbook    196 entries · 331 tag links
+  derive       20,903 pace · 21,045 et · 17,262 sarr · 20,449 tags
+```
+
+### While I am changing things
+
+`git pull` then re-run `python -m hkrd.serve`. The database only needs
+rebuilding when the schema or a derive step changes — the commit message says
+when. `python -m hkrd.serve --reload` restarts on code changes, which is what
+you want if you are editing alongside.
+
+Every view is a URL, so a page can be shared or bookmarked exactly as you left
+it: `?date=2026-05-13&race=4`. **⌘K** (or `/`) opens the command palette, which
+reaches every meeting, race, horse and page — it is also the only place the
+meeting is chosen.
+
+### Useful commands
+
+```bash
+python -m hkrd.jobs.bootstrap --legacy ../hk_race_dashboard   # rebuild everything
+python -m hkrd.jobs.derive_all --only pace                    # one derive step
+python -m hkrd.jobs.derive_all --date 2026-07-15              # one meeting
+python -m hkrd.jobs.fit_blend                                 # re-derive the blend weights
+python -m pytest -q                                           # the test suite
+```
+
 ## The idea
 
 A number appears in exactly one place and is computed exactly once.

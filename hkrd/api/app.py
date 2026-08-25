@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import Body, FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from hkrd.query import (bets as bets_q, blackbook as bb_q,
@@ -395,6 +395,13 @@ def rebuild_et_job(window_months: int = 24) -> JSONResponse:
         "errors": report.errors,
     }
     return JSONResponse(payload, status_code=200 if not report.errors else 500)
+
+
+# The root is Race Day. Landing on a directory listing, or a 404, is not a
+# useful first impression of a dashboard.
+@app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    return RedirectResponse("/pages/raceday.html")
 
 
 if WEB.is_dir():
