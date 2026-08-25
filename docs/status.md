@@ -11,15 +11,15 @@ measured against the real data, not estimated.
 
 | Layer | Modules | State |
 |---|---|---|
-| `store/` | schema, connect, coerce, upsert | Complete. 10 tables, 4 indexes, WAL enforced |
-| `ingest/` | `_client`, `results`, `corunning`, `odds` | Parsers built and fixture-tested |
+| `store/` | schema, connect, coerce, upsert | Complete. 20 tables, WAL enforced, FK on |
+| `ingest/` | `_client`, `results`, `corunning`, `odds`, `statement` | Parsers built and fixture-tested |
 | `derive/` | `probability`, `pace`, `et`, `tags` | Complete, all run over the full database |
 | `model/` | `sarr` | Complete |
-| `query/` | `types`, `race`, `formguide`, `model` | Complete for the pages built so far |
-| `api/` | `app` | 18 endpoints, all under 30ms |
-| `web/` | tokens, overlay, Model Analysis, Form Guide | 2 of 8 pages |
+| `query/` | `types`, `race`, `formguide`, `model`, `bets`, `bet_analysis`, `blackbook`, `lookup`, `market` | Complete for the pages built so far |
+| `api/` | `app` | 49 routes |
+| `web/` | tokens, overlay, palette, context, Model Analysis, Form Guide, Race Day, Blackbook, Bets | 5 of 8 pages |
 
-291 tests pass.
+491 tests pass.
 
 ### Data in the database
 
@@ -38,6 +38,9 @@ Everything below is populated from the real archive:
 | `trials` | 7,750 | `import_legacy_reports` |
 | `odds_snapshots` | 4,289 | `import_legacy_odds` |
 | `odds_pairs` | 47,385 | `import_legacy_odds` |
+| `bets` | 1,078 | `import_bets` + `import_statement` |
+| `bet_selections` | 4,116 | ditto |
+| `blackbook` | 196 | `import_blackbook` |
 
 ### Measured improvements
 
@@ -62,6 +65,19 @@ Everything below is populated from the real archive:
 - **`horse_id` degrades from April 2026**, not July: 90% → 55% → 0%.
 - **The 2026 scraper regression is two failures, not one** — the Chinese/detail
   path died in May, `horse_id` decayed separately to zero by July.
+- **The legacy settler missed two winning blocks.** Refs 2217 and 2218 sit in
+  the bets log at $0 returned while their own notes quote statement credits of
+  $80 and $40. The reconciliation found them; $120 of real returns had been
+  missing from the ledger.
+- **The statement parser double-counted every split credit.** A "Quinella -
+  Quinella Place" block pays one credit across two pools; the original wrote
+  the full figure to both halves. On 22 April that made $364.50 of credits read
+  as $729.
+- **Importing a statement duplicated bets already in the ledger.** The log was
+  written from the same statements but under its own ids, and its
+  `_bookie_ref` field had been stripped before writing — the reference survived
+  only inside the note text. Recovering it from there and matching on it turned
+  49 duplicate bets on 26 April back into 0.
 - **SARR crashes on a race with no distance** — 5 legacy races, 55 runners,
   whose `venue` column holds a course code rather than ST/HV.
 
@@ -71,7 +87,7 @@ Everything below is populated from the real archive:
 
 ### Ingest — the largest gap
 
-Ported: `results`, `corunning`, `odds`.
+Ported: `results`, `corunning`, `odds`, `statement`.
 Remaining: **`racecard`, `dividends`, `trials`, `vet`**.
 
 All are marked green in the extraction map (adapt, do not rewrite) and follow
@@ -79,8 +95,12 @@ the pattern the three ported ones establish.
 
 ### Pages
 
-Built: Model Analysis, Form Guide.
-Remaining: **Race Day, Lookup, Bets, Blackbook, Results, Trials**.
+Built: Model Analysis, Form Guide, Race Day, Blackbook, Bets.
+Remaining: **Lookup, Results, Trials**.
+
+The Bets page carries the ledger, the analysis and the reconciliation. The
+pre-bet ticket builder the design also specifies is NOT built: it needs live
+prices for an upcoming meeting, and no scraper here has met a live page.
 
 The token layer, shared overlay, row grammar and API client are all in place,
 so these follow an established pattern rather than starting fresh.

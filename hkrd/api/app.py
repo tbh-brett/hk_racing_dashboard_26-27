@@ -11,7 +11,7 @@ from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from hkrd.query import (bets as bets_q, blackbook as bb_q,
+from hkrd.query import (bet_analysis as ba_q, bets as bets_q, blackbook as bb_q,
                         formguide as fg_q, lookup as lookup_q,
                         market as market_q, model, race as race_q,
                         raceday as raceday_q)
@@ -340,6 +340,23 @@ def bets_ledger(date: str | None = None, account: str | None = None,
 @app.get("/api/bets/summary")
 def bets_summary(account: str | None = None) -> dict:
     return bets_q.summary(account=account)
+
+
+@app.get("/api/bets/analysis")
+def bets_analysis(account: str | None = None) -> dict:
+    """Everything the analysis section renders, in one read.
+
+    Every slice carries n and a 95% interval, because the design brief prints
+    the rule across the whole section: a 12-bet slice is not a finding.
+    """
+    return ba_q.analysis(account=account)
+
+
+@app.get("/api/bets/reconciliation")
+def bets_reconciliation(account: str | None = None) -> dict:
+    """Imported statement rows against logged bets. Nothing is silently
+    merged, so a block the two disagree on is named."""
+    return ba_q.reconciliation(account=account)
 
 
 @app.get("/api/bets/race/{date}/{race_no}")

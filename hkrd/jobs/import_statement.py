@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 from hkrd.ingest import statement
@@ -63,6 +64,18 @@ def _bet_id(rec: dict) -> str:
     return hashlib.sha1(raw.encode()).hexdigest()[:10]
 
 
+def _block_returns(conn) -> dict[str, float]:
+    """What the ledger currently has back on each bookie reference, summed.
+
+    A "Quinella - Quinella Place" line is two ledger rows against one statement
+    block, so the comparison that decides whether the ledger already knows
+    better has to be made at block level.
+    """
+    return {r["bookie_ref"]: r["ret"] or 0.0 for r in conn.execute(
+        "SELECT bookie_ref, sum(returned) ret FROM bets "
+        "WHERE bookie_ref IS NOT NULL GROUP BY bookie_ref")}
+
+
 def _existing_ids(conn) -> dict[tuple[str, str, str], str]:
     """(ref, date, type) -> the bet_id already in the ledger.
 
@@ -94,8 +107,11 @@ def run(src: Path, *, db: Path | None = None,
     try:
         init_db(conn)
         known = _existing_ids(conn)
+        held = _block_returns(conn)
         bets: list[tuple] = []
         sels: list[tuple] = []
+        seen: list[tuple] = []          # what each statement actually covered
+        stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
         for path in paths:
             try:
@@ -113,6 +129,7 @@ def run(src: Path, *, db: Path | None = None,
                     report.errors.append(f"{path.name}: unreadable date "
                                          f"{rec['meeting_date']!r}")
                     continue
+                is_new = (rec["bookie_ref"], date, rec["bet_type"]) not in known
                 bet_id = known.get((rec["bookie_ref"], date, rec["bet_type"]),
                                    _bet_id(rec))
                 legs = rec.get("legs") or []
@@ -132,14 +149,36 @@ def run(src: Path, *, db: Path | None = None,
                 method = ("statement_apportioned" if apportioned
                           else "bookie_statement")
 
+                # An apportioned half is a worse figure than a pool settled
+                # from its own dividend, so it does not overwrite one -- but
+                # only where the ledger's block actually adds up. The legacy
+                # log has refs 2217 and 2218 at $0 returned while its own notes
+                # quote credits of $80 and $40, so "already settled" cannot be
+                # assumed; where the block disagrees with the statement, the
+                # bookie's own record wins.
+                block_credit = float(rec.get("block_credit") or 0.0)
+                ledger_has = held.get(rec["bookie_ref"])
+                agrees = (ledger_has is not None
+                          and abs(ledger_has - block_credit) <= 0.01)
+                accept = is_new or not apportioned or not agrees
+                # `status` is always 'settled' -- a statement is issued after
+                # the meeting either way. The money columns come through as
+                # NULL when this import has nothing better to say, and the
+                # write below coalesces them onto what is already there.
+                settled = ((returned, returned - stake, "settled", hit, method)
+                           if accept else (None, None, "settled", None, None))
+
                 bets.append((
                     bet_id, rec["bookie_ref"], account, date, rec.get("venue"),
                     None if is_all_up else rec["race_number"],
                     rec["bet_type"], rec.get("all_up_formula"),
-                    stake, returned, returned - stake, "settled",
-                    hit, method,
+                    stake, *settled,
                     rec.get("placed_at"), None, "statement",
                     f"Imported from statement (ref {rec['bookie_ref']})."))
+
+                seen.append((bet_id, rec["bookie_ref"], path.name,
+                             float(rec.get("block_debit") or stake),
+                             float(rec.get("block_credit") or 0.0), stamp))
 
                 if is_all_up:
                     for i, leg in enumerate(legs, start=1):
@@ -168,23 +207,37 @@ def run(src: Path, *, db: Path | None = None,
                 "hit, settle_method, placed_at, settled_at, source, notes) "
                 "VALUES (" + ",".join("?" * 18) + ") "
                 "ON CONFLICT (bet_id) DO UPDATE SET "
-                "returned = excluded.returned, pnl = excluded.pnl, "
-                "status = excluded.status, hit = excluded.hit, "
-                "settle_method = excluded.settle_method "
-                # A half apportioned off one block credit is a GUESS at how a
-                # single credit split between two pools. Any return already in
-                # the ledger was settled properly -- the legacy log has ref
-                # 2209 as $90.00 win and $39.50 place, which sums to the same
-                # $129.50 the apportionment can only halve -- so an apportioned
-                # figure never overwrites one that exists.
-                "WHERE excluded.settle_method != 'statement_apportioned' "
-                "   OR bets.returned IS NULL "
-                "   OR bets.settle_method = 'statement_apportioned'", bets)
+                # The statement carries the bookie's own timestamp for the
+                # wager, and the reference it was written under. The legacy log
+                # had both fields stripped and fell back to when the row was
+                # written -- 495 of its 1,078 bets are stamped days or weeks
+                # after the race, which is a logging time, not a betting one.
+                # These are unconditional: the statement is the better record.
+                "placed_at = excluded.placed_at, "
+                "bookie_ref = excluded.bookie_ref, "
+                # Settlement is decided per row before the write (see
+                # `accept` above) and arrives as NULL where this import has
+                # nothing better to say than what is already in the ledger.
+                # coalesce keeps that, so the timestamp beside it still lands.
+                + ", ".join(
+                    f"{col} = coalesce(excluded.{col}, bets.{col})"
+                    for col in ("returned", "pnl", "status", "hit",
+                                "settle_method")), bets)
             conn.executemany(
                 "INSERT INTO bet_selections (bet_id, race_no, horse_no, leg_no, "
                 "is_banker) VALUES (?, ?, ?, ?, ?) "
                 "ON CONFLICT (bet_id, race_no, horse_no, leg_no) DO UPDATE SET "
                 "is_banker = excluded.is_banker", sels)
+            # Which bets a statement was actually read for. A reference
+            # recovered out of the legacy log's notes is not the same thing as
+            # a statement confirming the bet, and the reconciliation has to be
+            # able to tell them apart.
+            conn.executemany(
+                "INSERT INTO bet_statement_rows (bet_id, bookie_ref, "
+                "source_file, stake, returned, imported_at) VALUES (?,?,?,?,?,?) "
+                "ON CONFLICT (bet_id, source_file) DO UPDATE SET "
+                "stake = excluded.stake, returned = excluded.returned, "
+                "imported_at = excluded.imported_at", seen)
         after = conn.execute("SELECT count(*) FROM bets").fetchone()[0]
         report.bets, report.new_bets = len(bets), after - before
         report.selections = len(sels)

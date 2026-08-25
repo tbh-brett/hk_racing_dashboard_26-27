@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bets</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/pages.css">
+<link rel="stylesheet" href="../assets/bets.css">
+</head>
+<body>
+
+<!-- Layer 1. Rendered by context.js and identical on every page; no page
+     writes into it. See design brief 08 §1. -->
+<div class="chrome-meeting"></div>
+
+<nav class="chrome-nav" id="nav"></nav>
+
+<div class="bet-strip">
+  <div class="bet-brand">
+    <span class="dot"></span>BETS
+    <span class="sub">WHAT WAS ACTUALLY STAKED</span>
+  </div>
+  <div class="seg" id="view-toggle" role="group" aria-label="View"></div>
+  <div class="bet-sum" id="bet-sum"></div>
+</div>
+
+<section id="view-ledger">
+  <div class="filter-bar">
+    <div class="search">
+      <span class="glyph">⌕</span>
+      <input id="search" placeholder="horse, bet type or reference" aria-label="Search">
+      <button class="clear" id="clear-search" hidden>×</button>
+    </div>
+    <div class="active-filters" id="active-filters"></div>
+    <div class="match-count" id="match-count"></div>
+  </div>
+
+  <div class="chip-bar">
+    <div class="chip-label">TYPE</div>
+    <div class="chips" id="type-chips"></div>
+    <div class="chip-label bordered">RESULT</div>
+    <div class="chips fixed" id="result-chips"></div>
+    <div class="chip-label bordered">SOURCE</div>
+    <div class="chips fixed" id="source-chips"></div>
+  </div>
+
+  <div class="led-head" id="led-head" role="row"></div>
+  <div id="led-rows"></div>
+  <div class="led-foot" id="led-foot"></div>
+</section>
+
+<section id="view-analysis" hidden>
+  <div class="analysis" id="analysis"></div>
+</section>
+
+<section id="view-recon" hidden>
+  <div class="analysis" id="recon"></div>
+</section>
+
+<script type="module" src="../assets/bets.js"></script>
+</body>
+</html>

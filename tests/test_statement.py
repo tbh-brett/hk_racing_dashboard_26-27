@@ -355,18 +355,27 @@ def test_selections_are_written_so_a_horse_can_be_found_by_number(tmp_path, db):
     assert nos == [3, 4, 8]
 
 
+def _legacy_pair(conn, *, qin=90.0, qpl=39.5):
+    """Ref 2209 as the legacy log has it — both halves of the block, settled
+    from their own dividends, summing to the $129.50 the statement paid."""
+    with transaction(conn):
+        for bid, btype, ret in (("legacy01", "QIN", qin),
+                                ("legacy02", "QPL", qpl)):
+            conn.execute(
+                "INSERT INTO bets (bet_id, bookie_ref, race_date, race_no, "
+                "bet_type, stake, returned, pnl, status, hit, settle_method, "
+                "placed_at, source) VALUES (?,'2209','2026-04-22',1,?,30.0,"
+                "?,?,'settled',1,'dividend','2026-04-28T02:00:53',"
+                "'legacy_log')", (bid, btype, ret, ret - 30.0))
+
+
 def test_a_bet_already_in_the_ledger_is_updated_not_written_twice(tmp_path, db):
     """The legacy log was itself written from these statements and carries
     their references under ids of its own. Matching on the reference stopped
     the 26 April meeting appearing twice — 49 bets, $2,596 staked, counted as
     $5,192."""
     conn = get_conn(db)
-    with transaction(conn):
-        conn.execute(
-            "INSERT INTO bets (bet_id, bookie_ref, race_date, race_no, "
-            "bet_type, stake, returned, pnl, status, hit, settle_method, "
-            "source) VALUES ('legacy01','2209','2026-04-22',1,'QIN',30.0,"
-            "90.0,60.0,'settled',1,'dividend','legacy_log')")
+    _legacy_pair(conn)
     conn.close()
 
     src = tmp_path / "s.txt"
@@ -377,17 +386,12 @@ def test_a_bet_already_in_the_ledger_is_updated_not_written_twice(tmp_path, db):
     rows = conn.execute("SELECT bet_id, bet_type, returned, settle_method, "
                         "source FROM bets ORDER BY bet_type").fetchall()
     conn.close()
-    assert report.bets == 2 and report.new_bets == 1   # only the QPL half is new
-    assert [r["bet_id"] for r in rows] == ["legacy01", _new_qpl_id()]
-    # The pool settled from its own dividend is not overwritten by a half
+    assert report.bets == 2 and report.new_bets == 0   # both halves were there
+    assert [r["bet_id"] for r in rows] == ["legacy01", "legacy02"]
+    # The pools settled from their own dividends are not overwritten by halves
     # apportioned off one block credit.
-    qin = rows[0]
-    assert qin["returned"] == 90.0 and qin["settle_method"] == "dividend"
-
-
-def _new_qpl_id() -> str:
-    return import_statement._bet_id(
-        {"bookie_ref": "2209", "meeting_date": "20260422", "bet_type": "QPL"})
+    assert [r["returned"] for r in rows] == [90.0, 39.5]
+    assert {r["settle_method"] for r in rows} == {"dividend"}
 
 
 def test_an_apportioned_half_never_overwrites_a_settled_return(tmp_path, db):
@@ -395,13 +399,7 @@ def test_an_apportioned_half_never_overwrites_a_settled_return(tmp_path, db):
     the $129.50 the statement shows, which an apportionment can only halve —
     so the real split stands and the guess does not replace it."""
     conn = get_conn(db)
-    with transaction(conn):
-        for bid, btype, ret in (("lg_qin", "QIN", 90.0), ("lg_qpl", "QPL", 39.5)):
-            conn.execute(
-                "INSERT INTO bets (bet_id, bookie_ref, race_date, race_no, "
-                "bet_type, stake, returned, pnl, status, hit, source) "
-                "VALUES (?,'2209','2026-04-22',1,?,30.0,?,?,'settled',1,"
-                "'legacy_log')", (bid, btype, ret, ret - 30.0))
+    _legacy_pair(conn)
     conn.close()
 
     src = tmp_path / "s.txt"
@@ -415,3 +413,78 @@ def test_an_apportioned_half_never_overwrites_a_settled_return(tmp_path, db):
     assert rows["QIN"]["returned"] == 90.0
     assert rows["QPL"]["returned"] == pytest.approx(39.5)
     assert rows["QIN"]["hit"] == 1 and rows["QPL"]["hit"] == 1
+
+
+def test_the_statement_timestamp_replaces_the_log_s_writing_time(tmp_path, db):
+    """The log had `_bookie_placed_at` stripped and fell back to when the row
+    was written — 495 of its 1,078 bets are stamped days or weeks after the
+    race. The statement's own timestamp lands even on a row whose settlement
+    is protected, so the two are gated separately rather than as one row."""
+    conn = get_conn(db)
+    _legacy_pair(conn)
+    conn.close()
+
+    src = tmp_path / "s.txt"
+    src.write_text(_stmt(QQP), encoding="utf-8")
+    import_statement.run(src, db=db)
+
+    conn = get_conn(db)
+    row = conn.execute("SELECT placed_at, returned FROM bets "
+                       "WHERE bet_id = 'legacy01'").fetchone()
+    conn.close()
+    assert row["placed_at"] == "2026-04-22T18:40:00"   # the wager
+    assert row["returned"] == 90.0                     # still the real split
+
+
+def test_a_ledger_block_that_does_not_add_up_is_corrected_by_the_statement(
+        tmp_path, db):
+    """"Already settled" cannot be assumed. The legacy log has refs 2217 and
+    2218 at $0 returned while its own notes quote credits of $80 and $40 — the
+    old settler simply missed two winning blocks. Where the ledger's block
+    disagrees with the statement, the bookie's own record wins, and the $120 it
+    is owed comes back."""
+    conn = get_conn(db)
+    _legacy_pair(conn, qin=0.0, qpl=0.0)      # the settler missed this block
+    conn.close()
+
+    src = tmp_path / "s.txt"
+    src.write_text(_stmt(QQP), encoding="utf-8")   # ref 2209, $129.50 credit
+    import_statement.run(src, db=db)
+
+    conn = get_conn(db)
+    rows = conn.execute("SELECT bet_id, returned, settle_method FROM bets "
+                        "ORDER BY bet_id").fetchall()
+    conn.close()
+    assert sum(r["returned"] for r in rows) == pytest.approx(129.50)
+    assert {r["settle_method"] for r in rows} == {"statement_apportioned"}
+
+
+def test_which_bets_a_statement_was_actually_read_for_is_recorded(tmp_path, db):
+    """A reference recovered out of the legacy log's notes is the log quoting a
+    statement nobody imported. Without this table the reconciliation reported
+    all 1,078 bets as reconciled when two statements had been read."""
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.execute(
+            "INSERT INTO bets (bet_id, bookie_ref, race_date, race_no, "
+            "bet_type, stake, returned, pnl, status, hit, source) "
+            "VALUES ('quoted','9999','2026-04-22',1,'QIN',50.0,0.0,-50.0,"
+            "'settled',0,'legacy_log')")
+    conn.close()
+
+    src = tmp_path / "s.txt"
+    src.write_text(_stmt(QQP), encoding="utf-8")
+    import_statement.run(src, db=db)
+
+    conn = get_conn(db)
+    seen = conn.execute(
+        "SELECT bet_id, bookie_ref, source_file, stake, returned "
+        "FROM bet_statement_rows ORDER BY bet_id").fetchall()
+    conn.close()
+    assert len(seen) == 2                            # the two halves of 2209
+    assert {r["bookie_ref"] for r in seen} == {"2209"}
+    assert "quoted" not in {r["bet_id"] for r in seen}
+    # The BLOCK's figures, not the halves — comparing the halves to themselves
+    # would prove nothing.
+    assert {r["stake"] for r in seen} == {60.0}
+    assert {r["returned"] for r in seen} == {129.5}

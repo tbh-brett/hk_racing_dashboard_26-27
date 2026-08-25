@@ -269,3 +269,33 @@ def test_the_pace_route_reports_its_own_coverage(client):
     assert body["band"] is None
     assert body["unknown"] == body["field_size"] == 8
     assert body["confident"] is False
+
+
+def test_the_bets_analysis_route_carries_n_and_an_interval_on_every_slice(client):
+    """The rule the design prints across the whole section: a 12-bet slice is
+    not a finding. A route that returned a bare ROI would leave the page to
+    invent the caveat."""
+    body = client.get("/api/bets/analysis").json()
+    assert body["thin_bets"] == 30
+    for key in ("bets", "roi_ci", "thin", "clears_zero"):
+        assert key in body["overall"], key
+    assert "series" in body["cumulative"]
+    assert "selections" in body["clv"]      # n, even when it is zero
+    assert isinstance(body["by_type"], list)
+
+
+def test_an_empty_ledger_reports_zero_rather_than_failing(client):
+    """No bets have been imported into this fixture. The page still has to
+    render, and a null ROI is not the same as a break-even one."""
+    body = client.get("/api/bets/analysis").json()
+    assert body["overall"]["bets"] == 0
+    assert body["overall"]["roi"] is None
+    assert body["overall"]["roi_ci"] is None
+    assert body["clv"]["selections"] == 0
+
+
+def test_the_reconciliation_route_separates_read_from_quoted(client):
+    body = client.get("/api/bets/reconciliation").json()
+    assert body["confirmed"] == 0
+    assert body["quoted_not_read"] == 0
+    assert body["disagrees"] == []

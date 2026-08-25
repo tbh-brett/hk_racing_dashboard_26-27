@@ -109,6 +109,14 @@
   --book-rule-2:  #1a2423;   /* the quieter rule inside the expanded grid  */
   --book-hover:   #16211f;
   --book-here:    #16211f;   /* the race currently on screen               */
+  /* Bets band. The page's accent is AMBER, which is already the model-edge
+     hue -- the two never appear on the same page, and the alternative was a
+     ninth colour for a page whose subject is the money the edge was bet at. */
+  --bet-band:     #171410;
+  --bet-rule:     #2a2419;
+  --bet-rule-2:   #231e16;
+  --bet-hover:    #1f1a12;
+  --bet-dim:      #8a7550;
   --h2h-band:     #131218;   /* head-to-head band                          */
   --h2h-rule:     #2a2333;
   --h2h-dim:      #7a6470;

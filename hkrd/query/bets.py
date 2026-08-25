@@ -73,10 +73,59 @@ def ledger(*, date: str | None = None, account: str | None = None,
             ORDER BY s.leg_no, s.horse_no""", ids):
             picks.setdefault(r["bet_id"], []).append(dict(r))
 
+        # Which selections were booked horses, which statement confirmed the
+        # bet, and what price it was struck at against the close. All three are
+        # columns the ledger table renders, and all three are joins rather than
+        # anything the user has to have recorded.
+        booked: dict[str, list[str]] = {}
+        for r in conn.execute(f"""
+            SELECT DISTINCT s.bet_id, k.id entry_id, k.horse_name
+            FROM bet_selections s
+            JOIN bets b ON b.bet_id = s.bet_id
+            JOIN runners r ON r.race_date = b.race_date
+                          AND r.race_no = s.race_no AND r.horse_no = s.horse_no
+            JOIN blackbook k ON k.horse_name = r.horse_name
+                            AND b.race_date >= k.added_date
+            WHERE s.bet_id IN ({marks})""", ids):
+            booked.setdefault(r["bet_id"], []).append(
+                {"entry_id": r["entry_id"], "horse_name": r["horse_name"]})
+
+        confirmed = {r[0] for r in conn.execute(
+            f"SELECT DISTINCT bet_id FROM bet_statement_rows "
+            f"WHERE bet_id IN ({marks})", ids)}
+
+        # CLV per selection, averaged over the ones that can be priced. A
+        # ticket has no single price it was struck at, so this is a mean over
+        # its legs and is None when none of them can be priced.
+        clv: dict[str, list[float]] = {}
+        for r in conn.execute(f"""
+            SELECT s.bet_id, r.win_odds close_odds,
+                   (SELECT o.win_odds FROM odds_snapshots o
+                     WHERE o.race_date = b.race_date AND o.race_no = s.race_no
+                       AND o.horse_no = s.horse_no
+                       AND o.captured_at <= b.placed_at
+                       AND o.win_odds IS NOT NULL
+                     ORDER BY o.captured_at DESC LIMIT 1) taken
+            FROM bet_selections s
+            JOIN bets b ON b.bet_id = s.bet_id
+            JOIN runners r ON r.race_date = b.race_date
+                          AND r.race_no = s.race_no AND r.horse_no = s.horse_no
+            WHERE s.bet_id IN ({marks})
+              AND substr(b.placed_at, 1, 10) = b.race_date
+              AND r.win_odds IS NOT NULL""", ids):
+            if r["taken"] and r["close_odds"]:
+                clv.setdefault(r["bet_id"], []).append(
+                    r["taken"] / r["close_odds"] - 1)
+
         for b in bets:
             b["selections"] = picks.get(b["bet_id"], [])
             b["roi"] = (round((b["returned"] - b["stake"]) / b["stake"], 3)
                         if b["stake"] and b["returned"] is not None else None)
+            b["blackbook"] = booked.get(b["bet_id"], [])
+            b["statement_confirmed"] = b["bet_id"] in confirmed
+            legs = clv.get(b["bet_id"])
+            b["clv"] = round(sum(legs) / len(legs), 4) if legs else None
+            b["clv_legs"] = len(legs or ())
         return bets
     finally:
         if own:

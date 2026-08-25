@@ -383,6 +383,8 @@ def _expand(parsed: dict) -> list[dict[str, Any]]:
             "bookie_ref": parsed["bookie_ref"],
             "placed_at": parsed["placed_at"],
             "total_credit": parsed["total_credit"],
+            "block_debit": parsed["total_debit"],
+            "block_credit": parsed["total_credit"],
         }]
 
     multi = parsed.get("multi_legs")
@@ -412,6 +414,11 @@ def _expand(parsed: dict) -> list[dict[str, Any]]:
         "legs": multi or [], "bookie_ref": parsed["bookie_ref"],
         "placed_at": parsed["placed_at"],
         "total_credit": parsed["total_credit"],
+        # What the STATEMENT itself says, before any splitting. Reconciliation
+        # compares the block, not the halves -- the halves are this module's
+        # arithmetic and comparing them to themselves proves nothing.
+        "block_debit": parsed["total_debit"],
+        "block_credit": parsed["total_credit"],
     }
 
     if code is None:

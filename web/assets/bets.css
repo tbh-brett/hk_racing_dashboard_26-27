@@ -1,0 +1,205 @@
+/* Bets — ported from web/design-source/Bets.dc.html.
+ *
+ * The ledger and what it says. The filter bar, chips, section frames and panel
+ * boxes come from pages.css, which every page shares; what is here is the
+ * ledger row, the P/L curve and the slice table, which are this page's.
+ *
+ * The rule the design prints across the whole analysis section is the one the
+ * styling has to carry: "EVERY FIGURE CARRIES n AND AN INTERVAL · A 12-BET
+ * SLICE IS NOT A FINDING". So a thin slice is dimmed rather than hidden, and a
+ * point estimate whose interval straddles zero is never painted as a result.
+ */
+
+/* The shared chrome in pages.css is painted from these. Set once, here. */
+:root {
+  --page-accent:        var(--edge);
+  --page-accent-ground: var(--edge-ground);
+  --page-dim:           var(--bet-dim);
+  --page-band:          var(--bet-band);
+  --page-rule:          var(--bet-rule);
+  --page-rule-2:        var(--bet-rule-2);
+  --page-hover:         var(--bet-hover);
+}
+
+.bet-strip {
+  display: flex; align-items: center; gap: 2px; padding: 0 14px;
+  border-bottom: 1px solid var(--page-rule); background: var(--page-band);
+}
+.bet-brand {
+  display: flex; align-items: center; gap: 8px; padding: 9px 14px 9px 0;
+  font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 600;
+  letter-spacing: .14em; color: var(--page-accent);
+}
+.bet-brand .dot { width: 7px; height: 7px; background: var(--page-accent); }
+.bet-brand .sub { color: var(--page-dim); font-weight: 400; letter-spacing: .1em; }
+.bet-strip .seg { display: flex; border: 1px solid var(--line-3); margin: 0 12px 0 2px; }
+.bet-strip .seg button {
+  background: none; border: 0; cursor: pointer; padding: 4px 12px;
+  font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .1em;
+  color: var(--text-muted);
+}
+.bet-strip .seg button:hover { color: var(--text); }
+.bet-strip .seg button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+
+.bet-sum {
+  margin-left: auto; display: flex; gap: 16px; align-items: baseline;
+  font-family: var(--font-mono); font-size: var(--fs-xs);
+  letter-spacing: .08em; color: var(--text-dim);
+}
+.bet-sum b { color: var(--text-2); font-weight: 600; letter-spacing: 0; }
+.bet-sum .pos { color: var(--win); }
+.bet-sum .neg { color: var(--loss); }
+/* The overall figure with an interval that straddles zero. Printed in the
+   ordinary text colour, never in green: +17.5% on 1,078 bets is inside the
+   noise, and colouring it as a profit is the lie the section exists to stop. */
+.bet-sum .unproven { color: var(--text-2); }
+
+/* ── the ledger ──────────────────────────────────────────────────────────── */
+
+.led-head, .led-row {
+  display: grid; align-items: center;
+  grid-template-columns:
+    88px 46px 40px 96px minmax(150px, 1fr) 66px 72px 68px 74px 62px;
+  gap: 10px; padding: 0 14px;
+}
+.led-head {
+  height: 28px; border-bottom: 1px solid var(--line-2);
+  background: var(--surface); font-family: var(--font-mono);
+  font-size: var(--fs-xs); letter-spacing: .1em; color: var(--text-dim);
+}
+.led-head .r { text-align: right; }
+.led-row {
+  min-height: 30px; border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
+  cursor: default;
+}
+.led-row:hover { background: var(--page-hover); }
+.led-row .date { color: var(--text-2); }
+.led-row .venue { color: var(--text-dim); }
+.led-row .type { color: var(--text); letter-spacing: .04em; }
+.led-row .sel {
+  color: var(--text-muted); overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A horse on this ticket that was in the blackbook when it was struck. */
+.led-row .sel .booked { color: var(--book); }
+.led-row .num { text-align: right; }
+.led-row .pnl { text-align: right; font-weight: 600; }
+.led-row .pos { color: var(--win); }
+.led-row .neg { color: var(--loss); }
+.led-row .clv { text-align: right; }
+.led-row .clv.pos { color: var(--win); }
+.led-row .clv.neg { color: var(--loss-dim); }
+/* No snapshot at or before the wager. Not zero CLV — unmeasured. */
+.led-row .clv.none { color: var(--text-faint); }
+.led-row .src { font-size: var(--fs-xs); letter-spacing: .06em; }
+.led-row .src .confirmed { color: var(--win); }
+.led-row .src .quoted { color: var(--text-faint); }
+
+.led-foot {
+  display: flex; gap: 18px; padding: 9px 14px; flex-wrap: wrap;
+  border-top: 1px solid var(--line-2); background: var(--surface);
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
+}
+.led-foot b { color: var(--text-2); }
+.led-foot .right { margin-left: auto; color: var(--text-dim); }
+
+/* ── slices ──────────────────────────────────────────────────────────────── */
+
+.slice-tab {
+  width: 100%; border-collapse: collapse;
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+}
+.slice-tab th {
+  text-align: left; padding: 5px 10px 5px 0; font-weight: 400;
+  font-size: var(--fs-xs); letter-spacing: .1em; color: var(--text-dim);
+  border-bottom: 1px solid var(--line-2); white-space: nowrap;
+}
+.slice-tab th.r, .slice-tab td.r { text-align: right; }
+.slice-tab td {
+  padding: 5px 10px 5px 0; border-bottom: 1px solid var(--line);
+  color: var(--text-muted); white-space: nowrap;
+}
+.slice-tab td.label { color: var(--text-2); }
+.slice-tab td.pos { color: var(--win); }
+.slice-tab td.neg { color: var(--loss); }
+/* Under 30 bets. Dimmed, not hidden — a six-bet slice is a fact about the
+   betting even when it is not a finding. */
+.slice-tab tr.thin td { color: var(--text-faint); }
+.slice-tab tr.thin td.label { color: var(--text-dim); }
+.slice-tab .ci { color: var(--text-faint); letter-spacing: 0; }
+/* An interval that excludes zero. The only case where a colour is earned. */
+.slice-tab tr.clears td.roi { font-weight: 600; }
+
+/* ── the P/L curve ───────────────────────────────────────────────────────── */
+
+.curve { position: relative; padding: 6px 0 0; }
+.curve svg { display: block; width: 100%; height: 168px; }
+.curve .zero { stroke: var(--line-3); stroke-width: 1; }
+.curve .line { fill: none; stroke: var(--page-accent); stroke-width: 1.5; }
+.curve .fill { fill: var(--edge-wash); }
+.curve .peak, .curve .trough { stroke: var(--line-2); stroke-dasharray: 2 3; }
+.curve .dot { fill: var(--page-accent); }
+.curve-axis {
+  display: flex; justify-content: space-between; gap: 10px; padding-top: 4px;
+  font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint);
+  letter-spacing: .06em; white-space: nowrap;
+}
+.curve-axis span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.curve-mark {
+  position: absolute; font-family: var(--font-mono); font-size: var(--fs-xs);
+  color: var(--text-dim); pointer-events: none;
+}
+
+/* ── CLV ─────────────────────────────────────────────────────────────────── */
+
+.clv-line {
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
+}
+.clv-line .big { font-size: var(--fs-lg); color: var(--win); font-weight: 600; }
+.clv-line .big.neg { color: var(--loss); }
+.clv-line .n { color: var(--text-faint); }
+
+/* ── reconciliation ──────────────────────────────────────────────────────── */
+
+/* One statement file that was read. */
+.file-row {
+  display: grid; grid-template-columns: 64px 1fr 110px;
+  gap: 12px; align-items: baseline; padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
+}
+.file-row .n { color: var(--text-2); }
+.file-row .file { color: var(--text-dim); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.file-row .when { text-align: right; color: var(--text-faint); }
+
+.recon-row {
+  display: grid; grid-template-columns: 92px 1fr 120px 120px 88px;
+  gap: 12px; align-items: baseline; padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
+}
+.recon-row .ref { color: var(--text-2); }
+.recon-row .file { color: var(--text-faint); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.recon-row .r { text-align: right; }
+.recon-row.disagree { background: var(--miss-ground); padding-left: 8px; }
+.recon-row .state { letter-spacing: .08em; font-size: var(--fs-xs); }
+.recon-row.disagree .state { color: var(--loss-dim); }
+
+/* Imported rows keep a dashed border until they are matched to a logged bet.
+   Manual rows are solid from the moment they are confirmed. Nothing is
+   silently merged. */
+.recon-tile {
+  border: 1px solid var(--line-2); padding: 7px 10px;
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+}
+.recon-tile.pending { border-style: dashed; }
+.recon-tile .k {
+  font-size: var(--fs-xs); letter-spacing: .1em; color: var(--text-dim);
+  display: block; margin-bottom: 2px;
+}
+.recon-tile .v { color: var(--text); font-size: var(--fs-md); }
+.recon-tiles { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }

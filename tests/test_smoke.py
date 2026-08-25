@@ -336,8 +336,14 @@ def test_page_stylesheets_do_not_share_a_top_level_class() -> None:
     Only the LEADING class of a selector counts. `.band-item .name` and
     `.fit-cell .name` are scoped by their ancestor and cannot collide; `.detail`
     and `.detail` can. Shared rules belong in pages.css, which is exempt.
+
+    Every page stylesheet belongs in this list. blackbook.css was left out of
+    it, and the filter bar, chips and panel frames it defined were about to be
+    written a second time for the Bets page — the same collision, one sheet
+    later. They are in pages.css now, painted from page-scoped tokens.
     """
-    page_sheets = ["raceday.css", "formguide.css", "model.css"]
+    page_sheets = ["raceday.css", "formguide.css", "model.css",
+                   "blackbook.css", "bets.css"]
     seen: dict[str, list[str]] = {}
     for sheet in page_sheets:
         path = WEB_ASSETS / sheet

@@ -151,6 +151,22 @@ CREATE TABLE IF NOT EXISTS bet_selections (
 CREATE INDEX IF NOT EXISTS ix_bets_date ON bets(race_date, race_no);
 CREATE INDEX IF NOT EXISTS ix_bet_sel_race ON bet_selections(race_no, horse_no);
 
+-- One row per bet a statement was actually read for. Without this, a bet whose
+-- bookie reference was recovered out of the legacy log's notes is
+-- indistinguishable from one a statement confirmed, and the reconciliation
+-- reports every bet as reconciled when two statements out of thirty meetings
+-- have been read. Design brief: "Nothing is silently merged."
+CREATE TABLE IF NOT EXISTS bet_statement_rows (
+  bet_id      TEXT NOT NULL,
+  bookie_ref  TEXT NOT NULL,
+  source_file TEXT NOT NULL,
+  stake       REAL,                     -- as the STATEMENT has it
+  returned    REAL,                     -- ditto, before any apportioning
+  imported_at TEXT NOT NULL,
+  PRIMARY KEY (bet_id, source_file),
+  FOREIGN KEY (bet_id) REFERENCES bets(bet_id)
+);
+
 -- ── blackbook ────────────────────────────────────────────────────────────────
 --
 -- A hypothesis tracker, not a list of favourites: every entry is a claim that

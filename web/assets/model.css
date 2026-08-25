@@ -116,13 +116,6 @@
 }
 .weight-picker .seg button { min-width: 42px; }
 
-.section-foot {
-  display: flex; gap: 18px; padding: 7px 2px; flex-wrap: wrap;
-  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
-}
-.section-foot .right { margin-left: auto; color: var(--text-faint); }
-.section-foot .warn { color: var(--edge); }
-
 .model-empty {
   display: flex; align-items: center; justify-content: center; padding: 60px 0;
   font-family: var(--font-mono); font-size: var(--fs); color: var(--text-faint);

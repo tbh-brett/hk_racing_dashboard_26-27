@@ -50,6 +50,10 @@ export const api = {
   bets: (q = '') => get(`/bets${q}`),
   betsSummary: () => get('/bets/summary'),
   betsForRace: (date, no) => get(`/bets/race/${date}/${no}`),
+  betsAnalysis: (account) => get(
+    `/bets/analysis${account ? `?account=${encodeURIComponent(account)}` : ''}`),
+  betsReconciliation: (account) => get(
+    `/bets/reconciliation${account ? `?account=${encodeURIComponent(account)}` : ''}`),
   lookup: (q) => get(`/lookup?${q}`),
   lookupInsight: (q) => get(`/lookup/insight?${q}`),
   lookupFilters: () => get('/lookup/filters'),
