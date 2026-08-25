@@ -211,7 +211,38 @@ def blackbook_list(status: str | None = None, tag: str | None = None) -> dict:
 
 @app.get("/api/blackbook/tags")
 def blackbook_tags() -> dict:
-    return {"tags": bb_q.tag_performance()}
+    """Per booking reason: strike, place, ROI and A/E with a 95% interval.
+
+    A/E is the figure that says whether a tag beats the PRICE rather than
+    merely wins sometimes, so `cleared` counts the tags whose interval excludes
+    1.00 and `expected_by_chance` says how many would at 5%. Publishing both is
+    what stops a tag that looks like it is working from reading as one.
+    """
+    tags = bb_q.tag_performance()
+    scored = [t for t in tags if t["ae"] is not None]
+    cleared = [t["tag"] for t in scored
+               if t["ae_lo"] > 1.0 or t["ae_hi"] < 1.0]
+    return {"tags": tags, "scored": len(scored), "cleared": cleared,
+            "expected_by_chance": round(len(scored) * 0.05, 1)}
+
+
+@app.get("/api/blackbook/summary")
+def blackbook_summary(today: str | None = None) -> dict:
+    """How big the book is, and whether it resolves."""
+    return bb_q.book_summary(today=today)
+
+
+@app.post("/api/blackbook/{entry_id}/status")
+def set_blackbook_status(entry_id: str, body: dict = Body(...)) -> dict:
+    """Resolve an entry. One call, because a book that only grows is unusable."""
+    from hkrd.jobs import write_notes
+
+    try:
+        return write_notes.set_status(entry_id, body.get("status", ""))
+    except KeyError as exc:
+        raise HTTPException(404, f"no blackbook entry {exc.args[0]}") from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
 
 
 @app.get("/api/blackbook/declared/{date}")

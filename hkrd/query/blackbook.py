@@ -13,9 +13,14 @@ to write down, which are the ones that went well.
 
 So runs since booking are not read from the export. They are derived from the
 runners table, which holds every run of every horse. Against the same 196
-entries that yields 429 subsequent runs rather than 27. The hand-written records
+entries that yields 355 subsequent runs rather than 27. The hand-written records
 survive as `blackbook_notes` -- an observation about a run is worth keeping, it
 just isn't the record OF the run.
+
+The derivation also excludes the run each entry was written FROM, which the
+naive version did not. Over the real book that correction moves the flat-stake
+return from -5.1% to -16.6%: ten of the forty-two apparent wins since booking
+were the source runs themselves.
 """
 from __future__ import annotations
 
@@ -24,7 +29,7 @@ from typing import Any
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["list_entries", "entry_detail", "for_race", "declared_on",
-           "tag_performance", "tag_definitions"]
+           "tag_performance", "tag_definitions", "book_summary"]
 
 # HK pays three places in fields of seven or more, two in smaller fields. Using
 # a flat top-3 would credit the book with places that never paid.
@@ -33,13 +38,34 @@ _PLACES_SQL = """
          THEN 1 ELSE 0 END"""
 
 # Every run of a booked horse after the day it was booked. `f` carries the field
-# size because the place rule depends on it.
+# size because the place rule depends on it, and the race's book — the sum of
+# 1/odds over the whole field — because an implied probability has to be
+# de-vigged against the race it came from, not against 1.0.
 _RUNS_SINCE_FROM = """
     FROM blackbook b
     JOIN runners r ON r.horse_name = b.horse_name AND r.race_date > b.added_date
-    JOIN (SELECT race_date, race_no, count(*) field_size
+                  -- The run the entry is ANCHORED to is not a test of it. In
+                  -- 71 of the 193 legacy entries with a source date the source
+                  -- run falls after the booking date -- the entry was written
+                  -- off a trial or the card, naming the engagement it was
+                  -- booked for -- so without this the run that created the
+                  -- thesis is counted as evidence for it. It is shown in full
+                  -- as the source run instead.
+                  AND NOT (b.source_date IS NOT NULL
+                           AND r.race_date = b.source_date
+                           AND r.race_no = b.source_race_no)
+    JOIN (SELECT race_date, race_no, count(*) field_size,
+                 sum(CASE WHEN win_odds > 0 THEN 1.0 / win_odds END) book,
+                 count(win_odds) priced
             FROM runners GROUP BY race_date, race_no) f
       ON f.race_date = r.race_date AND f.race_no = r.race_no"""
+
+# The market's own estimate that THIS runner wins, with the overround divided
+# out. NULL when the race is not fully priced -- a book summed over part of a
+# field is not a book, and dividing by it would quietly inflate every A/E.
+_IMPLIED_SQL = """
+    CASE WHEN r.win_odds > 0 AND f.book > 0 AND f.priced = f.field_size
+         THEN (1.0 / r.win_odds) / f.book END"""
 
 
 def _entry_rows(conn: Connection, where: str = "", params: Any = ()) -> list[dict]:
@@ -116,7 +142,8 @@ def entry_detail(entry_id: str, *, conn: Connection | None = None
         entry["runs"] = [dict(r) for r in conn.execute(f"""
             SELECT r.race_date, r.race_no, r.horse_no, r.place, r.place_code,
                    r.draw, r.jockey, r.trainer, r.win_odds,
-                   a.distance, a.going, a.surface, a.course, a.race_class,
+                   a.venue, a.distance, a.going, a.surface, a.course,
+                   a.race_class,
                    f.field_size, e.figure et_figure, e.confidence et_confidence,
                    p.pace_style, {_PLACES_SQL} placed
             {_RUNS_SINCE_FROM}
@@ -126,6 +153,30 @@ def entry_detail(entry_id: str, *, conn: Connection | None = None
             WHERE b.id = ?
             ORDER BY r.race_date DESC, r.race_no DESC
         """, (entry_id,)).fetchall()]
+
+        # The run the thesis was written from, in full and on its own. Design
+        # brief 06 asks for it ("the same expanded run row from the Form Guide,
+        # so the reasoning is visible without navigating away") and keeping it
+        # out of the record above is what stops it counting as a test.
+        entry["source_run"] = None
+        if entry["source_date"] and entry["source_race_no"]:
+            row = conn.execute("""
+                SELECT r.race_date, r.race_no, r.horse_no, r.place, r.place_code,
+                       r.draw, r.jockey, r.trainer, r.win_odds,
+                       a.venue, a.distance, a.going, a.surface, a.course,
+                       a.race_class, e.figure et_figure,
+                       e.confidence et_confidence, p.pace_style,
+                       (SELECT count(*) FROM runners x
+                         WHERE x.race_date = r.race_date
+                           AND x.race_no = r.race_no) field_size
+                FROM runners r
+                JOIN races a ON a.race_date = r.race_date AND a.race_no = r.race_no
+                LEFT JOIN runner_et e USING (race_date, race_no, horse_no)
+                LEFT JOIN runner_pace p USING (race_date, race_no, horse_no)
+                WHERE r.horse_name = ? AND r.race_date = ? AND r.race_no = ?
+            """, (entry["horse_name"], entry["source_date"],
+                  entry["source_race_no"])).fetchone()
+            entry["source_run"] = dict(row) if row else None
 
         # Hand-written observations, kept apart from the derived runs above so
         # it stays clear which is a record and which is a remark.
@@ -228,7 +279,9 @@ def tag_performance(*, conn: Connection | None = None) -> list[dict[str, Any]]:
                    sum({_PLACES_SQL}) places,
                    sum(CASE WHEN r.place = 1 AND r.win_odds IS NOT NULL
                             THEN r.win_odds ELSE 0 END) win_return,
-                   sum(CASE WHEN r.win_odds IS NOT NULL THEN 1 ELSE 0 END) priced
+                   sum(CASE WHEN r.win_odds IS NOT NULL THEN 1 ELSE 0 END) priced,
+                   sum({_IMPLIED_SQL}) expected_wins,
+                   sum(CASE WHEN {_IMPLIED_SQL} IS NOT NULL THEN 1 ELSE 0 END) ae_runs
             {_RUNS_SINCE_FROM}
             JOIN blackbook_tags t ON t.id = b.id
             WHERE r.place IS NOT NULL
@@ -257,6 +310,8 @@ def tag_performance(*, conn: Connection | None = None) -> list[dict[str, Any]]:
             d["priced_runs"] = priced
             d["thin"] = runs < 20
             d["definition"] = defs.get(d["tag"])
+            d.update(_actual_over_expected(d.pop("expected_wins"),
+                                           d["wins"], d.pop("ae_runs")))
             out.append(d)
         for tag, n in booked.items():
             if not any(o["tag"] == tag for o in out):
@@ -264,7 +319,8 @@ def tag_performance(*, conn: Connection | None = None) -> list[dict[str, Any]]:
                             "runs": 0, "wins": 0, "places": 0,
                             "strike_rate": None, "place_rate": None,
                             "roi_win": None, "priced_runs": 0, "thin": True,
-                            "definition": defs.get(tag)})
+                            "definition": defs.get(tag),
+                            **_actual_over_expected(None, 0, 0)})
         return out
     finally:
         if own:
@@ -277,6 +333,101 @@ def tag_definitions(*, conn: Connection | None = None) -> dict[str, str]:
     try:
         return {r["tag"]: r["definition"] for r in conn.execute(
             "SELECT tag, definition FROM blackbook_tag_definitions")}
+    finally:
+        if own:
+            conn.close()
+
+
+def _actual_over_expected(expected: float | None, wins: int, runs: int) -> dict:
+    """A/E — actual wins over the wins the market implied, with an interval.
+
+    The one figure on this page that says whether a tag beats the price rather
+    than merely wins sometimes. A tag can have a fine strike rate purely by
+    booking short-priced horses; A/E divides that out. 1.00 IS the market.
+
+    The interval is the Poisson one, A/E ± 1.96·sqrt(A)/E: wins are a count, and
+    at the counts here (a dozen or two per tag) a normal interval on the RATE
+    understates how wide the honest range is. With no wins at all the upper
+    bound is the 95% Poisson bound of 3.0 events, not zero — a tag that has not
+    won yet has not been shown to fail.
+    """
+    if not expected or runs == 0:
+        return {"ae": None, "ae_lo": None, "ae_hi": None, "ae_runs": runs,
+                "expected_wins": round(expected, 2) if expected else None}
+    ae = wins / expected
+    half = 1.96 * (wins ** 0.5) / expected
+    return {
+        "ae": round(ae, 2),
+        "ae_lo": round(max(0.0, ae - half), 2),
+        "ae_hi": round(ae + half if wins else 3.0 / expected, 2),
+        "ae_runs": runs,
+        "expected_wins": round(expected, 2),
+    }
+
+
+def book_summary(*, today: str | None = None,
+                 conn: Connection | None = None) -> dict[str, Any]:
+    """The header strip: how big the book is, and whether it resolves.
+
+    "Retiring an entry must be as easy as creating one. A blackbook that only
+    ever grows becomes unusable within a season." — design brief 06. So the
+    health metric here is RESOLUTION, not size: how many entries have been
+    settled one way or the other rather than left running.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        status = {r["status"]: r["n"] for r in conn.execute(
+            "SELECT status, count(*) n FROM blackbook GROUP BY status")}
+        total = sum(status.values())
+
+        declared = 0
+        if today:
+            declared = conn.execute(
+                "SELECT count(DISTINCT b.id) FROM blackbook b "
+                "JOIN runners r ON r.horse_name = b.horse_name "
+                "WHERE r.race_date = ?", (today,)).fetchone()[0]
+
+        # Every run since booking, priced, as if each had been backed to a flat
+        # stake. Not a claim about what was bet -- see `bets_ledger` below.
+        row = conn.execute(f"""
+            SELECT count(*) runs,
+                   sum(CASE WHEN r.place = 1 THEN 1 ELSE 0 END) wins,
+                   sum(CASE WHEN r.place = 1 THEN r.win_odds ELSE 0 END) returned,
+                   sum(CASE WHEN r.win_odds IS NOT NULL THEN 1 ELSE 0 END) priced,
+                   sum({_IMPLIED_SQL}) expected_wins,
+                   sum(CASE WHEN {_IMPLIED_SQL} IS NOT NULL THEN 1 ELSE 0 END) ae_runs
+            {_RUNS_SINCE_FROM}
+            WHERE r.place IS NOT NULL AND r.win_odds IS NOT NULL
+        """).fetchone()
+
+        priced = row["priced"] or 0
+        review = conn.execute(f"""
+            SELECT count(*) FROM (
+              SELECT b.id FROM blackbook b
+              JOIN runners r ON r.horse_name = b.horse_name
+                            AND r.race_date > b.added_date
+              WHERE b.status = 'active' AND r.place IS NOT NULL
+              GROUP BY b.id HAVING count(*) >= 4)""").fetchone()[0]
+
+        return {
+            "total": total, "status": status,
+            "active": status.get("active", 0),
+            "resolved": total - status.get("active", 0),
+            "declared_today": declared, "today": today,
+            "review_due": review,
+            "runs_since": row["runs"] or 0,
+            "wins_since": row["wins"] or 0,
+            "flat_roi": (round(((row["returned"] or 0) - priced) / priced, 3)
+                         if priced else None),
+            **_actual_over_expected(row["expected_wins"], row["wins"] or 0,
+                                    row["ae_runs"] or 0),
+            # There is no bets ledger yet, so backed-versus-missed cannot be
+            # split. Saying so is the point: brief 06 calls missed bets "the
+            # single most important feature", and a page that showed 0 backed
+            # would be asserting something it has not been told.
+            "bets_ledger": False,
+        }
     finally:
         if own:
             conn.close()

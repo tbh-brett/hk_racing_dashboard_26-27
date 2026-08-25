@@ -42,6 +42,11 @@ export const api = {
   blackbook: (q = '') => get(`/blackbook${q}`),
   blackbookEntry: (id) => get(`/blackbook/${encodeURIComponent(id)}`),
   blackbookTags: () => get('/blackbook/tags'),
+  blackbookDeclared: (date) => get(`/blackbook/declared/${date}`),
+  blackbookSummary: (today) => get(
+    `/blackbook/summary${today ? `?today=${today}` : ''}`),
+  setBlackbookStatus: (id, status) => post(
+    `/blackbook/${encodeURIComponent(id)}/status`, { status }),
   concentration: (date, no) => get(`/market/concentration/${date}/${no}`),
   coverage: () => get('/market/coverage'),
   formGuide: (date, no, history = 6) =>

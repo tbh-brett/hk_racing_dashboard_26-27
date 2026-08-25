@@ -103,17 +103,6 @@
 .fg-row .wt { padding: 0 6px; text-align: right; color: var(--text-2); }
 .fg-row .odds { text-align: right; font-size: 14px; font-weight: 600; }
 
-.style-chip {
-  display: inline-block; max-width: 100%; box-sizing: border-box;
-  font-size: var(--fs-xs); padding: 1px 4px; white-space: nowrap;
-  overflow: hidden;
-}
-.style-leader   { color: var(--style-leader); background: var(--style-leader-g); }
-.style-onpace   { color: var(--style-onpace); background: var(--style-onpace-g); }
-.style-midfield { color: var(--style-mid); background: var(--style-mid-g); }
-.style-closer   { color: var(--style-closer); background: var(--style-closer-g); }
-.style-unknown  { color: var(--text-faint); background: var(--line); }
-
 /* The six-figure sequence, newest left, with the trend as a tint under it.
    A trend drawn as a line would claim more precision than six figures carry. */
 .seq { display: flex; gap: 3px; align-items: baseline; }

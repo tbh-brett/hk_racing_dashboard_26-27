@@ -85,6 +85,12 @@
   --pop-field:      #24323a;
   --pop-act:        #12211f;
 
+  /* ── Blackbook surfaces, off the artboard ────────────────────────────── */
+  --thesis:         #0e1518;   /* the ground under a thesis or a ledger     */
+  --source-run:     #101820;   /* the run that prompted a booking           */
+  --miss-ground:    #241419;   /* a review prompt, a missed engagement      */
+  --market-tick:    #3a4150;   /* the 1.00 mark on an A/E interval          */
+
   /* Band grounds, read off the Race Day artboard. */
   --book-band:    #12181a;   /* blackbook band                             */
   --book-rule:    #1e2a2a;

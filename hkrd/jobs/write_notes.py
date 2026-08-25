@@ -21,7 +21,8 @@ from pathlib import Path
 
 from hkrd.store.connect import db_path, get_conn, transaction
 
-__all__ = ["save_note", "delete_note", "promote_to_blackbook", "next_entry_id"]
+__all__ = ["save_note", "delete_note", "promote_to_blackbook",
+           "next_entry_id", "set_status"]
 
 
 def _now() -> str:
@@ -119,5 +120,33 @@ def promote_to_blackbook(horse_name: str, *, reasoning: str,
                 "expiry_date": expiry, "status": "active", "reasoning": reason,
                 "confidence": confidence, "source_race": source,
                 "tags": sorted({t.strip() for t in (tags or []) if t.strip()})}
+    finally:
+        conn.close()
+
+
+# The three ways a thesis ends, plus the one way it lives.
+STATUSES = ("active", "won_out", "retired", "expired")
+
+
+def set_status(entry_id: str, status: str, *, db: Path | None = None) -> dict:
+    """Resolve an entry — or put it back to active.
+
+    "Retiring an entry must be as easy as creating one. A blackbook that only
+    ever grows becomes unusable within a season." — design brief 06. So this is
+    one call with no ceremony, and the page puts it one click from the row.
+    """
+    if status not in STATUSES:
+        raise ValueError(f"status must be one of {', '.join(STATUSES)}")
+    conn = get_conn(db if db is not None else db_path())
+    try:
+        with transaction(conn):
+            cur = conn.execute(
+                "UPDATE blackbook SET status = ? WHERE id = ?", (status, entry_id))
+        if not cur.rowcount:
+            raise KeyError(entry_id)
+        row = conn.execute(
+            "SELECT id, horse_name, status FROM blackbook WHERE id = ?",
+            (entry_id,)).fetchone()
+        return dict(row)
     finally:
         conn.close()

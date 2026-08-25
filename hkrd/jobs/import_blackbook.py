@@ -13,7 +13,7 @@ improvement/improving and trial/barrier_trial.
 The `performances` array is imported as hand-written notes, not as the record
 of what happened. 171 of the 196 entries have none, because logging one relied
 on remembering to. Runs since booking are derived from the runners table
-instead -- see query/blackbook.py.
+instead -- 355 of them against the same 196 entries -- see query/blackbook.py.
 """
 from __future__ import annotations
 

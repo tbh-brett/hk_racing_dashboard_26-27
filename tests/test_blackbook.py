@@ -243,7 +243,47 @@ def test_review_is_prompted_after_four_unresolved_runs(booked):
         conn.execute("UPDATE blackbook SET added_date = '2026-01-01'")
     entry = bb.entry_detail("bb_1", conn=conn)
     conn.close()
-    assert entry["runs_since"] == 5 and entry["review_due"] is True
+    # Five races in the fixture, one of which is the source run and does not
+    # count as a test of the thesis it produced.
+    assert entry["runs_since"] == 4 and entry["review_due"] is True
+
+
+def test_the_run_the_thesis_came_from_is_not_a_test_of_it(booked):
+    """The source run is shown in full, and kept out of the record.
+
+    It is not a pedantic distinction. In 71 of the 193 legacy entries with a
+    source date the source run falls AFTER the booking date — the entry was
+    written off a trial or the card and names the engagement it was booked for
+    — so counting it credited the book with the very run that inspired it.
+    Over the real 196 entries the correction moves the flat-stake return from
+    -5.1% to -16.6%.
+    """
+    conn = get_conn(booked)
+    with transaction(conn):
+        # Book it before the source run, the shape those 71 entries have.
+        conn.execute("UPDATE blackbook SET added_date = '2026-03-01', "
+                     "source_date = '2026-04-01', source_race_no = 1")
+    entry = bb.entry_detail("bb_1", conn=conn)
+    conn.close()
+
+    dates = [r["race_date"] for r in entry["runs"]]
+    assert "2026-04-01" not in dates                 # the source run
+    assert dates == ["2026-07-01", "2026-06-01", "2026-05-01"]
+    assert entry["runs_since"] == 3
+    # Shown, not discarded — the reasoning has to be visible without leaving.
+    assert entry["source_run"]["race_date"] == "2026-04-01"
+    assert entry["source_run"]["place"] == 2
+
+
+def test_a_source_run_with_no_matching_race_is_none_not_an_error(booked):
+    conn = get_conn(booked)
+    with transaction(conn):
+        conn.execute("UPDATE blackbook SET source_date = '2019-01-01', "
+                     "source_race_no = 9")
+    entry = bb.entry_detail("bb_1", conn=conn)
+    conn.close()
+    assert entry["source_run"] is None
+    assert entry["runs_since"] == 3
 
 
 def test_a_booking_made_after_a_race_is_flagged_over_it(booked):
@@ -301,3 +341,83 @@ def test_a_missing_entry_is_none_not_an_empty_shell(booked):
     conn = get_conn(booked)
     assert bb.entry_detail("bb_nope", conn=conn) is None
     conn.close()
+
+
+# ── against the price ────────────────────────────────────────────────────────
+
+def test_ae_measures_wins_against_what_the_market_implied(booked):
+    """Strike rate says a tag wins sometimes; A/E says whether it beats the
+    PRICE. A tag can look strong purely by booking short-priced horses."""
+    conn = get_conn(booked)
+    rows = {t["tag"]: t for t in bb.tag_performance(conn=conn)}
+    conn.close()
+    t = rows["traffic"]
+    # FAST ONE at 5.0 against six fillers at 10.0: the raw book is
+    # 0.2 + 6x0.1 = 0.8, so the DE-VIGGED implied chance is 0.2/0.8 = 0.25 --
+    # not the 0.2 the raw price suggests. Dividing the overround out is the
+    # whole point; skipping it would understate every expectation by 20%.
+    assert t["expected_wins"] == pytest.approx(0.25 * t["ae_runs"], abs=0.01)
+    assert t["ae"] == pytest.approx(t["wins"] / t["expected_wins"], abs=0.02)
+    assert t["ae_lo"] < t["ae"] < t["ae_hi"]
+
+
+def test_a_partly_priced_race_is_left_out_of_ae(booked):
+    """The implied probability has to be de-vigged against the whole field. A
+    book summed over part of one is not a book, and dividing by it inflates
+    every A/E it touches."""
+    conn = get_conn(booked)
+    before = {t["tag"]: t for t in bb.tag_performance(conn=conn)}["traffic"]
+    with transaction(conn):
+        conn.execute("UPDATE runners SET win_odds = NULL "
+                     "WHERE race_date = '2026-05-01' AND horse_no = 4")
+    after = {t["tag"]: t for t in bb.tag_performance(conn=conn)}["traffic"]
+    conn.close()
+    assert after["ae_runs"] == before["ae_runs"] - 1
+    assert after["runs"] == before["runs"]      # the run still counts as a run
+
+
+def test_a_tag_with_no_wins_keeps_an_upper_bound(booked):
+    """A tag that has not won yet has not been shown to fail. The Poisson bound
+    at zero events is 3.0, not zero."""
+    conn = get_conn(booked)
+    with transaction(conn):
+        conn.execute("UPDATE runners SET place = 4 WHERE horse_no = 1 "
+                     "AND race_date > '2026-04-10'")
+    rows = {t["tag"]: t for t in bb.tag_performance(conn=conn)}
+    conn.close()
+    t = rows["traffic"]
+    assert t["wins"] == 0 and t["ae"] == 0.0
+    assert t["ae_hi"] > 0
+
+
+def test_the_book_summary_counts_resolution_not_size(booked):
+    """"A blackbook that only ever grows becomes unusable within a season", so
+    the health metric is how many entries were settled."""
+    conn = get_conn(booked)
+    with transaction(conn):
+        conn.execute("INSERT INTO blackbook (id, horse_name, added_date, status) "
+                     "VALUES ('bb_2', 'FAST ONE', '2026-01-01', 'won_out')")
+        conn.execute("INSERT INTO blackbook (id, horse_name, added_date, status) "
+                     "VALUES ('bb_3', 'FAST ONE', '2026-01-01', 'retired')")
+    s = bb.book_summary(conn=conn)
+    conn.close()
+    assert s["total"] == 3 and s["active"] == 1 and s["resolved"] == 2
+    assert s["status"]["won_out"] == 1
+
+
+def test_the_summary_says_there_is_no_bets_ledger(booked):
+    """Brief 06 calls missed bets the most important feature on the page. It
+    needs a ledger that does not exist, and a zero would read as "nothing was
+    missed" — so the flag is explicit."""
+    conn = get_conn(booked)
+    s = bb.book_summary(conn=conn)
+    conn.close()
+    assert s["bets_ledger"] is False
+
+
+def test_declared_today_is_counted_only_when_a_date_is_given(booked):
+    conn = get_conn(booked)
+    assert bb.book_summary(conn=conn)["declared_today"] == 0
+    s = bb.book_summary(today="2026-05-01", conn=conn)
+    conn.close()
+    assert s["declared_today"] == 1 and s["today"] == "2026-05-01"
