@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lookup</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/pages.css">
+<link rel="stylesheet" href="../assets/lookup.css">
+</head>
+<body>
+
+<!-- Layer 1. Rendered by context.js and identical on every page; no page
+     writes into it. See design brief 08 §1. -->
+<div class="chrome-meeting"></div>
+
+<nav class="chrome-nav" id="nav"></nav>
+
+<!-- "every page carries this line — it states what is current and quantifies
+     what is missing". A page that slices by running style over a corpus that
+     is 60% unlabelled is slicing something other than what it says. -->
+<div class="corpus-line" id="corpus"></div>
+
+<div class="lk-strip">
+  <div class="lk-brand">
+    <span class="dot"></span>LOOKUP
+    <span class="sub">THE WHOLE ARCHIVE, SLICED</span>
+  </div>
+  <div class="seg" id="tab-toggle" role="group" aria-label="Tab"></div>
+  <div class="lk-sum" id="lk-sum"></div>
+</div>
+
+<div class="lk-body">
+  <aside class="filter-panel" id="filter-panel">
+    <div class="fp-head">
+      <span class="t">FILTERS</span>
+      <span class="n" id="filter-count"></span>
+      <button class="fp-clear" id="clear-filters">Clear all</button>
+    </div>
+    <div class="fp-note">changes apply live</div>
+    <div id="filter-groups"></div>
+  </aside>
+
+  <main class="lk-main">
+    <div class="active-filters" id="active-filters"></div>
+
+    <section id="tab-runs">
+      <div class="lk-head" id="lk-head" role="row"></div>
+      <div id="lk-rows"></div>
+      <div class="section-foot framed" id="lk-foot"></div>
+    </section>
+
+    <section id="tab-breakdown" hidden>
+      <div class="dim-bar" id="breakdown-dims"></div>
+      <div id="breakdown"></div>
+    </section>
+
+    <section id="tab-pivot" hidden>
+      <div class="dim-bar" id="pivot-dims"></div>
+      <div id="pivot"></div>
+    </section>
+
+    <section id="tab-outliers" hidden>
+      <div id="outliers"></div>
+    </section>
+
+    <section id="tab-insight" hidden>
+      <div class="analysis" id="insight"></div>
+    </section>
+  </main>
+</div>
+
+<script type="module" src="../assets/lookup.js"></script>
+</body>
+</html>

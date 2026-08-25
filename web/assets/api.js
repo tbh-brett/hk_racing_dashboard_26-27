@@ -57,6 +57,14 @@ export const api = {
   lookup: (q) => get(`/lookup?${q}`),
   lookupInsight: (q) => get(`/lookup/insight?${q}`),
   lookupFilters: () => get('/lookup/filters'),
+  lookupBreakdown: (q, dimension) => get(
+    `/lookup/breakdown?dimension=${encodeURIComponent(dimension)}${q ? `&${q}` : ''}`),
+  lookupPivot: (q, rows, cols, metric) => get(
+    `/lookup/pivot?rows=${encodeURIComponent(rows)}&cols=${encodeURIComponent(cols)}`
+    + `&metric=${encodeURIComponent(metric)}${q ? `&${q}` : ''}`),
+  lookupOutliers: (q, delta) => get(
+    `/lookup/outliers?delta=${delta}${q ? `&${q}` : ''}`),
+  lookupCorpus: () => get('/lookup/corpus'),
   blackbookSummary: (today) => get(
     `/blackbook/summary${today ? `?today=${today}` : ''}`),
   setBlackbookStatus: (id, status) => post(

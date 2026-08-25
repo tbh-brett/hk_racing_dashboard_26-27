@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from hkrd.query import (bet_analysis as ba_q, bets as bets_q, blackbook as bb_q,
                         formguide as fg_q, lookup as lookup_q,
+                        slices as slices_q,
                         market as market_q, model, race as race_q,
                         raceday as raceday_q)
 
@@ -226,7 +227,50 @@ def lookup_insight(request: Request, source: str = "race") -> dict:
 @app.get("/api/lookup/filters")
 def lookup_filters() -> dict:
     """The filter vocabulary, so the page renders it from one definition."""
-    return {"groups": lookup_q.FILTERS, "sources": list(lookup_q.SOURCES)}
+    return {"groups": lookup_q.FILTERS, "sources": list(lookup_q.SOURCES),
+            "dimensions": list(slices_q.DIMENSIONS),
+            "metrics": list(slices_q.METRICS),
+            "min_sample": slices_q.MIN_SAMPLE,
+            "outlier_delta": slices_q.OUTLIER_DELTA}
+
+
+@app.get("/api/lookup/breakdown")
+def lookup_breakdown(request: Request, dimension: str = "venue",
+                     min_sample: int = slices_q.MIN_SAMPLE) -> dict:
+    """One dimension against the filtered slice's own baseline, with an
+    interval on every row and the count expected to clear by chance."""
+    try:
+        return slices_q.breakdown(dimension, min_sample=min_sample,
+                                  **_lookup_filters(request))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.get("/api/lookup/pivot")
+def lookup_pivot(request: Request, rows: str = "venue", cols: str = "draw",
+                 metric: str = "strike_rate",
+                 min_sample: int = slices_q.MIN_SAMPLE) -> dict:
+    """Two dimensions crossed, every cell carrying its n."""
+    try:
+        return slices_q.pivot(rows, cols, metric=metric, min_sample=min_sample,
+                              **_lookup_filters(request))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.get("/api/lookup/outliers")
+def lookup_outliers(request: Request, delta: int = slices_q.OUTLIER_DELTA,
+                    limit: int = 200) -> dict:
+    """Runs whose finish most disagrees with the market's ranking. One run is
+    a story, not a signal — so repeats are counted and named."""
+    return slices_q.outliers(delta=delta, limit=limit,
+                             **_lookup_filters(request))
+
+
+@app.get("/api/lookup/corpus")
+def lookup_corpus() -> dict:
+    """What the database holds, for the line every page carries."""
+    return slices_q.corpus()
 
 
 # ── race day ─────────────────────────────────────────────────────────────────

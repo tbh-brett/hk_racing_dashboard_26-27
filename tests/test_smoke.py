@@ -343,7 +343,7 @@ def test_page_stylesheets_do_not_share_a_top_level_class() -> None:
     later. They are in pages.css now, painted from page-scoped tokens.
     """
     page_sheets = ["raceday.css", "formguide.css", "model.css",
-                   "blackbook.css", "bets.css"]
+                   "blackbook.css", "bets.css", "lookup.css"]
     seen: dict[str, list[str]] = {}
     for sheet in page_sheets:
         path = WEB_ASSETS / sheet

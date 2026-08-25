@@ -15,11 +15,11 @@ measured against the real data, not estimated.
 | `ingest/` | `_client`, `results`, `corunning`, `odds`, `statement` | Parsers built and fixture-tested |
 | `derive/` | `probability`, `pace`, `et`, `tags` | Complete, all run over the full database |
 | `model/` | `sarr` | Complete |
-| `query/` | `types`, `race`, `formguide`, `model`, `bets`, `bet_analysis`, `blackbook`, `lookup`, `market` | Complete for the pages built so far |
-| `api/` | `app` | 49 routes |
-| `web/` | tokens, overlay, palette, context, Model Analysis, Form Guide, Race Day, Blackbook, Bets | 5 of 8 pages |
+| `query/` | `types`, `race`, `formguide`, `model`, `bets`, `bet_analysis`, `blackbook`, `lookup`, `slices`, `market` | Complete for the pages built so far |
+| `api/` | `app` | 53 routes |
+| `web/` | tokens, overlay, palette, context, Model Analysis, Form Guide, Race Day, Blackbook, Bets, Lookup | 6 of 8 pages |
 
-491 tests pass.
+510 tests pass.
 
 ### Data in the database
 
@@ -95,8 +95,8 @@ the pattern the three ported ones establish.
 
 ### Pages
 
-Built: Model Analysis, Form Guide, Race Day, Blackbook, Bets.
-Remaining: **Lookup, Results, Trials**.
+Built: Model Analysis, Form Guide, Race Day, Blackbook, Bets, Lookup.
+Remaining: **Results, Trials**.
 
 The Bets page carries the ledger, the analysis and the reconciliation. The
 pre-bet ticket builder the design also specifies is NOT built: it needs live
@@ -109,7 +109,6 @@ so these follow an established pattern rather than starting fresh.
 
 - `derive/sectionals.py` — sectional decomposition
 - `model/fuse.py`, `model/staking.py`, `model/backtest.py`
-- `query/bets.py`, `query/lookup.py` (search_runs with full filter set)
 - `export/pdf.py` — the form guide PDF builder ports directly
 - Blackbook storage and the note → blackbook promotion flow
 - Deployment: Litestream is configured but never run

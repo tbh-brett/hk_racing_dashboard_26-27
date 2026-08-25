@@ -117,6 +117,14 @@
   --bet-rule-2:   #231e16;
   --bet-hover:    #1f1a12;
   --bet-dim:      #8a7550;
+  /* Lookup band. Slate: the page is the neutral one, the whole archive with
+     no editorial position, and giving it a hue would imply one. */
+  --lk-band:      #12151a;
+  --lk-rule:      #232932;
+  --lk-rule-2:    #1e232b;
+  --lk-hover:     #191e26;
+  --lk-dim:       #6f7b8c;
+  --lk-accent:    #93a4bb;
   --h2h-band:     #131218;   /* head-to-head band                          */
   --h2h-rule:     #2a2333;
   --h2h-dim:      #7a6470;

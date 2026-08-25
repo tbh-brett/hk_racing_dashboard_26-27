@@ -11,7 +11,7 @@ import time
 
 import pytest
 
-from hkrd.query import lookup
+from hkrd.query import lookup, slices
 from hkrd.query.types import RunnerLine
 from hkrd.store import upsert
 from hkrd.store.connect import get_conn, init_db, transaction
@@ -232,3 +232,163 @@ def test_insight_and_search_agree_on_what_the_slice_is(db):
     out = lookup.insight(conn=conn, **filters)
     conn.close()
     assert out["runs"] == len([r for r in runs if r.place is not None])
+
+
+# ── slicing, and the risk it carries ─────────────────────────────────────────
+#
+# Brief 07 §8: "This page's genuine risk is manufacturing false signals through
+# repeated slicing. A pivot is the easiest way in this whole tool to manufacture
+# a false finding." These tests hold the query layer to saying so.
+
+def test_a_breakdown_compares_against_the_filtered_slice_not_the_database(db):
+    """Sliced to Happy Valley, the question is which draws beat Happy Valley.
+    Comparing them to every race ever run folds the venue into every row."""
+    conn = get_conn(db)
+    whole = slices.breakdown("draw", conn=conn)["baseline"]
+    hv = slices.breakdown("draw", venue="HV", conn=conn)["baseline"]
+    conn.close()
+    assert whole["runs"] == 16 and hv["runs"] == 8
+
+
+def test_every_breakdown_row_carries_n_and_an_interval(db):
+    conn = get_conn(db)
+    b = slices.breakdown("venue", conn=conn)
+    conn.close()
+    assert b["rows"]
+    for row in b["rows"]:
+        assert row["runs"] >= 1
+        assert len(row["win_ci"]) == 2
+        assert row["win_delta"] is not None
+        assert "thin" in row and "clears" in row
+
+
+def test_a_zero_for_eight_cell_does_not_claim_a_certainty(db):
+    """The normal approximation gives [0, 0] on 0 of 8 — a claim eight runs
+    cannot support. Wilson gives an upper bound instead."""
+    lo, hi = slices._rate_interval(0, 8)
+    assert lo == 0.0
+    assert 0.2 < hi < 0.5
+
+
+def test_the_expected_by_chance_count_is_returned_beside_the_cleared_one(db):
+    """Eight cells clearing p<.05 out of 153 is not eight findings when 7.0
+    were expected at random — brief 07 §8's own example."""
+    conn = get_conn(db)
+    b = slices.breakdown("draw", conn=conn, min_sample=1)
+    conn.close()
+    assert b["cells"] == len([r for r in b["rows"] if not r["thin"]])
+    assert b["expected_by_chance"] == round(b["cells"] * 0.05, 1)
+
+
+def test_a_thin_row_is_marked_rather_than_dropped(db):
+    """Removing it would hide how much of the breakdown is noise."""
+    conn = get_conn(db)
+    b = slices.breakdown("draw", conn=conn)
+    conn.close()
+    assert all(r["thin"] for r in b["rows"])      # 2 runs per draw
+    assert b["thin_hidden"] == len(b["rows"])
+    assert b["cells"] == 0 and b["cleared"] == 0
+
+
+def test_every_pivot_cell_carries_its_own_n(db):
+    conn = get_conn(db)
+    p = slices.pivot("venue", "draw", conn=conn)
+    conn.close()
+    assert p["cells"] == 16
+    for rv in p["row_values"]:
+        for cv, cell in p["grid"][str(rv)].items():
+            assert cell["runs"] >= 1 and "thin" in cell
+
+
+def test_a_pivot_says_how_many_cells_will_look_notable_by_luck(db):
+    conn = get_conn(db)
+    p = slices.pivot("venue", "draw", conn=conn, min_sample=1)
+    conn.close()
+    assert p["expected_notable"] == round(p["cells"] * 0.05, 1)
+
+
+def test_the_ae_metric_is_the_only_one_that_pays_for_the_market_join(db):
+    """Asking for the field's implied book on every cell regardless took a
+    style-by-venue pivot from 40ms to 460ms."""
+    conn = get_conn(db)
+    fast = slices.pivot("venue", "draw", metric="strike_rate", conn=conn)
+    ae = slices.pivot("venue", "draw", metric="ae", conn=conn)
+    conn.close()
+    cell = fast["grid"]["HV"]["1"]
+    assert "expected_wins" not in cell
+    assert "expected_wins" in ae["grid"]["HV"]["1"]
+
+
+def test_an_unknown_dimension_raises_rather_than_returning_nothing(db):
+    conn = get_conn(db)
+    with pytest.raises(ValueError, match="dimension must be one of"):
+        slices.breakdown("colour of silks", conn=conn)
+    with pytest.raises(ValueError, match="metric must be one of"):
+        slices.pivot("venue", "draw", metric="vibes", conn=conn)
+    conn.close()
+
+
+# ── outliers ─────────────────────────────────────────────────────────────────
+
+def test_an_outlier_is_measured_against_the_market_rank_not_the_odds(db):
+    """Horse 1 is 4.0 in a field where everything else is 10.0, so it is the
+    favourite; finishing first is no outlier. In the second race it is 9.0
+    against 10.0s — still favourite — and finishing first is still none."""
+    conn = get_conn(db)
+    o = slices.outliers(delta=6, conn=conn)
+    conn.close()
+    flagged = {(r["race_date"], r["horse_no"]) for r in o["runs"]}
+    assert ("2026-05-01", 1) not in flagged
+    # Horse 8 finished 8th at 10.0, joint-second favourite on price. Its market
+    # rank is 2, so it ran 6 places worse than the market ranked it.
+    assert ("2026-05-01", 8) in flagged
+
+
+def test_ties_share_a_market_rank(db):
+    """Seven horses at 10.0 are all joint-second favourite, not second through
+    eighth. Ranking them 2..8 would invent an ordering the market never made
+    and flag six runners as outliers for finishing where they were priced."""
+    conn = get_conn(db)
+    o = slices.outliers(delta=1, conn=conn)
+    conn.close()
+    ranks = {r["market_rank"] for r in o["runs"] if r["race_date"] == "2026-05-01"}
+    assert ranks <= {1, 2}
+
+
+def test_the_match_count_is_the_whole_slice_not_the_page_returned(db):
+    """"Showing first N of M matching runs · every panel and tab is computed on
+    all M" — the artboard's own line. A `matched` capped at the limit breaks
+    it, and the SELECT-list placeholder that once bound to the wrong parameter
+    made the count 0 while the list stayed full."""
+    conn = get_conn(db)
+    o = slices.outliers(delta=1, limit=3, conn=conn)
+    conn.close()
+    assert o["shown"] == 3
+    assert o["matched"] > 3
+    assert o["of_runs"] == 16
+    assert o["truncated"] is True
+
+
+def test_a_repeat_offender_is_named_because_one_run_is_a_story(db):
+    conn = get_conn(db)
+    o = slices.outliers(delta=1, conn=conn)
+    conn.close()
+    # HORSE 8 runs in both meetings and is out of line in both.
+    repeats = {r["horse_name"] for r in o["runs"] if r["repeat"]}
+    assert o["repeat_horses"] == len(repeats)
+    assert all(r["appearances"] > 1 for r in o["runs"] if r["repeat"])
+
+
+# ── the line every page carries ──────────────────────────────────────────────
+
+def test_the_corpus_line_quantifies_what_is_missing(db):
+    """"every page carries this line — it states what is current and
+    quantifies what is missing". A page that slices by running style over a
+    corpus that is 60% unlabelled is slicing something other than it says."""
+    conn = get_conn(db)
+    c = slices.corpus(conn=conn)
+    conn.close()
+    assert c["runs"] == 16 and c["races"] == 2 and c["trials"] == 2
+    assert c["pace_labelled"] == 8
+    assert c["pace_share"] == 0.5
+    assert c["latest"] == "2026-06-01"

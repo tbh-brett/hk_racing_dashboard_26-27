@@ -299,3 +299,42 @@ def test_the_reconciliation_route_separates_read_from_quoted(client):
     assert body["confirmed"] == 0
     assert body["quoted_not_read"] == 0
     assert body["disagrees"] == []
+
+
+def test_the_lookup_filter_vocabulary_is_served_from_one_definition(client):
+    """The page renders its panel from this, so a filter the query layer does
+    not accept cannot appear on screen."""
+    body = client.get("/api/lookup/filters").json()
+    assert "race context" in body["groups"]
+    assert "draw" in body["dimensions"] and "strike_rate" in body["metrics"]
+    assert body["min_sample"] == 30 and body["outlier_delta"] == 6
+
+
+def test_a_breakdown_route_carries_the_expected_by_chance_count(client):
+    body = client.get("/api/lookup/breakdown?dimension=draw").json()
+    assert body["dimension"] == "draw"
+    assert "expected_by_chance" in body and "cleared" in body
+    for row in body["rows"]:
+        assert len(row["win_ci"]) == 2 and "thin" in row
+
+
+def test_an_unknown_dimension_is_a_422_not_a_500(client):
+    assert client.get("/api/lookup/breakdown?dimension=vibes").status_code == 422
+    assert client.get("/api/lookup/pivot?metric=vibes").status_code == 422
+
+
+def test_a_pivot_route_returns_every_cell_with_its_n(client):
+    body = client.get("/api/lookup/pivot?rows=venue&cols=draw").json()
+    assert body["cells"] >= 1
+    for row in body["grid"].values():
+        for cell in row.values():
+            assert cell["runs"] >= 1 and "thin" in cell
+
+
+def test_a_filter_reaches_every_lookup_route_not_just_the_grid(client):
+    """"every panel and tab is computed on all matching runs" — the artboard's
+    own line. A filter the panels ignore makes that false."""
+    whole = client.get("/api/lookup/breakdown?dimension=draw").json()
+    one = client.get("/api/lookup/breakdown?dimension=draw&draw_max=2").json()
+    assert one["baseline"]["runs"] < whole["baseline"]["runs"]
+    assert {r["value"] for r in one["rows"]} <= {1, 2}
