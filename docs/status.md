@@ -11,15 +11,15 @@ measured against the real data, not estimated.
 
 | Layer | Modules | State |
 |---|---|---|
-| `store/` | schema, connect, coerce, upsert | Complete. 20 tables, WAL enforced, FK on |
-| `ingest/` | `_client`, `results`, `corunning`, `odds`, `statement` | Parsers built and fixture-tested |
+| `store/` | schema, connect, coerce, upsert | Complete. 21 tables, WAL enforced, FK on |
+| `ingest/` | `_client`, `results`, `corunning`, `odds`, `statement`, `racecard`, `dividends`, `trials`, `vet` | Parsers built and fixture-tested |
 | `derive/` | `probability`, `pace`, `et`, `tags`, `trial_quality` | Complete, all run over the full database |
 | `model/` | `sarr`, `blend`, `backtest` | Complete |
 | `query/` | `types`, `race`, `formguide`, `model`, `bets`, `bet_analysis`, `blackbook`, `lookup`, `slices`, `market`, `trials`, `results` | Complete for the pages built so far |
 | `api/` | `app` + `routes/` (5 routers) | 55 routes |
 | `web/` | tokens, overlay, palette, context, Model Analysis, Form Guide, Race Day, Blackbook, Bets, Lookup, Trials, Results | **8 of 8 pages** |
 
-555 tests pass.
+616 tests pass.
 
 ### Data in the database
 
@@ -85,14 +85,26 @@ Everything below is populated from the real archive:
 
 ## Not done
 
-### Ingest — the largest gap
+### Ingest — complete
 
-Ported: `results`, `corunning`, `odds`, `statement`.
-Remaining: **`racecard`, `dividends`, `trials`, `vet`**.
-(The trials TABLE is populated from the legacy archive; the live scraper is not.)
+All nine parsers are written: `results`, `corunning`, `odds`, `statement`,
+`racecard`, `dividends`, `trials`, `vet`, and the shared `_client`.
 
-All are marked green in the extraction map (adapt, do not rewrite) and follow
-the pattern the three ported ones establish.
+Every one locates its columns by HEADER TEXT and validates the shape of what
+it read before returning. **None has met a live page** — see "Verified vs
+unverified" below.
+
+Two things the parsers recovered that the archive does not have:
+
+- **Trial distance and going.** HKJC publishes both in the batch header; the
+  legacy import dropped them, so none of the 7,750 archived trials carries
+  one. `query/trials` had said HKJC published no distance, which was wrong
+  about the source rather than about the data.
+- **Veterinary records at all.** There is no vet table in the archive. The old
+  scraper computed a "concern score" and then filtered its own output by it,
+  so a record that existed on the page and scored below a threshold was simply
+  not there. `ingest/vet` returns every record with its category and its age
+  and lets the caller decide.
 
 ### Pages
 

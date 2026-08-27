@@ -17,7 +17,7 @@ from . import coerce
 __all__ = [
     "upsert_races", "upsert_runners", "upsert_dividends",
     "upsert_comments", "upsert_odds_snapshots", "upsert_odds_pairs",
-    "upsert_trials",
+    "upsert_trials", "upsert_vet_records",
 ]
 
 Row = dict[str, Any]
@@ -174,14 +174,52 @@ def upsert_trials(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
             "running_positions": r.get("running_positions"),
             "venue": r.get("venue"),
             "surface": r.get("surface"),
+            "course": r.get("course"),
+            "distance": coerce.to_int(r.get("distance"), field="distance"),
+            "going": r.get("going"),
+            "jockey": r.get("jockey"),
+            "trainer": r.get("trainer"),
+            "draw": coerce.to_int(r.get("draw"), field="draw"),
+            "lengths_behind": r.get("lengths_behind"),
             "gear": r.get("gear"),
             "comment_text": r.get("comment_text"),
         })
     cols = ["trial_date", "trial_no", "horse_name", "place", "finish_time",
-            "section_times", "running_positions", "venue", "surface", "gear",
-            "comment_text"]
+            "section_times", "running_positions", "venue", "course", "surface",
+            "distance", "going", "jockey", "trainer", "draw",
+            "lengths_behind", "gear", "comment_text"]
     return _upsert(conn, "trials", cols,
                    ["trial_date", "trial_no", "horse_name"], prepared)
+
+
+def upsert_vet_records(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
+    """One row per veterinary NOTE, not per horse.
+
+    A horse can carry several and collapsing them to the most recent loses the
+    pattern that makes them worth reading — three bleeding notes in a season
+    say something one does not.
+    """
+    prepared = []
+    for r in rows:
+        detail = (r.get("detail") or "").strip()
+        if not detail or not r.get("record_date"):
+            continue                    # a note with no text or no date is
+                                        # not a record of anything
+        prepared.append({
+            "race_date": coerce.to_date(r.get("race_date")),
+            "race_no": coerce.to_int(r.get("race_no"), field="race_no"),
+            "horse_no": coerce.to_int(r.get("horse_no"), field="horse_no"),
+            "horse_name": (r.get("horse_name") or "").strip().upper(),
+            "record_date": coerce.to_date(r.get("record_date")),
+            "detail": detail,
+            "passed_date": coerce.to_date(r.get("passed_date")),
+            "category": r.get("category"),
+        })
+    cols = ["race_date", "race_no", "horse_no", "horse_name", "record_date",
+            "detail", "passed_date", "category"]
+    return _upsert(conn, "vet_records", cols,
+                   ["race_date", "race_no", "horse_name", "record_date",
+                    "detail"], prepared)
 
 
 def upsert_odds_pairs(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:

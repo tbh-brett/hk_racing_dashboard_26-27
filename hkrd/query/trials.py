@@ -10,12 +10,17 @@ So the rating is `derive/trial_quality.rate`, called here and nowhere else, and
 the Form Guide's inline band reads the same function through `for_horses`. A
 second rating in the page would drift from this one within a season.
 
-HKJC publishes no trial margin and no trial distance. Margin is derived from
-the batch winner's time at the 0.16s per length HKJC's own race margins imply,
-and is SHOWN but does not enter the rating -- it was measured and does not
-carry (see derive/trial_quality). Distance is not derivable and stays null
-rather than being guessed from the clock: a horse's trial over an unknown trip
-is still a fact; a trip inferred from a time is not.
+HKJC publishes no trial margin. It is derived from the batch winner's time at
+the 0.16s per length HKJC's own race margins imply, and is SHOWN but does not
+enter the rating -- it was measured and does not carry (see
+derive/trial_quality).
+
+Distance IS published, in the batch header, and this module said otherwise
+until `ingest/trials` was written against the page. The claim was wrong about
+the SOURCE, not about the data: no trial in the 7,750-row archive carries a
+distance because the legacy import dropped the field. New scrapes carry it, so
+a batch reads its distance where it has one and returns None where the archive
+never stored one -- which is a gap in the archive, not in HKJC.
 """
 from __future__ import annotations
 
@@ -44,6 +49,19 @@ def _wilson(hits: int, n: int) -> tuple[float, float] | None:
     centre = (phat + z * z / (2 * n)) / denom
     half = z * ((phat * (1 - phat) / n + z * z / (4 * n * n)) ** 0.5) / denom
     return round(max(0.0, centre - half), 4), round(min(1.0, centre + half), 4)
+
+
+def _column(row, name: str):
+    """Read a column that may predate this schema version.
+
+    `sqlite3.Row` raises IndexError for a name it does not have, and a
+    database written before `distance` was added is exactly the case a page
+    must not 500 on.
+    """
+    try:
+        return row[name]
+    except (IndexError, KeyError):
+        return None
 
 
 def _margin(time: float | None, best: float | None) -> float | None:
@@ -162,9 +180,13 @@ def batch(date: str, trial_no: int, *,
             "winning_time": best,
             "section_times": splits,
             "runners": runners,
-            # No distance is published for a trial, and inferring one from the
-            # clock would be a guess dressed as a fact.
-            "distance": None,
+            # Published in the batch header, so it is read where a scrape
+            # stored one. None means the archive has no distance for this
+            # batch -- the legacy import dropped the field -- and NOT that
+            # HKJC published none.
+            "distance": _column(rows[0], "distance"),
+            "going": _column(rows[0], "going"),
+            "course": _column(rows[0], "course"),
         }
     finally:
         if own:

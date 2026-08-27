@@ -72,3 +72,24 @@ def test_ingest_returns_only_scraped_fact():
     derived = {"pace_label", "actual_dev", "actual_going_adj_s", "et_figure",
                "pace_style", "sarr"}
     assert not derived & set(rows[0])
+
+
+def test_one_column_wrong_in_every_row_is_a_layout_change_not_a_quirk():
+    """The two-field rule alone let the single catastrophic case through.
+
+    Swap the Trainer and Act. Wt. headers and exactly one shape breaks:
+    `actual_weight` holds "D Eustace" in every row. Trainer has no shape to
+    break, because a trainer is a name and so is a horse — which is why the
+    validator cannot rely on catching two at once. One column wrong in EVERY
+    row is not a quirk; it is the wrong column.
+    """
+    from pathlib import Path
+
+    html = (Path(__file__).parent / "fixtures" / "results_race.html").read_text(
+        encoding="utf-8")
+    shifted = html.replace(
+        "<th>Trainer</th>\n  <th>Act. Wt.</th>",
+        "<th>Act. Wt.</th>\n  <th>Trainer</th>")
+    assert shifted != html, "fixture header changed; update this test"
+    with pytest.raises(results.ResultsError, match="in every row"):
+        results.parse_results_table(shifted, source="2026-07-15 HV R1")

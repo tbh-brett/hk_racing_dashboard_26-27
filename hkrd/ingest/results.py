@@ -134,20 +134,30 @@ def _validate(rows: list[dict[str, Any]], source: str) -> None:
     if not rows:
         return
 
-    broken: list[str] = []
+    mostly_bad: list[str] = []
+    never_right: list[str] = []
     for field, pattern in _SHAPES.items():
         values = [str(r.get(field, "")).strip() for r in rows if field in r]
         if not values:
             continue
-        bad = sum(1 for v in values if not pattern.match(v))
-        if bad > len(values) / 2:
-            example = next(v for v in values if not pattern.match(v))
-            broken.append(f"{field} holds {example!r}")
+        bad = [v for v in values if not pattern.match(v)]
+        if not bad:
+            continue
+        if len(bad) > len(values) / 2:
+            mostly_bad.append(f"{field} holds {bad[0]!r}")
+        if len(bad) == len(values) and len(values) >= 2:
+            never_right.append(f"{field} holds {bad[0]!r} in every row")
 
-    # One odd column is a quirk; two or more is a layout change.
-    if len(broken) >= 2:
-        raise ResultsError(
-            f"{source}: columns look misaligned — " + "; ".join(broken))
+    # One odd column is a quirk; two or more is a layout change -- AND so is
+    # one column that is wrong in every row. The two-field rule alone missed
+    # the single catastrophic case: move the Horse column onto Act. Wt.'s
+    # index and the parse comes back with horse_name='133',
+    # jockey='FASHION LEGEND (J080)', actual_weight='D Eustace' -- the exact
+    # shape of the corunning failure this validator was written to catch, and
+    # it did not raise, because only one shape broke.
+    if never_right or len(mostly_bad) >= 2:
+        detail = "; ".join(never_right or mostly_bad)
+        raise ResultsError(f"{source}: columns look misaligned — {detail}")
 
 
 def parse_results_table(html: str, *, source: str = "") -> list[dict[str, Any]]:

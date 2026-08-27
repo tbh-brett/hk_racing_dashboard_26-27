@@ -96,16 +96,48 @@ CREATE TABLE IF NOT EXISTS trials (
   trial_date        TEXT    NOT NULL,
   trial_no          INTEGER NOT NULL,
   horse_name        TEXT    NOT NULL,
-  place             INTEGER,
+  place             INTEGER,                -- derived: RESULT is empty at
+                                            -- source, so it is the LAST
+                                            -- running position (question C2)
   finish_time       REAL,
   section_times     TEXT,
   running_positions TEXT,
   venue             TEXT,
+  course            TEXT,                   -- the course name as published
   surface           TEXT,
+  distance          INTEGER,                -- published in the batch header;
+                                            -- the legacy import dropped it, so
+                                            -- no archived trial carries one
+  going             TEXT,
+  jockey            TEXT,
+  trainer           TEXT,
+  draw              INTEGER,
+  lengths_behind    REAL,
   gear              TEXT,
   comment_text      TEXT,
   PRIMARY KEY (trial_date, trial_no, horse_name)
 );
+
+-- Veterinary records. One row per NOTE, not per horse: a horse can carry
+-- several, and collapsing them to the most recent loses the pattern that makes
+-- them worth reading. Nothing is filtered on the way in -- the old scraper
+-- scored each note and dropped the ones below a threshold, so a record that
+-- existed on the page and did not survive the filter was simply not there.
+CREATE TABLE IF NOT EXISTS vet_records (
+  race_date    TEXT    NOT NULL,
+  race_no      INTEGER NOT NULL,
+  horse_no     INTEGER,
+  horse_name   TEXT    NOT NULL,
+  record_date  TEXT    NOT NULL,
+  detail       TEXT    NOT NULL,
+  passed_date  TEXT,                        -- cleared to race, when given
+  category     TEXT,                        -- RESPIRATORY | CARDIAC | PHYSICAL
+                                            -- | PERFORMANCE | PROCEDURAL
+                                            -- | UNKNOWN
+  PRIMARY KEY (race_date, race_no, horse_name, record_date, detail)
+);
+
+CREATE INDEX IF NOT EXISTS ix_vet_horse ON vet_records(horse_name, record_date);
 
 -- ── bets ─────────────────────────────────────────────────────────────────────
 --

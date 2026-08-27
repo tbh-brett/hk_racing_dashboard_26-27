@@ -25,7 +25,9 @@ import argparse
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from hkrd.ingest import corunning, results as results_ingest
+from hkrd.ingest import (corunning, dividends as dividends_ingest,
+                         racecard as racecard_ingest,
+                         results as results_ingest, vet as vet_ingest)
 from hkrd.ingest._client import FetchError
 from hkrd.store import upsert
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
@@ -39,9 +41,17 @@ class ScrapeReport:
     venue: str = ""
     races: int = 0
     runners: int = 0
+    declared: int = 0
     comments: int = 0
     lane_tags: int = 0
+    dividends: int = 0
+    vet_records: int = 0
     errors: list[str] = field(default_factory=list)
+    # A source that is absent is not a scrape that failed. The card is not
+    # published for every meeting this package can reach, and dividends and
+    # vet records only exist after the race — so those go here and do not
+    # make `ok` false, while a results failure does.
+    warnings: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -51,8 +61,14 @@ class ScrapeReport:
         lines = [f"  meeting            {self.date} {self.venue}",
                  f"  races              {self.races:>6}",
                  f"  runners            {self.runners:>6}",
+                 f"  declared           {self.declared:>6}",
                  f"  comments           {self.comments:>6}",
-                 f"  lane tags          {self.lane_tags:>6}"]
+                 f"  lane tags          {self.lane_tags:>6}",
+                 f"  dividends          {self.dividends:>6}",
+                 f"  vet records        {self.vet_records:>6}"]
+        if self.warnings:
+            lines.append(f"  not available      {len(self.warnings):>6}")
+            lines += [f"    {w}" for w in self.warnings[:6]]
         if self.errors:
             lines.append(f"  ERRORS             {len(self.errors):>6}")
             lines += [f"    {e}" for e in self.errors[:10]]
@@ -68,11 +84,26 @@ def scrape_meeting(date: str, venue: str, *, post_race: bool = False,
     keyed on (race_date, race_no, horse_no).
     """
     report = ScrapeReport(date=date, venue=venue)
+
+    # BEFORE the race: the card is the declared field, and it is the only
+    # source for rating, gear and days-since-last. It is fetched first so a
+    # meeting can be scraped ahead of time and again after — the second pass
+    # upserts the results onto the same rows.
+    try:
+        card = racecard_ingest.fetch_meeting(date, venue, max_races=max_races,
+                                             session=session)
+        report.declared = _store_card(db, card)
+        report.warnings.extend(f"racecard: {e}" for e in card["errors"])
+    except (FetchError, racecard_ingest.RacecardError) as e:
+        report.warnings.append(f"racecard: {e}")
+
     try:
         races = results_ingest.fetch_meeting(date, venue, max_races=max_races,
                                              session=session)
     except (FetchError, results_ingest.ResultsError) as e:
         report.errors.append(f"results: {e}")
+        # A card with no results yet is a meeting that has not been run, not a
+        # failed scrape. Report what was declared rather than nothing.
         return report
 
     conn = get_conn(db if db is not None else db_path())
@@ -97,7 +128,80 @@ def scrape_meeting(date: str, venue: str, *, post_race: bool = False,
         except (FetchError, corunning.CoRunningError) as e:
             report.errors.append(f"corunning: {e}")
 
+        # Dividends and vet records are also post-race only.
+        try:
+            paid = dividends_ingest.fetch_meeting(
+                date, venue, max_races=max_races, session=session)
+            report.dividends = _store_dividends(db, date, paid)
+        except (FetchError, dividends_ingest.DividendsError) as e:
+            report.warnings.append(f"dividends: {e}")
+
+        try:
+            notes = vet_ingest.fetch_meeting(date, venue, max_races=max_races,
+                                             session=session)
+            report.vet_records = _store_vet(db, notes)
+        except (FetchError, vet_ingest.VetError) as e:
+            report.warnings.append(f"vet: {e}")
+
     return report
+
+
+def _open(db: Path | None):
+    conn = get_conn(db if db is not None else db_path())
+    init_db(conn)
+    return conn
+
+
+def _store_card(db: Path | None, card: dict) -> int:
+    """The declared field. Written through the same upsert the results use, so
+    a race scraped twice is one set of rows rather than two."""
+    written = 0
+    conn = _open(db)
+    try:
+        with transaction(conn):
+            for race in card["races"]:
+                head = race["race"]
+                upsert.upsert_races(conn, [head])
+                written += upsert.upsert_runners(conn, [{
+                    "race_date": head["race_date"],
+                    "race_no": r.get("race_no"),
+                    "horse_no": r.get("horse_no"),
+                    "horse_name": r.get("horse_name"),
+                    "draw": r.get("draw"), "jockey": r.get("jockey"),
+                    "trainer": r.get("trainer"),
+                    "actual_weight": r.get("actual_weight"),
+                    "declared_weight": r.get("declared_weight"),
+                    "rating": r.get("rating"), "gear": r.get("gear"),
+                } for r in race["runners"]])
+    finally:
+        conn.close()
+    return written
+
+
+def _store_dividends(db: Path | None, date: str,
+                     paid: dict[int, list[dict]]) -> int:
+    written = 0
+    conn = _open(db)
+    try:
+        with transaction(conn):
+            for race_no, rows in paid.items():
+                written += upsert.upsert_dividends(conn, [
+                    {**r, "race_date": date, "race_no": race_no} for r in rows])
+    finally:
+        conn.close()
+    return written
+
+
+def _store_vet(db: Path | None, notes: dict[int, list[dict]]) -> int:
+    written = 0
+    conn = _open(db)
+    try:
+        with transaction(conn):
+            for rows in notes.values():
+                written += upsert.upsert_vet_records(conn, rows)
+    finally:
+        conn.close()
+    return written
 
 
 def _store_race(conn, date: str, race: dict) -> int:

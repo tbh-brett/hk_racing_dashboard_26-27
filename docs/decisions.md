@@ -177,3 +177,33 @@ is its own artboard, so the nav is eight items and Lab has a home. Built.
 **C2 — the Trials `RESULT` column.** Empty at source, not merely unwired in the
 interface: the trials scrape's own `result` field is blank on every row across
 159 files. Finishing position derives from the last running position instead.
+
+---
+
+## The seven legacy logic modules — **discarded**
+
+`decision_engine.py`, `betting_strategy.py`, `form_screener.py`,
+`horse_cycle.py`, `backtest_model.py`, `calibration_harness.py` and
+`train_gbm.py` — 6,806 lines in the old repo — are **not** ported.
+
+The owner's instruction, verbatim: "Disregard all seven logic completely, those
+are all vibe-coded without thorough consideration, and plenty of newly
+implemented functions and features replaces them."
+
+What replaces each, so nothing is lost by accident:
+
+| Legacy module | Replaced by |
+|---|---|
+| `backtest_model.py`, `calibration_harness.py` | `model/backtest.py` — walk-forward calibration and value, split by date |
+| `train_gbm.py` | nothing, deliberately. See below. |
+| `decision_engine.py`, `betting_strategy.py` | nothing, deliberately. See below. |
+| `form_screener.py` | `query/formguide.py` + `query/slices.py` + the Form Guide and Lookup pages |
+| `horse_cycle.py` | `derive/et.py` (figure vs par with an effective sample size) and `model/sarr.py` |
+
+**Why the betting and training modules have no replacement.** `model/backtest`
+measured the thing all three depend on: over 596 walk-forward races there is no
+edge against the closing market at any blend weight, and the return gets worse
+as more disagreement is required. A staking engine, a ticket builder and a
+gradient-boosted head all exist to exploit an edge; the edge is not there. If a
+future fundamental stream beats the price on this harness, they become worth
+writing — and the harness will say so.
