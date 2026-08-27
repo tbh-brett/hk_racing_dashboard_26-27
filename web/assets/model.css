@@ -121,3 +121,20 @@
   font-family: var(--font-mono); font-size: var(--fs); color: var(--text-faint);
   letter-spacing: .08em;
 }
+
+/* ── does it beat the price ──────────────────────────────────────────────── */
+
+.bt-verdict {
+  padding: 9px 2px 6px; font-family: var(--font-mono); font-size: var(--fs-sm);
+  line-height: 1.6; color: var(--text-muted); max-width: 96ch;
+}
+.bt-verdict b { color: var(--text-2); letter-spacing: .06em; }
+.bt-verdict b.pos { color: var(--win); }
+.bt-verdict b.neg { color: var(--loss); }
+.bt-reading {
+  padding: 6px 2px 0; font-family: var(--font-mono); font-size: var(--fs-xs);
+  line-height: 1.6; color: var(--text-dim); max-width: 96ch;
+}
+/* A bin under the minimum sample. Dimmed, never dropped — removing it hides
+   how much of the reliability curve is unsupported. */
+.model-grid tr.thin td { color: var(--text-faint); }

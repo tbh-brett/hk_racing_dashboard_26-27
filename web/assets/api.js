@@ -97,6 +97,7 @@ export const api = {
   sarrRace: (date, no) => get(`/model/sarr/${date}/${no}`),
   blendRace: (date, no, weight) => get(
     `/model/blend/${date}/${no}` + (weight === undefined ? '' : `?weight=${weight}`)),
+  modelBacktest: (q = '') => get(`/model/backtest${q ? `?${q}` : ''}`),
   status: () => get('/status'),
   rebuildEt: (months = 24) => post(`/jobs/rebuild-et?window_months=${months}`),
 };

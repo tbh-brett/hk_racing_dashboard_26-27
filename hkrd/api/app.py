@@ -216,6 +216,24 @@ def meeting_card(date: str) -> dict:
     return summary
 
 
+# ── backtest ─────────────────────────────────────────────────────────────────
+
+@app.get("/api/model/backtest")
+def model_backtest(split_date: str | None = None, weight: float | None = None,
+                   edge: float = 0.0) -> dict:
+    """Walk-forward calibration and value, recomputed rather than quoted.
+
+    Two questions, not one: is the model calibrated, and is there anything to
+    bet on. A model can be well calibrated and unprofitable, and reporting
+    only the second is how a filter that got lucky becomes a rule.
+    """
+    from hkrd.model import backtest as bt
+
+    body = bt.walk_forward(split_date=split_date, weight=weight, edge=edge)
+    body["measured"] = bt.MEASURED
+    return body
+
+
 # ── market ───────────────────────────────────────────────────────────────────
 
 @app.get("/api/market/concentration/{date}/{race_no}")

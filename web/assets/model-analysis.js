@@ -21,7 +21,9 @@ const NAV = [
   ['Trials', 'trials.html'], ['Model Analysis', 'model-analysis.html'],
 ];
 
-const VIEWS = [['sarr', 'SARR'], ['blend', 'BLEND'], ['et', 'ET'], ['all', 'ALL']];
+const VIEWS = [['sarr', 'SARR'], ['blend', 'BLEND'],
+               ['backtest', 'DOES IT BEAT THE PRICE'], ['et', 'ET'],
+               ['all', 'ALL']];
 const WEIGHTS = [0, 0.1, 0.32, 1];
 
 const $ = (id) => document.getElementById(id);
@@ -35,7 +37,7 @@ const el = (tag, cls, text) => {
 
 const state = {
   date: null, race: 1, races: [], view: 'all', weight: null,
-  sarr: null, blend: null, et: null,
+  sarr: null, blend: null, et: null, backtest: null,
   sortS: { key: 'rank', dir: 1 }, sortB: { key: 'blended', dir: -1 },
 };
 
@@ -372,6 +374,111 @@ function pct(v) {
   return v === null || v === undefined ? DASH : `${v.toFixed(1)}%`;
 }
 
+/** A PROPORTION as a percentage. Distinct from `pct` above, which takes a
+ *  number already scaled 0-100 — passing 0.012 to that one prints "0.0%". */
+function share(v, digits = 1) {
+  return v === null || v === undefined ? DASH : `${(v * 100).toFixed(digits)}%`;
+}
+
+/* ── does it beat the price ──────────────────────────────────────────────── */
+//
+// Two questions, and they are not the same one. A model can be well calibrated
+// and unprofitable, or profitable and badly calibrated. The page shows both,
+// and shows the negative answer as plainly as it would show a positive one.
+
+function renderBacktest() {
+  const b = state.backtest;
+  if (!b) return;
+  $('bt-sub').textContent = b.usable
+    ? `WALK-FORWARD · SPLIT ${b.split_date} · TRAIN ${b.train_races} / `
+      + `TEST ${b.test_races} RACES · ${b.calibration.runners.toLocaleString()} RUNNERS`
+    : 'NOT ENOUGH SCORED RACES TO BACKTEST';
+  if (!b.usable) {
+    $('bt-body').replaceChildren();
+    return;
+  }
+
+  const c = b.calibration;
+  $('bt-head').replaceChildren(...[
+    ['PREDICTED BAND', ''], ['RUNNERS', 'num'], ['WINS', 'num'],
+    ['MODEL SAYS', 'num'], ['ACTUAL', 'num'], ['95% CI', ''], ['READ', ''],
+  ].map(([label, cls]) => el('th', cls || null, label)));
+
+  $('bt-body').replaceChildren(...c.bins.map((bin) => {
+    const tr = el('tr', bin.thin ? 'thin' : null);
+    tr.append(el('td', null, `${share(bin.lo, 0)}–${share(bin.hi, 0)}`));
+    tr.append(el('td', 'num', bin.runners.toLocaleString()));
+    tr.append(el('td', 'num', String(bin.wins)));
+    tr.append(el('td', 'num', share(bin.predicted)));
+    tr.append(el('td', 'num', share(bin.actual)));
+    tr.append(el('td', null, bin.ci
+      ? `[${share(bin.ci[0])}, ${share(bin.ci[1])}]` : DASH));
+    // "Off" means the model's own prediction falls outside the interval its
+    // outcomes support. That is a miscalibration, not a near miss.
+    tr.append(el('td', bin.off ? 'warn' : null,
+      bin.thin ? `n<${c.min_bin}` : bin.off ? 'OUTSIDE THE INTERVAL' : 'inside'));
+    return tr;
+  }));
+
+  const foot = $('bt-foot');
+  foot.replaceChildren();
+  foot.append(el('span', null, `Brier ${num(c.brier, 5)}`));
+  foot.append(el('span', null, `log loss ${num(c.log_loss, 4)}`));
+  foot.append(el('span', c.off_bins ? 'warn' : null,
+    c.off_bins
+      ? `${c.off_bins} bin(s) outside their interval`
+      : 'every bin falls inside the interval its outcomes support'));
+
+  // The second question, and the one that decides whether any of this is
+  // worth having.
+  const host = $('bt-value');
+  host.replaceChildren();
+  const v = b.value;
+  const line = el('div', 'bt-verdict');
+  if (!v.bets) {
+    line.append(el('b', null, 'NOTHING TO BET ON. '));
+    line.append(document.createTextNode(
+      `At the fitted weight of ${num(b.weight, 2)} the model IS the de-vigged `
+      + 'market, so there are no value bets by construction — not a small '
+      + 'edge, none.'));
+  } else {
+    line.append(el('b', v.roi > 0 ? 'pos' : 'neg',
+      `${v.bets.toLocaleString()} BETS · ROI ${signed(v.roi * 100, 1)}%. `));
+    line.append(document.createTextNode(
+      `Strike ${share(v.strike_rate)} on ${v.staked.toLocaleString()} staked. `
+      + v.note));
+  }
+  host.append(line);
+
+  // What happens as the model is asked to disagree with the market more.
+  const m = b.measured;
+  if (m && m.value_by_weight.length) {
+    const tbl = el('table', 'model-grid');
+    const head = el('tr');
+    [['WEIGHT ON THE MODEL', ''], ['EDGE REQUIRED', 'num'], ['BETS', 'num'],
+     ['STRIKE', 'num'], ['ROI', 'num']]
+      .forEach(([l, cls]) => head.append(el('th', cls || null, l)));
+    const thead = el('thead');
+    thead.append(head);
+    tbl.append(thead);
+    const body = el('tbody');
+    m.value_by_weight.forEach((r) => {
+      const tr = el('tr');
+      tr.append(el('td', null, num(r.weight, 2)));
+      tr.append(el('td', 'num', share(r.edge, 0)));
+      tr.append(el('td', 'num', r.bets.toLocaleString()));
+      tr.append(el('td', 'num', share(r.strike)));
+      tr.append(el('td', 'num neg', `${signed(r.roi * 100, 1)}%`));
+      body.append(tr);
+    });
+    tbl.append(body);
+    const box = el('div', 'table-scroll');
+    box.append(tbl);
+    host.append(box);
+    host.append(el('div', 'bt-reading', m.reading));
+  }
+}
+
 /* ── ET ──────────────────────────────────────────────────────────────────── */
 
 /* Brief 01 lists "big hero numbers and dashboard-y KPI tiles" under Explicitly
@@ -457,9 +564,11 @@ function render() {
   const show = (id, on) => { $(id).hidden = !on; };
   show('sec-sarr', state.view === 'sarr' || state.view === 'all');
   show('sec-blend', state.view === 'blend' || state.view === 'all');
+  show('sec-backtest', state.view === 'backtest' || state.view === 'all');
   show('sec-et', state.view === 'et' || state.view === 'all');
   renderSarr();
   renderBlend();
+  renderBacktest();
   renderEt();
 }
 
@@ -476,6 +585,14 @@ async function loadBlend() {
     (e) => { $('blend-foot').replaceChildren(el('span', 'warn', `blend: ${e.message}`)); });
   renderBlend();
 }
+
+async function loadBacktest() {
+  state.backtest = await settle(api.modelBacktest(), (e) => {
+    $('bt-sub').textContent = `backtest: ${e.message}`;
+  });
+  renderBacktest();
+}
+
 
 async function loadRace() {
   const [sarr, et] = await Promise.all([
@@ -524,7 +641,9 @@ async function onRebuild() {
     // re-renders the global strip rather than a page-local copy.
     context.status = await api.status().catch(() => context.status);
     context.render();
-    await Promise.all([renderEtSummary(), loadRace()]);
+    // The backtest is over the whole archive, not this race, so it loads once
+    // rather than on every race change.
+    await Promise.all([renderEtSummary(), loadBacktest(), loadRace()]);
   } catch (e) {
     out.className = 'job-result err';
     out.textContent = `rebuild failed: ${e.message}`;
@@ -549,6 +668,9 @@ async function init() {
   document.addEventListener('keydown', onKey);
 
   await settle(renderEtSummary(), () => {});
+  // Over the whole archive rather than this race, so it loads once here and
+  // not again on every race change.
+  await loadBacktest();
   context.onChange(onContext);
   await context.init();
   await onContext(context, 'meeting');

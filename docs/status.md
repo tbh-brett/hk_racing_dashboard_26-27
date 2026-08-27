@@ -14,12 +14,12 @@ measured against the real data, not estimated.
 | `store/` | schema, connect, coerce, upsert | Complete. 20 tables, WAL enforced, FK on |
 | `ingest/` | `_client`, `results`, `corunning`, `odds`, `statement` | Parsers built and fixture-tested |
 | `derive/` | `probability`, `pace`, `et`, `tags`, `trial_quality` | Complete, all run over the full database |
-| `model/` | `sarr` | Complete |
+| `model/` | `sarr`, `blend`, `backtest` | Complete |
 | `query/` | `types`, `race`, `formguide`, `model`, `bets`, `bet_analysis`, `blackbook`, `lookup`, `slices`, `market`, `trials`, `results` | Complete for the pages built so far |
-| `api/` | `app` + `routes/` (5 routers) | 54 routes |
+| `api/` | `app` + `routes/` (5 routers) | 55 routes |
 | `web/` | tokens, overlay, palette, context, Model Analysis, Form Guide, Race Day, Blackbook, Bets, Lookup, Trials, Results | **8 of 8 pages** |
 
-546 tests pass.
+555 tests pass.
 
 ### Data in the database
 
@@ -113,15 +113,66 @@ so these follow an established pattern rather than starting fresh.
 ### Not started
 
 - `derive/sectionals.py` — sectional decomposition
-- `model/fuse.py`, `model/staking.py`, `model/backtest.py`
 - `export/pdf.py` — the form guide PDF builder ports directly
 - Deployment: Litestream is configured but never run
+
+`model/fuse.py` is built, under the name `model/blend.py`. `model/backtest.py`
+is built. **`model/staking.py` is deliberately NOT built** — see below.
 
 Blackbook storage and the note → blackbook promotion flow ARE built. The form
 lives in `web/assets/review.js` and is called by BOTH the Form Guide and
 Results — the Results artboard asks for exactly that ("same form as the Form
 Guide — reviewing and booking is one action"), and a smoke guard holds it to
 one caller.
+
+---
+
+## The model does not beat the price
+
+This is the largest finding in the rebuild and it is negative, so it is stated
+here rather than left in a module docstring. Walk-forward over 596 usable
+races (train: 327 before 2025-12-14, test: 269 from it, 3,321 test runners):
+
+**The de-vigged market is well calibrated.** All nine reliability bins fall
+inside the interval their outcomes support — none off. Brier 0.06788, log loss
+2.0983.
+
+| predicted band | n | model says | actual | 95% CI |
+|---|---|---|---|---|
+| 0–2% | 662 | 1.2% | 1.4% | [0.7%, 2.6%] |
+| 2–5% | 817 | 3.4% | 2.5% | [1.6%, 3.8%] |
+| 5–8% | 566 | 6.2% | 6.4% | [4.6%, 8.7%] |
+| 8–12% | 553 | 9.5% | 10.7% | [8.4%, 13.5%] |
+| 12–18% | 369 | 14.5% | 14.9% | [11.6%, 18.9%] |
+| 18–25% | 213 | 21.1% | 19.3% | [14.5%, 25.1%] |
+| 25–35% | 102 | 29.1% | 31.4% | [23.2%, 40.9%] |
+| 35–50% | 33 | 41.3% | 42.4% | [27.2%, 59.2%] · thin |
+| 50–100% | 6 | 66.6% | 66.7% | [30.0%, 90.3%] · thin |
+
+**There is nothing to bet on.** At the fitted blend weight of zero the model IS
+the market, so there are no value bets by construction. At every positive
+weight the answer is a loss, and it gets *worse* as more disagreement is
+required:
+
+| weight on the model | edge required | bets | strike | ROI |
+|---|---|---|---|---|
+| 0.05 | 10% | 555 | 1.3% | −42.2% |
+| 0.10 | 10% | 1,007 | 1.4% | −50.1% |
+| 0.10 | 25% | 411 | 1.0% | −59.4% |
+| 0.25 | 10% | 1,563 | 2.4% | −36.5% |
+| 1.00 | 10% | 1,952 | 3.4% | −30.2% |
+
+Demanding a bigger disagreement selects the horses the market is most
+confident the model is wrong about, and the market is right about them. That
+is the signature of no signal, not of a signal too small to exploit.
+
+**This is why `model/staking.py` is not in the package.** Kelly sizing on an
+edge that has not been shown to exist compounds the error rather than
+exploiting it, and "is there an edge" has to be answered before "how much".
+
+The finding is recomputed live at `/api/model/backtest` and rendered on Model
+Analysis, so a rerun that disagrees with the table above is visible rather
+than silent.
 
 ---
 
