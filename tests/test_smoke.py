@@ -462,3 +462,24 @@ def test_a_literal_path_is_declared_before_the_parameter_that_would_eat_it() -> 
                         f"which matches it — the literal is unreachable")
             declared.append((route.path, parts, methods))
     assert not problems, "\n".join(problems)
+
+
+def test_the_promotion_form_is_written_once() -> None:
+    """The Results artboard asks for "same form as the Form Guide — reviewing
+    and booking is one action". Two copies would give the two surfaces
+    different tag vocabularies and eventually different rules about what a
+    promotion means, which is the shape the old dashboard was in.
+    """
+    import re
+
+    assets = WEB_ASSETS
+    calls = {}
+    for path in sorted(assets.glob("*.js")):
+        src = path.read_text(encoding="utf-8")
+        # api.js declares the endpoint; review.js is the only caller.
+        hits = len(re.findall(r"\bapi\.createBlackbookEntry\(", src))
+        if hits:
+            calls[path.name] = hits
+    assert list(calls) == ["review.js"], (
+        "the blackbook promotion is called from more than one place: "
+        f"{sorted(calls)}")

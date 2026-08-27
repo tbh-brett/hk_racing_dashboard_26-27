@@ -12,6 +12,7 @@
 import { api, num, signed } from './api.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
+import { conditionLabel, loadTags, renderReview } from './review.js';
 
 const NAV = [
   ['Race Day', 'raceday.html'], ['Form Guide', 'form-guide.html'],
@@ -413,12 +414,6 @@ function runKey(horseNo, run) {
   return `${horseNo}:${run.race_date}:${run.race_no}`;
 }
 
-function condLabel(run) {
-  return [run.venue, run.course, run.distance ? `${run.distance}m` : null,
-          run.going, run.race_class ? `C${run.race_class}` : null]
-    .filter(Boolean).join(' ');
-}
-
 function finClass(run) {
   if (run.place === 1) return 'win';
   if (run.place !== null && run.place <= 3) return 'placed';
@@ -439,7 +434,7 @@ function runRow(runner, run, index) {
   const when = el('div', 'when');
   when.append(el('span', 'caret', open ? '▼' : '▶'));
   when.append(el('span', null, run.race_date));
-  when.append(el('span', 'cond', condLabel(run)));
+  when.append(el('span', 'cond', conditionLabel(run)));
   row.append(when);
 
   const st = el('div');
@@ -796,138 +791,32 @@ function showBlackbookNote(event, bb) {
   placePopover(event);
 }
 
-/* The ten booking reasons the Blackbook page filters on, plus whatever the
-   imported book actually uses — loaded once, so the picker offers the real
-   vocabulary rather than a hard-coded guess. */
-let TAG_OPTIONS = [];
-
-async function loadTags() {
-  try {
-    const body = await api.blackbookTags();
-    TAG_OPTIONS = body.tags.map((t) => t.tag).sort();
-  } catch { TAG_OPTIONS = []; }
-}
-
 function showNote(event, runner, run) {
-  const pop = $('popover');
-  const existing = noteFor(runner.horse_name, run);
-  const bb = state.guide?.blackbook?.[runner.horse_name];
-
-  const hd = el('div', 'hd');
-  hd.append(document.createTextNode('RUN NOTE'));
-  hd.append(el('span', 'meta', `${runner.horse_name} · ${run.race_date} R${run.race_no}`));
-  const close = el('button', 'close', '✕');
-  close.addEventListener('click', hidePopover);
-  hd.append(close);
-  pop.replaceChildren(hd);
-
-  if (existing) pop.append(el('div', 'body', existing.note));
-
-  const row = el('div', 'row');
-  const input = el('input');
-  input.value = existing?.note ?? '';
-  input.placeholder = 'note on this run';
-  row.append(input);
-  const save = el('button', 'act', 'SAVE');
-  const err = el('div', 'err');
-  save.addEventListener('click', async () => {
-    save.disabled = true;
-    try {
-      const saved = await api.saveNote({
-        horse_name: runner.horse_name, race_date: run.race_date,
-        race_no: run.race_no, note: input.value,
-      });
-      const list = (state.notes[runner.horse_name] ?? [])
-        .filter((n) => !(n.race_date === run.race_date && n.race_no === run.race_no));
+  // One form, one module — the Results page calls the same one. Its artboard
+  // asks for exactly that: "same form as the Form Guide — reviewing and
+  // booking is one action". See review.js.
+  renderReview($('popover'), {
+    horseName: runner.horse_name,
+    run,
+    existingNote: noteFor(runner.horse_name, run),
+    booked: state.guide?.blackbook?.[runner.horse_name],
+    onSaved: (saved) => {
+      const list = (state.notes[runner.horse_name] ?? []).filter(
+        (n) => !(n.race_date === run.race_date && n.race_no === run.race_no));
       state.notes[runner.horse_name] = [saved, ...list];
       hidePopover();
       render();
-    } catch (e) {
-      err.textContent = e.message;
-      save.disabled = false;
-    }
-  });
-  row.append(save);
-  pop.append(row);
-  pop.append(err);
-
-  // Design brief 06 Part 0: a note is a record, the book is a judgement. The
-  // promotion is one deliberate click, pre-filled — never automatic.
-  const sep = el('div', 'sep');
-  if (bb) {
-    const line = el('div', 'hint');
-    line.textContent = `■ ALREADY IN THE BLACKBOOK — ${bb.added_date}`
-      + ((bb.tags ?? []).length ? ` · ${bb.tags.join(' · ')}` : '');
-    sep.append(line);
-  } else {
-    const open = el('button', 'act', '+ ADD TO BLACKBOOK');
-    open.addEventListener('click', () => {
-      open.remove();
-      sep.append(promoteForm(runner, run, input));
-    });
-    sep.append(open);
-    sep.append(el('div', 'hint', 'a note is a record · the book is a judgement'));
-  }
-  pop.append(sep);
-  placePopover(event);
-  input.focus();
-}
-
-function promoteForm(runner, run, noteInput) {
-  const form = el('div');
-  form.append(el('div', 'cap', 'HORSE'));
-  form.append(el('div', 'val strong', runner.horse_name));
-  form.append(el('div', 'cap', 'SOURCE RUN'));
-  form.append(el('div', 'val', `${run.race_date} R${run.race_no} · ${condLabel(run)}`));
-  form.append(el('div', 'cap', 'REASON'));
-  const reason = el('textarea');
-  reason.rows = 3;
-  reason.value = noteInput.value;         // pre-filled — nothing to retype
-  form.append(reason);
-
-  const chosen = new Set();
-  const cap = el('div', 'cap', 'TAGS');
-  form.append(cap);
-  const tags = el('div', 'tags');
-  TAG_OPTIONS.forEach((t) => {
-    const b = el('button', 'tag', t);
-    b.setAttribute('aria-pressed', 'false');
-    b.addEventListener('click', () => {
-      if (chosen.has(t)) chosen.delete(t); else chosen.add(t);
-      b.setAttribute('aria-pressed', String(chosen.has(t)));
-      cap.textContent = `TAGS  ${chosen.size} SELECTED`;
-    });
-    tags.append(b);
-  });
-  form.append(tags);
-
-  const err = el('div', 'err');
-  const row = el('div', 'row');
-  const confirm = el('button', 'act', 'ADD TO BLACKBOOK');
-  confirm.addEventListener('click', async () => {
-    confirm.disabled = true;
-    try {
-      const entry = await api.createBlackbookEntry({
-        horse_name: runner.horse_name, reasoning: reason.value,
-        source_date: run.race_date, source_race_no: run.race_no,
-        tags: [...chosen],
-      });
+    },
+    onPromoted: (entry) => {
       state.guide.blackbook[runner.horse_name] = entry;
       hidePopover();
       render();
-    } catch (e) {
-      err.textContent = e.message;
-      confirm.disabled = false;
-    }
+    },
+    onClose: hidePopover,
   });
-  row.append(confirm);
-  const cancel = el('button', 'act ghost', 'CANCEL');
-  cancel.addEventListener('click', hidePopover);
-  row.append(cancel);
-  form.append(row);
-  form.append(err);
-  return form;
+  placePopover(event);
 }
+
 
 /* ── render ──────────────────────────────────────────────────────────────── */
 

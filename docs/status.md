@@ -115,8 +115,13 @@ so these follow an established pattern rather than starting fresh.
 - `derive/sectionals.py` — sectional decomposition
 - `model/fuse.py`, `model/staking.py`, `model/backtest.py`
 - `export/pdf.py` — the form guide PDF builder ports directly
-- Blackbook storage and the note → blackbook promotion flow
 - Deployment: Litestream is configured but never run
+
+Blackbook storage and the note → blackbook promotion flow ARE built. The form
+lives in `web/assets/review.js` and is called by BOTH the Form Guide and
+Results — the Results artboard asks for exactly that ("same form as the Form
+Guide — reviewing and booking is one action"), and a smoke guard holds it to
+one caller.
 
 ---
 

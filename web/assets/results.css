@@ -183,3 +183,58 @@
   font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--edge);
   letter-spacing: .06em; margin-top: 6px;
 }
+
+/* ── one runner, expanded ────────────────────────────────────────────────── */
+
+.res-row { cursor: pointer; }
+.res-row .noted { color: var(--book); margin-left: 5px; }
+
+/* Named `result-detail`, not `run-detail`: formguide.css already styles
+   `.run-detail` as a two-column flex block for the expanded past run, and a
+   page that ever loaded both sheets would get whichever won. */
+.result-detail {
+  border-bottom: 1px solid var(--line-2); background: var(--detail);
+  padding: 9px 14px 11px;
+}
+.sect-band { margin-bottom: 8px; }
+.sect-band .k {
+  display: block; font-family: var(--font-mono); font-size: var(--fs-xs);
+  letter-spacing: .1em; color: var(--page-dim); margin-bottom: 4px;
+}
+.sect { display: flex; gap: 4px; flex-wrap: wrap; }
+/* A time without a position is a clock reading; a position without a time is
+   a shape. They are drawn as one cell because they are one fact. */
+.sect .seg {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  min-width: 58px; padding: 3px 6px; border: 1px solid var(--line-2);
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+}
+.sect .seg .t { color: var(--text-2); }
+.sect .seg .p { color: var(--text-faint); font-size: var(--fs-xs); }
+
+.facts { display: flex; flex-wrap: wrap; gap: 6px 22px; }
+.fact { display: flex; align-items: baseline; gap: 7px;
+  font-family: var(--font-mono); font-size: var(--fs-sm); }
+.fact .k { font-size: var(--fs-xs); letter-spacing: .1em; color: var(--page-dim); }
+.fact .v { color: var(--text-2); }
+
+.run-stewards { margin-top: 8px; }
+.run-stewards .k {
+  display: block; font-family: var(--font-mono); font-size: var(--fs-xs);
+  letter-spacing: .1em; color: var(--page-dim); margin-bottom: 3px;
+}
+.run-stewards .text {
+  font-family: var(--font-mono); font-size: var(--fs-xs); line-height: 1.5;
+  color: var(--text-muted); max-width: 96ch;
+}
+
+.run-actions { display: flex; align-items: center; gap: 12px; margin-top: 9px; }
+.run-actions .act {
+  font-family: var(--font-mono); font-size: var(--fs-xs); cursor: pointer;
+  color: var(--book); border: 1px solid var(--book-ground);
+  background: var(--pop-act); padding: 3px 9px; letter-spacing: .06em;
+}
+.run-actions .act:hover { color: var(--text); }
+.run-actions .hint {
+  font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint);
+}

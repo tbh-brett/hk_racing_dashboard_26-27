@@ -20,6 +20,7 @@
 import { api, num } from './api.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
+import { loadTags, renderReview } from './review.js';
 
 const NAV = [
   ['Race Day', 'raceday.html'], ['Form Guide', 'form-guide.html'],
@@ -44,7 +45,10 @@ const COLS = [
   ['WIN SP', 'r'], ['PLC SP', 'r'], ['ET FIGURE', 'r'], ['POSITIONS', ''],
 ];
 
-const state = { meeting: null, result: null, loading: false };
+const state = {
+  meeting: null, result: null, loading: false,
+  open: new Set(), notes: {},
+};
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
 
@@ -121,6 +125,119 @@ function renderRaceLine() {
 
 /* ── the finishing order ─────────────────────────────────────────────────── */
 
+/* ── one runner, expanded ────────────────────────────────────────────────── */
+
+/** Sectionals with the position held at each, which is the pair that says
+ *  where a race was won. A time without a position is a clock reading; a
+ *  position without a time is a shape. */
+function sectionalBand(runner) {
+  const times = runner.section_times ?? [];
+  const positions = runner.running_positions ?? [];
+  if (!times.length && !positions.length) return null;
+  const band = el('div', 'sect-band');
+  band.append(el('span', 'k', 'SECTIONALS · POSITION AT EACH'));
+  const strip = el('div', 'sect');
+  const count = Math.max(times.length, positions.length);
+  for (let i = 0; i < count; i += 1) {
+    const cell = el('div', 'seg');
+    cell.append(el('span', 't',
+      times[i] === undefined ? DASH : num(times[i], 2)));
+    cell.append(el('span', 'p',
+      positions[i] === undefined ? DASH : `P${positions[i]}`));
+    strip.append(cell);
+  }
+  band.append(strip);
+  return band;
+}
+
+function factRow(label, value, title) {
+  const row = el('div', 'fact');
+  row.append(el('span', 'k', label));
+  const v = el('span', 'v', value ?? DASH);
+  if (title) v.title = title;
+  row.append(v);
+  return row;
+}
+
+function detailBlock(runner, stewardsFor, booked) {
+  const box = el('div', 'result-detail');
+  const band = sectionalBand(runner);
+  if (band) box.append(band);
+
+  const facts = el('div', 'facts');
+  facts.append(factRow('GEAR', runner.gear || null));
+  facts.append(factRow('DRAW', runner.draw ? String(runner.draw) : null));
+  facts.append(factRow('WEIGHT',
+    runner.actual_weight ? `${runner.actual_weight} lb` : null));
+  // Lane comes from the Comments on Running page, and only about a quarter of
+  // comments carry a descriptor at all — so it is absent, not zero, when HKJC
+  // did not say.
+  facts.append(factRow('LANE', (runner.lane_notes ?? []).join(' · ') || null,
+    'from HKJC Comments on Running — absent where none was published'));
+  facts.append(factRow('FIGURE', runner.figure_display || null));
+  facts.append(factRow('SARR', runner.sarr === null || runner.sarr === undefined
+    ? null : `${num(runner.sarr, 1)}${runner.sarr_rank ? ` · rank ${runner.sarr_rank}` : ''}`));
+  facts.append(factRow('TAGS', (runner.tags ?? []).join(' · ') || null));
+  box.append(facts);
+
+  if (stewardsFor.length) {
+    const stew = el('div', 'run-stewards');
+    stew.append(el('span', 'k', 'STEWARDS'));
+    stewardsFor.forEach((s) => stew.append(el('div', 'text', s.comment_text)));
+    box.append(stew);
+  }
+
+  const actions = el('div', 'run-actions');
+  const note = el('button', 'act',
+    booked ? '■ IN THE BLACKBOOK · NOTE THIS RUN' : 'RUN NOTE · ADD TO BLACKBOOK');
+  note.addEventListener('click', (e) => openReview(e, runner, booked));
+  actions.append(note);
+  actions.append(el('span', 'hint',
+    'same form as the Form Guide — reviewing and booking is one action'));
+  box.append(actions);
+  return box;
+}
+
+function hidePopover() {
+  $('popover').hidden = true;
+}
+
+function openReview(event, runner, booked) {
+  const race = state.result.race;
+  renderReview($('popover'), {
+    horseName: runner.horse_name,
+    run: {
+      race_date: race.race_date, race_no: race.race_no, venue: race.venue,
+      course: race.course, distance: race.distance, going: race.going,
+      race_class: race.race_class,
+    },
+    existingNote: (state.notes[runner.horse_name] ?? []).find(
+      (n) => n.race_date === race.race_date && n.race_no === race.race_no),
+    booked: booked ? { added_date: booked.added_date,
+                       tags: (booked.tags ?? '').split(',').filter(Boolean) }
+      : null,
+    onSaved: (saved) => {
+      const list = (state.notes[runner.horse_name] ?? []).filter(
+        (n) => !(n.race_date === saved.race_date && n.race_no === saved.race_no));
+      state.notes[runner.horse_name] = [saved, ...list];
+      hidePopover();
+      render();
+    },
+    onPromoted: () => {
+      hidePopover();
+      // Re-read rather than patching local state: the booked panel is a join,
+      // and a horse promoted now changes what that join returns.
+      loadRace();
+    },
+    onClose: hidePopover,
+  });
+  const pop = $('popover');
+  pop.hidden = false;
+  const r = event.currentTarget.getBoundingClientRect();
+  pop.style.left = `${Math.min(r.left, window.innerWidth - 356)}px`;
+  pop.style.top = `${Math.min(r.bottom + 4, window.innerHeight - 220)}px`;
+}
+
 function resultRow(runner, booked, backed) {
   const row = el('div', 'res-row');
   const placed = runner.place !== null
@@ -169,6 +286,14 @@ function resultRow(runner, booked, backed) {
     pos.title = `sectionals ${runner.section_times.map((t) => num(t, 2)).join(' · ')}`;
   }
   row.append(pos);
+  row.addEventListener('click', () => {
+    if (state.open.has(runner.horse_no)) state.open.delete(runner.horse_no);
+    else state.open.add(runner.horse_no);
+    render();
+  });
+  if (state.notes[runner.horse_name]?.length) {
+    horse.append(el('span', 'noted', '✎'));
+  }
   return row;
 }
 
@@ -206,8 +331,19 @@ function renderResult() {
     if (b.place === null || b.place === undefined) return -1;
     return a.place - b.place;
   });
-  host.replaceChildren(...order.map((x) =>
-    resultRow(x, booked.get(x.horse_name), backed.has(x.horse_name))));
+  const byHorse = new Map();
+  (r.stewards ?? []).forEach((s) => {
+    if (!byHorse.has(s.horse_no)) byHorse.set(s.horse_no, []);
+    byHorse.get(s.horse_no).push(s);
+  });
+  host.replaceChildren();
+  order.forEach((x) => {
+    host.append(resultRow(x, booked.get(x.horse_name), backed.has(x.horse_name)));
+    if (state.open.has(x.horse_no)) {
+      host.append(detailBlock(x, byHorse.get(x.horse_no) ?? [],
+                              booked.get(x.horse_name)));
+    }
+  });
 }
 
 /* ── panels ──────────────────────────────────────────────────────────────── */
@@ -396,7 +532,13 @@ async function loadRace() {
   if (!context.date || !context.race) return;
   state.loading = true;
   try {
-    state.result = await api.raceResult(context.date, context.race);
+      state.result = await api.raceResult(context.date, context.race);
+    // Notes need the names, so they follow rather than run alongside. The
+    // grid is already on screen by then — a slow lookup never delays it.
+    const names = state.result.race.runners.map((x) => x.horse_name);
+    render();
+    const notes = await api.notes(names).catch(() => ({ notes: {} }));
+    state.notes = notes.notes ?? {};
   } catch (e) {
     state.result = null;
     $('res-rows').replaceChildren(
@@ -417,6 +559,7 @@ async function loadMeeting() {
 async function onContext(_ctx, what) {
   if (what === 'date') {
     state.result = null;
+    state.open.clear();
     await loadMeeting();
   }
   await loadRace();
@@ -425,6 +568,7 @@ async function onContext(_ctx, what) {
 async function boot() {
   renderNav();
   installPalette();
+  await loadTags();
   context.onChange(onContext);
   await context.init();
   await loadMeeting();
