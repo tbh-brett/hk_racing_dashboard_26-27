@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trials</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/pages.css">
+<link rel="stylesheet" href="../assets/trials.css">
+</head>
+<body>
+
+<!-- Layer 1. Rendered by context.js and identical on every page; no page
+     writes into it. See design brief 08 §1. -->
+<div class="chrome-meeting"></div>
+
+<nav class="chrome-nav" id="nav"></nav>
+
+<div class="tr-strip">
+  <div class="tr-brand">
+    <span class="dot"></span>TRIALS
+    <span class="sub">ONE ENGINE, TWO SURFACES</span>
+  </div>
+  <div class="seg" id="view-toggle" role="group" aria-label="View"></div>
+  <div class="tr-sum" id="tr-sum"></div>
+</div>
+
+<div class="filter-bar">
+  <div class="search">
+    <span class="glyph">⌕</span>
+    <input id="search" placeholder="horse or comment text" aria-label="Search">
+    <button class="clear" id="clear-search" hidden>×</button>
+  </div>
+  <div class="active-filters" id="active-filters"></div>
+  <div class="match-count" id="match-count"></div>
+</div>
+
+<div class="chip-bar">
+  <div class="chip-label">QUALITY</div>
+  <div class="chips" id="band-chips"></div>
+  <div class="chip-label bordered">VENUE</div>
+  <div class="chips fixed" id="venue-chips"></div>
+</div>
+
+<section id="view-batches">
+  <div id="batches"></div>
+</section>
+
+<section id="view-standouts" hidden>
+  <div id="standouts"></div>
+</section>
+
+<section id="view-calibration" hidden>
+  <div class="analysis" id="calibration"></div>
+</section>
+
+<script type="module" src="../assets/trials.js"></script>
+</body>
+</html>

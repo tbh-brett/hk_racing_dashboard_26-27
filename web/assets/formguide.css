@@ -163,6 +163,28 @@
   background: var(--detail); font-family: var(--font-mono); font-size: var(--fs-xs);
 }
 .trial-band .empty { color: var(--text-faint); letter-spacing: .06em; }
+.trial-band .trial-line {
+  display: flex; align-items: baseline; gap: 8px; white-space: nowrap;
+  overflow: hidden;
+}
+.trial-band .trial-line .d { color: var(--text-2); }
+.trial-band .trial-line .v, .trial-band .trial-line .p,
+.trial-band .trial-line .m { color: var(--text-dim); }
+.trial-band .trial-line .c {
+  color: var(--text-muted); min-width: 0; overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The same five bands the Trials page uses, from the same rating. */
+.trial-band .q {
+  width: 16px; flex: none; text-align: center; font-weight: 600;
+}
+.trial-band .q-standout { color: var(--win); }
+.trial-band .q-positive { color: var(--book); }
+.trial-band .q-neutral  { color: var(--text-faint); }
+.trial-band .q-negative { color: var(--loss); }
+/* A trial the horse was not asked to win. Measured on the baseline, so it is
+   drawn as neither credit nor debit. */
+.trial-band .q-untested { color: var(--text-faint); }
 
 .h2h-band {
   display: flex; align-items: center; gap: 14px; padding: 5px 12px;

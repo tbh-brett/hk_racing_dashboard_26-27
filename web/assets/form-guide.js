@@ -58,7 +58,7 @@ const state = {
   date: null, race: 1, races: [], guide: null, pace: null,
   open: new Set(), openRuns: new Set(), focus: null,
   sort: null, sortDir: 1, fit: null, fitFor: null,
-  notes: {}, h2h: {}, quality: {}, popover: null,
+  notes: {}, h2h: {}, quality: {}, trials: {}, popover: null,
 };
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
@@ -346,12 +346,35 @@ function horseRow(runner) {
 
 /* ── expanded horse ──────────────────────────────────────────────────────── */
 
-function trialBand() {
+function trialBand(runner) {
   const band = el('div', 'trial-band');
-  // Trials are not ingested yet. The band keeps its height and says so, which
-  // is the artboard's own empty state — a collapsing band would change the
-  // page's rhythm from horse to horse.
-  band.append(el('div', 'empty', 'NO RECENT TRIAL'));
+  const found = state.trials[runner.horse_name];
+  // The band keeps its height when there is nothing to show — the artboard's
+  // own empty state. A collapsing band would change the page's rhythm from
+  // horse to horse.
+  if (!found || !found.length) {
+    band.append(el('div', 'empty', 'NO TRIAL BEFORE THIS RACE'));
+    return band;
+  }
+  // The same rating the Trials page shows, from the same function. A second
+  // rating written here would drift from that one within a season.
+  found.forEach((t) => {
+    const row = el('div', 'trial-line');
+    row.append(el('span', `q q-${t.quality_band.toLowerCase()}`, t.quality_mark));
+    row.append(el('span', 'd', t.trial_date));
+    row.append(el('span', 'v', `${t.venue} ${t.surface}`));
+    row.append(el('span', 'p',
+      t.place === null ? DASH : `${t.place}/${t.field_size}`));
+    if (t.margin !== null && t.margin !== undefined) {
+      row.append(el('span', 'm', `${num(t.margin, 1)}L`));
+    }
+    const txt = el('span', 'c', t.comment ?? '');
+    // The reasons, so a mark nobody can check is not a mark anyone acts on.
+    txt.title = `${t.quality_band}${t.quality_reasons.length
+      ? ` — ${t.quality_reasons.join('; ')}` : ''}`;
+    row.append(txt);
+    band.append(row);
+  });
   return band;
 }
 
@@ -635,7 +658,7 @@ function runDetail(runner, run) {
 
 function detailBlock(runner) {
   const box = el('div', 'horse-detail');
-  box.append(trialBand());
+  box.append(trialBand(runner));
   const h2h = h2hBand(runner);
   if (h2h) box.append(h2h);
 
@@ -1046,6 +1069,7 @@ async function loadRace() {
   state.open.clear();
   state.openRuns.clear();
   state.h2h = {};
+  state.trials = {};
   state.focus = null;
   state.fit = null;
   state.fitFor = null;
@@ -1067,15 +1091,19 @@ async function loadRace() {
   // Blackbook and notes are per-card and load after the grid is on screen, so
   // a slow lookup never delays the form itself.
   const names = state.guide.race.runners.map((r) => r.horse_name);
-  const [book, notes] = await Promise.all([
+  const [book, notes, trials] = await Promise.all([
     api.meetingBlackbook(state.date).catch(() => null),
     api.notes(names).catch(() => ({ notes: {} })),
+    // `before` the race being reviewed: a trial run after it was not available
+    // when it was run, and showing it would let hindsight into a form guide.
+    api.trialsForHorses(names, state.date).catch(() => ({ trials: {} })),
   ]);
   state.guide.blackbook = {};
   (book?.entries ?? [])
     .filter((e) => e.race_no === state.race)
     .forEach((e) => { state.guide.blackbook[e.horse_name] = e; });
   state.notes = notes.notes ?? {};
+  state.trials = trials.trials ?? {};
   render();
 }
 

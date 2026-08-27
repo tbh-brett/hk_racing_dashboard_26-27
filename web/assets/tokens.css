@@ -125,6 +125,14 @@
   --lk-hover:     #191e26;
   --lk-dim:       #6f7b8c;
   --lk-accent:    #93a4bb;
+  /* Trials band. Green-grey: the trial ground is not the racecourse, and the
+     page should not read as one. */
+  --tr-band:      #111714;
+  --tr-rule:      #202a25;
+  --tr-rule-2:    #1b231f;
+  --tr-hover:     #172018;
+  --tr-dim:       #6c8578;
+  --tr-accent:    #8fbfa4;
   --h2h-band:     #131218;   /* head-to-head band                          */
   --h2h-rule:     #2a2333;
   --h2h-dim:      #7a6470;

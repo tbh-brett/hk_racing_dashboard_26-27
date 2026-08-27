@@ -65,6 +65,13 @@ export const api = {
   lookupOutliers: (q, delta) => get(
     `/lookup/outliers?delta=${delta}${q ? `&${q}` : ''}`),
   lookupCorpus: () => get('/lookup/corpus'),
+  trials: (limit = 12, venue) => get(
+    `/trials?limit=${limit}` + (venue ? `&venue=${venue}` : '')),
+  trialStandouts: (days = 21) => get(`/trials/standouts?days=${days}`),
+  trialCalibration: () => get('/trials/calibration'),
+  trialsForHorses: (horses, before) => get(
+    `/trials/horses?horses=${encodeURIComponent(horses.join(','))}`
+    + (before ? `&before=${before}` : '')),
   blackbookSummary: (today) => get(
     `/blackbook/summary${today ? `?today=${today}` : ''}`),
   setBlackbookStatus: (id, status) => post(

@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from hkrd.query import (bet_analysis as ba_q, bets as bets_q, blackbook as bb_q,
                         formguide as fg_q, lookup as lookup_q,
-                        slices as slices_q,
+                        slices as slices_q, trials as trials_q,
                         market as market_q, model, race as race_q,
                         raceday as raceday_q)
 
@@ -414,6 +414,50 @@ def bets_for_horse(name: str, since: str | None = None) -> dict:
     return {"horse_name": name.upper(),
             "bets": bets_q.bets_for_horse(name, since=since)}
 
+
+
+# ── trials ───────────────────────────────────────────────────────────────────
+
+@app.get("/api/trials")
+def trials_feed(limit: int = 12, venue: str | None = None) -> dict:
+    """Recent trial batches, each runner rated by the same engine the Form
+    Guide's inline band uses."""
+    batches = trials_q.recent_batches(limit=limit, venue=venue)
+    return {"batches": batches, "count": len(batches)}
+
+
+@app.get("/api/trials/standouts")
+def trials_standouts(days: int = 21, limit: int = 40) -> dict:
+    """The live feed: the same rating every trial gets, filtered. Not a list
+    anyone maintains by hand."""
+    return trials_q.standouts(days=days, limit=limit)
+
+
+@app.get("/api/trials/calibration")
+def trials_calibration() -> dict:
+    """What each band actually went on to do at the races. The rating is only
+    worth showing if the bands separate, so the page prints this beside them."""
+    return trials_q.calibration()
+
+
+@app.get("/api/trials/batch/{date}/{trial_no}")
+def trials_batch(date: str, trial_no: int) -> dict:
+    body = trials_q.batch(date, trial_no)
+    if not body:
+        raise HTTPException(404, f"no trial {date} T{trial_no}")
+    return body
+
+
+@app.get("/api/trials/horses")
+def trials_for_horses(horses: str, before: str | None = None,
+                      limit: int = 2) -> dict:
+    """Each named horse's most recent trials — the Form Guide's inline band.
+
+    `before` keeps it honest on a past race: a trial run after the race being
+    reviewed was not available when the race was run.
+    """
+    names = [h.strip() for h in horses.split(",") if h.strip()]
+    return {"trials": trials_q.for_horses(names, before=before, limit=limit)}
 
 
 # ── market ───────────────────────────────────────────────────────────────────

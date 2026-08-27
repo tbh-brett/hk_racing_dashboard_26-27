@@ -7,6 +7,11 @@
    into the top two -- that leak is what made the top-left button change
    identity between pages in the previous build. */
 
+/* `hidden` has to beat a display rule, or a section a page hides stays on
+   screen: .filter-bar is display:flex, which outranks the UA sheet's
+   [hidden] { display: none }. */
+[hidden] { display: none !important; }
+
 .chrome-meeting {
   display: flex; align-items: stretch; height: 32px;
   background: var(--bg-deep); border-bottom: 1px solid var(--line);

@@ -13,13 +13,13 @@ measured against the real data, not estimated.
 |---|---|---|
 | `store/` | schema, connect, coerce, upsert | Complete. 20 tables, WAL enforced, FK on |
 | `ingest/` | `_client`, `results`, `corunning`, `odds`, `statement` | Parsers built and fixture-tested |
-| `derive/` | `probability`, `pace`, `et`, `tags` | Complete, all run over the full database |
+| `derive/` | `probability`, `pace`, `et`, `tags`, `trial_quality` | Complete, all run over the full database |
 | `model/` | `sarr` | Complete |
-| `query/` | `types`, `race`, `formguide`, `model`, `bets`, `bet_analysis`, `blackbook`, `lookup`, `slices`, `market` | Complete for the pages built so far |
-| `api/` | `app` | 53 routes |
-| `web/` | tokens, overlay, palette, context, Model Analysis, Form Guide, Race Day, Blackbook, Bets, Lookup | 6 of 8 pages |
+| `query/` | `types`, `race`, `formguide`, `model`, `bets`, `bet_analysis`, `blackbook`, `lookup`, `slices`, `market`, `trials` | Complete for the pages built so far |
+| `api/` | `app` | 58 routes |
+| `web/` | tokens, overlay, palette, context, Model Analysis, Form Guide, Race Day, Blackbook, Bets, Lookup, Trials | 7 of 8 pages |
 
-510 tests pass.
+532 tests pass.
 
 ### Data in the database
 
@@ -89,14 +89,15 @@ Everything below is populated from the real archive:
 
 Ported: `results`, `corunning`, `odds`, `statement`.
 Remaining: **`racecard`, `dividends`, `trials`, `vet`**.
+(The trials TABLE is populated from the legacy archive; the live scraper is not.)
 
 All are marked green in the extraction map (adapt, do not rewrite) and follow
 the pattern the three ported ones establish.
 
 ### Pages
 
-Built: Model Analysis, Form Guide, Race Day, Blackbook, Bets, Lookup.
-Remaining: **Results, Trials**.
+Built: Model Analysis, Form Guide, Race Day, Blackbook, Bets, Lookup, Trials.
+Remaining: **Results**.
 
 The Bets page carries the ledger, the analysis and the reconciliation. The
 pre-bet ticket builder the design also specifies is NOT built: it needs live
