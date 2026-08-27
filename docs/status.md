@@ -15,11 +15,11 @@ measured against the real data, not estimated.
 | `ingest/` | `_client`, `results`, `corunning`, `odds`, `statement` | Parsers built and fixture-tested |
 | `derive/` | `probability`, `pace`, `et`, `tags`, `trial_quality` | Complete, all run over the full database |
 | `model/` | `sarr` | Complete |
-| `query/` | `types`, `race`, `formguide`, `model`, `bets`, `bet_analysis`, `blackbook`, `lookup`, `slices`, `market`, `trials` | Complete for the pages built so far |
-| `api/` | `app` | 58 routes |
-| `web/` | tokens, overlay, palette, context, Model Analysis, Form Guide, Race Day, Blackbook, Bets, Lookup, Trials | 7 of 8 pages |
+| `query/` | `types`, `race`, `formguide`, `model`, `bets`, `bet_analysis`, `blackbook`, `lookup`, `slices`, `market`, `trials`, `results` | Complete for the pages built so far |
+| `api/` | `app` + `routes/` (5 routers) | 54 routes |
+| `web/` | tokens, overlay, palette, context, Model Analysis, Form Guide, Race Day, Blackbook, Bets, Lookup, Trials, Results | **8 of 8 pages** |
 
-532 tests pass.
+546 tests pass.
 
 ### Data in the database
 
@@ -96,12 +96,16 @@ the pattern the three ported ones establish.
 
 ### Pages
 
-Built: Model Analysis, Form Guide, Race Day, Blackbook, Bets, Lookup, Trials.
-Remaining: **Results**.
+All eight are built: Race Day, Form Guide, Lookup, Bets, Blackbook, Results,
+Trials, Model Analysis.
 
-The Bets page carries the ledger, the analysis and the reconciliation. The
-pre-bet ticket builder the design also specifies is NOT built: it needs live
-prices for an upcoming meeting, and no scraper here has met a live page.
+Two pieces of a page are deliberately absent, both for the same reason — they
+need live prices for an upcoming meeting, and no scraper here has met a live
+page:
+
+- the Bets page's pre-bet ticket builder (the ledger, analysis and
+  reconciliation ARE built);
+- Race Day's live odds refresh, which reads the archive instead.
 
 The token layer, shared overlay, row grammar and API client are all in place,
 so these follow an established pattern rather than starting fresh.

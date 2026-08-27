@@ -133,6 +133,14 @@
   --tr-hover:     #172018;
   --tr-dim:       #6c8578;
   --tr-accent:    #8fbfa4;
+  /* Results band. Deep blue-grey: the race is over and the page is a record,
+     so it sits quieter than Race Day's live card. */
+  --re-band:      #101419;
+  --re-rule:      #1f262f;
+  --re-rule-2:    #1a2028;
+  --re-hover:     #161c24;
+  --re-dim:       #6b7688;
+  --re-accent:    #7e9cc4;
   --h2h-band:     #131218;   /* head-to-head band                          */
   --h2h-rule:     #2a2333;
   --h2h-dim:      #7a6470;

@@ -65,6 +65,8 @@ export const api = {
   lookupOutliers: (q, delta) => get(
     `/lookup/outliers?delta=${delta}${q ? `&${q}` : ''}`),
   lookupCorpus: () => get('/lookup/corpus'),
+  meetingResults: (date) => get(`/results/${date}`),
+  raceResult: (date, no) => get(`/results/${date}/${no}`),
   trials: (limit = 12, venue) => get(
     `/trials?limit=${limit}` + (venue ? `&venue=${venue}` : '')),
   trialStandouts: (days = 21) => get(`/trials/standouts?days=${days}`),

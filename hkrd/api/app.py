@@ -11,15 +11,20 @@ from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from hkrd.query import (bet_analysis as ba_q, bets as bets_q, blackbook as bb_q,
-                        formguide as fg_q, lookup as lookup_q,
-                        slices as slices_q, trials as trials_q,
+from hkrd.api import routes
+from hkrd.query import (blackbook as bb_q, formguide as fg_q,
                         market as market_q, model, race as race_q,
                         raceday as raceday_q)
 
 WEB = Path(__file__).resolve().parent.parent.parent / "web"
 
 app = FastAPI(title="hkrd", version="0.1.0")
+
+# One router per page's domain. Order is not significant between routers, but
+# it is WITHIN blackbook's — see the note there.
+for _module in (routes.lookup, routes.blackbook, routes.bets, routes.results,
+                routes.trials):
+    app.include_router(_module.router)
 
 
 @app.on_event("startup")
@@ -186,93 +191,6 @@ def head_to_head(horse_a: str, horse_b: str, before: str | None = None) -> dict:
     return fg_q.head_to_head(horse_a, horse_b, before=before)
 
 
-# ── lookup ───────────────────────────────────────────────────────────────────
-
-# Declared once so the route signature and the query layer cannot drift apart.
-def _lookup_filters(request: Request) -> dict:
-    known = {k for group in lookup_q.FILTERS.values() for k in group}
-    out: dict = {}
-    for key, value in request.query_params.items():
-        if key not in known or value == "":
-            continue
-        out[key] = (value.lower() in ("1", "true", "yes")
-                    if key in ("placed", "won")
-                    else int(value) if value.lstrip("-").isdigit()
-                    else value)
-    return out
-
-
-@app.get("/api/lookup")
-def lookup(request: Request, source: str = "race", limit: int = 500,
-           order: str = "recent") -> dict:
-    """Filtered runs, as the same RunnerLine every other page renders."""
-    filters = _lookup_filters(request)
-    try:
-        runs = lookup_q.search_runs(source=source, limit=limit, order=order,
-                                    **filters)
-    except ValueError as exc:
-        raise HTTPException(422, str(exc)) from exc
-    return {"runs": [r.to_dict() for r in runs], "count": len(runs),
-            "filters": filters, "source": source,
-            "truncated": len(runs) >= limit}
-
-
-@app.get("/api/lookup/insight")
-def lookup_insight(request: Request, source: str = "race") -> dict:
-    """What the slice shows, with its own weakness beside it — n on every
-    figure, and the count that would look notable by chance."""
-    return lookup_q.insight(source=source, **_lookup_filters(request))
-
-
-@app.get("/api/lookup/filters")
-def lookup_filters() -> dict:
-    """The filter vocabulary, so the page renders it from one definition."""
-    return {"groups": lookup_q.FILTERS, "sources": list(lookup_q.SOURCES),
-            "dimensions": list(slices_q.DIMENSIONS),
-            "metrics": list(slices_q.METRICS),
-            "min_sample": slices_q.MIN_SAMPLE,
-            "outlier_delta": slices_q.OUTLIER_DELTA}
-
-
-@app.get("/api/lookup/breakdown")
-def lookup_breakdown(request: Request, dimension: str = "venue",
-                     min_sample: int = slices_q.MIN_SAMPLE) -> dict:
-    """One dimension against the filtered slice's own baseline, with an
-    interval on every row and the count expected to clear by chance."""
-    try:
-        return slices_q.breakdown(dimension, min_sample=min_sample,
-                                  **_lookup_filters(request))
-    except ValueError as exc:
-        raise HTTPException(422, str(exc)) from exc
-
-
-@app.get("/api/lookup/pivot")
-def lookup_pivot(request: Request, rows: str = "venue", cols: str = "draw",
-                 metric: str = "strike_rate",
-                 min_sample: int = slices_q.MIN_SAMPLE) -> dict:
-    """Two dimensions crossed, every cell carrying its n."""
-    try:
-        return slices_q.pivot(rows, cols, metric=metric, min_sample=min_sample,
-                              **_lookup_filters(request))
-    except ValueError as exc:
-        raise HTTPException(422, str(exc)) from exc
-
-
-@app.get("/api/lookup/outliers")
-def lookup_outliers(request: Request, delta: int = slices_q.OUTLIER_DELTA,
-                    limit: int = 200) -> dict:
-    """Runs whose finish most disagrees with the market's ranking. One run is
-    a story, not a signal — so repeats are counted and named."""
-    return slices_q.outliers(delta=delta, limit=limit,
-                             **_lookup_filters(request))
-
-
-@app.get("/api/lookup/corpus")
-def lookup_corpus() -> dict:
-    """What the database holds, for the line every page carries."""
-    return slices_q.corpus()
-
-
 # ── race day ─────────────────────────────────────────────────────────────────
 
 @app.get("/api/raceday/{date}/blackbook")
@@ -296,168 +214,6 @@ def meeting_card(date: str) -> dict:
     if not summary["races"]:
         raise HTTPException(404, f"no meeting on {date}")
     return summary
-
-
-# ── blackbook ────────────────────────────────────────────────────────────────
-
-@app.get("/api/blackbook")
-def blackbook_list(status: str | None = None, tag: str | None = None) -> dict:
-    """The list view. `runs_since` and `record since` are derived from the
-    runners table, not from what anyone remembered to log."""
-    entries = bb_q.list_entries(status=status, tag=tag)
-    return {"entries": entries, "count": len(entries),
-            "filters": {"status": status, "tag": tag}}
-
-
-@app.get("/api/blackbook/tags")
-def blackbook_tags() -> dict:
-    """Per booking reason: strike, place, ROI and A/E with a 95% interval.
-
-    A/E is the figure that says whether a tag beats the PRICE rather than
-    merely wins sometimes, so `cleared` counts the tags whose interval excludes
-    1.00 and `expected_by_chance` says how many would at 5%. Publishing both is
-    what stops a tag that looks like it is working from reading as one.
-    """
-    tags = bb_q.tag_performance()
-    scored = [t for t in tags if t["ae"] is not None]
-    cleared = [t["tag"] for t in scored
-               if t["ae_lo"] > 1.0 or t["ae_hi"] < 1.0]
-    return {"tags": tags, "scored": len(scored), "cleared": cleared,
-            "expected_by_chance": round(len(scored) * 0.05, 1)}
-
-
-@app.get("/api/blackbook/summary")
-def blackbook_summary(today: str | None = None) -> dict:
-    """How big the book is, and whether it resolves."""
-    return bb_q.book_summary(today=today)
-
-
-@app.post("/api/blackbook/{entry_id}/status")
-def set_blackbook_status(entry_id: str, body: dict = Body(...)) -> dict:
-    """Resolve an entry. One call, because a book that only grows is unusable."""
-    from hkrd.jobs import write_notes
-
-    try:
-        return write_notes.set_status(entry_id, body.get("status", ""))
-    except KeyError as exc:
-        raise HTTPException(404, f"no blackbook entry {exc.args[0]}") from exc
-    except ValueError as exc:
-        raise HTTPException(422, str(exc)) from exc
-
-
-@app.get("/api/blackbook/backed-vs-missed")
-def blackbook_backed_vs_missed(entry_id: str | None = None) -> dict:
-    """What was backed, what was not, and how each did.
-
-    Design brief 06 calls this "the single most important feature on the page":
-    without it only the hits are visible. It is a join over the bets ledger, so
-    nothing has to be logged by hand.
-    """
-    return bets_q.backed_and_missed(entry_id=entry_id)
-
-
-@app.get("/api/blackbook/declared/{date}")
-def blackbook_declared(date: str) -> dict:
-    """Booked horses declared across one meeting."""
-    rows = bb_q.declared_on(date)
-    return {"race_date": date, "entries": rows, "count": len(rows)}
-
-
-@app.get("/api/blackbook/{entry_id}")
-def blackbook_entry(entry_id: str) -> dict:
-    entry = bb_q.entry_detail(entry_id)
-    if entry is None:
-        raise HTTPException(404, f"no blackbook entry {entry_id}")
-    entry.update(bb_q.entry_bets(entry_id))
-    return entry
-
-
-# ── bets ─────────────────────────────────────────────────────────────────────
-
-@app.get("/api/bets")
-def bets_ledger(date: str | None = None, account: str | None = None,
-                limit: int = 500) -> dict:
-    rows = bets_q.ledger(date=date, account=account, limit=limit)
-    return {"bets": rows, "count": len(rows)}
-
-
-@app.get("/api/bets/summary")
-def bets_summary(account: str | None = None) -> dict:
-    return bets_q.summary(account=account)
-
-
-@app.get("/api/bets/analysis")
-def bets_analysis(account: str | None = None) -> dict:
-    """Everything the analysis section renders, in one read.
-
-    Every slice carries n and a 95% interval, because the design brief prints
-    the rule across the whole section: a 12-bet slice is not a finding.
-    """
-    return ba_q.analysis(account=account)
-
-
-@app.get("/api/bets/reconciliation")
-def bets_reconciliation(account: str | None = None) -> dict:
-    """Imported statement rows against logged bets. Nothing is silently
-    merged, so a block the two disagree on is named."""
-    return ba_q.reconciliation(account=account)
-
-
-@app.get("/api/bets/race/{date}/{race_no}")
-def bets_for_race(date: str, race_no: int) -> dict:
-    return {"race_date": date, "race_no": race_no,
-            "bets": bets_q.bets_for_race(date, race_no)}
-
-
-@app.get("/api/bets/horse/{name}")
-def bets_for_horse(name: str, since: str | None = None) -> dict:
-    return {"horse_name": name.upper(),
-            "bets": bets_q.bets_for_horse(name, since=since)}
-
-
-
-# ── trials ───────────────────────────────────────────────────────────────────
-
-@app.get("/api/trials")
-def trials_feed(limit: int = 12, venue: str | None = None) -> dict:
-    """Recent trial batches, each runner rated by the same engine the Form
-    Guide's inline band uses."""
-    batches = trials_q.recent_batches(limit=limit, venue=venue)
-    return {"batches": batches, "count": len(batches)}
-
-
-@app.get("/api/trials/standouts")
-def trials_standouts(days: int = 21, limit: int = 40) -> dict:
-    """The live feed: the same rating every trial gets, filtered. Not a list
-    anyone maintains by hand."""
-    return trials_q.standouts(days=days, limit=limit)
-
-
-@app.get("/api/trials/calibration")
-def trials_calibration() -> dict:
-    """What each band actually went on to do at the races. The rating is only
-    worth showing if the bands separate, so the page prints this beside them."""
-    return trials_q.calibration()
-
-
-@app.get("/api/trials/batch/{date}/{trial_no}")
-def trials_batch(date: str, trial_no: int) -> dict:
-    body = trials_q.batch(date, trial_no)
-    if not body:
-        raise HTTPException(404, f"no trial {date} T{trial_no}")
-    return body
-
-
-@app.get("/api/trials/horses")
-def trials_for_horses(horses: str, before: str | None = None,
-                      limit: int = 2) -> dict:
-    """Each named horse's most recent trials — the Form Guide's inline band.
-
-    `before` keeps it honest on a past race: a trial run after the race being
-    reviewed was not available when the race was run.
-    """
-    names = [h.strip() for h in horses.split(",") if h.strip()]
-    return {"trials": trials_q.for_horses(names, before=before, limit=limit)}
 
 
 # ── market ───────────────────────────────────────────────────────────────────

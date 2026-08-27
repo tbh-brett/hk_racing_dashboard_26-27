@@ -136,16 +136,28 @@ def bets_for_race(date: str, race_no: int, *,
                   conn: Connection | None = None) -> list[dict[str, Any]]:
     """Every bet touching one race, including the all-up legs that pass
     through it — an all-up has no race number of its own, so a bet on race 4
-    would otherwise vanish from race 4."""
+    would otherwise vanish from race 4.
+
+    One row per SELECTION in this race, carrying the horse it backed and how
+    that horse finished. The Results page renders the tickets with their picks
+    beside them, and re-joining for the names there would put the same join in
+    two places.
+    """
     own = conn is None
     conn = conn or get_conn()
     try:
         return _rows(conn, """
-            SELECT DISTINCT b.*, s.leg_no
+            SELECT b.*, s.leg_no, s.horse_no, s.is_banker,
+                   r.horse_name, r.place, r.win_odds,
+                   (SELECT count(DISTINCT l.race_no) FROM bet_selections l
+                     WHERE l.bet_id = b.bet_id) legs
             FROM bets b
             JOIN bet_selections s ON s.bet_id = b.bet_id
+            LEFT JOIN runners r ON r.race_date = b.race_date
+                               AND r.race_no = s.race_no
+                               AND r.horse_no = s.horse_no
             WHERE b.race_date = ? AND s.race_no = ?
-            ORDER BY b.placed_at""", (date, race_no))
+            ORDER BY b.placed_at, s.horse_no""", (date, race_no))
     finally:
         if own:
             conn.close()

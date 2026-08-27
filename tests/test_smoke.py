@@ -344,7 +344,7 @@ def test_page_stylesheets_do_not_share_a_top_level_class() -> None:
     """
     page_sheets = ["raceday.css", "formguide.css", "model.css",
                    "blackbook.css", "bets.css", "lookup.css",
-                   "trials.css"]
+                   "trials.css", "results.css"]
     seen: dict[str, list[str]] = {}
     for sheet in page_sheets:
         path = WEB_ASSETS / sheet
@@ -391,3 +391,74 @@ def test_no_rule_paints_text_on_its_own_colour() -> None:
         "these rules paint text on a ground of its own colour:\n"
         + "\n".join(offenders)
     )
+
+
+def test_every_route_module_is_included_in_the_app() -> None:
+    """A router nobody includes is a page of 404s that nothing catches.
+
+    app.py grew past the 600-line cap and was split by domain; the failure
+    mode a split introduces is a module that exists, imports cleanly, and is
+    never mounted.
+    """
+    from hkrd.api import routes
+    from hkrd.api.app import app
+
+    # This FastAPI version wraps an included router in an opaque object rather
+    # than copying its routes onto the app, so the app's own list does not
+    # contain them. The OpenAPI schema is the one place that always names every
+    # path the app will actually serve.
+    mounted = set(app.openapi()["paths"])
+
+    missing = []
+    for name in routes.__all__:
+        module = getattr(routes, name)
+        for route in module.router.routes:
+            if route.path not in mounted:
+                missing.append(f"{name}: {route.path}")
+    assert not missing, "declared but never mounted:\n" + "\n".join(missing)
+
+
+def test_a_literal_path_is_declared_before_the_parameter_that_would_eat_it() -> None:
+    """`/api/blackbook/{entry_id}` matches `/api/blackbook/tags`.
+
+    FastAPI resolves in declaration order, so a literal segment declared after
+    a path parameter that can match it is unreachable — `tags` gets looked up
+    as an entry id and 404s. This has to be a test rather than a comment,
+    because the breakage is silent at import time and only shows as one route
+    quietly answering for another.
+
+    Two paths can only collide when they have the SAME number of segments and
+    differ only where one holds a parameter: `/api/blackbook/{entry_id}/status`
+    cannot shadow `/api/blackbook/backed-vs-missed`, which is a segment
+    shorter.
+    """
+    import re
+
+    from hkrd.api import routes
+
+    param = re.compile(r"\A\{[^}]+\}\Z")
+
+    def shadows(pattern: list[str], literal: list[str]) -> bool:
+        """True when `pattern` would match a request for `literal`."""
+        if len(pattern) != len(literal):
+            return False
+        return all(param.fullmatch(a) or a == b
+                   for a, b in zip(pattern, literal))
+
+    problems = []
+    for name in routes.__all__:
+        declared: list[tuple[str, list[str], set[str]]] = []
+        for route in getattr(routes, name).router.routes:
+            parts = route.path.strip("/").split("/")
+            methods = set(route.methods or ())
+            for earlier, earlier_parts, earlier_methods in declared:
+                if not (methods & earlier_methods):
+                    continue          # different verbs never shadow
+                if any(param.fullmatch(x) for x in parts):
+                    continue          # only a literal path can be eaten
+                if shadows(earlier_parts, parts):
+                    problems.append(
+                        f"{name}: {route.path} is declared after {earlier}, "
+                        f"which matches it — the literal is unreachable")
+            declared.append((route.path, parts, methods))
+    assert not problems, "\n".join(problems)
