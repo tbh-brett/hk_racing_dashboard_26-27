@@ -11,7 +11,7 @@ from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from hkrd.api import routes
+from hkrd.api import auth, routes
 from hkrd.query import (blackbook as bb_q, formguide as fg_q,
                         market as market_q, model, race as race_q,
                         raceday as raceday_q)
@@ -19,6 +19,12 @@ from hkrd.query import (blackbook as bb_q, formguide as fg_q,
 WEB = Path(__file__).resolve().parent.parent.parent / "web"
 
 app = FastAPI(title="hkrd", version="0.1.0")
+
+# One shared password in front of everything. Configured at import so a deploy
+# that forgot its secret fails here rather than serving the betting ledger to
+# the internet — see api/auth for why this refuses to fail open.
+auth.configure()
+auth.install(app)
 
 # One router per page's domain. Order is not significant between routers, but
 # it is WITHIN blackbook's — see the note there.

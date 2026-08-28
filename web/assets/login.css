@@ -1,0 +1,33 @@
+/* The sign-in page. The only page that renders before a session exists, so it
+   loads nothing that needs one. */
+
+.login-page {
+  display: grid; place-items: center; min-height: 100vh; margin: 0;
+  background: var(--bg); color: var(--text);
+}
+.login {
+  display: flex; flex-direction: column; gap: 10px; width: 288px;
+  font-family: var(--font-mono);
+}
+.login .brand {
+  display: flex; align-items: center; gap: 8px; font-size: var(--fs-md);
+  font-weight: 600; letter-spacing: .14em; color: var(--alert);
+}
+.login .brand .dot { width: 9px; height: 9px; background: var(--alert); }
+.login input[type="password"] {
+  background: var(--bg-deep); border: 1px solid var(--line-2);
+  color: var(--text); font: inherit; font-size: var(--fs); padding: 7px 9px;
+}
+.login input[type="password"]:focus {
+  outline: 1px solid var(--edge); outline-offset: -1px;
+}
+.login button {
+  background: var(--text); color: var(--bg); border: 0; font: inherit;
+  font-size: var(--fs-sm); letter-spacing: .1em; padding: 7px; cursor: pointer;
+}
+.login button:hover { background: var(--text-2); }
+.login .err { color: var(--alert); font-size: var(--fs-xs); margin: 0; }
+.login .note {
+  color: var(--text-faint); font-size: var(--fs-xs); line-height: 1.5;
+  margin: 0;
+}
