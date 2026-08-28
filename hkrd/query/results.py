@@ -22,13 +22,14 @@ from __future__ import annotations
 
 from typing import Any
 
+from hkrd.derive import sectionals as sx
 from hkrd.query import bets as bets_q
 from hkrd.query import formguide as fg_q
 from hkrd.query.race import get_race
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["meeting_results", "race_result", "dividends", "stewards",
-           "race_money"]
+           "race_money", "race_sectionals"]
 
 
 def meeting_results(date: str, *, conn: Connection | None = None
@@ -220,6 +221,7 @@ def race_result(date: str, race_no: int, *, conn: Connection | None = None
                      "backfilled silently."),
         }
         body["booked"] = _booked_that_ran(conn, date, race_no)
+        body["sectionals"] = race_sectionals(date, race_no, conn=conn)
         winner = next((r for r in race.runners if r.place == 1), None)
         body["winning_time"] = winner.finish_time if winner else None
         body["winning_time_display"] = (
@@ -251,3 +253,42 @@ def _booked_that_ran(conn: Connection, date: str, race_no: int
         JOIN runners r ON r.horse_name = b.horse_name
         WHERE r.race_date = ? AND r.race_no = ? AND r.race_date >= b.added_date
         ORDER BY r.place IS NULL, r.place""", (date, race_no))]
+
+
+def race_sectionals(date: str, race_no: int, *,
+                    conn: Connection | None = None) -> dict[str, Any]:
+    """Where the race was won, section by section, keyed by horse number.
+
+    Keyed rather than listed because the page joins it onto the runner rows it
+    already has — returning a second ordered list would give the page two
+    orderings of the same field to keep in step.
+
+    A race whose distance has no published section layout comes back empty
+    with the reason, rather than raising: an unusual trip is not a reason for
+    the whole result to fail to load.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        race = conn.execute(
+            "SELECT distance FROM races WHERE race_date = ? AND race_no = ?",
+            (date, race_no)).fetchone()
+        if not race or race["distance"] is None:
+            return {"by_horse": {}, "unavailable": "no distance recorded"}
+        runners = [dict(r) for r in conn.execute(
+            "SELECT race_date, race_no, horse_no, horse_name, section_times, "
+            "running_positions FROM runners "
+            "WHERE race_date = ? AND race_no = ?", (date, race_no))]
+        try:
+            rows = sx.race_sections(runners, race["distance"])
+        except sx.SectionError as exc:
+            return {"by_horse": {}, "unavailable": str(exc)}
+        return {
+            "by_horse": {str(r["horse_no"]): r for r in rows},
+            "distance": race["distance"],
+            "notable_seconds": sx.NOTABLE_SECONDS,
+            "unavailable": None if rows else "no sectionals recorded",
+        }
+    finally:
+        if own:
+            conn.close()

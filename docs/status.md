@@ -13,13 +13,13 @@ measured against the real data, not estimated.
 |---|---|---|
 | `store/` | schema, connect, coerce, upsert | Complete. 21 tables, WAL enforced, FK on |
 | `ingest/` | `_client`, `results`, `corunning`, `odds`, `statement`, `racecard`, `dividends`, `trials`, `vet` | Parsers built and fixture-tested |
-| `derive/` | `probability`, `pace`, `et`, `tags`, `trial_quality` | Complete, all run over the full database |
+| `derive/` | `probability`, `pace`, `et`, `tags`, `trial_quality`, `sectionals` | Complete, all run over the full database |
 | `model/` | `sarr`, `blend`, `backtest` | Complete |
 | `query/` | `types`, `race`, `formguide`, `model`, `bets`, `bet_analysis`, `blackbook`, `lookup`, `slices`, `market`, `trials`, `results` | Complete for the pages built so far |
 | `api/` | `app` + `routes/` (5 routers) | 55 routes |
 | `web/` | tokens, overlay, palette, context, Model Analysis, Form Guide, Race Day, Blackbook, Bets, Lookup, Trials, Results | **8 of 8 pages** |
 
-616 tests pass.
+635 tests pass.
 
 ### Data in the database
 
@@ -124,9 +124,10 @@ so these follow an established pattern rather than starting fresh.
 
 ### Not started
 
-- `derive/sectionals.py` — sectional decomposition
-- `export/pdf.py` — the form guide PDF builder ports directly
 - Deployment: Litestream is configured but never run
+
+`derive/sectionals.py` is built. `export/pdf.py` is **dropped** — the owner
+confirmed the form-guide PDF is no longer wanted.
 
 `model/fuse.py` is built, under the name `model/blend.py`. `model/backtest.py`
 is built. **`model/staking.py` is deliberately NOT built** — see below.

@@ -129,24 +129,62 @@ function renderRaceLine() {
 
 /** Sectionals with the position held at each, which is the pair that says
  *  where a race was won. A time without a position is a clock reading; a
- *  position without a time is a shape. */
+ *  position without a time is a shape.
+ *
+ *  Where derive/sectionals has decomposed the race, each cell also carries how
+ *  the section compared to the field and how many places changed hands over
+ *  it — the two together, because a fastest closing section from last that
+ *  gained nothing is not a run at the race, and the rank alone implies it was.
+ */
 function sectionalBand(runner) {
+  const decomposed = state.result?.sectionals?.by_horse?.[String(runner.horse_no)];
   const times = runner.section_times ?? [];
   const positions = runner.running_positions ?? [];
   if (!times.length && !positions.length) return null;
+
   const band = el('div', 'sect-band');
-  band.append(el('span', 'k', 'SECTIONALS · POSITION AT EACH'));
+  const cap = el('span', 'k');
+  cap.append(document.createTextNode('SECTIONALS · POSITION AT EACH'));
+  if (decomposed) {
+    cap.append(el('span', 'sub',
+      ` · RANK IN FIELD · PLACES GAINED · ${DASH}0.25s/400m OR BETTER IS MARKED`));
+  }
+  band.append(cap);
+
   const strip = el('div', 'sect');
-  const count = Math.max(times.length, positions.length);
+  const count = Math.max(times.length, positions.length,
+    decomposed?.sections?.length ?? 0);
   for (let i = 0; i < count; i += 1) {
-    const cell = el('div', 'seg');
+    const s = decomposed?.sections?.[i];
+    const cell = el('div', `seg${s?.notable ? ' notable' : ''}`);
     cell.append(el('span', 't',
       times[i] === undefined ? DASH : num(times[i], 2)));
     cell.append(el('span', 'p',
       positions[i] === undefined ? DASH : `P${positions[i]}`));
+    if (s) {
+      const meta = el('span', 'm');
+      meta.append(el('span', 'rk', s.rank === null ? DASH : `#${s.rank}`));
+      // No places on the opening section: every horse starts level, so there
+      // is no earlier position to have gained on.
+      if (s.places_gained !== null && s.places_gained !== undefined) {
+        meta.append(el('span',
+          s.places_gained > 0 ? 'up' : s.places_gained < 0 ? 'down' : null,
+          `${s.places_gained > 0 ? '+' : ''}${s.places_gained}`));
+      }
+      cell.append(meta);
+      cell.title = `${s.length_m}m in ${num(s.seconds, 2)}s — `
+        + `${num(s.per_400, 2)}s per 400m, `
+        + `${s.dev === null ? 'no field median' : `${s.dev > 0 ? '+' : ''}`
+          + `${num(s.dev, 2)}s vs the field`}`
+        + `, rank ${s.rank ?? DASH} of the field`;
+    }
     strip.append(cell);
   }
   band.append(strip);
+
+  if (decomposed?.read) {
+    band.append(el('div', 'sect-read', decomposed.read));
+  }
   return band;
 }
 

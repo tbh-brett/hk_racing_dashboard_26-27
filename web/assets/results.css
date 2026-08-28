@@ -238,3 +238,21 @@
 .run-actions .hint {
   font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint);
 }
+
+/* A section the runner beat the field's median over by 0.25 s/400m or more.
+   Measured: below that the band stops separating from the field. */
+.sect .seg.notable { border-color: var(--page-accent); }
+.sect .seg .m {
+  display: flex; gap: 5px; align-items: baseline;
+  font-size: var(--fs-xs); color: var(--text-faint);
+}
+.sect .seg .m .rk { color: var(--text-dim); }
+.sect .seg .m .up { color: var(--win); }
+.sect .seg .m .down { color: var(--loss-dim); }
+.sect-band .k .sub { color: var(--text-faint); letter-spacing: .06em; }
+/* The one-line read of the run. The pairing of time and places is the point,
+   so it is a sentence rather than another number. */
+.sect-read {
+  margin-top: 5px; font-family: var(--font-mono); font-size: var(--fs-xs);
+  color: var(--page-accent); letter-spacing: .02em;
+}
