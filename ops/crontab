@@ -1,0 +1,44 @@
+# The schedule, in Hong Kong time (the container sets TZ=Asia/Hong_Kong, so a
+# line here means what it reads as).
+#
+# WHY NOT A RACE CALENDAR. Racing is roughly Wednesday evening at Happy Valley
+# and Saturday or Sunday afternoon at Sha Tin, but that moves for typhoons,
+# public holidays and international meetings — several times a season, and
+# silently. Encoding it here would put the calendar in two places and let them
+# drift. So the schedule is dumb and the job is smart: `nightly` reads the
+# database, works out what is outstanding, and asks HKJC only about the dates
+# it cannot already answer. A quiet night is a handful of requests and no
+# writes; it does not even run the derive pass.
+#
+# Five runs a day, each one covering a different way the data goes stale:
+#
+#   07:00  dividends and vet records published overnight, and tomorrow's card
+#   13:00  a card published during the day, before an evening meeting
+#   19:00  after a Sha Tin afternoon meeting
+#   22:45  after the early Happy Valley races, so the page is current while
+#          the meeting is still on
+#   23:45  after the last race anywhere
+#
+# --db is passed explicitly even though HKRD_DB is set. If the environment were
+# ever lost, the scrape would write to ./hkrd.db inside the container, every
+# count would look correct, and the dashboard would read a different file that
+# never changed. That failure is worth guarding twice.
+
+0  7  * * *   python -m hkrd.jobs.nightly --db /data/hkrd.db
+0  13 * * *   python -m hkrd.jobs.nightly --db /data/hkrd.db
+0  19 * * *   python -m hkrd.jobs.nightly --db /data/hkrd.db
+45 22 * * *   python -m hkrd.jobs.nightly --db /data/hkrd.db
+45 23 * * *   python -m hkrd.jobs.nightly --db /data/hkrd.db
+
+# Barrier trials. A separate line because they are a different source on a
+# different schedule, and folding them into `nightly` would mean a failed
+# race-day scrape takes the trials down with it.
+#
+# No date and no weekday pattern. Measured over the 2025-26 archive, trials
+# fall on Tue, Thu and Fri equally (26.4% of 159 days each), Mon 16.4%, and
+# Sat and Wed a handful of times — "Tuesday and Thursday" would miss 47% of
+# them silently. HKJC publishes the list of trial days on the page itself, so
+# the job reads it and fetches what the database is missing. Trial results
+# appear late morning; noon and evening cover a late publication.
+0  12 * * *   python -m hkrd.jobs.scrape_trials --db /data/hkrd.db
+0  20 * * *   python -m hkrd.jobs.scrape_trials --db /data/hkrd.db

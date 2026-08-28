@@ -464,6 +464,37 @@ def test_a_literal_path_is_declared_before_the_parameter_that_would_eat_it() -> 
     assert not problems, "\n".join(problems)
 
 
+def test_no_two_routes_claim_the_same_path_and_method() -> None:
+    """FastAPI answers with the FIRST route registered for a path.
+
+    A second `@app.get("/api/status")` does not raise, does not warn where
+    anyone reads it, and does not 500. It simply never runs, and the endpoint
+    someone believes they added quietly returns the other one's payload — the
+    exact shape of failure this rebuild exists to remove. It happened once
+    already: a deployment status endpoint was added beside the model's, and
+    the model's was the one that had been there first.
+
+    This walks the whole application, mounts and routers included, rather than
+    the router modules, because the collision that occurred was between a
+    router and app.py.
+    """
+    from collections import Counter
+
+    from hkrd.api.app import app
+
+    seen: Counter[tuple[str, str]] = Counter()
+    for route in app.routes:
+        for method in getattr(route, "methods", None) or ():
+            if method in ("HEAD", "OPTIONS"):
+                continue
+            seen[(method, getattr(route, "path", ""))] += 1
+
+    duplicates = [f"{m} {path} declared {n} times"
+                  for (m, path), n in sorted(seen.items()) if n > 1]
+    assert not duplicates, (
+        "only the first declaration answers:\n" + "\n".join(duplicates))
+
+
 def test_the_promotion_form_is_written_once() -> None:
     """The Results artboard asks for "same form as the Form Guide — reviewing
     and booking is one action". Two copies would give the two surfaces

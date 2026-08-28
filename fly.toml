@@ -1,0 +1,58 @@
+# Fly.io. One machine, one volume, one SQLite file.
+#
+# WHY ONE MACHINE. A Fly volume attaches to exactly one machine, and the
+# database is a file on it. A second machine would either have no data or a
+# second copy of it diverging from the first. Litestream is what makes one
+# machine safe: the volume is not the only copy, object storage is, and a lost
+# machine is a restore rather than a loss.
+#
+# The trade is honest — a deploy is a few seconds of downtime for one user on
+# a dashboard that is read between races. Queries measure 0.000s against local
+# SQLite where a hosted database would put a network round-trip in front of
+# every one of them, and there are hundreds per page.
+
+app = "hkrd"
+primary_region = "hkg"          # the data, the races and the reader are all
+                                # in Hong Kong; anywhere else adds latency to
+                                # every request for no benefit
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  HKRD_DB = "/data/hkrd.db"
+  HKRD_HOST = "0.0.0.0"
+  HKRD_PORT = "8080"
+  TZ = "Asia/Hong_Kong"
+
+[mounts]
+  source = "hkrd_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+
+  # NOT auto-stopped. A stopped machine runs no cron, so the meeting that
+  # finished at 23:00 is never scraped and the dashboard is a week stale by
+  # Sunday — with nothing on screen to say why. This is the one setting where
+  # Fly's default is wrong for this app.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    # Liveness only: can the process read its own database. Data freshness is
+    # deliberately NOT checked here — a machine serving correctly through a
+    # quiet racing week must not be restarted for it. See query/health.
+    grace_period = "20s"
+    interval = "30s"
+    timeout = "5s"
+    method = "GET"
+    path = "/api/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"                # numpy, scipy and pandas are resident, and
+                                # the ET rebuild holds a season in memory.
+                                # 512mb OOMs during derive.

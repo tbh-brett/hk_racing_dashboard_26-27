@@ -99,15 +99,47 @@ requirements, so the frontend stays real HTML. Queries measured 0.000s against S
 this data versus 1.09s for a full-table read — local SQLite keeps that, where a hosted
 database would add a network round-trip to every one of them.
 
-## Setup
+## Hosting it
+
+`docs/deploy.md` is the runbook — first deploy, restoring from backup, and what
+to do when a scrape fails. The short version of what you sign up for:
+
+| | Why | Cost |
+|---|---|---|
+| **Fly.io** | Runs the container and holds the volume the database sits on. | ~US$5–7/mo |
+| **S3-compatible object storage** (Cloudflare R2, Backblaze B2, or Fly's Tigris) | Litestream streams the SQLite WAL here, so the machine is not the only copy. | free at 33 MB |
+| a domain | Optional. `hkrd.fly.dev` already works and is HTTPS. | ~US$12/yr |
+
+**No database service.** The whole thing is a 33 MB file with 342,065 rows, and
+a targeted query on it measures 0.000s. Supabase or Neon would put a network
+round-trip in front of each of the hundreds of queries a page makes, in
+exchange for nothing this workload needs.
+
+**Not serverless.** Vercel, Netlify and Lambda have no persistent writable
+filesystem, and SQLite is a file.
 
 ```bash
-pip install -e ".[dev]"
-cp .env.example .env
-python -m pytest tests/ -q
-uvicorn hkrd.api.app:app --reload      # once Phase 3 lands
+fly secrets set HKRD_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
+fly deploy
 ```
 
-## Status
+The dashboard serves the complete betting ledger and the blackbook, so it
+refuses to start without `HKRD_PASSWORD` — a deploy that forgot its secret must
+fail rather than publish them. `HKRD_ALLOW_NO_AUTH=1` is the explicit opt-out
+for a local instance, and the test suite sets it.
 
-Phase 0.1 — scaffold. No logic yet.
+## What runs on its own
+
+`ops/crontab`, in Hong Kong time: `jobs.nightly` five times a day and
+`jobs.scrape_trials` twice. Neither holds a race calendar. `nightly` reads the
+database, works out which meetings are missing results or dividends, and asks
+HKJC only about the dates it cannot already answer — a night with nothing
+outstanding is a handful of requests and no writes. `scrape_trials` reads
+HKJC's own list of trial days, because measured over the 2025-26 archive they
+fall on Tue, Thu and Fri equally (26.4% of 159 days each), Mon 16.4%, and Sat
+and Wed a handful of times: a Tuesday/Thursday cron would miss 47% of them
+silently.
+
+Whether that worked is on the page, not in a log file. `/api/ops/status`
+carries `scrape_state` — `ok`, `failed`, `running` or `never` — because a
+dashboard serving last week looks exactly like one serving today.

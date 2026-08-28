@@ -337,6 +337,28 @@ CREATE TABLE IF NOT EXISTS runner_tags (
   PRIMARY KEY (race_date, race_no, horse_no, tag)
 );
 
+-- ── operations ───────────────────────────────────────────────────────────────
+
+-- What the scheduled jobs did, and when. Not a log file: on a deployed box the
+-- question "is the data stale, or did Wednesday's scrape fail?" has to be
+-- answerable from the dashboard itself, by the person who owns it, without a
+-- terminal. The health endpoint reads this table and the last row is the
+-- answer.
+--
+-- Kept deliberately small. It records the OUTCOME of a run, not its output —
+-- the counts live in the tables the run wrote, and duplicating them here would
+-- create the second copy of a number this package exists to avoid.
+CREATE TABLE IF NOT EXISTS job_runs (
+  job         TEXT    NOT NULL,          -- nightly | scrape_meeting | derive_all
+  started_at  TEXT    NOT NULL,          -- ISO-8601 UTC
+  finished_at TEXT,                      -- NULL while running, or if killed
+  ok          INTEGER,                   -- 1 | 0 | NULL if it never finished
+  detail      TEXT,                      -- one line, the same the CLI prints
+  PRIMARY KEY (job, started_at)
+);
+
+CREATE INDEX IF NOT EXISTS ix_job_runs_recent ON job_runs(job, started_at DESC);
+
 -- ── indexes ──────────────────────────────────────────────────────────────────
 -- History is looked up by horse across dates constantly (form guide, lookup,
 -- horse page); the meeting index serves race day.

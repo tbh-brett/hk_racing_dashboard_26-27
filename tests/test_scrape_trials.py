@@ -96,3 +96,64 @@ def test_the_report_counts_what_carries_a_distance(tmp_path):
     report = scrape_trials.scrape("2026-08-21", db=tmp_path / "t.db",
                                   session=_Session())
     assert report.with_distance == report.runners
+
+
+# ── which days to fetch ──────────────────────────────────────────────────────
+#
+# Measured over the 2025-26 archive (159 trial days): Tue, Thu and Fri 26.4%
+# each, Mon 16.4%, Sat 3.1%, Wed 1.3%. A crontab guessing Tuesday and Thursday
+# would miss 47% of trial days and say nothing. HKJC publishes the list, so the
+# job asks instead of guessing.
+
+def test_the_day_list_is_read_from_the_page(tmp_path):
+    from hkrd.ingest import trials as ingest
+    html = ('<select id="selectId">'
+            '<option value="">Select date</option>'
+            '<option value="21/08/2026">21/08/2026</option>'
+            '<option value="18/08/2026">18/08/2026</option></select>')
+    assert ingest.parse_day_list(html) == ["2026-08-21", "2026-08-18"]
+
+
+def test_a_missing_selector_raises_rather_than_returning_nothing():
+    """Otherwise the scheduled scrape stops finding trials forever and the
+    only symptom is an archive that quietly stops growing."""
+    from hkrd.ingest import trials as ingest
+    with pytest.raises(ingest.TrialsError):
+        ingest.parse_day_list("<html><body>no selector here</body></html>")
+
+
+def test_a_selector_with_no_parseable_dates_raises():
+    from hkrd.ingest import trials as ingest
+    with pytest.raises(ingest.TrialsError):
+        ingest.parse_day_list(
+            '<select id="selectId"><option value="Aug 21">x</option></select>')
+
+
+def test_only_the_days_the_database_lacks_are_fetched(tmp_path):
+    db = tmp_path / "t.db"
+    scrape_trials.scrape("2026-08-21", db=db, session=_Session())
+
+    listed = ["2026-08-25", "2026-08-21", "2026-08-18"]
+    assert scrape_trials.outstanding(listed, db=db) == ["2026-08-18",
+                                                        "2026-08-25"]
+
+
+def test_catch_up_takes_the_most_recent_and_runs_them_oldest_first(tmp_path):
+    """Oldest first so a run cut short leaves the gap at the recent end, where
+    the next run will find it, rather than a hole in the middle."""
+    listed = [f"2026-08-{d:02d}" for d in (25, 21, 18, 14, 11, 7, 4)]
+    got = scrape_trials.outstanding(listed, db=tmp_path / "empty.db", limit=3)
+    assert got == ["2026-08-18", "2026-08-21", "2026-08-25"]
+
+
+def test_a_day_hkjc_does_not_publish_is_not_a_failure(tmp_path):
+    """Asked by hand for a known trial day, an empty result is a fault. Asked
+    every morning by cron, it is most mornings."""
+    class Missing:
+        def get(self, *a, **k):
+            return _Resp(404, "")
+
+    report = scrape_trials.scrape("2026-08-22", db=tmp_path / "t.db",
+                                  session=Missing())
+    assert report.ok and report.no_such_day and report.batches == 0
+    assert "none published" in report.render()

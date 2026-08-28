@@ -1,6 +1,15 @@
-"""Scrape one day of barrier trials and store it.
+"""Scrape barrier trials and store them.
 
-    python -m hkrd.jobs.scrape_trials --date 2026-08-21
+    python -m hkrd.jobs.scrape_trials --date 2026-08-21   # one day
+    python -m hkrd.jobs.scrape_trials                     # whatever is new
+
+With no date it asks HKJC which trial days exist and fetches the recent ones
+the database does not have. That question has an answer at source — the page
+carries its own list of dates — and it is the only correct one: measured over
+the 2025-26 archive, trials fall on Tue, Thu and Fri equally (26.4% of 159
+days each), Mon 16.4%, and Sat and Wed a handful of times. A crontab that
+guessed Tuesday and Thursday from habit would miss 47% of them, and miss them
+silently.
 
 Separate from `scrape_meeting` because trials are held on their own days, at
 their own venues, and a trial day is not a meeting. Folding them into the
@@ -15,6 +24,7 @@ than in the source.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -23,7 +33,7 @@ from hkrd.ingest._client import FetchError, NotFound
 from hkrd.store import upsert
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
-__all__ = ["scrape", "TrialScrapeReport"]
+__all__ = ["scrape", "catch_up", "TrialScrapeReport"]
 
 
 @dataclass
@@ -35,12 +45,19 @@ class TrialScrapeReport:
     runners: int = 0
     with_distance: int = 0
     errors: list[str] = field(default_factory=list)
+    # HKJC answering "there is no trial page for that date" is an answer, not
+    # a failure. It only became worth distinguishing when this went on a
+    # schedule: asked by hand for a known trial day, an empty result is a
+    # fault; asked every morning, it is most mornings.
+    no_such_day: bool = False
 
     @property
     def ok(self) -> bool:
-        return not self.errors and self.batches > 0
+        return not self.errors
 
     def render(self) -> str:
+        if self.no_such_day:
+            return f"  trial day          {self.date}  — none published"
         lines = [f"  trial day          {self.date}",
                  f"  batches            {self.batches:>6}",
                  f"  runners            {self.runners:>6}",
@@ -58,7 +75,7 @@ def scrape(date: str, *, db: Path | None = None,
     try:
         batches = trials_ingest.fetch_day(date, session=session)
     except NotFound:
-        report.errors.append(f"no trial page for {date}")
+        report.no_such_day = True
         return report
     except (FetchError, trials_ingest.TrialsError) as exc:
         report.errors.append(f"trials: {exc}")
@@ -103,14 +120,64 @@ def scrape(date: str, *, db: Path | None = None,
     return report
 
 
+def outstanding(days: Sequence[str], *, db: Path | None = None,
+                limit: int = 6) -> list[str]:
+    """Of the days HKJC lists, the recent ones not already in the database.
+
+    Oldest first, so a run that is cut short has filled the gap from the far
+    end rather than leaving a hole in the middle of the archive.
+    """
+    conn = get_conn(db if db is not None else db_path())
+    try:
+        init_db(conn)
+        have = {r[0] for r in conn.execute(
+            "SELECT DISTINCT trial_date FROM trials")}
+    finally:
+        conn.close()
+    missing = [d for d in days if d not in have]
+    # `days` arrives newest first; take the most recent few, then run them in
+    # order. The limit is a guard against a first run against an empty
+    # database fetching a year of trial days in one go.
+    return sorted(missing[:limit])
+
+
+def catch_up(*, db: Path | None = None, limit: int = 6,
+             session=None) -> list[TrialScrapeReport]:
+    """Ask which trial days exist, fetch the recent ones we are missing."""
+    days = trials_ingest.list_days(session=session)
+    return [scrape(d, db=db, session=session)
+            for d in outstanding(days, db=db, limit=limit)]
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--date", required=True, help="YYYY-MM-DD")
+    ap.add_argument("--date", default=None,
+                    help="YYYY-MM-DD; omit to fetch whatever is new")
     ap.add_argument("--db", type=Path, default=None)
+    ap.add_argument("--limit", type=int, default=6,
+                    help="most trial days to fetch in one catch-up run")
     a = ap.parse_args(argv)
-    report = scrape(a.date, db=a.db)
-    print(report.render())
-    return 0 if report.ok else 1
+
+    if a.date:
+        report = scrape(a.date, db=a.db)
+        print(report.render())
+        return 0 if report.ok else 1
+
+    try:
+        reports = catch_up(db=a.db, limit=a.limit)
+    except (FetchError, trials_ingest.TrialsError) as exc:
+        # The day list itself failed. That is not "no new trials" and must not
+        # exit 0 — it is the one failure that would make this job look like it
+        # is working forever while never fetching anything again.
+        print(f"  could not read the trial day list — {exc}")
+        return 1
+
+    if not reports:
+        print("  trials             nothing new")
+        return 0
+    for report in reports:
+        print(report.render())
+    return 0 if all(r.ok for r in reports) else 1
 
 
 if __name__ == "__main__":

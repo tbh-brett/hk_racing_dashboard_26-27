@@ -33,7 +33,8 @@ from bs4 import BeautifulSoup
 
 from hkrd.ingest._client import fetch_html, urls
 
-__all__ = ["TrialsError", "parse_trial_day", "parse_batch", "fetch_day"]
+__all__ = ["TrialsError", "parse_trial_day", "parse_batch", "fetch_day",
+           "parse_day_list", "list_days"]
 
 
 class TrialsError(ValueError):
@@ -262,3 +263,50 @@ def fetch_day(date: str, *, session=None) -> list[dict[str, Any]]:
     for batch in batches:
         batch["trial_date"] = date
     return batches
+
+
+# ── which days exist ─────────────────────────────────────────────────────────
+#
+# HKJC publishes the list of trial days in a dropdown on the trials page, and
+# that list is the only correct source for it. Measured over the 2025-26
+# archive, trials fall on Tue, Thu and Fri equally (26.4% of 159 days each),
+# Mon 16.4%, and Sat and Wed a handful of times — so any weekday schedule
+# guessed from habit misses roughly half of them. Asking costs one request.
+
+def parse_day_list(html: str) -> list[str]:
+    """The dates in the page's own selector, newest first, as YYYY-MM-DD.
+
+    Raises rather than returning [] when the selector is missing: an empty
+    list and a changed page must not look the same, or the scheduled scrape
+    quietly stops finding trials and nothing says when it stopped.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    select = soup.find("select", id="selectId") or soup.find("select")
+    if select is None:
+        raise TrialsError(
+            "trial day selector not found — the page layout changed, or this "
+            "is not the trials page")
+
+    days: list[str] = []
+    for option in select.find_all("option"):
+        value = (option.get("value") or "").strip()
+        if not value:
+            continue
+        # dd/mm/yyyy in the page. Parsed explicitly rather than with a
+        # dateutil guess, because 01/02/2026 is a different day in each
+        # reading and both are plausible dates.
+        m = re.fullmatch(r"(\d{2})/(\d{2})/(\d{4})", value)
+        if m:
+            d, mo, y = m.groups()
+            days.append(f"{y}-{mo}-{d}")
+
+    if not days:
+        raise TrialsError(
+            "trial day selector found but held no dates — the value format "
+            "changed from dd/mm/yyyy")
+    return days
+
+
+def list_days(*, session=None) -> list[str]:
+    """Every trial day HKJC currently lists, newest first."""
+    return parse_day_list(fetch_html(urls.trials, session=session))

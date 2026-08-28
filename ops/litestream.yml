@@ -10,9 +10,24 @@
 #
 # The database still needs WAL mode enabled, which store/connect.py sets.
 
+# Every value below comes from the environment, so the bucket and its keys are
+# Fly secrets and never appear in the repo. Litestream expands ${...} itself.
+#
+# LITESTREAM_ENDPOINT is what makes this work with something other than AWS.
+# Cloudflare R2, Backblaze B2 and Tigris are all S3-compatible but none of them
+# lives at an AWS hostname, and with the endpoint unset Litestream would try
+# Amazon and fail with a credentials error that names the wrong problem. Left
+# empty it does mean AWS S3, which is the correct default.
+
 dbs:
-  - path: /data/hkrd.db
+  - path: ${HKRD_DB}
     replicas:
       - url: ${LITESTREAM_REPLICA_URL}
+        endpoint: ${LITESTREAM_ENDPOINT}
+        region: ${LITESTREAM_REGION}
         retention: 720h          # 30 days
+        # 10s is the recovery point: the most that can be lost is the last ten
+        # seconds of writes. A scrape takes minutes, so a machine dying
+        # mid-scrape costs the tail of one meeting, which the next run re-fetches
+        # anyway — every write is an upsert.
         sync-interval: 10s

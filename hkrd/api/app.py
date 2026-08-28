@@ -13,8 +13,8 @@ from fastapi.staticfiles import StaticFiles
 
 from hkrd.api import auth, routes
 from hkrd.query import (blackbook as bb_q, formguide as fg_q,
-                        market as market_q, model, race as race_q,
-                        raceday as raceday_q)
+                        health as health_q, market as market_q, model,
+                        race as race_q, raceday as raceday_q)
 
 WEB = Path(__file__).resolve().parent.parent.parent / "web"
 
@@ -52,8 +52,31 @@ def _warm() -> None:
 
 
 @app.get("/api/health")
-def health() -> dict:
-    return {"ok": True}
+def health() -> JSONResponse:
+    """Liveness, for the platform. Open, so it says nothing about the data.
+
+    503 rather than a 200 with ok:false — Fly reads the status code, and a
+    machine that cannot reach its own database should stop taking traffic
+    rather than serve every page as an empty table. Stale data is NOT a
+    failure here: killing a healthy machine because Sunday has not happened
+    yet turns a quiet week into an outage. Freshness is /api/ops/status.
+    """
+    try:
+        return JSONResponse(health_q.liveness())
+    except Exception as exc:            # noqa: BLE001 — reported, not swallowed
+        return JSONResponse({"ok": False, "error": f"{type(exc).__name__}: {exc}"},
+                            status_code=503)
+
+
+@app.get("/api/ops/status")
+def ops_status() -> dict:
+    """What is in the database and how old it is. Behind the password.
+
+    The scrape runs at night with nobody watching, and a dashboard serving
+    last week looks exactly like one serving today. This is where the
+    difference is written down.
+    """
+    return health_q.status()
 
 
 @app.get("/api/meetings")
