@@ -118,10 +118,11 @@ exchange for nothing this workload needs.
 **Not serverless.** Vercel, Netlify and Lambda have no persistent writable
 filesystem, and SQLite is a file.
 
-```bash
-fly secrets set HKRD_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
-fly deploy
+```powershell
+.\ops\deploy.ps1        # Windows: installs flyctl, creates everything, deploys, verifies
 ```
+
+`docs/deploy.md` has the same sequence by hand for any other shell.
 
 The dashboard serves the complete betting ledger and the blackbook, so it
 refuses to start without `HKRD_PASSWORD` — a deploy that forgot its secret must

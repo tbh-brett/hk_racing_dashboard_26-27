@@ -36,7 +36,33 @@ Pick R2 if you have no preference.
 
 ---
 
-## First deploy
+## First deploy — the one-command way
+
+On Windows, open **PowerShell**, `cd` to this repo, and run:
+
+```powershell
+.\ops\deploy.ps1
+```
+
+It installs flyctl if it is missing, signs you in, creates the app and the
+volume, asks for the two R2 values, generates and sets the dashboard password,
+builds the database, deploys, uploads the database and then checks that both
+the health endpoint and replication are actually working. Every step checks
+whether it has already been done, so it is safe to re-run after a failure.
+
+The R2 secret is read with `Read-Host -AsSecureString` and piped to
+`fly secrets import` on **stdin** — never as a command-line argument. So it
+does not appear in PowerShell history, in the process list, or in any file.
+
+```powershell
+.\ops\deploy.ps1 -LegacyRepo C:\code\hk_race_dashboard   # if the old repo is elsewhere
+.\ops\deploy.ps1 -SkipUpload                              # deploy the app, no data
+```
+
+On macOS or Linux there is no script — run the steps below by hand; they are
+the same sequence.
+
+## First deploy — by hand
 
 You need `flyctl` installed and `fly auth login` done.
 
