@@ -3,8 +3,13 @@
 Rebuild of the previous Streamlit dashboard (`tbh-brett/hk_race_dashboard`), which reached
 135 files and ~119k lines with a 22,898-line monolith at the centre.
 
-**Read `AGENTS.md` first.** It is the working contract, and `tests/test_smoke.py` enforces
-the parts of it that can be checked mechanically.
+**If you own this and want to use it, read [`docs/start-here.md`](docs/start-here.md).**
+It is written in plain English: one command to open the dashboard, and what the
+hosting is for.
+
+**If you are an AI agent working on this, read `AGENTS.md` first.** It is the working
+contract, and `tests/test_smoke.py` enforces the parts of it that can be checked
+mechanically.
 
 ## Running it locally
 

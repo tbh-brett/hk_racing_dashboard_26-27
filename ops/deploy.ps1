@@ -46,7 +46,10 @@ function Die  ($text)     { Write-Host ""; Write-Host "    $text" -ForegroundCol
 $script:FlyExe = $null
 
 function Resolve-Fly {
-    $cmd = Get-Command fly -CommandType Application -ErrorAction SilentlyContinue
+    # -First 1: Get-Command returns every match on PATH, and the .Source of a
+    # multi-match result is the paths joined together, which is not a program.
+    $cmd = Get-Command fly -CommandType Application -ErrorAction SilentlyContinue |
+           Select-Object -First 1
     if ($cmd) { $script:FlyExe = $cmd.Source }
     return [bool]$cmd
 }
