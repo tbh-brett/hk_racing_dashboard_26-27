@@ -19,12 +19,32 @@
 # Amazon and fail with a credentials error that names the wrong problem. Left
 # empty it does mean AWS S3, which is the correct default.
 
+# THE ENDPOINT IS THE HOST ONLY. R2's bucket page shows a URL with the bucket
+# on the end — https://<account>.r2.cloudflarestorage.com/hkrd-backups — and
+# pasting that whole thing here doubles it. Litestream appends the bucket from
+# the replica URL itself, so the request becomes
+#   /hkrd-backups/hkrd-backups?prefix=hkrd/generations/
+# Observed against the 0.3.13 binary pointed at a local server, both forms. The
+# bucket belongs in LITESTREAM_REPLICA_URL and nowhere else.
+
 dbs:
   - path: ${HKRD_DB}
     replicas:
       - url: ${LITESTREAM_REPLICA_URL}
         endpoint: ${LITESTREAM_ENDPOINT}
         region: ${LITESTREAM_REGION}
+
+        # Named here rather than left to the environment. Litestream's S3
+        # client falls through to the AWS SDK's default credential chain, and
+        # AWS_ACCESS_KEY_ID in the container SILENTLY WINS over
+        # LITESTREAM_ACCESS_KEY_ID — measured: with both set the request went
+        # out signed with the ambient one, and R2 rejected a key of the wrong
+        # length. Fly sets no AWS credentials today, so this is not a live
+        # fault; it is one env var away from being one, and the symptom would
+        # be replication failing against an account nobody configured.
+        access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
+        secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}
+
         retention: 720h          # 30 days
         # 10s is the recovery point: the most that can be lost is the last ten
         # seconds of writes. A scrape takes minutes, so a machine dying

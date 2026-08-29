@@ -61,16 +61,45 @@ In the Cloudflare dashboard:
 The endpoint is `https://<account-id>.r2.cloudflarestorage.com`. The account ID
 is also on the R2 overview page if you lose it.
 
-Three settings that matter, all checked against the Litestream 0.3.13 binary
+Four things that matter, all checked against the Litestream 0.3.13 binary
 rather than assumed:
 
-- **`LITESTREAM_REGION=auto`.** R2 has no regions and rejects a real one.
-- **The endpoint is required.** Left empty, Litestream talks to Amazon and
-  fails with a credentials error that names the wrong problem entirely.
-- **Path-style addressing**, which Litestream uses automatically once an
-  endpoint is set — the request it builds is
-  `https://<account-id>.r2.cloudflarestorage.com/hkrd-backups?prefix=hkrd/generations/`,
-  with the bucket in the path. R2 accepts this; nothing to configure.
+**The endpoint is the host ONLY — do not include the bucket.** R2's bucket page
+shows a URL with the bucket on the end, and it is the obvious thing to copy:
+
+| | |
+|---|---|
+| shown on the bucket page | `https://<account-id>.r2.cloudflarestorage.com/hkrd-backups` |
+| `LITESTREAM_ENDPOINT` | `https://<account-id>.r2.cloudflarestorage.com` |
+| `LITESTREAM_REPLICA_URL` | `s3://hkrd-backups/hkrd` |
+
+Litestream appends the bucket from the replica URL itself. Pointed at a local
+server and watched, the two forms produce:
+
+```
+endpoint host only        ->  /hkrd-backups?delimiter=%2F&prefix=hkrd%2Fgenerations%2F
+endpoint with the bucket  ->  /hkrd-backups/hkrd-backups?delimiter=%2F&prefix=hkrd%2Fgenerations%2F
+```
+
+The bucket doubles. It does not fail at sign-in, either — the signature is
+computed before the path is resolved, so a wrong endpoint and wrong keys give
+the same `401 Unauthorized` and you will spend the afternoon on the keys.
+
+**`LITESTREAM_REGION=auto`.** R2 has no regions and rejects a real one.
+
+**The endpoint is required.** Left empty, Litestream talks to Amazon and fails
+with a credentials error that names the wrong problem entirely.
+
+**The credentials are pinned in `ops/litestream.yml`, not left to the
+environment.** Litestream's S3 client falls through to the AWS SDK's default
+credential chain, and an `AWS_ACCESS_KEY_ID` in the container silently beats
+`LITESTREAM_ACCESS_KEY_ID` — measured: with both set, the request went out
+signed with the ambient one. Fly sets no AWS credentials, so this is not a live
+fault; naming them in the config keeps it one env var further from becoming
+one. Nothing for you to do, but it is why the config repeats them.
+
+Path-style addressing needs no configuration — Litestream uses it automatically
+once an endpoint is set, and R2 accepts it.
 
 Tigris instead, if you would rather not leave Fly:
 
