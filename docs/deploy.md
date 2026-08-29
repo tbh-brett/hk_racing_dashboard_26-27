@@ -40,10 +40,37 @@ Pick R2 if you have no preference.
 
 You need `flyctl` installed and `fly auth login` done.
 
-### 1. The bucket and its keys
+### 1. The bucket and its keys — Cloudflare R2
 
-Create a bucket (R2: *R2 → Create bucket*, name it `hkrd-backups`) and an API
-token scoped to it. Keep the account ID — R2's endpoint contains it.
+In the Cloudflare dashboard:
+
+1. **R2 → Create bucket.** Name it `hkrd-backups`. Location: *Automatic*, or
+   *Asia-Pacific* to sit near the machine. **Leave the jurisdiction unset** —
+   picking EU or FedRAMP changes the endpoint hostname, and the one below stops
+   working.
+2. **R2 → Manage API Tokens → Create API Token.**
+   - Permission: **Object Read & Write**
+   - Scope it to `hkrd-backups` only, not "all buckets". This token is going
+     into an environment variable on an internet-facing machine; there is no
+     reason for it to reach anything else in the account.
+   - TTL: forever, unless you want to diarise a rotation.
+3. Copy the three things it shows you **once**: the Access Key ID, the Secret
+   Access Key, and the S3 endpoint. Put all three in your password manager
+   before closing the page — the secret is not shown again.
+
+The endpoint is `https://<account-id>.r2.cloudflarestorage.com`. The account ID
+is also on the R2 overview page if you lose it.
+
+Three settings that matter, all checked against the Litestream 0.3.13 binary
+rather than assumed:
+
+- **`LITESTREAM_REGION=auto`.** R2 has no regions and rejects a real one.
+- **The endpoint is required.** Left empty, Litestream talks to Amazon and
+  fails with a credentials error that names the wrong problem entirely.
+- **Path-style addressing**, which Litestream uses automatically once an
+  endpoint is set — the request it builds is
+  `https://<account-id>.r2.cloudflarestorage.com/hkrd-backups?prefix=hkrd/generations/`,
+  with the bucket in the path. R2 accepts this; nothing to configure.
 
 Tigris instead, if you would rather not leave Fly:
 
@@ -167,6 +194,17 @@ that emptiness over the backup within ten seconds, which turns a recoverable
 problem into an unrecoverable one. If you see `RESTORE FAILED. Refusing to
 start.` in the logs, fix the credentials or the bucket — do not work around it
 by deleting the replica config.
+
+That guard rests on Litestream distinguishing two cases, which it does —
+verified against the 0.3.13 binary, both branches:
+
+| Situation | `restore -if-replica-exists` | What the entrypoint does |
+|---|---|---|
+| Replica reachable, no backups in it yet (a genuine first boot) | logs `no matching backups found`, **exit 0**, writes no file | starts with an empty database |
+| Endpoint unreachable, or the credentials are wrong | logs `cannot fetch generations: ...`, **exit 1**, writes no file | refuses to start |
+
+Without that distinction the flag would swallow an auth failure and the
+protection would be decorative.
 
 ---
 

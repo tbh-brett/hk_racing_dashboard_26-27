@@ -92,10 +92,12 @@ COPY ops/ ops/
 RUN pip install --no-cache-dir --no-deps --force-reinstall . \
     && chmod +x ops/entrypoint.sh
 
-# LITESTREAM_ENDPOINT and _REGION are defaulted empty rather than left unset:
-# Litestream expands ${...} in its config file, and an undefined variable there
-# is a startup error, not an empty string. Empty means "AWS S3", which is the
-# correct default for the one provider that needs no endpoint.
+# LITESTREAM_ENDPOINT and _REGION are declared here so the two knobs R2 needs
+# are visible in the image rather than only in a Fly secret. Litestream expands
+# an unset variable to an empty string and carries on — checked against the
+# 0.3.13 binary, config parses identically set-empty or unset — so these are
+# documentation, not a guard. Empty means AWS S3, which is the correct default
+# for the one provider that needs no endpoint.
 ENV PYTHONUNBUFFERED=1 \
     HKRD_DB=/data/hkrd.db \
     HKRD_HOST=0.0.0.0 \
