@@ -160,3 +160,57 @@ To rebuild the database from scratch:
 If a page is empty or a number looks wrong, that is a bug worth reporting — the
 whole point of this rebuild is that an empty column should never be something
 you have to notice yourself.
+
+---
+
+## 9. Filling in missing data
+
+The database was built from your old archive folder, and that archive stops at
+some point — the dashboard is not broken, it simply has not been told about
+anything after that date. To see where it stops:
+
+```powershell
+.\ops\catch-up.ps1 -ShowOnly
+```
+
+It prints a month-by-month table of every source and says which ones have gone
+quiet. To actually fetch what is missing:
+
+```powershell
+.\ops\catch-up.ps1              # the last 60 days
+.\ops\catch-up.ps1 -Days 120    # further back
+```
+
+Races, results, dividends, comments on running and barrier trials all come from
+HKJC and this fetches them. It asks one question every 1.2 seconds and only
+about dates it cannot already answer, so a wide catch-up takes a while. Leave it
+running. Re-running is always safe — every write replaces the same row rather
+than adding a second one.
+
+**Bets are the exception.** HKJC does not know what you staked, so no scrape can
+recover them. They come from your account statements:
+
+```powershell
+.venv\Scripts\python -m hkrd.jobs.import_statement --src "C:\folder\statement.txt"
+```
+
+## 10. Making changes to the dashboard
+
+Install **Claude Code** on your PC and open it in this folder. It can then read
+the code, make the change, run the tests and show you the result — which is a
+much shorter loop than describing a page to someone who cannot see it.
+
+```powershell
+npm install -g @anthropic-ai/claude-code
+cd C:\Users\tbhbr\hk_racing_dashboard_26-27
+claude
+```
+
+(That needs Node.js from https://nodejs.org first.)
+
+Then just describe what you want in plain English. Useful things to say:
+
+- "read AGENTS.md and docs/start-here.md first" — the working rules are written
+  down, and they are what keeps the rebuild from turning back into the old one
+- "run the tests before you tell me it works"
+- "show me the page before and after"
