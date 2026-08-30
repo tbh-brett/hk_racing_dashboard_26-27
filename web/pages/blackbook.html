@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blackbook</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/pages.css">
+<link rel="stylesheet" href="../assets/blackbook.css">
+</head>
+<body>
+
+<!-- Layer 1. Rendered by context.js and identical on every page; no page
+     writes into it. See design brief 08 §1. -->
+<div class="chrome-meeting"></div>
+
+<nav class="chrome-nav" id="nav"></nav>
+
+<!-- The header strip: what the book is, which view, and how it is doing. -->
+<div class="bb-strip">
+  <div class="bb-brand">
+    <span class="dot"></span>BLACKBOOK
+    <span class="sub">HYPOTHESIS TRACKER</span>
+  </div>
+  <div class="seg" id="view-toggle" role="group" aria-label="View"></div>
+  <div class="bb-sum" id="bb-sum"></div>
+</div>
+
+<section id="view-list">
+  <div class="filter-bar">
+    <div class="search">
+      <span class="glyph">⌕</span>
+      <input id="search" placeholder="horse, reason text or tag" aria-label="Search">
+      <button class="clear" id="clear-search" hidden>×</button>
+    </div>
+    <div class="active-filters" id="active-filters"></div>
+    <div class="match-count" id="match-count"></div>
+  </div>
+
+  <div class="chip-bar">
+    <div class="chip-label">TAG</div>
+    <div class="chips" id="tag-chips"></div>
+    <div class="chip-label bordered">BOOKED</div>
+    <div class="chips fixed" id="range-chips"></div>
+    <div class="chips fixed bordered" id="today-chip"></div>
+    <div class="status-tabs" id="status-tabs"></div>
+  </div>
+
+  <div class="bb-head" id="bb-head" role="row"></div>
+  <div id="entries"></div>
+  <div class="bb-foot" id="bb-foot"></div>
+</section>
+
+<section id="view-analysis" hidden>
+  <div class="analysis">
+    <div class="section-head">
+      <span class="title">BY TAG</span>
+      <span class="sub" id="analysis-sub"></span>
+    </div>
+    <div class="table-box">
+      <div class="tag-head" role="row">
+        <div>TAG</div><div class="r">ENTRIES</div><div class="r">RUNS</div>
+        <div class="r">STRIKE</div><div class="r">PLACE</div>
+        <div>A/E · 95% CI</div><div class="r">ROI</div><div>DEFINITION</div>
+      </div>
+      <div id="tag-rows"></div>
+    </div>
+    <div class="section-foot framed" id="analysis-foot"></div>
+
+    <div class="panels">
+      <div class="panel-box">
+        <div class="panel-hd">EVERY RUN SINCE BOOKING — THE WHOLE BOOK</div>
+        <div class="panel-body" id="whole-book"></div>
+      </div>
+      <div class="panel-box narrow">
+        <div class="panel-hd">STATUS OF THE BOOK · RESOLUTION IS THE HEALTH METRIC</div>
+        <div class="panel-body" id="status-panel"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script type="module" src="../assets/blackbook.js"></script>
+</body>
+</html>

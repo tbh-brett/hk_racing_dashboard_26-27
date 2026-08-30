@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; padding:0; background:#0e1117; }
+  * { box-sizing: border-box; }
+  a { color:#f0a824; text-decoration:none; }
+  a:hover { color:#ffc75a; }
+  input { outline:none; }
+  ::-webkit-scrollbar { width:9px; height:9px; }
+  ::-webkit-scrollbar-track { background:#0e1117; }
+  ::-webkit-scrollbar-thumb { background:#2b303a; }
+  @keyframes tick { 0%,100% { opacity:1 } 50% { opacity:.35 } }
+</style>
+</helmet>
+<div style="min-height:100vh;background:#0e1117;color:#fafafa;font-family:'IBM Plex Sans',system-ui,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;-webkit-font-smoothing:antialiased">
+
+  <div style="display:flex;align-items:stretch;height:32px;border-bottom:1px solid #1c202a;background:#0b0e13;overflow-x:auto">
+    <div style="display:flex;align-items:center;gap:9px;padding:0 14px;border-right:1px solid #1c202a;flex:none">
+      <div style="width:9px;height:9px;background:#e63946;flex:none"></div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:12px;letter-spacing:.16em">RACEDAY</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;padding:0 16px;flex:none;min-width:max-content;font-family:'IBM Plex Mono',monospace;font-size:12px;white-space:nowrap">
+      <span style="font-weight:600">HV</span>
+      <span style="color:#cfd3da">15 Jul 2026</span>
+      <span style="color:#8b929e">11 races</span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:#8b929e"><span style="width:6px;height:6px;border-radius:50%;background:#35b37e;animation:tick 1.6s infinite;flex:none"></span>active meeting · 16:22</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;padding:0 14px;border-left:1px solid #1c202a;flex:none;min-width:max-content;margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px">
+      <span style="color:#6f757f;letter-spacing:.1em">DATA</span>
+      <sc-for list="{{ freshness }}" as="f" hint-placeholder-count="5">
+        <span onClick="{{ f.go }}" style="display:flex;align-items:baseline;gap:4px;cursor:pointer;padding:1px 5px;border:1px solid {{ f.border }};background:{{ f.bg }};white-space:nowrap" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.07)">
+          <span style="color:#8b929e">{{ f.name }}</span>
+          <span style="color:{{ f.color }};font-weight:600">{{ f.mark }}</span>
+          <span style="color:{{ f.color }}">{{ f.age }}</span>
+        </span>
+      </sc-for>
+      <sc-if value="{{ refreshMsg }}" hint-placeholder-val="{{ false }}">
+        <span style="color:#2ec4b6;white-space:nowrap">{{ refreshMsg }}</span>
+      </sc-if>
+    </div>
+  </div>
+
+  <nav style="display:flex;align-items:stretch;height:34px;border-bottom:1px solid #262a33;background:#12151b">
+    <sc-for list="{{ pages }}" as="p" hint-placeholder-count="6">
+      <a href="{{ p.href }}" style="display:flex;align-items:center;padding:0 16px;font-size:12px;font-weight:500;letter-spacing:.03em;cursor:pointer;color:#8b929e;border-right:1px solid #1c202a;text-decoration:none" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.06)">
+        <span style="color:{{ p.color }};border-bottom:2px solid {{ p.mark }};padding-bottom:1px">{{ p.name }}</span>
+      </a>
+    </sc-for>
+  </nav>
+
+  <div style="height:5px;background:{{ acct.color }}"></div>
+  <div style="display:flex;align-items:stretch;min-height:42px;border-bottom:1px solid {{ acct.rule }};background:{{ acct.band }}">
+    <div style="position:relative;display:flex;align-items:stretch;border-right:1px solid {{ acct.rule }}">
+      <div onClick="{{ toggleAcct }}" style="display:flex;align-items:center;gap:10px;padding:0 14px;cursor:pointer" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.06)">
+        <span style="width:11px;height:11px;background:{{ acct.color }}"></span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;color:{{ acct.dim }}">LOGGING TO</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600;letter-spacing:.04em;color:{{ acct.color }}">{{ acct.name }}</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:{{ acct.dim }}">{{ acctCaret }}</span>
+      </div>
+      <sc-if value="{{ acctOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;left:0;top:100%;z-index:20;min-width:250px;background:#12151b;border:1px solid #2b303a;box-shadow:0 10px 28px rgba(0,0,0,.7)">
+          <sc-for list="{{ accounts }}" as="a" hint-placeholder-count="2">
+            <div onClick="{{ a.go }}" style="display:flex;align-items:center;gap:9px;padding:8px 12px;cursor:pointer;border-bottom:1px solid #1c202a;background:{{ a.bg }};border-left:3px solid {{ a.rule }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.06)">
+              <span style="width:10px;height:10px;background:{{ a.dot }}"></span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:{{ a.fg }}">{{ a.name }}</span>
+              <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f757f">{{ a.count }} BETS</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:{{ a.plColor }}">{{ a.pl }}</span>
+            </div>
+          </sc-for>
+          <div style="padding:6px 12px;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#5b616b;line-height:1.5">The band above and the 5px rule stay this account's colour everywhere — the dropdown is quiet, the indicator is not.</div>
+        </div>
+      </sc-if>
+    </div>
+    <div style="flex:1"></div>
+    <div style="display:flex;align-items:center;gap:14px;padding:0 14px;border-left:1px solid {{ acct.rule }};font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e">
+      <span>RACEDAY</span>
+      <span style="color:#fafafa;font-weight:600;font-size:13px">${{ day.total }}</span>
+      <span style="color:#5b616b">/ ${{ day.ceiling }}</span>
+      <div style="width:110px;height:8px;background:#191d24;position:relative">
+        <div style="height:8px;background:{{ day.barColor }};width:{{ day.barW }}%"></div>
+        <div style="position:absolute;left:100%;top:-2px;width:1px;height:12px;background:#4a5260"></div>
+      </div>
+      <span style="color:{{ day.color }};font-weight:600">{{ day.note }}</span>
+      <span style="color:#2b303a">|</span>
+      <div style="display:flex;border:1px solid #2b303a">
+        <sc-for list="{{ viewTabs }}" as="v" hint-placeholder-count="3">
+          <div onClick="{{ v.go }}" style="padding:2px 9px;cursor:pointer;color:{{ v.fg }};background:{{ v.bg }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.08)">{{ v.label }}</div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{ isEntry }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;align-items:stretch;min-height:calc(100vh - 85px)">
+    <div style="flex:1;min-width:0;border-right:1px solid #262a33">
+      <div style="display:flex;align-items:center;gap:0;border-bottom:1px solid #262a33;background:#12151b;min-height:34px">
+        <div style="padding:0 12px 0 14px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#6f757f;white-space:nowrap">BET TYPE</div>
+        <sc-for list="{{ types }}" as="t" hint-placeholder-count="5">
+          <div onClick="{{ t.go }}" style="padding:0 13px;height:34px;line-height:34px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;border-left:1px solid #1c202a;color:{{ t.fg }};background:{{ t.bg }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.08)">{{ t.name }}</div>
+        </sc-for>
+        <div style="flex:1"></div>
+        <sc-if value="{{ isSingleRace }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;align-items:stretch">
+          <div style="padding:0 12px;height:34px;line-height:34px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#6f757f;border-left:1px solid #1c202a">RACE</div>
+          <sc-for list="{{ raceChips }}" as="r" hint-placeholder-count="11">
+            <div onClick="{{ r.go }}" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;border-left:1px solid #1c202a;color:{{ r.fg }};background:{{ r.bg }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.08)">{{ r.n }}</div>
+          </sc-for>
+        </div>
+        </sc-if>
+      </div>
+
+      <sc-if value="{{ isSingleRace }}" hint-placeholder-val="{{ true }}">
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;padding:6px 14px;border-bottom:1px solid #1e232c;background:{{ bankerBarBg }}">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#6f757f">BANKER</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:{{ bankerLabelColor }}">{{ bankerLabel }}</span>
+          <sc-if value="{{ hasBanker }}" hint-placeholder-val="{{ false }}">
+            <span onClick="{{ clearBanker }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e;border:1px solid #2b303a;padding:1px 7px;cursor:pointer" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.08)">CLEAR BANKER</span>
+          </sc-if>
+          <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f757f">{{ bankerExplain }}</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:30px 34px 34px 158px 74px 28px 84px 66px 66px 56px 1fr;align-items:center;height:36px;background:#12151b;border-bottom:1px solid #2b303a;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:#8b929e">
+          <div style="padding:0 4px;text-align:center">NO</div>
+          <div style="padding:0 4px;text-align:center;color:#f0a824">BNK</div>
+          <div style="padding:0 4px;text-align:center">SEL</div>
+          <div style="padding:0 8px">HORSE</div>
+          <div style="padding:0 6px">STYLE</div>
+          <div style="padding:0 2px;text-align:center">DR</div>
+          <div style="padding:0 6px">JOCKEY</div>
+          <div style="padding:0 6px;text-align:right;color:#cfd3da">WIN</div>
+          <div style="padding:0 6px;text-align:right;color:#cfd3da">PLACE</div>
+          <div style="padding:0 6px;text-align:right">WIN %</div>
+          <div style="padding:0 8px">PLACE % · HARVILLE-HENERY <span style="color:#5b616b">v OLD 3× RULE</span></div>
+        </div>
+        <sc-for list="{{ card }}" as="r" hint-placeholder-count="12">
+          <div style="display:grid;grid-template-columns:30px 34px 34px 158px 74px 28px 84px 66px 66px 56px 1fr;align-items:center;height:30px;border-bottom:1px solid #191d24;background:{{ r.bg }};border-left:3px solid {{ r.rule }};font-family:'IBM Plex Mono',monospace" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.035)">
+            <div onClick="{{ r.toggle }}" style="padding:0 4px;text-align:center;font-size:12px;font-weight:600;cursor:pointer">{{ r.no }}</div>
+            <div onClick="{{ r.setBanker }}" style="height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:inline-block;width:14px;height:14px;line-height:13px;text-align:center;font-size:9px;border-radius:50%;color:{{ r.bnkFg }};border:1px solid {{ r.bnkBorder }};background:{{ r.bnkBg }}">{{ r.bnk }}</span>
+            </div>
+            <div onClick="{{ r.toggle }}" style="height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="display:inline-block;width:14px;height:14px;line-height:13px;text-align:center;font-size:9px;color:{{ r.boxFg }};border:1px solid {{ r.boxBorder }};background:{{ r.boxBg }}">{{ r.box }}</span>
+            </div>
+            <div onClick="{{ r.toggle }}" style="padding:0 8px;display:flex;align-items:baseline;gap:6px;white-space:nowrap;overflow:hidden;cursor:pointer">
+              <span style="font-size:12px;font-weight:600;color:{{ r.nameColor }}">{{ r.name }}</span>
+              <sc-if value="{{ r.bb }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size:9px;padding:0 4px;color:#2ec4b6;border:1px solid #1e4a45">BB</span>
+              </sc-if>
+              <sc-if value="{{ r.vetAny }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size:9px;padding:0 4px;color:{{ r.vetColor }};border:1px solid {{ r.vetBorder }};background:{{ r.vetBg }}">{{ r.vetTag }}</span>
+              </sc-if>
+            </div>
+            <div style="padding:0 6px"><span style="display:inline-block;max-width:100%;font-size:9px;padding:1px 4px;white-space:nowrap;overflow:hidden;color:{{ r.styleColor }};background:{{ r.styleBg }}">{{ r.style }}</span></div>
+            <div style="padding:0 2px;text-align:center;font-size:11px;color:#cfd3da">{{ r.draw }}</div>
+            <div style="padding:0 6px;font-size:11px;color:#cfd3da;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.jockey }}</div>
+            <div style="padding:0 6px;text-align:right;font-size:14px;font-weight:600;color:{{ r.winOddsColor }}">{{ r.odds }}</div>
+            <div style="padding:0 6px;text-align:right;font-size:14px;font-weight:600;color:{{ r.placeOddsColor }}">{{ r.placeOdds }}</div>
+            <div style="padding:0 6px;text-align:right;font-size:11px;color:#8b929e">{{ r.win }}</div>
+            <div style="padding:0 8px;display:flex;align-items:center;gap:8px">
+              <span style="font-size:12px;font-weight:600;width:44px;color:{{ r.placeColor }}">{{ r.place }}</span>
+              <div style="position:relative;width:110px;height:8px;background:#191d24">
+                <div style="height:8px;background:{{ r.placeColor }};width:{{ r.placeW }}%"></div>
+                <div style="position:absolute;left:{{ r.linearW }}%;top:-2px;width:2px;height:12px;background:#7a6470"></div>
+              </div>
+              <span style="font-size:10px;color:#7a6470;width:70px">3× {{ r.linear }}</span>
+              <span style="font-size:10px;color:{{ r.gapColor }};white-space:nowrap">{{ r.gapNote }}</span>
+            </div>
+          </div>
+        </sc-for>
+        <div style="padding:6px 14px;border-bottom:1px solid #262a33;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f757f">WIN AND PLACE ARE BOTH SCRAPED PRICES AT EQUAL WEIGHT — PLACE IS NEVER DERIVED FROM WIN. THE RATIO ON THIS CARD RANGES {{ ratioRange }}, WHICH IS WHY THE 3× RULE OF THUMB CANNOT WORK.</div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isAllUp }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="display:flex;align-items:center;gap:9px;padding:8px 14px;border-bottom:1px solid #262a33;background:#12151b">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#6f757f;width:52px">STEP 1</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.06em">PICK RACES</span>
+          <div style="display:flex;gap:4px;margin-left:8px">
+            <sc-for list="{{ allUpRaceChips }}" as="r" hint-placeholder-count="11">
+              <span onClick="{{ r.go }}" style="width:30px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:{{ r.fg }};background:{{ r.bg }};border:1px solid {{ r.border }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.08)">{{ r.n }}</span>
+            </sc-for>
+          </div>
+          <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f757f">{{ allUp.raceCount }} SELECTED · ONLY SELECTED RACES APPEAR BELOW</span>
+        </div>
+
+        <sc-if value="{{ allUp.none }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:26px 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6f757f;line-height:1.6">PICK AT LEAST TWO RACES TO BUILD A CHAIN. THE WORKSPACE STAYS EMPTY UNTIL THEN — NO GREYED-OUT PLACEHOLDERS.</div>
+        </sc-if>
+
+        <sc-if value="{{ allUp.any }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;align-items:stretch;gap:0;overflow-x:auto;border-bottom:1px solid #262a33">
+          <sc-for list="{{ allUp.legs }}" as="l" hint-placeholder-count="3">
+            <div style="width:352px;flex:none;border-right:1px solid #262a33;display:flex;flex-direction:column">
+              <div style="padding:7px 10px;background:#161a21;border-bottom:1px solid #1e232c">
+                <div style="display:flex;align-items:baseline;gap:8px">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600">{{ l.race }}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#cfd3da">{{ l.off }}</span>
+                  <span onClick="{{ l.drop }}" style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#8b929e;border:1px solid #2b303a;padding:0 5px;cursor:pointer" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">REMOVE</span>
+                </div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ l.meta }}</div>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.09em;color:#6f757f">BET TYPE</span>
+                  <div style="display:flex;gap:2px">
+                    <sc-for list="{{ l.typeChips }}" as="t" hint-placeholder-count="4">
+                      <span onClick="{{ t.go }}" style="padding:1px 8px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.05em;color:{{ t.fg }};background:{{ t.bg }};border:1px solid {{ t.border }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ t.name }}</span>
+                    </sc-for>
+                  </div>
+                  <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:9px;color:{{ l.pickColor }};white-space:nowrap">{{ l.pickNote }}</span>
+                </div>
+              </div>
+
+              <div style="display:grid;grid-template-columns:26px 30px 30px 1fr 46px 46px;align-items:center;height:22px;background:#12151b;border-bottom:1px solid #2b303a;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.07em;color:#8b929e">
+                <div style="padding:0 3px;text-align:center">NO</div>
+                <div style="padding:0 3px;text-align:center;color:#f0a824">BNK</div>
+                <div style="padding:0 3px;text-align:center">SEL</div>
+                <div style="padding:0 6px">HORSE NAME</div>
+                <div style="padding:0 5px;text-align:right">WIN</div>
+                <div style="padding:0 5px;text-align:right">PLACE</div>
+              </div>
+              <sc-for list="{{ l.runners }}" as="r" hint-placeholder-count="12">
+                <div style="display:grid;grid-template-columns:26px 30px 30px 1fr 46px 46px;align-items:center;height:25px;border-bottom:1px solid #191d24;background:{{ r.bg }};border-left:2px solid {{ r.rule }};font-family:'IBM Plex Mono',monospace;font-size:11px;opacity:{{ r.opacity }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.035)">
+                  <div onClick="{{ r.sel }}" style="padding:0 3px;text-align:center;font-weight:600;cursor:{{ r.cursor }};color:{{ r.noColor }}">{{ r.no }}</div>
+                  <div onClick="{{ r.bank }}" style="height:25px;display:flex;align-items:center;justify-content:center;cursor:{{ r.cursor }}">
+                    <span style="display:inline-block;width:13px;height:13px;line-height:12px;text-align:center;font-size:8px;border-radius:50%;color:{{ r.bnkFg }};border:1px solid {{ r.bnkBorder }};background:{{ r.bnkBg }}">{{ r.bnk }}</span>
+                  </div>
+                  <div onClick="{{ r.sel }}" style="height:25px;display:flex;align-items:center;justify-content:center;cursor:{{ r.cursor }}">
+                    <span style="display:inline-block;width:13px;height:13px;line-height:12px;text-align:center;font-size:8px;color:{{ r.boxFg }};border:1px solid {{ r.boxBorder }};background:{{ r.boxBg }}">{{ r.box }}</span>
+                  </div>
+                  <div onClick="{{ r.sel }}" style="padding:0 6px;display:flex;align-items:baseline;gap:5px;cursor:{{ r.cursor }};white-space:nowrap;overflow:hidden">
+                    <span style="font-weight:{{ r.nameWeight }};color:{{ r.nameColor }};overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span>
+                    <sc-if value="{{ r.scr }}" hint-placeholder-val="{{ false }}">
+                      <span style="flex:none;font-size:8px;padding:0 3px;color:#8b929e;border:1px solid #3a4150;letter-spacing:.06em">SCR</span>
+                    </sc-if>
+                    <sc-if value="{{ r.fav }}" hint-placeholder-val="{{ false }}">
+                      <span style="flex:none;font-size:8px;padding:0 3px;color:#f0a824;border:1px solid #4a3a18;letter-spacing:.06em">FAV</span>
+                    </sc-if>
+                  </div>
+                  <div style="padding:0 5px;text-align:right;font-weight:600;color:{{ r.oddsColor }}">{{ r.odds }}</div>
+                  <div style="padding:0 5px;text-align:right;color:{{ r.placeColor }}">{{ r.placeOdds }}</div>
+                </div>
+              </sc-for>
+              <div style="flex:1;min-height:6px"></div>
+            </div>
+          </sc-for>
+          <div style="width:150px;flex:none;padding:9px 10px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5b616b;line-height:1.6">Panels scroll sideways. Comparing selections across legs is the whole task, so the legs sit beside each other rather than stacked.</div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ allUp.ready }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:10px 14px 12px 14px;border-bottom:1px solid #262a33">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#6f757f;width:52px">STEP 3</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.06em">HOW MANY OF MY {{ allUp.raceCount }} LEGS MUST WIN</span>
+            <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f757f">GENERATED FROM THE RACE COUNT — AN INVALID FORMULA CANNOT BE PICKED</span>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:9px">
+            <sc-for list="{{ allUp.formulas }}" as="f" hint-placeholder-count="4">
+              <div onClick="{{ f.go }}" style="flex:1;max-width:190px;padding:7px 10px;cursor:pointer;border:1px solid {{ f.border }};background:{{ f.bg }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.06)">
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;color:{{ f.fg }}">{{ f.label }}</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:{{ f.subColor }};margin-top:2px">{{ f.legs }} OF {{ allUp.raceCount }} MUST WIN</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:{{ f.subColor }};margin-top:3px">{{ f.combos }} COMBINATION<span>{{ f.plural }}</span></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ allUp.any }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;align-items:center;gap:0;border-bottom:1px solid #262a33;background:#101820">
+          <div style="display:flex;align-items:baseline;gap:9px;padding:9px 16px;border-right:1px solid #1e2731">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e;letter-spacing:.06em">No. of Bets:</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:19px;font-weight:600;color:{{ ticket.comboColor }}">{{ ticket.combos }}</span>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:9px;padding:9px 16px;border-right:1px solid #1e2731">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e;letter-spacing:.06em">Unit Bet:</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:19px;font-weight:600">${{ ticket.unit }}</span>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:9px;padding:9px 16px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e;letter-spacing:.06em">Bet Total:</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:19px;font-weight:600;color:{{ ticket.totalColor }}">${{ ticket.total }}</span>
+          </div>
+          <span style="margin-left:auto;padding:0 16px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f757f">{{ ticket.comboFormula }}</span>
+        </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-top:1px solid #262a33;background:#12151b;font-family:'IBM Plex Mono',monospace;font-size:11px;flex-wrap:wrap">
+        <span style="color:#8b929e;letter-spacing:.08em">STAKE PER COMBINATION</span>
+        <span style="display:flex;align-items:center;border:1px solid #3a4150;background:#0b0e13">
+          <span style="padding:0 5px 0 8px;color:#8b929e">$</span>
+          <input value="{{ unitText }}" onChange="{{ setUnit }}" inputmode="numeric" style="width:78px;background:transparent;border:none;color:#fafafa;font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;padding:3px 8px 3px 0" />
+        </span>
+        <div style="display:flex;gap:3px">
+          <sc-for list="{{ stakes }}" as="s" hint-placeholder-count="4">
+            <span onClick="{{ s.go }}" style="padding:2px 8px;cursor:pointer;font-size:10px;color:{{ s.fg }};border:1px solid {{ s.border }};background:{{ s.bg }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.08)">{{ s.v }}</span>
+          </sc-for>
+        </div>
+        <span style="color:#2b303a">|</span>
+        <span style="color:#8b929e;letter-spacing:.08em">LINK BLACKBOOK</span>
+        <sc-for list="{{ bbLinks }}" as="l" hint-placeholder-count="3">
+          <span onClick="{{ l.go }}" style="padding:2px 8px;cursor:pointer;font-size:10px;color:{{ l.fg }};border:1px solid {{ l.border }};background:{{ l.bg }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.08)">{{ l.label }}</span>
+        </sc-for>
+      </div>
+    </div>
+
+    <aside style="width:440px;flex:none;background:#12151b">
+      <div style="padding:8px 12px;border-bottom:1px solid #262a33;display:flex;align-items:baseline;gap:8px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.1em">PRE-BET</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e">{{ ticket.label }}</span>
+        <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5b616b">{{ ticket.scope }}</span>
+      </div>
+
+      <div style="padding:10px 12px;border-bottom:1px solid #262a33;background:#101820">
+        <div style="display:flex;align-items:baseline;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#6f757f">COMBINATIONS AND OUTLAY<span style="margin-left:auto;color:#5b616b;letter-spacing:0">{{ ticket.comboFormula }}</span></div>
+        <div style="display:flex;align-items:flex-end;gap:0;margin-top:7px">
+          <div style="flex:1">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;letter-spacing:.06em">COMBINATIONS</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;line-height:1.1;color:{{ ticket.comboColor }}">{{ ticket.combos }}</div>
+          </div>
+          <div style="flex:1;border-left:1px solid #1e2731;padding-left:12px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;letter-spacing:.06em">PER COMBINATION</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;line-height:1.1">${{ ticket.unit }}</div>
+          </div>
+          <div style="flex:1;border-left:1px solid #1e2731;padding-left:12px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;letter-spacing:.06em">TOTAL OUTLAY</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;line-height:1.1;color:{{ ticket.totalColor }}">${{ ticket.total }}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:2px;margin-top:8px">
+          <sc-for list="{{ ticket.comboBlocks }}" as="b" hint-placeholder-count="6">
+            <div style="flex:1;height:7px;background:{{ b.bg }}"></div>
+          </sc-for>
+        </div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e;margin-top:6px">{{ ticket.comboNote }}</div>
+      </div>
+
+      <sc-if value="{{ ticket.empty }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:14px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6f757f;line-height:1.6">{{ ticket.emptyNote }}</div>
+      </sc-if>
+
+      <sc-if value="{{ ticket.any }}" hint-placeholder-val="{{ true }}">
+      <div>
+        <sc-if value="{{ ticket.hasBanker }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:9px 12px;border-bottom:1px solid #262a33">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#6f757f;margin-bottom:5px">BANKER PLACE PROBABILITY · HARVILLE-HENERY</div>
+          <div style="display:flex;align-items:baseline;gap:9px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600">{{ ticket.bankerName }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e">win {{ ticket.bankerWin }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e">place odd {{ ticket.bankerPlaceOdd }}</span>
+            <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;letter-spacing:-.01em;color:#f0a824">{{ ticket.bankerPlace }}</span>
+          </div>
+          <div style="position:relative;height:10px;background:#191d24;margin-top:6px">
+            <div style="height:10px;background:#f0a824;width:{{ ticket.bankerPlaceW }}%"></div>
+            <div style="position:absolute;left:{{ ticket.bankerLinearW }}%;top:-3px;width:2px;height:16px;background:#c9748f"></div>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:8px;margin-top:5px;font-family:'IBM Plex Mono',monospace;font-size:10px">
+            <span style="color:{{ ticket.gapColor }}">3× RULE {{ ticket.bankerLinear }}</span>
+            <span style="color:#8b929e">{{ ticket.bankerGapWord }} BY {{ ticket.bankerGap }} POINTS</span>
+            <span style="margin-left:auto;color:#5b616b">3 × WIN% IS NOT A PLACE PROBABILITY</span>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ ticket.noBankerSet }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:9px 12px;border-bottom:1px solid #262a33">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#6f757f;margin-bottom:5px">NO BANKER · ALL SELECTIONS COMBINE WITH EACH OTHER</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#cfd3da;line-height:1.5">{{ ticket.noBankerNote }}</div>
+        </div>
+        </sc-if>
+
+        <div style="padding:9px 12px;border-bottom:1px solid #262a33">
+          <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:5px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#6f757f">MARKET CONCENTRATION · LATEST SNAPSHOT {{ conc.stamp }}</span>
+            <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.08em;color:{{ conc.color }};border:1px solid {{ conc.border }};background:{{ conc.bg }};padding:1px 7px">{{ conc.band }}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:9px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:600">{{ conc.top3 }}%</span>
+            <div style="flex:1;height:9px;background:#191d24;position:relative">
+              <div style="height:9px;background:{{ conc.color }};width:{{ conc.w }}%"></div>
+              <div style="position:absolute;left:{{ conc.morningW }}%;top:-3px;width:2px;height:15px;background:#7a6470"></div>
+            </div>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7a6470;white-space:nowrap">morning {{ conc.morning }}%</span>
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e;margin-top:5px;line-height:1.5">{{ conc.note }}</div>
+        </div>
+
+        <sc-if value="{{ ticket.pairsAny }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:9px 12px;border-bottom:1px solid #262a33">
+          <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:5px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#6f757f">PAIR RANKING</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#5b616b">RANKING PAIRS BEATS BOXING A SET AT EVERY TICKET SIZE</span>
+          </div>
+          <sc-for list="{{ ticket.pairs }}" as="p" hint-placeholder-count="5">
+            <div style="display:flex;align-items:center;gap:8px;height:19px;font-family:'IBM Plex Mono',monospace;font-size:11px">
+              <span style="color:#6f757f;width:14px">{{ p.rank }}</span>
+              <span style="color:#cfd3da;width:104px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.label }}</span>
+              <div style="flex:1;height:7px;background:#191d24"><div style="height:7px;background:{{ p.barColor }};width:{{ p.w }}%"></div></div>
+              <span style="width:46px;text-align:right;color:#cfd3da">{{ p.prob }}</span>
+              <span style="width:56px;text-align:right;font-size:10px;color:{{ p.inColor }}">{{ p.inTicket }}</span>
+            </div>
+          </sc-for>
+        </div>
+        </sc-if>
+
+        <sc-for list="{{ findings }}" as="f" hint-placeholder-count="2">
+          <div style="padding:8px 12px;border-bottom:1px solid #262a33;background:{{ f.bg }};border-left:2px solid {{ f.rule }}">
+            <div style="display:flex;align-items:baseline;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.09em;color:{{ f.rule }}">{{ f.title }}<span style="margin-left:auto;color:#6f757f;letter-spacing:0">{{ f.stat }}</span></div>
+            <div style="font-size:12px;line-height:1.45;color:#cfd3da;margin-top:4px">{{ f.body }}</div>
+          </div>
+        </sc-for>
+
+        <sc-for list="{{ flags }}" as="g" hint-placeholder-count="2">
+          <div style="padding:8px 12px;border-bottom:1px solid #262a33;background:{{ g.bg }};border-left:2px solid {{ g.rule }}">
+            <div style="display:flex;align-items:baseline;gap:8px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.09em;color:{{ g.rule }}">{{ g.title }}</span>
+              <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e">{{ g.detail }}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+              <span onClick="{{ g.override }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:1px 8px;cursor:pointer;letter-spacing:.06em;color:{{ g.ovColor }};border:1px solid {{ g.ovBorder }};background:{{ g.ovBg }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ g.ovLabel }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:{{ g.logColor }}">{{ g.logNote }}</span>
+            </div>
+          </div>
+        </sc-for>
+
+        <div style="padding:10px 12px;display:flex;align-items:center;gap:10px">
+          <span onClick="{{ ticket.confirm }}" style="flex:1;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;letter-spacing:.08em;padding:7px 0;cursor:pointer;color:{{ ticket.btnColor }};border:1px solid {{ ticket.btnBorder }};background:{{ ticket.btnBg }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ ticket.btnLabel }}</span>
+          <span onClick="{{ ticket.clear }}" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e;border:1px solid #2b303a;padding:7px 12px;cursor:pointer" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.08)">CLEAR</span>
+        </div>
+        <sc-if value="{{ ticket.placed }}" hint-placeholder-val="{{ false }}">
+          <div style="margin:0 12px 12px 12px;padding:7px 9px;border:1px solid {{ acct.rule }};background:{{ acct.band }};font-family:'IBM Plex Mono',monospace;font-size:11px;color:{{ acct.color }};line-height:1.5">{{ ticket.placedNote }}</div>
+        </sc-if>
+      </div>
+      </sc-if>
+    </aside>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isLedger }}" hint-placeholder-val="{{ false }}">
+  <div>
+    <div style="display:flex;align-items:stretch;border-bottom:1px solid #262a33;background:#12151b;min-height:32px">
+      <div style="display:flex;align-items:center;padding:0 12px 0 14px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#6f757f;border-right:1px solid #1c202a">FILTER</div>
+      <sc-for list="{{ ledgerFilters }}" as="f" hint-placeholder-count="10">
+        <div onClick="{{ f.go }}" style="padding:0 11px;height:32px;line-height:32px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;border-right:1px solid #1c202a;color:{{ f.fg }};background:{{ f.bg }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.08)">{{ f.label }}</div>
+      </sc-for>
+      <div style="flex:1"></div>
+      <div style="display:flex;align-items:center;gap:12px;padding:0 14px;border-left:1px solid #1c202a;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e">
+        <span>{{ led.n }} BETS</span>
+        <span>STAKED <span style="color:#cfd3da">${{ led.stake }}</span></span>
+        <span>RETURNED <span style="color:#cfd3da">${{ led.ret }}</span></span>
+        <span>P/L <span style="font-weight:600;color:{{ led.plColor }}">{{ led.pl }}</span></span>
+        <span>ROI <span style="font-weight:600;color:{{ led.plColor }}">{{ led.roi }}</span></span>
+        <span style="color:#c8792f">{{ led.unrec }} UNRECONCILED</span>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:78px 84px 40px 58px 216px 70px 74px 88px 148px 1fr;align-items:center;height:26px;background:#12151b;border-bottom:1px solid #2b303a;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.09em;color:#8b929e">
+      <div style="padding:0 8px">DATE</div><div style="padding:0 8px">MEETING</div><div style="padding:0 6px">RACE</div>
+      <div style="padding:0 8px">TYPE</div><div style="padding:0 8px">SELECTIONS</div>
+      <div style="padding:0 8px;text-align:right">STAKE</div><div style="padding:0 8px;text-align:right">RETURN</div>
+      <div style="padding:0 8px;text-align:right">P/L</div><div style="padding:0 8px">BLACKBOOK</div>
+      <div style="padding:0 8px">SOURCE · CLV</div>
+    </div>
+    <sc-for list="{{ ledgerRows }}" as="b" hint-placeholder-count="14">
+      <div style="display:grid;grid-template-columns:78px 84px 40px 58px 216px 70px 74px 88px 148px 1fr;align-items:center;min-height:28px;border-bottom:1px solid #191d24;font-family:'IBM Plex Mono',monospace;font-size:11px;background:{{ b.bg }};border-left:3px solid {{ b.rule }}">
+        <div style="padding:0 8px;color:#cfd3da;white-space:nowrap">{{ b.date }}</div>
+        <div style="padding:0 8px;color:#8b929e;white-space:nowrap">{{ b.meeting }}</div>
+        <div style="padding:0 6px;color:#cfd3da">{{ b.race }}</div>
+        <div style="padding:0 8px;color:#cfd3da">{{ b.type }}</div>
+        <div style="padding:0 8px;color:#cfd3da;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ b.sel }}</div>
+        <div style="padding:0 8px;text-align:right;color:#cfd3da">${{ b.stake }}</div>
+        <div style="padding:0 8px;text-align:right;color:#cfd3da">${{ b.ret }}</div>
+        <div style="padding:0 8px;text-align:right;font-weight:600;color:{{ b.plColor }}">{{ b.pl }}</div>
+        <div style="padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          <sc-if value="{{ b.bbAny }}" hint-placeholder-val="{{ false }}">
+            <span style="font-size:10px;color:#2ec4b6;border:1px solid #1e4a45;padding:0 5px">{{ b.bb }}</span>
+          </sc-if>
+        </div>
+        <div style="padding:0 8px;display:flex;align-items:center;gap:8px;white-space:nowrap">
+          <span style="font-size:10px;padding:0 5px;color:{{ b.srcColor }};border:1px {{ b.srcStyle }} {{ b.srcBorder }}">{{ b.src }}</span>
+          <span style="font-size:11px;color:{{ b.clvColor }};width:52px;text-align:right">{{ b.clv }}</span>
+          <div style="width:70px;height:7px;background:#191d24;position:relative;flex:none">
+            <div style="position:absolute;left:50%;top:-2px;width:1px;height:11px;background:#3a4150"></div>
+            <div style="position:absolute;left:{{ b.clvLeft }}%;width:{{ b.clvW }}%;top:0;height:7px;background:{{ b.clvColor }}"></div>
+          </div>
+          <sc-if value="{{ b.override }}" hint-placeholder-val="{{ false }}">
+            <span style="font-size:9px;color:#c9748f;border:1px solid #4a2733;padding:0 4px">OVERRIDE LOGGED</span>
+          </sc-if>
+        </div>
+      </div>
+    </sc-for>
+
+    <div style="display:flex;align-items:stretch;border-top:1px solid #262a33;background:#0b0e13">
+      <div style="flex:1;padding:9px 14px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#6f757f;margin-bottom:6px">RECONCILIATION · IMPORTED STATEMENT ROWS AGAINST LOGGED BETS</div>
+        <sc-for list="{{ recon }}" as="r" hint-placeholder-count="3">
+          <div style="display:flex;align-items:center;gap:10px;padding:3px 0;font-family:'IBM Plex Mono',monospace;font-size:11px;white-space:nowrap">
+            <span style="color:#8b929e;width:70px">{{ r.date }}</span>
+            <span style="color:#cfd3da;width:170px;overflow:hidden;text-overflow:ellipsis">{{ r.statement }}</span>
+            <span style="color:#4c525c">↔</span>
+            <span style="color:#cfd3da;width:170px;overflow:hidden;text-overflow:ellipsis">{{ r.logged }}</span>
+            <span style="color:{{ r.color }};font-size:10px;border:1px solid {{ r.border }};padding:0 6px">{{ r.state }}</span>
+            <span style="color:#6f757f;font-size:10px">{{ r.note }}</span>
+          </div>
+        </sc-for>
+        <sc-if value="{{ reconNone }}" hint-placeholder-val="{{ false }}">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4c525c">NOTHING IMPORTED ON THIS ACCOUNT — EVERY ROW WAS LOGGED HERE</div>
+        </sc-if>
+      </div>
+      <div style="width:300px;flex:none;border-left:1px solid #262a33;padding:9px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e;line-height:1.6">
+        <div style="color:#fafafa;letter-spacing:.1em;font-size:10px;margin-bottom:5px">IMPORTED vs MANUAL</div>
+        Imported rows keep a dashed border and the IMPORT chip until they are matched to a logged bet. Manual rows are solid from the moment they are confirmed. Nothing is silently merged.
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isAnalysis }}" hint-placeholder-val="{{ false }}">
+  <div style="padding:14px">
+    <div style="display:flex;gap:14px;align-items:stretch">
+      <div style="flex:1;min-width:0;border:1px solid #262a33">
+        <div style="display:flex;align-items:baseline;gap:10px;padding:8px 12px;border-bottom:1px solid #262a33;background:#12151b">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.1em">CUMULATIVE P/L</span>
+          <sc-for list="{{ plLegend }}" as="l" hint-placeholder-count="2">
+            <span style="display:flex;align-items:center;gap:5px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e"><span style="width:9px;height:3px;background:{{ l.color }}"></span>{{ l.name }} <span style="color:{{ l.plColor }}">{{ l.pl }}</span></span>
+          </sc-for>
+          <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5b616b">n={{ plN }} BETS · 15 MAR → 15 JUL</span>
+        </div>
+        <div style="padding:10px 12px">
+          <svg viewBox="0 0 640 200" width="100%" height="210" preserveAspectRatio="none" style="display:block">
+            <line x1="0" y1="{{ zeroY }}" x2="640" y2="{{ zeroY }}" stroke="#2b303a" stroke-width="1"></line>
+            <sc-for list="{{ plLines }}" as="l" hint-placeholder-count="2">
+              <polyline points="{{ l.points }}" fill="none" stroke="{{ l.color }}" stroke-width="1.8"></polyline>
+            </sc-for>
+          </svg>
+          <div style="display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#5b616b;margin-top:3px">
+            <span>15 MAR</span><span>APR</span><span>MAY</span><span>JUN</span><span>15 JUL</span>
+          </div>
+        </div>
+      </div>
+      <div style="width:430px;flex:none;border:1px solid #262a33">
+        <div style="padding:8px 12px;border-bottom:1px solid #262a33;background:#12151b;display:flex;align-items:baseline;gap:8px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.1em">CLOSING LINE VALUE</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e">BEATING THE CLOSE IS CLOSE TO THE DEFINITION OF A GOOD BET</span>
+        </div>
+        <div style="padding:10px 12px">
+          <div style="display:flex;align-items:center;gap:2px;height:120px">
+            <sc-for list="{{ clvBars }}" as="c" hint-placeholder-count="18">
+              <div style="flex:1;display:flex;flex-direction:column;justify-content:{{ c.justify }};height:120px">
+                <div style="height:{{ c.h }}px;background:{{ c.color }}"></div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;margin-top:6px">
+            <span style="color:#8b929e">AVERAGE CLV</span>
+            <span style="font-size:16px;font-weight:600;color:{{ clv.avgColor }}">{{ clv.avg }}</span>
+            <span style="color:#6f757f">n={{ clv.n }} · 95% CI {{ clv.ci }}</span>
+            <span style="margin-left:auto;color:{{ clv.beatColor }}">{{ clv.beat }} BEAT THE CLOSE</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:14px;margin-top:14px;align-items:stretch">
+      <div style="flex:1;min-width:0;border:1px solid #262a33">
+        <div style="padding:8px 12px;border-bottom:1px solid #262a33;background:#12151b;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.1em">BY BET TYPE</div>
+        <div style="display:grid;grid-template-columns:64px 44px 78px 78px 90px 92px 1fr;align-items:center;height:24px;border-bottom:1px solid #1e232c;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.08em;color:#6f757f">
+          <div style="padding:0 10px">TYPE</div><div style="padding:0 6px;text-align:right">n</div>
+          <div style="padding:0 8px;text-align:right">STAKE</div><div style="padding:0 8px;text-align:right">RETURN</div>
+          <div style="padding:0 8px;text-align:right">STRIKE</div><div style="padding:0 8px;text-align:right">ROI</div>
+          <div style="padding:0 10px">95% CI ON ROI</div>
+        </div>
+        <sc-for list="{{ byType }}" as="t" hint-placeholder-count="5">
+          <div style="display:grid;grid-template-columns:64px 44px 78px 78px 90px 92px 1fr;align-items:center;height:28px;border-bottom:1px solid #191d24;font-family:'IBM Plex Mono',monospace;font-size:11px;opacity:{{ t.opacity }}">
+            <div style="padding:0 10px;font-weight:600;color:{{ t.labelColor }}">{{ t.type }}</div>
+            <div style="padding:0 6px;text-align:right;color:{{ t.nColor }}">{{ t.n }}</div>
+            <div style="padding:0 8px;text-align:right;color:#cfd3da">${{ t.stake }}</div>
+            <div style="padding:0 8px;text-align:right;color:#cfd3da">${{ t.ret }}</div>
+            <div style="padding:0 8px;text-align:right"><span style="color:#cfd3da">{{ t.sr }}</span><span style="font-size:9px;color:{{ t.nColor }}"> {{ t.srN }}</span></div>
+            <div style="padding:0 8px;text-align:right;font-weight:600;color:{{ t.roiColor }}">{{ t.roi }}</div>
+            <div style="padding:0 10px;display:flex;align-items:center;gap:7px">
+              <div style="position:relative;flex:1;height:7px;background:#191d24">
+                <div style="position:absolute;left:50%;top:-2px;width:1px;height:11px;background:#3a4150"></div>
+                <div style="position:absolute;left:{{ t.ciLeft }}%;width:{{ t.ciW }}%;top:0;height:7px;background:{{ t.ciColor }}"></div>
+              </div>
+              <span style="font-size:9px;color:{{ t.nColor }};width:84px;text-align:right;white-space:nowrap">{{ t.ciLabel }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="width:430px;flex:none;border:1px solid #262a33">
+        <div style="padding:8px 12px;border-bottom:1px solid #262a33;background:#12151b;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.1em">ALL-UP vs THE STRAIGHT BET IT REPLACED</div>
+        <div style="padding:10px 12px">
+          <sc-for list="{{ allUpVs }}" as="a" hint-placeholder-count="2">
+            <div style="margin-bottom:9px">
+              <div style="display:flex;align-items:baseline;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11px">
+                <span style="color:{{ a.color }};letter-spacing:.06em">{{ a.label }}</span>
+                <span style="color:#6f757f">n={{ a.n }}</span>
+                <span style="margin-left:auto;color:#cfd3da">${{ a.stake }} → ${{ a.ret }}</span>
+                <span style="width:64px;text-align:right;font-size:13px;font-weight:600;color:{{ a.roiColor }}">{{ a.roi }}</span>
+              </div>
+              <div style="height:9px;background:#191d24;margin-top:4px"><div style="height:9px;background:{{ a.barColor }};width:{{ a.w }}%"></div></div>
+            </div>
+          </sc-for>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#c9748f;line-height:1.55;border-top:1px solid #1e232c;padding-top:7px">Anchoring a chain on the best selection is sound. Funding it by shrinking the straight conviction bet is the error — when the anchor won, the straight bet outperformed the bundle.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:14px;margin-top:14px;align-items:stretch">
+      <div style="flex:1;min-width:0;border:1px solid #262a33">
+        <div style="padding:8px 12px;border-bottom:1px solid #262a33;background:#12151b;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.1em">BY MARKET CONCENTRATION BAND · DOES THE COVERAGE RULE HOLD</div>
+        <div style="padding:10px 12px">
+          <sc-for list="{{ byBand }}" as="b" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:9px;height:26px;font-family:'IBM Plex Mono',monospace;font-size:11px;opacity:{{ b.opacity }}">
+              <span style="width:92px;color:{{ b.color }};letter-spacing:.06em">{{ b.band }}</span>
+              <span style="width:44px;color:{{ b.nColor }};text-align:right">n={{ b.n }}</span>
+              <div style="flex:1;height:9px;background:#191d24;position:relative">
+                <div style="position:absolute;left:50%;top:-2px;width:1px;height:13px;background:#3a4150"></div>
+                <div style="position:absolute;left:{{ b.left }}%;width:{{ b.w }}%;top:0;height:9px;background:{{ b.barColor }}"></div>
+              </div>
+              <span style="width:66px;text-align:right;font-weight:600;color:{{ b.roiColor }}">{{ b.roi }}</span>
+              <span style="width:120px;text-align:right;font-size:9px;color:{{ b.nColor }}">{{ b.ciLabel }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="width:430px;flex:none;border:1px solid #262a33">
+        <div style="padding:8px 12px;border-bottom:1px solid #262a33;background:#12151b;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.1em">FAVOURITE INCLUDED vs EXCLUDED</div>
+        <div style="padding:10px 12px">
+          <sc-for list="{{ byFav }}" as="f" hint-placeholder-count="2">
+            <div style="margin-bottom:9px">
+              <div style="display:flex;align-items:baseline;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11px">
+                <span style="color:{{ f.color }};letter-spacing:.06em">{{ f.label }}</span>
+                <span style="color:#6f757f">n={{ f.n }}</span>
+                <span style="margin-left:auto;color:#cfd3da">${{ f.stake }} → ${{ f.ret }}</span>
+                <span style="width:64px;text-align:right;font-size:13px;font-weight:600;color:{{ f.roiColor }}">{{ f.roi }}</span>
+              </div>
+              <div style="height:9px;background:#191d24;margin-top:4px"><div style="height:9px;background:{{ f.barColor }};width:{{ f.w }}%"></div></div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;margin-top:3px">{{ f.share }}</div>
+            </div>
+          </sc-for>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#c9748f;line-height:1.55;border-top:1px solid #1e232c;padding-top:7px">{{ favNote }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:16px;padding:9px 2px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e;flex-wrap:wrap">
+      <span>EVERY FIGURE CARRIES n AND AN INTERVAL · A 12-BET SLICE IS NOT A FINDING</span>
+      <span style="margin-left:auto;color:#6f757f">SLICES UNDER {{ thinN }} BETS ARE DIMMED</span>
+    </div>
+  </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;thinSampleCutoff&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:8,&quot;min&quot;:3,&quot;max&quot;:20,&quot;step&quot;:1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Analysis&quot;}}">
+const AMBER = '#f0a824', TEAL = '#2ec4b6', MUTED = '#8b929e', MAGENTA = '#c9748f';
+const WIN = '#35b37e', LOSS = '#e0637f', VIOLET = '#b7a2e8', COPPER = '#c8792f';
+
+// Two accounts. The dropdown is quiet; the 5px rule and the band carry the signal.
+const ACCOUNTS = [
+  { k: 'brett', name: 'BRETT', color: TEAL, band: '#101a1a', rule: '#1e4a45', dim: '#5f7a78' },
+  { k: 'kelvin', name: 'KELVIN', color: VIOLET, band: '#161426', rule: '#3a3358', dim: '#7a7392' },
+];
+
+// SELECTED / HOVER / DEFAULT are declared as complete fg+bg+border triples.
+// Hover NEVER touches foreground — every interactive element uses one static
+// inset-shadow wash instead, which reads correctly on light and dark alike.
+function chip(on, tone) {
+  const t = tone || {};
+  return on
+    ? { fg: t.onFg || '#0e1117', bg: t.onBg || '#fafafa', border: t.onBorder || (t.onBg || '#fafafa') }
+    : { fg: t.offFg || MUTED, bg: 'transparent', border: t.offBorder || '#2b303a' };
+}
+
+// no, name, draw, jockey, winOdds, placeOdds (scraped, never derived), style, bb, vet
+const CARD = [
+  [10, 'KYRUS TREASURE', 6, 'J Moreira', 3.0, 1.4, 'On-Pace', false, null],
+  [2, 'CASA ROCHESTER', 2, 'L Ferraris', 4.9, 1.9, 'Midfield', false, null],
+  [12, 'OCEAN IMPACT', 9, 'K Teetan', 6.1, 2.3, 'Closer', false, ['routine', 'passed post-race exam 04 Jul']],
+  [8, 'FIREFOOT', 8, 'J Orman', 7.5, 2.6, 'Closer', true, null],
+  [4, 'ROMANTIC LAOS', 3, 'K C Leung', 12, 3.8, 'Midfield', false, null],
+  [9, 'NOBLE PURSUIT', 1, 'E C W Wong', 15, 4.1, 'Leader', true, null],
+  [1, 'HARMONY GALAXY', 5, 'B Avdulla', 16, 5.2, 'Midfield', false, ['significant', 'barred pending official trial, cleared 02 Jul']],
+  [6, 'STORM RUNNER', 12, 'A Atzeni', 18, 5.5, 'Closer', false, null],
+  [11, 'NORTHERN BEAST', 10, 'M F Poon', 26, 7.4, 'On-Pace', false, null],
+  [3, 'VOLCANIC SPARK', 11, 'C Y Ho', 32, 9.8, 'Leader', false, null],
+  [5, 'SERANGOON', 7, 'H Bowman', 33, 8.6, 'Midfield', false, ['routine', 'passed post-race exam 21 Jun']],
+  [7, 'FAST SPEED', 4, 'P N Wong', 51, 14.0, 'Closer', false, null],
+];
+const STYLE_SKIN = {
+  'Leader': { color: '#ff8a5c', bg: '#3a2013' }, 'On-Pace': { color: '#e8c04a', bg: '#3a3012' },
+  'Midfield': { color: '#9aa7b8', bg: '#1f2630' }, 'Closer': { color: '#4fb3e0', bg: '#12283a' },
+};
+
+const RACE_META = {
+  1: '1200m C5', 2: '1650m C4', 3: '1800m C4', 4: '1200m C3', 5: '1650m C4', 6: '1000m C2',
+  7: '1800m C4', 8: '1200m C3', 9: '2200m C4', 10: '1650m C5', 11: '1200m C4',
+};
+const RACE_OFF = {
+  1: '15:15', 2: '15:45', 3: '16:45', 4: '17:15', 5: '17:45', 6: '18:15',
+  7: '18:45', 8: '19:15', 9: '19:45', 10: '20:15', 11: '20:45',
+};
+const RACE_COND = {
+  1: 'Turf 1200m · Good · Class 5', 2: 'Turf 1650m · Good · Class 4', 3: 'Turf 1800m · Good · Class 4',
+  4: 'Turf 1200m · Good · Class 3', 5: 'Turf 1650m · Good · Class 4', 6: 'Turf 1000m · Good · Class 2',
+  7: 'Turf 1800m · Yielding · Class 4', 8: 'Turf 1200m · Good · Class 3', 9: 'Turf 2200m · Good · Class 4',
+  10: 'AWT 1650m · Good · Class 5', 11: 'Turf 1200m · Good · Class 4',
+};
+// per-race field for the All-Up leg tables: no, name, win odds, place odds, scratched
+const RACE_FIELDS = {
+  1: [[7, 'GOLD MOUNT', 3.1, 1.4, false], [4, 'SIGHT HERO', 6.4, 2.2, false], [2, 'LUCKY PRIDE', 5.2, 1.9, false], [9, 'TOP HOPE', 11, 3.4, false], [5, 'BRAVE POWER', 14, 4.1, true]],
+  2: [[8, 'WINNING VIBE', 3.9, 1.6, false], [5, 'GLORY STAR', 4.4, 1.8, false], [3, 'ROYAL RACER', 7.8, 2.4, false], [11, 'SUPER FORTUNE', 21, 5.4, false]],
+  4: [[1, 'GOOD FIT', 4.1, 1.7, false], [2, 'GRAND DELIGHT', 5.5, 2.0, false], [6, 'I EXCELLE', 8.2, 2.6, false], [10, 'BRAVE POWER', 13, 3.8, false], [8, 'MR ANDERSON', 26, 6.9, true]],
+  5: [[2, 'KING OPIE', 4.6, 1.8, false], [6, 'WINNING ENDEAVOUR', 8.1, 2.7, false], [9, 'MR ANDERSON', 12, 3.6, false], [11, 'SUPER FORTUNE', 21, 5.4, false]],
+  6: [[8, 'SPICY GRILL', 3.4, 1.5, false], [5, 'MIRACLE VICTORY', 6.7, 2.3, false], [3, 'ATOMIC FORCE', 9.8, 3.1, false]],
+  7: [[7, 'MISTER MONACO', 4.4, 1.8, false], [1, 'SOUND GUARD', 5.1, 2.0, false], [4, 'SILVER HERO', 9.2, 2.9, false], [12, 'TOUCH OF LUCK', 33, 8.2, false], [6, 'GENERAL WINNER', 18, 5.0, true]],
+  8: [[9, 'KING OPIE', 3.8, 1.6, false], [2, 'TRIPLE MOON', 7.2, 2.4, false], [5, 'GENERAL WINNER', 9.4, 3.0, false]],
+  9: [[1, 'ANGEL OF PEACE', 4.9, 1.9, false], [5, 'PACKING TREADMILL', 6.4, 2.2, false], [12, 'DIAMOND SOARES', 14, 4.0, false]],
+  10: [[7, 'SIGHT HERO', 5.6, 2.1, false], [9, 'GOLDEN FORTUNE', 8.8, 2.8, false], [3, 'HAPPY JOURNEY', 12, 3.6, false]],
+  11: [[2, 'MR ANDERSON', 4.7, 1.9, false], [4, 'HAILTOTHEVICTORS', 6.2, 2.2, false], [7, 'MASSIVE MOVE', 18, 5.0, false]],
+};
+RACE_FIELDS[3] = CARD.map(r => [r[0], r[1], r[4], r[5], false]);
+
+const TYPES = ['WIN', 'PLACE', 'QIN', 'QPL', 'ALL-UP'];
+const LEG_TYPES = ['WIN', 'PLACE', 'QIN', 'QPL'];
+const STAKE_CHIPS = [100, 200, 500, 1000];
+const BB_LINKS = ['none', '8 FIREFOOT', '9 NOBLE PURSUIT'];
+
+// Sources report last success and a row count — silent success and silent failure never look alike.
+const SOURCES = [
+  { k: 'card', name: 'Card', mins: 122, normal: 720, rows: '47 runners · 12 gear · 4 scratchings' },
+  { k: 'odds', name: 'Odds', mins: 47, normal: 15, rows: '132 win · 132 place · 2 matrices' },
+  { k: 'results', name: 'Results', mins: null, normal: 240, rows: '0 rows — nothing run yet today' },
+  { k: 'trials', name: 'Trials', mins: 4320, normal: 10080, rows: '38 trials · 38 comments' },
+  { k: 'vet', name: 'Vet', mins: 118, normal: 720, rows: '6 records · 2 significant' },
+];
+
+// ledger: date, meeting, race, type, selections, stake, return, account, imported, reconciled,
+//         blackbook, priceTaken, closePrice, favIncluded, band, override
+const LEDGER = [
+  ['15 Jul', 'HV', 'R1', 'WIN', '4 SIGHT HERO', 300, 0, 'brett', false, true, '', 6.4, 7.1, true, 'STRONG', false],
+  ['15 Jul', 'HV', 'R2', 'QPL', '2 · 5, 7, 9', 300, 640, 'brett', false, true, '', 9.2, 8.4, true, 'MEDIUM', false],
+  ['15 Jul', 'HV', 'R2', 'PLACE', '11 SUPER FORTUNE', 200, 0, 'kelvin', false, true, '11 SUPER FORTUNE', 4.1, 4.6, false, 'MEDIUM', true],
+  ['12 Jul', 'ST', 'R5', 'QIN', '3 · 6, 8', 400, 0, 'brett', false, true, '', 14.0, 11.5, false, 'WEAK', true],
+  ['12 Jul', 'ST', 'R7', 'WIN', '4 SILVER HERO', 500, 2380, 'brett', false, true, '4 SILVER HERO', 4.8, 4.2, true, 'STRONG', false],
+  ['12 Jul', 'ST', 'R9', 'QPL', '5 · 1, 4, 12', 300, 0, 'kelvin', true, false, '5 PACKING TREADMILL', 7.6, 8.9, true, 'MEDIUM', false],
+  ['08 Jul', 'HV', 'R3', 'WIN', '8 FIREFOOT', 400, 0, 'brett', false, true, '8 FIREFOOT', 8.5, 7.5, true, 'STRONG', false],
+  ['08 Jul', 'HV', 'R6', 'ALL-UP', 'R6 2 → R8 5', 200, 1180, 'brett', false, true, '', 11.2, 9.8, true, 'MEDIUM', false],
+  ['05 Jul', 'ST', 'R2', 'PLACE', '7 MASSIVE MOVE', 300, 690, 'kelvin', false, true, '7 MASSIVE MOVE', 3.4, 3.1, true, 'STRONG', false],
+  ['05 Jul', 'ST', 'R4', 'QIN', '1 · 3, 9, 11', 600, 0, 'brett', true, false, '', 16.5, 21.0, false, 'WEAK', true],
+  ['28 Jun', 'HV', 'R7', 'WIN', '12 TOUCH OF LUCK', 300, 0, 'brett', false, true, '12 TOUCH OF LUCK', 28.0, 33.0, false, 'WEAK', false],
+  ['28 Jun', 'HV', 'R9', 'QPL', '5 · 2, 6', 400, 1240, 'kelvin', false, true, '', 6.1, 5.4, true, 'MEDIUM', false],
+  ['21 Jun', 'ST', 'R3', 'WIN', '2 GRAND DELIGHT', 300, 0, 'brett', false, true, '2 GRAND DELIGHT', 5.9, 5.5, true, 'STRONG', false],
+  ['21 Jun', 'ST', 'R8', 'PLACE', '9 KING OPIE', 400, 980, 'brett', false, true, '', 3.8, 3.5, true, 'STRONG', false],
+  ['14 Jun', 'HV', 'R5', 'QIN', '6 · 2, 4', 400, 0, 'kelvin', false, true, '', 12.5, 15.0, false, 'MEDIUM', false],
+  ['14 Jun', 'HV', 'R11', 'WIN', '7 MISTER MONACO', 500, 2650, 'brett', false, true, '', 5.6, 4.9, true, 'MEDIUM', false],
+  ['07 Jun', 'ST', 'R4', 'QPL', '3 · 7, 10, 12', 300, 0, 'brett', false, true, '', 18.0, 22.0, false, 'WEAK', true],
+  ['07 Jun', 'ST', 'R6', 'WIN', '5 WINNING VIBE', 400, 2960, 'brett', false, true, '5 WINNING VIBE', 7.9, 6.8, true, 'STRONG', false],
+  ['31 May', 'HV', 'R2', 'PLACE', '1 TRIPLE MOON', 300, 300, 'kelvin', false, true, '1 TRIPLE MOON', 4.4, 4.4, true, 'MEDIUM', false],
+  ['31 May', 'HV', 'R8', 'ALL-UP', 'R8 9 → R10 3 → R11 7', 300, 0, 'brett', false, true, '', 13.5, 17.0, false, 'WEAK', false],
+  ['24 May', 'ST', 'R1', 'WIN', '3 ATOMIC FORCE', 400, 0, 'brett', false, true, '3 ATOMIC FORCE', 9.8, 12.0, false, 'MEDIUM', false],
+  ['24 May', 'ST', 'R7', 'ALL-UP', 'R7 4 → R10 8', 200, 0, 'brett', false, true, '', 14.0, 16.5, false, 'WEAK', true],
+  ['17 May', 'HV', 'R4', 'QPL', '2 · 6, 9', 400, 890, 'brett', false, true, '', 8.2, 7.4, true, 'MEDIUM', false],
+  ['10 May', 'ST', 'R6', 'WIN', '11 SUPER FORTUNE', 300, 0, 'brett', false, true, '11 SUPER FORTUNE', 19.0, 21.0, false, 'WEAK', false],
+  ['03 May', 'HV', 'R9', 'PLACE', '5 SPICY GRILL', 400, 1080, 'brett', false, true, '', 4.9, 4.3, true, 'STRONG', false],
+  ['26 Apr', 'ST', 'R5', 'QIN', '4 · 2, 8', 400, 1620, 'kelvin', false, true, '', 10.5, 9.2, true, 'MEDIUM', false],
+  ['19 Apr', 'HV', 'R3', 'WIN', '7 GLORY STAR', 300, 0, 'brett', false, true, '7 GLORY STAR', 11.0, 13.5, false, 'WEAK', false],
+  ['12 Apr', 'ST', 'R8', 'QPL', '1 · 4, 7', 300, 720, 'brett', false, true, '', 7.1, 6.5, true, 'MEDIUM', false],
+  ['05 Apr', 'HV', 'R6', 'WIN', '6 SIGHT HERO', 500, 3400, 'brett', false, true, '6 SIGHT HERO', 7.4, 6.2, true, 'STRONG', false],
+  ['29 Mar', 'ST', 'R2', 'PLACE', '8 WINNING VIBE', 300, 0, 'kelvin', false, true, '', 3.9, 4.4, true, 'MEDIUM', false],
+  ['22 Mar', 'HV', 'R7', 'ALL-UP', 'R7 5 → R9 3', 400, 0, 'brett', false, true, '', 15.5, 19.0, false, 'WEAK', false],
+  ['15 Mar', 'ST', 'R4', 'WIN', '9 ROYAL RACER', 300, 1290, 'brett', false, true, '', 4.6, 4.1, true, 'STRONG', false],
+];
+
+// straight bets that were shrunk to fund a chain — the comparison the brief asks for
+const STRAIGHT_VS_CHAIN = { chainStake: 1100, chainRet: 1180, straightStake: 1100, straightRet: 2340, chainN: 4, straightN: 4 };
+
+const CEILING = 3000;
+const MAX_COMBOS = 8;
+
+function pctSigned(v) { return (v > 0 ? '+' : (v < 0 ? '−' : '')) + Math.abs(v * 100).toFixed(0) + '%'; }
+function pct1(v) { return (v * 100).toFixed(1) + '%'; }
+function money(v) { return Math.round(v).toLocaleString('en-US'); }
+function comb(n, k) {
+  if (k < 0 || k > n) return 0;
+  let r = 1;
+  for (let i = 0; i < k; i++) r = r * (n - i) / (i + 1);
+  return Math.round(r);
+}
+function fmtOdds(v) { return v >= 10 ? String(Math.round(v)) : v.toFixed(1); }
+function ageLabel(mins) {
+  if (mins == null) return '—';
+  if (mins < 60) return mins + 'm';
+  if (mins < 1440) return Math.round(mins / 60) + 'h';
+  return Math.round(mins / 1440) + 'd';
+}
+
+// exact Harville-Henery top-3 probability from de-vigged win probabilities
+function harvillePlace(p, i) {
+  const n = p.length;
+  let total = p[i];
+  for (let j = 0; j < n; j++) {
+    if (j === i) continue;
+    total += p[j] * p[i] / (1 - p[j]);
+    for (let k = 0; k < n; k++) {
+      if (k === i || k === j) continue;
+      total += p[j] * (p[k] / (1 - p[j])) * (p[i] / (1 - p[j] - p[k]));
+    }
+  }
+  return Math.min(1, total);
+}
+
+class Component extends DCLogic {
+  state = {
+    account: 'brett', acctOpen: false, view: 'entry', type: 'QPL', race: 3,
+    sel: [8, 9, 2, 12, 4], banker: null,
+    unit: 200, unitText: '200', bbLink: '8 FIREFOOT',
+    allUpRaces: [3, 5, 7], allUpTypes: { 3: 'WIN', 5: 'QPL', 7: 'WIN' },
+    allUpSel: { 3: [8], 5: [11, 6], 7: [4] }, allUpBanker: { 5: 6 }, allUpLegs: 3,
+    overrides: {}, placed: false, ledgerFilter: 'ALL', refreshed: null,
+  };
+
+  toggleSel(no) {
+    this.setState(s => {
+      const on = s.sel.indexOf(no) >= 0;
+      const sel = on ? s.sel.filter(x => x !== no) : s.sel.concat([no]);
+      // deselecting the banker clears the banker rather than leaving a dangling reference
+      const banker = on && s.banker === no ? null : s.banker;
+      return { sel, banker, placed: false };
+    });
+  }
+  setBanker(no) {
+    this.setState(s => ({
+      banker: s.banker === no ? null : no,
+      sel: s.sel.indexOf(no) >= 0 ? s.sel : s.sel.concat([no]),
+      placed: false,
+    }));
+  }
+  setUnit(e) {
+    const raw = String(e.target.value).replace(/[^0-9]/g, '');
+    this.setState({ unitText: raw, unit: raw === '' ? 0 : Number(raw), placed: false });
+  }
+  toggleAllUpRace(n) {
+    this.setState(s => {
+      const on = s.allUpRaces.indexOf(n) >= 0;
+      const races = on ? s.allUpRaces.filter(x => x !== n) : s.allUpRaces.concat([n]).sort((a, b) => a - b);
+      const types = Object.assign({}, s.allUpTypes);
+      const sel = Object.assign({}, s.allUpSel);
+      if (on) { delete types[n]; delete sel[n]; } else { types[n] = 'WIN'; sel[n] = []; }
+      return {
+        allUpRaces: races, allUpTypes: types, allUpSel: sel,
+        allUpLegs: Math.min(s.allUpLegs, races.length) || races.length,
+        placed: false,
+      };
+    });
+  }
+  toggleAllUpRunner(race, no) {
+    this.setState(s => {
+      const cur = s.allUpSel[race] || [];
+      const on = cur.indexOf(no) >= 0;
+      const sel = Object.assign({}, s.allUpSel);
+      sel[race] = on ? cur.filter(x => x !== no) : cur.concat([no]);
+      const bank = Object.assign({}, s.allUpBanker);
+      if (on && bank[race] === no) delete bank[race];
+      return { allUpSel: sel, allUpBanker: bank, placed: false };
+    });
+  }
+  setAllUpBanker(race, no) {
+    this.setState(s => {
+      const bank = Object.assign({}, s.allUpBanker);
+      const sel = Object.assign({}, s.allUpSel);
+      if (bank[race] === no) { delete bank[race]; } else {
+        bank[race] = no;
+        const cur = sel[race] || [];
+        if (cur.indexOf(no) < 0) sel[race] = cur.concat([no]);
+      }
+      return { allUpBanker: bank, allUpSel: sel, placed: false };
+    });
+  }
+
+  probs() {
+    if (this._p) return this._p;
+    const raw = CARD.map(r => 1 / r[4]);
+    const sum = raw.reduce((a, b) => a + b, 0);
+    this._p = { p: raw.map(v => v / sum), over: sum };
+    return this._p;
+  }
+
+  // combination count, stated as a formula so the arithmetic is checkable
+  comboInfo() {
+    const st = this.state;
+    if (st.type === 'ALL-UP') {
+      const n = st.allUpRaces.length, r = Math.min(st.allUpLegs, n);
+      return { count: n < 2 ? 0 : comb(n, r), formula: n < 2 ? '' : 'C(' + n + ',' + r + ')' };
+    }
+    const n = st.sel.length;
+    if (st.type === 'WIN' || st.type === 'PLACE') return { count: n, formula: n + ' × single' };
+    if (st.banker != null && st.sel.indexOf(st.banker) >= 0) {
+      const legs = n - 1;
+      return { count: Math.max(0, legs), formula: 'banker × ' + legs + ' legs' };
+    }
+    return { count: comb(n, 2), formula: 'C(' + n + ',2)' };
+  }
+
+  renderVals() {
+    const st = this.state;
+    const acct = ACCOUNTS.find(a => a.k === st.account) || ACCOUNTS[0];
+    const { p } = this.probs();
+    const thinN = this.props.thinSampleCutoff ?? 8;
+    const type = st.type;
+    const isAllUp = type === 'ALL-UP';
+    const isExotic = type === 'QIN' || type === 'QPL';
+
+    const ledger = LEDGER.filter(b => b[7] === st.account);
+    const filtered = ledger.filter(b => {
+      if (st.ledgerFilter === 'ALL') return true;
+      if (st.ledgerFilter === 'WON') return b[6] > b[5];
+      if (st.ledgerFilter === 'LOST') return b[6] === 0;
+      if (st.ledgerFilter === 'IMPORTED') return b[8];
+      if (st.ledgerFilter === 'UNRECONCILED') return !b[9];
+      return b[3] === st.ledgerFilter;
+    });
+
+    const ci = this.comboInfo();
+    const combos = ci.count;
+    const total = combos * st.unit;
+    const dayTotal = ledger.filter(b => b[0] === '15 Jul').reduce((a, b) => a + b[5], 0);
+    const projected = dayTotal + total;
+
+    const selIdx = st.sel.map(no => CARD.findIndex(r => r[0] === no)).filter(i => i >= 0);
+    const bankerIdx = st.banker == null ? null : CARD.findIndex(r => r[0] === st.banker);
+    const hasBanker = bankerIdx != null && bankerIdx >= 0 && st.sel.indexOf(st.banker) >= 0;
+    const favIdx = 0;
+    const favIncluded = isAllUp
+      ? Object.keys(st.allUpSel).some(k => (st.allUpSel[k] || []).length > 0)
+      : selIdx.indexOf(favIdx) >= 0;
+
+    const bankerPlaceP = hasBanker ? harvillePlace(p, bankerIdx) : null;
+    const bankerLinearP = hasBanker ? Math.min(1, p[bankerIdx] * 3) : null;
+
+    const pairs = [];
+    for (let a = 0; a < selIdx.length; a++) {
+      for (let b = a + 1; b < selIdx.length; b++) {
+        const i = selIdx[a], j = selIdx[b];
+        pairs.push({ i, j, prob: p[i] * (p[j] / (1 - p[i])) + p[j] * (p[i] / (1 - p[j])) });
+      }
+    }
+    pairs.sort((x, y) => y.prob - x.prob);
+    const maxPair = pairs.length ? pairs[0].prob : 1;
+
+    const conc3 = (p[0] + p[1] + p[2]) * 100;
+    const bandOf = v => (v >= 55 ? 'STRONG' : (v >= 42 ? 'MEDIUM' : 'WEAK'));
+    const band = bandOf(conc3), morning = conc3 - 6.4;
+
+    const ratios = CARD.map(r => r[4] / r[5]);
+    const ratioRange = Math.min.apply(null, ratios).toFixed(2) + '× TO ' + Math.max.apply(null, ratios).toFixed(2) + '×';
+
+    // guardrails — every one warns and logs, none blocks
+    const flags = [];
+    if (st.unit > 0 && projected > CEILING) {
+      flags.push({ k: 'ceiling', title: 'RACEDAY CEILING', detail: '$' + money(projected) + ' of $' + money(CEILING) + ' with this ticket' });
+    }
+    if (combos > MAX_COMBOS) {
+      flags.push({ k: 'combos', title: 'COMBINATION COUNT', detail: combos + ' lines against a soft limit of ' + MAX_COMBOS });
+    }
+    if (!favIncluded && !isAllUp && selIdx.length > 1) {
+      flags.push({ k: 'fav', title: 'FAVOURITE EXCLUDED', detail: 'ticket leaves out 10 KYRUS TREASURE at ' + fmtOdds(CARD[0][4]) });
+    }
+    const anchorRace = isAllUp ? st.allUpRaces[0] : null;
+    const anchorNos = isAllUp ? (st.allUpSel[anchorRace] || []) : [];
+    const anchorClash = isAllUp && anchorNos.length === 1 && ledger.some(b =>
+      b[2] === 'R' + anchorRace && b[3] !== 'ALL-UP' && b[0] === '15 Jul');
+    if (anchorClash) {
+      flags.push({ k: 'anchor', title: 'ANCHOR ALSO HAS A STRAIGHT BET', detail: 'R' + anchorRace + ' already carries a straight bet today' });
+    }
+
+    const findings = [];
+    if (isExotic && hasBanker && bankerIdx !== favIdx) {
+      findings.push({
+        title: 'BANKER IS NOT THE FAVOURITE', stat: 'QPL −11.3% v QIN −35.1%',
+        body: type === 'QIN'
+          ? 'A non-favourite banker has survived far better in QPL than QIN. If the banker is a good selection that will not necessarily win, QPL is the structurally correct pool.'
+          : 'QPL is the structurally correct pool for a non-favourite banker — this ticket is already in it.',
+        rule: type === 'QIN' ? AMBER : TEAL, bg: type === 'QIN' ? '#1c1608' : '#101a1a',
+      });
+    }
+    if (isExotic && !hasBanker && selIdx.length >= 4) {
+      findings.push({
+        title: 'BOXED, NOT BANKERED', stat: comb(selIdx.length, 2) + ' lines v ' + (selIdx.length - 1) + ' with a banker',
+        body: 'A boxed set of ' + selIdx.length + ' costs ' + comb(selIdx.length, 2) + ' lines. Naming a banker cuts that to ' + (selIdx.length - 1) + ' and concentrates the stake on the selection you rate highest. Boxing is the right call only when you genuinely cannot separate the top of the set.',
+        rule: AMBER, bg: '#1c1608',
+      });
+    }
+    if (anchorClash) {
+      findings.push({
+        title: 'FUNDING THE CHAIN', stat: 'straight +113% v chain +7%',
+        body: 'Anchoring on your best selection is sound. Shrinking the straight bet to pay for the chain is the part that has cost money — when the anchor won, the straight bet beat the bundle.',
+        rule: MAGENTA, bg: '#1a1218',
+      });
+    }
+    if (!favIncluded && !isAllUp && selIdx.length > 1) {
+      findings.push({
+        title: 'LOSS CENTRE PATTERN', stat: this.favStat(),
+        body: 'Favourite-excluded tickets carry a disproportionate share of net losses relative to stake in your own record. Not a rule — but this ticket is in that group.',
+        rule: MAGENTA, bg: '#1a1218',
+      });
+    }
+
+    const agg = rows => {
+      const stake = rows.reduce((a, b) => a + b[5], 0);
+      const ret = rows.reduce((a, b) => a + b[6], 0);
+      const wins = rows.filter(b => b[6] > b[5]).length;
+      const roiV = stake ? (ret - stake) / stake : 0;
+      const sd = rows.length > 1 ? Math.sqrt(rows.reduce((a, b) => {
+        const r = (b[6] - b[5]) / Math.max(b[5], 1);
+        return a + Math.pow(r - roiV, 2);
+      }, 0) / (rows.length - 1)) : 1;
+      return { n: rows.length, stake, ret, wins, roiV, half: rows.length ? 1.96 * sd / Math.sqrt(rows.length) : 2 };
+    };
+    const scale = 100 / 4;
+    const ciBar = a => ({
+      ciLeft: Math.max(0, 50 + (a.roiV - a.half) * scale),
+      ciW: Math.min(100, a.half * 2 * scale),
+      ciLabel: pctSigned(a.roiV - a.half) + ' … ' + pctSigned(a.roiV + a.half),
+    });
+
+    const byType = TYPES.map(t => {
+      const a = agg(ledger.filter(b => b[3] === t));
+      const thin = a.n < thinN;
+      return Object.assign({
+        type: t, n: a.n, stake: money(a.stake), ret: money(a.ret),
+        sr: a.n ? (a.wins / a.n * 100).toFixed(0) + '%' : '—',
+        srN: a.n ? '(' + a.wins + '/' + a.n + ')' : '',
+        roi: a.n ? pctSigned(a.roiV) : '—',
+        roiColor: !a.n ? '#5b616b' : (thin ? MUTED : (a.roiV >= 0 ? WIN : LOSS)),
+        opacity: thin ? 0.5 : 1,
+        labelColor: thin ? MUTED : '#fafafa',
+        nColor: thin ? '#4c525c' : '#6f757f',
+        ciColor: thin ? '#242832' : '#2b3a44',
+      }, ciBar(a));
+    });
+
+    const byBand = ['STRONG', 'MEDIUM', 'WEAK'].map(bnd => {
+      const a = agg(ledger.filter(b => b[14] === bnd));
+      const thin = a.n < thinN;
+      const bar = ciBar(a);
+      return {
+        band: bnd, n: a.n, roi: a.n ? pctSigned(a.roiV) : '—',
+        roiColor: !a.n ? '#5b616b' : (thin ? MUTED : (a.roiV >= 0 ? WIN : LOSS)),
+        color: bnd === 'STRONG' ? AMBER : (bnd === 'MEDIUM' ? '#cfd3da' : MUTED),
+        barColor: thin ? '#3a4150' : (a.roiV >= 0 ? WIN : LOSS),
+        left: a.roiV >= 0 ? 50 : Math.max(0, 50 + a.roiV * scale),
+        w: Math.min(50, Math.abs(a.roiV) * scale),
+        opacity: thin ? 0.5 : 1,
+        nColor: thin ? '#4c525c' : '#6f757f',
+        ciLabel: a.n ? bar.ciLabel : 'no bets',
+      };
+    });
+
+    const favA = agg(ledger.filter(b => b[13])), noFavA = agg(ledger.filter(b => !b[13]));
+    const totalLoss = ledger.reduce((a, b) => a + Math.max(0, b[5] - b[6]), 0);
+    const noFavLoss = ledger.filter(b => !b[13]).reduce((a, b) => a + Math.max(0, b[5] - b[6]), 0);
+    const noFavShare = noFavA.stake / Math.max(1, favA.stake + noFavA.stake);
+
+    const clvRows = ledger.map(b => ({ v: (b[11] - b[12]) / b[12] }));
+    const clvAvg = clvRows.reduce((a, c) => a + c.v, 0) / Math.max(1, clvRows.length);
+    const clvSd = clvRows.length > 1 ? Math.sqrt(clvRows.reduce((a, c) => a + Math.pow(c.v - clvAvg, 2), 0) / (clvRows.length - 1)) : 0;
+    const clvHalf = 1.96 * clvSd / Math.sqrt(Math.max(1, clvRows.length));
+    const clvBeat = clvRows.filter(c => c.v > 0).length;
+    const clvMax = Math.max.apply(null, clvRows.map(c => Math.abs(c.v)).concat([0.2]));
+
+    const dates = ['15 Mar', '22 Mar', '29 Mar', '05 Apr', '12 Apr', '19 Apr', '26 Apr', '03 May', '10 May', '17 May', '24 May', '31 May', '07 Jun', '14 Jun', '21 Jun', '28 Jun', '05 Jul', '08 Jul', '12 Jul', '15 Jul'];
+    const series = ACCOUNTS.map(a => {
+      const rows = LEDGER.filter(b => b[7] === a.k);
+      let cum = 0;
+      return { acct: a, pts: dates.map(d => { rows.filter(b => b[0] === d).forEach(b => { cum += b[6] - b[5]; }); return cum; }), final: cum };
+    });
+    const allVals = series.reduce((acc, s) => acc.concat(s.pts), [0]);
+    const lo = Math.min.apply(null, allVals), hi = Math.max.apply(null, allVals);
+    const y = v => 190 - (v - lo) / Math.max(1, hi - lo) * 180;
+
+    // All-Up legs — only selected races render at all. Each leg is a real table:
+    // banker sits left of selection because it is the structural decision.
+    const allUpLegs = st.allUpRaces.map(r => {
+      const picks = st.allUpSel[r] || [];
+      const legType = st.allUpTypes[r] || 'WIN';
+      const legBanker = st.allUpBanker[r];
+      const need = legType === 'QIN' || legType === 'QPL' ? 2 : 1;
+      const ok = picks.length >= need;
+      const runnersRaw = RACE_FIELDS[r] || [];
+      const live = runnersRaw.filter(x => !x[4]);
+      const favNo = live.length ? live.slice().sort((a, b) => a[2] - b[2])[0][0] : null;
+      return {
+        race: 'Race ' + r, off: RACE_OFF[r], meta: RACE_COND[r],
+        drop: () => this.toggleAllUpRace(r),
+        typeChips: LEG_TYPES.map(t => {
+          const c = chip(t === legType);
+          return {
+            name: t, fg: c.fg, bg: c.bg, border: c.border,
+            go: () => this.setState(s => {
+              const types = Object.assign({}, s.allUpTypes); types[r] = t;
+              return { allUpTypes: types, placed: false };
+            }),
+          };
+        }),
+        pickNote: ok ? picks.length + ' selected' : (need === 2 ? 'pick 2 for ' + legType : 'pick a runner'),
+        pickColor: ok ? TEAL : COPPER,
+        runners: runnersRaw.map(([no, name, odds, plc, scr]) => {
+          const on = !scr && picks.indexOf(no) >= 0;
+          const isBanker = !scr && legBanker === no;
+          return {
+            no, name, scr, fav: !scr && no === favNo,
+            odds: fmtOdds(odds), placeOdds: plc.toFixed(1),
+            opacity: scr ? 0.4 : 1,
+            cursor: scr ? 'default' : 'pointer',
+            noColor: scr ? '#6f757f' : '#fafafa',
+            nameColor: scr ? '#8b929e' : (no === favNo ? '#fafafa' : '#cfd3da'),
+            nameWeight: no === favNo && !scr ? 600 : 400,
+            oddsColor: scr ? '#6f757f' : '#fafafa',
+            placeColor: scr ? '#5b616b' : '#cfd3da',
+            box: on ? '✓' : '',
+            boxFg: on ? '#0e1117' : '#3f4550',
+            boxBg: on ? '#cfd3da' : 'transparent',
+            boxBorder: on ? '#cfd3da' : '#3a4150',
+            bnk: isBanker ? 'B' : '',
+            bnkFg: isBanker ? '#0e1117' : '#3f4550',
+            bnkBg: isBanker ? AMBER : 'transparent',
+            bnkBorder: isBanker ? AMBER : '#3a4150',
+            bg: isBanker ? 'rgba(240,168,36,0.07)' : (on ? 'rgba(255,255,255,0.03)' : 'transparent'),
+            rule: isBanker ? AMBER : (on ? '#cfd3da' : 'transparent'),
+            sel: () => { if (!scr) this.toggleAllUpRunner(r, no); },
+            bank: (e) => { e.stopPropagation(); if (!scr) this.setAllUpBanker(r, no); },
+          };
+        }),
+      };
+    });
+    const nRaces = st.allUpRaces.length;
+    const formulas = [];
+    for (let r = nRaces; r >= 2; r--) {
+      const c = comb(nRaces, r);
+      formulas.push({
+        legs: r, combos: c, plural: c === 1 ? '' : 'S',
+        label: r + '×' + c,
+        on: st.allUpLegs === r,
+        go: () => this.setState({ allUpLegs: r, placed: false }),
+      });
+    }
+
+    const allUpComplete = nRaces >= 2 && allUpLegs.every(l => l.pickColor === TEAL);
+
+    return {
+      pages: [
+        ['Race Day', 'Race Day.dc.html'],
+        ['Form Guide', 'Form Guide.dc.html'],
+        ['Bets', 'Bets.dc.html'],
+        ['Blackbook', 'Blackbook.dc.html'],
+        ['Results', 'Results.dc.html'],
+        ['Lookup', 'Lookup.dc.html'],
+        ['Trials', 'Trials.dc.html'],
+      ].map(([name, href], i) => ({
+        name, color: i === 2 ? '#fafafa' : 'inherit', mark: i === 2 ? '#e63946' : 'transparent', href,
+      })),
+      byFav: [
+        {
+          label: 'FAVOURITE INCLUDED', n: favA.n, stake: money(favA.stake), ret: money(favA.ret),
+          roi: favA.n ? pctSigned(favA.roiV) : '—', roiColor: favA.roiV >= 0 ? WIN : LOSS,
+          color: '#cfd3da', barColor: favA.roiV >= 0 ? WIN : LOSS,
+          w: Math.min(100, Math.abs(favA.roiV) * 100),
+          share: 'holds ' + ((1 - noFavShare) * 100).toFixed(0) + '% of stake, ' + ((1 - noFavLoss / Math.max(1, totalLoss)) * 100).toFixed(0) + '% of gross losses',
+        },
+        {
+          label: 'FAVOURITE EXCLUDED', n: noFavA.n, stake: money(noFavA.stake), ret: money(noFavA.ret),
+          roi: noFavA.n ? pctSigned(noFavA.roiV) : '—', roiColor: noFavA.roiV >= 0 ? WIN : LOSS,
+          color: MAGENTA, barColor: MAGENTA,
+          w: Math.min(100, Math.abs(noFavA.roiV) * 100),
+          share: 'holds ' + (noFavShare * 100).toFixed(0) + '% of stake, ' + (noFavLoss / Math.max(1, totalLoss) * 100).toFixed(0) + '% of gross losses',
+        },
+      ],
+      favNote: 'Favourite-excluded tickets are ' + (noFavShare * 100).toFixed(0) + '% of stake but '
+        + (noFavLoss / Math.max(1, totalLoss) * 100).toFixed(0) + '% of gross losses on this account — on n=' + noFavA.n + '.',
+      thinN,
+    };
+  }
+
+  favStat() {
+    const rows = LEDGER.filter(b => b[7] === this.state.account);
+    const noFav = rows.filter(b => !b[13]);
+    const loss = rows.reduce((a, b) => a + Math.max(0, b[5] - b[6]), 0);
+    const noFavLoss = noFav.reduce((a, b) => a + Math.max(0, b[5] - b[6]), 0);
+    const share = noFav.reduce((a, b) => a + b[5], 0) / Math.max(1, rows.reduce((a, b) => a + b[5], 0));
+    return (share * 100).toFixed(0) + '% of stake, ' + (noFavLoss / Math.max(1, loss) * 100).toFixed(0) + '% of losses';
+  }
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,261 @@
+/* Lookup — ported from web/design-source/Lookup.dc.html.
+ *
+ * The whole archive, filtered, with five readings of the same slice. The
+ * filter bar, chips, section frames and panel boxes come from pages.css.
+ *
+ * Brief 07 §8 names the risk the styling has to carry: "This page's genuine
+ * risk is manufacturing false signals through repeated slicing. A pivot is the
+ * easiest way in this whole tool to manufacture a false finding." So a cell
+ * under the minimum sample is dimmed rather than hidden, every figure sits
+ * beside its n, and a rate only takes a colour when its interval clears the
+ * baseline.
+ */
+
+/* The shared chrome in pages.css is painted from these. Set once, here. */
+:root {
+  --page-accent:        var(--lk-accent);
+  --page-accent-ground: var(--lk-rule);
+  --page-dim:           var(--lk-dim);
+  --page-band:          var(--lk-band);
+  --page-rule:          var(--lk-rule);
+  --page-rule-2:        var(--lk-rule-2);
+  --page-hover:         var(--lk-hover);
+}
+
+.corpus-line {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  padding: 5px 14px; border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint);
+}
+.corpus-line b { color: var(--text-dim); font-weight: 400; }
+.corpus-line .sep { color: var(--line-3); }
+/* What is MISSING, which is the half of this line that earns its place. */
+.corpus-line .gap { color: var(--edge); }
+.corpus-line .why { margin-left: auto; color: var(--text-faint); }
+
+.lk-strip {
+  display: flex; align-items: center; gap: 2px; padding: 0 14px;
+  border-bottom: 1px solid var(--page-rule); background: var(--page-band);
+}
+.lk-brand {
+  display: flex; align-items: center; gap: 8px; padding: 9px 14px 9px 0;
+  font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 600;
+  letter-spacing: .14em; color: var(--page-accent);
+}
+.lk-brand .dot { width: 7px; height: 7px; background: var(--page-accent); }
+.lk-brand .sub { color: var(--page-dim); font-weight: 400; letter-spacing: .1em; }
+.lk-strip .seg { display: flex; border: 1px solid var(--line-3); margin: 0 12px 0 2px; }
+.lk-strip .seg button {
+  background: none; border: 0; cursor: pointer; padding: 4px 12px;
+  font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .1em;
+  color: var(--text-muted);
+}
+.lk-strip .seg button:hover { color: var(--text); }
+.lk-strip .seg button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+.lk-sum {
+  margin-left: auto; display: flex; gap: 16px; align-items: baseline;
+  font-family: var(--font-mono); font-size: var(--fs-xs);
+  letter-spacing: .08em; color: var(--text-dim);
+}
+.lk-sum b { color: var(--text-2); font-weight: 600; letter-spacing: 0; }
+
+/* ── layout ──────────────────────────────────────────────────────────────── */
+
+.lk-body { display: flex; align-items: flex-start; min-height: 0; }
+.lk-main { flex: 1; min-width: 0; }
+
+.filter-panel {
+  width: 232px; flex: none; align-self: stretch;
+  border-right: 1px solid var(--page-rule); background: var(--page-band);
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+}
+.fp-head {
+  display: flex; align-items: baseline; gap: 8px; padding: 8px 12px 6px;
+  border-bottom: 1px solid var(--page-rule-2);
+}
+.fp-head .t { letter-spacing: .12em; color: var(--text-2); font-weight: 600; }
+.fp-head .n { color: var(--page-accent); }
+.fp-clear {
+  margin-left: auto; background: none; border: 0; cursor: pointer;
+  color: var(--text-faint); font-family: var(--font-mono); font-size: var(--fs-xs);
+}
+.fp-clear:hover { color: var(--edge); }
+.fp-note {
+  padding: 4px 12px 8px; font-size: var(--fs-xs); color: var(--text-faint);
+}
+.fp-group { border-top: 1px solid var(--page-rule-2); padding: 7px 12px 9px; }
+.fp-group > .k {
+  display: block; font-size: var(--fs-xs); letter-spacing: .12em;
+  color: var(--page-dim); margin-bottom: 5px;
+}
+.fp-field { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.fp-field label {
+  width: 82px; flex: none; font-size: var(--fs-xs); color: var(--text-dim);
+}
+.fp-field input, .fp-field select {
+  flex: 1; min-width: 0; background: var(--bg); color: var(--text);
+  border: 1px solid var(--line-2); font-family: var(--font-mono);
+  font-size: var(--fs-xs); padding: 3px 5px;
+}
+.fp-field input:focus, .fp-field select:focus {
+  outline: 1px solid var(--page-accent); outline-offset: -1px;
+}
+
+/* ── the runs grid ───────────────────────────────────────────────────────── */
+
+.lk-head, .lk-row {
+  display: grid; align-items: center;
+  grid-template-columns:
+    86px 32px 40px 40px 44px 52px 44px 46px 34px 34px minmax(130px, 1fr)
+    34px 78px 78px 68px 54px 62px;
+  gap: 8px; padding: 0 14px;
+}
+.lk-head {
+  height: 28px; border-bottom: 1px solid var(--line-2);
+  background: var(--surface); font-family: var(--font-mono);
+  font-size: var(--fs-xs); letter-spacing: .08em; color: var(--text-dim);
+  white-space: nowrap; overflow: hidden;
+}
+.lk-head .r { text-align: right; }
+.lk-row {
+  min-height: 26px; border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
+  white-space: nowrap;
+}
+.lk-row:hover { background: var(--page-hover); }
+.lk-row .date { color: var(--text-2); }
+.lk-row .horse { color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+.lk-row .r { text-align: right; }
+.lk-row .fin.win { color: var(--win); font-weight: 600; }
+.lk-row .fin.plc { color: var(--text-2); }
+/* A trial has no odds, no draw and no class. Marked rather than blank, so the
+   gap reads as "trials do not have this" rather than "this is missing". */
+.lk-row.trial { background: var(--thesis); }
+.lk-row .src { color: var(--page-dim); font-size: var(--fs-xs); letter-spacing: .08em; }
+
+/* ── breakdown and pivot ─────────────────────────────────────────────────── */
+
+.dim-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 7px 14px; border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-dim);
+}
+.dim-bar .k { letter-spacing: .12em; color: var(--page-dim); }
+.dim-bar select {
+  background: var(--bg); color: var(--text); border: 1px solid var(--line-2);
+  font-family: var(--font-mono); font-size: var(--fs-xs); padding: 2px 5px;
+}
+
+/* Natural width, not the viewport's. Stretched to 100% the CI column ended up
+   an inch from the difference it qualifies, which is the one pairing on this
+   table that has to be read together. */
+.bd-tab { border-collapse: collapse;
+  font-family: var(--font-mono); font-size: var(--fs-sm); }
+.bd-tab td, .bd-tab th { padding-right: 16px; }
+.bd-tab td:last-child, .bd-tab th:last-child { padding-right: 10px; }
+.bd-tab th {
+  text-align: left; padding: 6px 10px; font-weight: 400;
+  font-size: var(--fs-xs); letter-spacing: .1em; color: var(--text-dim);
+  border-bottom: 1px solid var(--line-2); white-space: nowrap;
+  background: var(--surface);
+}
+.bd-tab th.r, .bd-tab td.r { text-align: right; }
+.bd-tab td {
+  padding: 5px 10px; border-bottom: 1px solid var(--line);
+  color: var(--text-muted); white-space: nowrap;
+}
+.bd-tab td.label { color: var(--text-2); }
+.bd-tab .ci { color: var(--text-faint); letter-spacing: 0; }
+.bd-tab .base { color: var(--text-faint); }
+/* Under the minimum sample. Dimmed, never hidden — removing it hides how much
+   of the breakdown is noise. */
+.bd-tab tr.thin td { color: var(--text-faint); }
+.bd-tab tr.thin td.label { color: var(--text-dim); }
+/* An interval that clears the baseline. The only case where colour is earned. */
+.bd-tab td.delta.up { color: var(--win); font-weight: 600; }
+.bd-tab td.delta.down { color: var(--loss); font-weight: 600; }
+.bd-tab .verdict { font-size: var(--fs-xs); letter-spacing: .06em; }
+.bd-tab .verdict.clear { color: var(--text-2); }
+.bd-tab .verdict.noise { color: var(--text-faint); }
+
+.pv-tab { border-collapse: collapse; font-family: var(--font-mono);
+  font-size: var(--fs-sm); }
+/* The frame ends where the table does, rather than running to the viewport. */
+.lk-main .table-box { display: inline-block; max-width: 100%; }
+.pv-tab th, .pv-tab td {
+  padding: 4px 9px; border: 1px solid var(--line); white-space: nowrap;
+  text-align: right;
+}
+.pv-tab th { background: var(--surface); color: var(--text-dim);
+  font-weight: 400; font-size: var(--fs-xs); letter-spacing: .08em; }
+.pv-tab th.rowh, .pv-tab td.rowh { text-align: left; color: var(--text-2); }
+.pv-tab td .v { display: block; color: var(--text); }
+.pv-tab td .n { display: block; font-size: var(--fs-xs); color: var(--text-faint); }
+/* 40%, per the artboard: "cells under the minimum sample are dimmed to 40%". */
+.pv-tab td.thin { opacity: .4; }
+.pv-tab td.empty { color: var(--text-faint); }
+.pv-tab .total { background: var(--surface-2); }
+
+/* ── outliers ────────────────────────────────────────────────────────────── */
+
+.ol-note {
+  padding: 10px 14px; border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: var(--fs-sm); line-height: 1.6;
+  color: var(--text-dim); max-width: 92ch;
+}
+.ol-note b { color: var(--text-2); font-weight: 600; }
+.ol-head, .ol-row {
+  display: grid; align-items: center;
+  grid-template-columns: 88px 34px minmax(150px, 1fr) minmax(140px, 1.2fr)
+    40px 78px 74px 60px 58px;
+  gap: 10px; padding: 0 14px;
+}
+.ol-head {
+  height: 28px; border-bottom: 1px solid var(--line-2); background: var(--surface);
+  font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .1em;
+  color: var(--text-dim);
+}
+.ol-head .r { text-align: right; }
+.ol-row {
+  min-height: 28px; border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
+  white-space: nowrap;
+}
+.ol-row:hover { background: var(--page-hover); }
+.ol-row .date { color: var(--text-2); }
+.ol-row .horse { color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+.ol-row .cond { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; }
+.ol-row .r { text-align: right; }
+.ol-row .delta.up { color: var(--win); font-weight: 600; }
+.ol-row .delta.down { color: var(--loss); font-weight: 600; }
+/* "A horse appearing here twice is the only thing on this tab that starts to
+   mean something." */
+.ol-row .repeat {
+  font-size: var(--fs-xs); letter-spacing: .06em; color: var(--edge);
+  border: 1px solid var(--edge-ground-2); padding: 0 3px; margin-left: 6px;
+}
+
+/* ── insight ─────────────────────────────────────────────────────────────── */
+
+.ins-line {
+  display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
+}
+.ins-line .big { font-size: var(--fs-lg); color: var(--text); font-weight: 600; }
+.ins-line .n { color: var(--text-faint); }
+/* The A/E scale, drawn so 1.00 is a fixed point rather than a number to read. */
+.ae-scale { position: relative; height: 22px; margin: 10px 0 4px;
+  background: var(--line); }
+.ae-scale i { position: absolute; top: 0; bottom: 0; background: var(--line-3); }
+.ae-scale .mark { position: absolute; top: -2px; bottom: -2px; width: 2px;
+  background: var(--text-2); }
+.ae-scale .one { position: absolute; top: -2px; bottom: -2px; width: 1px;
+  background: var(--text-faint); }
+.ae-axis { display: flex; justify-content: space-between;
+  font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint); }
+.style-row { display: flex; align-items: baseline; gap: 8px; height: 20px; }
+.style-row .label { width: 76px; color: var(--text-2); }
+.style-row .n { width: 56px; color: var(--text-faint); font-size: var(--fs-xs); }
+.style-row .track { flex: 1; height: 8px; background: var(--line); }
+.style-row .track i { display: block; height: 8px; background: var(--page-accent); }
+.style-row .v { width: 52px; text-align: right; color: var(--text-2); }

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Model Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/pages.css">
+<link rel="stylesheet" href="../assets/model.css">
+</head>
+<body>
+
+<!-- Layer 1. Rendered by context.js and identical on every page; no page
+     writes into it. See design brief 08 §1. -->
+<div class="chrome-meeting"></div>
+
+<nav class="chrome-nav" id="nav"></nav>
+
+<div class="race-strip">
+  <div class="label">RACE</div>
+  <div class="race-chips" id="race-chips"></div>
+  <div class="strip-right">
+    <span class="sep">|</span>
+    <span>MODEL VIEW</span>
+    <div class="seg" id="view-toggle" role="group" aria-label="Model view"></div>
+  </div>
+</div>
+
+<main class="model-page">
+  <div id="job-result" class="job-result" hidden></div>
+
+  <section class="model-section" id="sec-sarr">
+    <div class="section-head">
+      <span class="title">SARR</span>
+      <span class="sub">SPEED-ADJUSTED RATING RANK · WHY EACH HORSE RANKED WHERE IT DID,
+        ONE COLUMN PER WEIGHTED COMPONENT, WIDEST WEIGHT FIRST</span>
+    </div>
+    <div class="table-scroll">
+      <table class="model-grid" id="sarr-table">
+        <thead><tr id="sarr-head"></tr></thead>
+        <tbody id="sarr-body"></tbody>
+      </table>
+    </div>
+    <div class="section-foot" id="sarr-foot"></div>
+  </section>
+
+  <section class="model-section" id="sec-blend">
+    <div class="section-head">
+      <span class="title">BLEND</span>
+      <span class="sub">THE BLEND'S COMPONENTS, SIDE BY SIDE — NOT JUST THE OUTPUT</span>
+      <div class="weight-picker" id="weight-picker" role="group"
+           aria-label="Weight on the fundamental stream"></div>
+    </div>
+    <div class="table-scroll">
+      <table class="model-grid" id="blend-table">
+        <thead><tr id="blend-head"></tr></thead>
+        <tbody id="blend-body"></tbody>
+      </table>
+    </div>
+    <div class="section-foot" id="blend-foot"></div>
+  </section>
+
+  <!-- Is the model calibrated, and is there anything to bet on. Two
+       questions: a model can be well calibrated and unprofitable, and
+       reporting only the second is how a lucky filter becomes a rule. -->
+  <section class="model-section" id="sec-backtest">
+    <div class="section-head">
+      <span class="title">DOES IT BEAT THE PRICE</span>
+      <span class="sub" id="bt-sub"></span>
+    </div>
+    <div class="table-scroll">
+      <table class="model-grid" id="bt-table">
+        <thead><tr id="bt-head"></tr></thead>
+        <tbody id="bt-body"></tbody>
+      </table>
+    </div>
+    <div class="section-foot" id="bt-foot"></div>
+    <div id="bt-value"></div>
+  </section>
+
+  <section class="model-section" id="sec-et">
+    <div class="section-head">
+      <span class="title">ET</span>
+      <span class="sub">EXPECTED TIME · WHAT THE FIGURE IS MADE OF, AND HOW MUCH
+        EVIDENCE SITS BEHIND IT</span>
+      <button id="rebuild-et" class="btn">REBUILD ET</button>
+    </div>
+
+    <p class="note">
+      ET is a <strong>descriptive</strong> figure, not a model input. It carries real
+      standalone signal (AUC 0.658 predicting the next run) but adds nothing on top of
+      the market price once log-odds are controlled (p = 0.746). Read it; do not build
+      selection rules on it.
+    </p>
+
+    <div class="section-foot" id="et-summary"></div>
+    <div class="invariants" id="et-invariants"></div>
+
+    <div class="table-scroll">
+      <table class="model-grid" id="et-table">
+        <thead>
+          <tr>
+            <th class="centre" style="width:34px">NO</th>
+            <th class="left" style="width:200px">HORSE</th>
+            <th class="centre" style="width:40px">PL</th>
+            <th style="width:80px">TIME</th>
+            <th style="width:76px">FIGURE</th>
+            <th style="width:80px"
+                title="Was this a fast time for these conditions?">VS PAR</th>
+            <th style="width:82px"
+                title="Did this horse outrun the field it was in?">VS RACE</th>
+            <th style="width:60px">N<sub>EFF</sub></th>
+            <th class="left" style="width:110px">CONFIDENCE</th>
+            <th class="left">LEVEL</th>
+          </tr>
+        </thead>
+        <tbody id="et-body"></tbody>
+      </table>
+    </div>
+
+    <div class="section-foot">
+      <span>VS PAR AND VS RACE ANSWER DIFFERENT QUESTIONS AND ARE SHOWN SEPARATELY —
+        THE V4 MODEL CONFLATED THEM</span>
+      <span class="right">A PAR IS A PROPERTY OF THE RACE: EVERY RUNNER SHARES ONE, AND
+        IF THAT COUNT IS EVER NOT 1 THE MODEL IS WRONG WHATEVER ITS ACCURACY</span>
+    </div>
+  </section>
+</main>
+
+<script type="module" src="../assets/model-analysis.js"></script>
+</body>
+</html>

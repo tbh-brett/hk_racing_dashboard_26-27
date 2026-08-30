@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Form Guide</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/pages.css">
+<link rel="stylesheet" href="../assets/formguide.css">
+</head>
+<body>
+
+<!-- Layer 1. Rendered by context.js and identical on every page; no page
+     writes into it. See design brief 08 §1. -->
+<div class="chrome-meeting"></div>
+
+<nav class="chrome-nav" id="nav"></nav>
+
+<div class="race-strip">
+  <div class="label">RACE</div>
+  <div class="race-chips" id="race-chips"></div>
+  <div class="strip-right">
+    <span id="sort-state"></span>
+    <span id="open-count">0 EXPANDED</span>
+    <button class="strip-btn" id="expand-all">EXPAND ALL</button>
+    <button class="strip-btn" id="collapse-all">COLLAPSE ALL</button>
+  </div>
+</div>
+
+<!-- The race header bar. Everything that is a property of the race and not of
+     any runner lives here, so the grid below is only about horses. -->
+<div class="race-hdr" id="race-hdr"></div>
+
+<div class="fg-body">
+  <div class="fg-main">
+    <!-- One grid template, shared by the card header, every horse row and every
+         run row, so a collapsed row and an expanded one line up column for
+         column and the eye tracks straight down. -->
+    <div class="fg-head" id="fg-head" role="row"></div>
+    <div id="runners"></div>
+    <div class="fg-foot" id="fg-foot"></div>
+  </div>
+
+  <aside class="fit-aside" id="fit-aside"></aside>
+</div>
+
+<div class="popover" id="popover" hidden></div>
+
+<script type="module" src="../assets/form-guide.js"></script>
+</body>
+</html>

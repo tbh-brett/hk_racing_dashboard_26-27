@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; padding:0; background:#0e1117; }
+  * { box-sizing: border-box; }
+  a { color:#f0a824; text-decoration:none; }
+  a:hover { color:#ffc75a; }
+  ::-webkit-scrollbar { width:9px; height:9px; }
+  ::-webkit-scrollbar-track { background:#0e1117; }
+  ::-webkit-scrollbar-thumb { background:#2b303a; }
+  @keyframes tick { 0%,100% { opacity:1 } 50% { opacity:.35 } }
+</style>
+</helmet>
+<div style="min-height:100vh;background:#0e1117;color:#fafafa;font-family:'IBM Plex Sans',system-ui,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;-webkit-font-smoothing:antialiased">
+
+  <div style="display:flex;align-items:stretch;height:32px;border-bottom:1px solid #1c202a;background:#0b0e13;overflow-x:auto">
+    <div style="display:flex;align-items:center;gap:9px;padding:0 14px;border-right:1px solid #1c202a;flex:none">
+      <div style="width:9px;height:9px;background:#e63946;flex:none"></div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:12px;letter-spacing:.16em">RACEDAY</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;padding:0 16px;flex:none;min-width:max-content;font-family:'IBM Plex Mono',monospace;font-size:12px;white-space:nowrap">
+      <span style="font-weight:600">HV</span>
+      <span style="color:#cfd3da">15 Jul 2026</span>
+      <span style="color:#8b929e">11 races</span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:#8b929e"><span style="width:6px;height:6px;border-radius:50%;background:#35b37e;animation:tick 1.6s infinite;flex:none"></span>active meeting · 16:22</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;padding:0 14px;border-left:1px solid #1c202a;flex:none;min-width:max-content;margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px">
+      <span style="color:#6f757f;letter-spacing:.1em">DATA</span>
+      <sc-for list="{{ freshness }}" as="f" hint-placeholder-count="5">
+        <span onClick="{{ f.go }}" style="display:flex;align-items:baseline;gap:4px;cursor:pointer;padding:1px 5px;border:1px solid {{ f.border }};background:{{ f.bg }};white-space:nowrap" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.07)">
+          <span style="color:#8b929e">{{ f.name }}</span>
+          <span style="color:{{ f.color }};font-weight:600">{{ f.mark }}</span>
+          <span style="color:{{ f.color }}">{{ f.age }}</span>
+        </span>
+      </sc-for>
+      <sc-if value="{{ refreshMsg }}" hint-placeholder-val="{{ false }}">
+        <span style="color:#2ec4b6;white-space:nowrap">{{ refreshMsg }}</span>
+      </sc-if>
+    </div>
+  </div>
+
+  <nav style="display:flex;align-items:stretch;height:34px;border-bottom:1px solid #262a33;background:#12151b">
+    <sc-for list="{{ pages }}" as="p" hint-placeholder-count="6">
+      <a href="{{ p.href }}" style="display:flex;align-items:center;padding:0 16px;font-size:12px;font-weight:500;letter-spacing:.03em;cursor:pointer;color:#8b929e;border-right:1px solid #1c202a;text-decoration:none" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.06)">
+        <span style="color:{{ p.color }};border-bottom:2px solid {{ p.mark }};padding-bottom:1px">{{ p.name }}</span>
+      </a>
+    </sc-for>
+  </nav>
+
+  <div style="display:flex;align-items:center;gap:0;height:36px;border-bottom:1px solid #1e2a2a;background:#12181a">
+    <div style="display:flex;align-items:center;gap:8px;padding:0 14px;border-right:1px solid #1e2a2a;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#2ec4b6;letter-spacing:.1em;white-space:nowrap">
+      <span style="width:7px;height:7px;background:#2ec4b6"></span>BLACKBOOK
+      <span style="color:#5f7a78">HYPOTHESIS TRACKER</span>
+    </div>
+    <div style="display:flex;border:1px solid #2b303a;margin:0 12px 0 2px;font-family:'IBM Plex Mono',monospace;font-size:11px">
+      <div onClick="{{ setList }}" style="padding:2px 10px;cursor:pointer;color:{{ listColor }};background:{{ listBg }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.08)">LIST</div>
+      <div onClick="{{ setAnalysis }}" style="padding:2px 10px;cursor:pointer;color:{{ anColor }};background:{{ anBg }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.08)">ANALYSIS</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;padding:0 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e;border-left:1px solid #1e2a2a">
+      <span><span style="color:#fafafa;font-weight:600;font-size:13px">{{ sum.total }}</span> ENTRIES</span>
+      <span><span style="color:#2ec4b6;font-weight:600;font-size:13px">{{ sum.active }}</span> ACTIVE</span>
+      <span><span style="color:#f0a824;font-weight:600;font-size:13px">{{ sum.today }}</span> RUN TODAY</span>
+      <span style="color:#2b303a">|</span>
+      <span>BACKED <span style="color:#cfd3da">{{ sum.backed }}</span> · ROI <span style="color:{{ sum.backedRoiColor }};font-weight:600">{{ sum.backedRoi }}</span></span>
+      <span>MISSED <span style="color:#cfd3da">{{ sum.missed }}</span> · ROI <span style="color:{{ sum.missedRoiColor }};font-weight:600">{{ sum.missedRoi }}</span></span>
+      <span style="color:#c9748f">{{ sum.verdict }}</span>
+    </div>
+  </div>
+
+  <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+  <div>
+    <div style="display:flex;align-items:stretch;border-bottom:1px solid #1e2a2a;background:#12181a;min-height:36px">
+      <div style="display:flex;align-items:center;gap:8px;padding:0 12px 0 14px;border-right:1px solid #1e2a2a;flex:none">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5f7a78">⌕</span>
+        <input value="{{ searchText }}" onChange="{{ setSearch }}" placeholder="horse, note text or tag" style="width:236px;background:transparent;border:none;outline:none;color:#fafafa;font-family:'IBM Plex Mono',monospace;font-size:12px;padding:4px 0" />
+        <sc-if value="{{ hasSearch }}" hint-placeholder-val="{{ false }}">
+          <span onClick="{{ clearSearch }}" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e;cursor:pointer;padding:0 3px" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.1)">×</span>
+        </sc-if>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;flex-wrap:wrap;flex:1;min-width:0">
+        <sc-if value="{{ activeAny }}" hint-placeholder-val="{{ true }}">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#5f7a78;flex:none">ACTIVE</span>
+        </sc-if>
+        <sc-for list="{{ activeFilters }}" as="a" hint-placeholder-count="2">
+          <span onClick="{{ a.remove }}" style="display:flex;align-items:baseline;gap:5px;font-family:'IBM Plex Mono',monospace;font-size:10px;padding:1px 6px;cursor:pointer;white-space:nowrap;color:{{ a.color }};border:1px solid {{ a.border }};background:{{ a.bg }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">
+            <span style="color:#6f757f">{{ a.kind }}</span>{{ a.label }}<span style="color:#8b929e">×</span>
+          </span>
+        </sc-for>
+        <sc-if value="{{ noneActive }}" hint-placeholder-val="{{ false }}">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#4c525c">NO FILTERS — SHOWING ALL {{ sum.total }}</span>
+        </sc-if>
+        <sc-if value="{{ activeAny }}" hint-placeholder-val="{{ false }}">
+          <span onClick="{{ clearAll }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:1px 7px;cursor:pointer;color:#f0a824;border:1px solid #4a3a18;background:#241d0e;flex:none" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">CLEAR ALL ×</span>
+        </sc-if>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:0 12px;border-left:1px solid #1e2a2a;font-family:'IBM Plex Mono',monospace;font-size:11px;flex:none">
+        <span style="color:#fafafa;font-weight:600">{{ matchCount }}</span>
+        <span style="color:#5f7a78">OF {{ sum.total }} MATCH</span>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:stretch;border-bottom:1px solid #262a33;background:#12151b;min-height:32px">
+      <div style="display:flex;align-items:center;padding:0 10px 0 14px;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;letter-spacing:.1em;white-space:nowrap;border-right:1px solid #1c202a">TAG</div>
+      <div style="display:flex;align-items:center;gap:4px;padding:5px 10px;flex-wrap:wrap;flex:1;min-width:0">
+        <sc-for list="{{ tagChips }}" as="t" hint-placeholder-count="10">
+          <span onClick="{{ t.go }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:1px 7px;cursor:pointer;white-space:nowrap;color:{{ t.color }};border:1px solid {{ t.border }};background:{{ t.bg }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ t.label }} <span style="color:{{ t.nColor }}">{{ t.n }}</span></span>
+        </sc-for>
+      </div>
+      <div style="display:flex;align-items:center;padding:0 10px;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;letter-spacing:.1em;white-space:nowrap;border-left:1px solid #1c202a;border-right:1px solid #1c202a">BOOKED</div>
+      <div style="display:flex;align-items:center;gap:4px;padding:5px 10px;flex:none">
+        <sc-for list="{{ rangeChips }}" as="d" hint-placeholder-count="4">
+          <span onClick="{{ d.go }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:1px 7px;cursor:pointer;white-space:nowrap;color:{{ d.fg }};border:1px solid {{ d.border }};background:{{ d.bg }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ d.label }}</span>
+        </sc-for>
+      </div>
+      <div style="display:flex;align-items:center;padding:5px 10px;border-left:1px solid #1c202a;flex:none">
+        <span onClick="{{ toggleToday }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:1px 8px;cursor:pointer;white-space:nowrap;letter-spacing:.06em;color:{{ todayChip.fg }};border:1px solid {{ todayChip.border }};background:{{ todayChip.bg }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">RUNNING TODAY {{ sum.today }}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:0;border-left:1px solid #1c202a;flex:none">
+        <sc-for list="{{ statusTabs }}" as="s" hint-placeholder-count="4">
+          <div onClick="{{ s.go }}" style="padding:0 11px;height:32px;line-height:32px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;cursor:pointer;white-space:nowrap;color:{{ s.color }};background:{{ s.bg }};border-right:1px solid #1c202a" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.08)">{{ s.label }} <span style="color:#6f757f">{{ s.n }}</span></div>
+        </sc-for>
+      </div>
+    </div>
+
+    <sc-if value="{{ noMatch }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:34px 14px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6f757f;line-height:1.7">NOTHING MATCHES THIS FILTER SET.<br /><span style="color:#4c525c">Filters combine, so narrowing on tag and status and date together can easily reach zero. Remove a chip above.</span></div>
+    </sc-if>
+
+    <div style="display:grid;grid-template-columns:26px 150px 184px 60px 190px 58px 74px 114px 92px 1fr;align-items:center;height:26px;background:#12151b;border-bottom:1px solid #2b303a;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.09em;color:#8b929e">
+      <sc-for list="{{ cols }}" as="c" hint-placeholder-count="10">
+        <div onClick="{{ c.go }}" style="padding:0 8px;text-align:{{ c.a }};color:{{ c.fg }};background:{{ c.bg }};height:26px;line-height:26px;cursor:pointer;user-select:none;white-space:nowrap;border-bottom:1px solid {{ c.rule }}" style-hover="color:#fafafa;background:#1a1d23">{{ c.t }}<span style="font-size:8px;color:{{ c.indColor }};margin-left:4px">{{ c.ind }}</span></div>
+      </sc-for>
+    </div>
+
+    <sc-for list="{{ entries }}" as="e" hint-placeholder-count="12">
+      <div>
+        <div onClick="{{ e.toggle }}" style="display:grid;grid-template-columns:26px 150px 184px 60px 190px 58px 74px 114px 92px 1fr;align-items:center;min-height:30px;cursor:pointer;background:{{ e.bg }};border-bottom:1px solid #191d24;border-left:3px solid {{ e.rule }};font-family:'IBM Plex Mono',monospace" style-hover="background:#1c212a">
+          <div style="padding:0 6px;text-align:center;font-size:9px;color:{{ e.caretColor }}">{{ e.caret }}</div>
+          <div style="padding:0 8px;display:flex;align-items:baseline;gap:6px;white-space:nowrap;overflow:hidden">
+            <span style="font-size:12px;font-weight:600;color:#8b929e">{{ e.no }}</span>
+            <span style="font-size:13px;font-weight:600;color:{{ e.nameColor }};overflow:hidden;text-overflow:ellipsis">{{ e.name }}</span>
+          </div>
+          <div style="padding:0 8px;display:flex;gap:4px;overflow:hidden">
+            <sc-for list="{{ e.tags }}" as="t" hint-placeholder-count="2">
+              <span style="font-size:9px;padding:0 4px;line-height:15px;white-space:nowrap;color:{{ t.color }};border:1px solid {{ t.border }}">{{ t.label }}</span>
+            </sc-for>
+          </div>
+          <div style="padding:0 8px;font-size:11px;color:#8b929e;white-space:nowrap">{{ e.booked }}</div>
+          <div style="padding:0 8px;font-size:10px;color:#8b929e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.srcShort }}</div>
+          <div style="padding:0 8px;text-align:right;font-size:12px;color:{{ e.runsColor }}">{{ e.runs }}</div>
+          <div style="padding:0 8px;text-align:right;font-size:12px;font-weight:600;color:{{ e.recColor }}">{{ e.record }}</div>
+          <div style="padding:0 8px;white-space:nowrap">
+            <sc-if value="{{ e.todayAny }}" hint-placeholder-val="{{ true }}">
+              <span style="font-size:10px;font-weight:600;padding:1px 5px;color:#f0a824;border:1px solid #4a3a18;background:#241d0e;letter-spacing:.06em">{{ e.next }}</span>
+            </sc-if>
+            <sc-if value="{{ e.todayNone }}" hint-placeholder-val="{{ false }}">
+              <span style="font-size:10px;color:#5b616b">{{ e.next }}</span>
+            </sc-if>
+          </div>
+          <div style="padding:0 8px;white-space:nowrap">
+            <span style="font-size:10px;font-weight:600;letter-spacing:.06em;padding:1px 5px;color:{{ e.statusColor }};border:1px solid {{ e.statusBorder }};background:{{ e.statusBg }}">{{ e.status }}</span>
+          </div>
+          <div style="padding:0 8px;display:flex;align-items:center;gap:8px;justify-content:flex-end">
+            <sc-if value="{{ e.review }}" hint-placeholder-val="{{ false }}">
+              <span style="font-size:10px;color:#c9748f;border:1px solid #4a2733;background:#241419;padding:1px 6px;white-space:nowrap">REVIEW · {{ e.runs }} RUNS UNRESOLVED</span>
+            </sc-if>
+            <span onClick="{{ e.wonOut }}" style="font-size:10px;color:#8b929e;border:1px solid #2b303a;padding:1px 7px;cursor:pointer;white-space:nowrap" style-hover="color:#f0a824;border-color:#4a3a18">WON OUT</span>
+            <span onClick="{{ e.retire }}" style="font-size:10px;color:#8b929e;border:1px solid #2b303a;padding:1px 7px;cursor:pointer;white-space:nowrap" style-hover="color:#e0637f;border-color:#4a2733">RETIRE</span>
+          </div>
+        </div>
+
+        <sc-if value="{{ e.open }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#0b0e13;border-bottom:1px solid #262a33;display:flex;align-items:stretch">
+          <div style="flex:1;min-width:0;border-right:1px solid #1e232c">
+            <div style="padding:8px 12px;border-bottom:1px solid #1e232c;background:#0e1518">
+              <div style="display:flex;align-items:baseline;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#2ec4b6">THE THESIS<span style="color:#5f7a78">BOOKED {{ e.booked }} FROM THE {{ e.srcDate }} RUN</span></div>
+              <div style="font-size:12px;line-height:1.45;color:#cfd3da;margin-top:5px">{{ e.reason }}</div>
+            </div>
+
+            <div style="padding:7px 12px 3px 12px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#6f757f">SOURCE RUN · IN FULL</div>
+            <div style="display:grid;grid-template-columns:150px 66px 78px 34px 44px 150px 1fr 40px;align-items:center;min-height:24px;background:#101820;border-top:1px solid #1e232c;border-bottom:1px solid #161d24;font-family:'IBM Plex Mono',monospace;font-size:11px">
+              <div style="padding:0 8px;color:#fafafa;white-space:nowrap">{{ e.src.date }} <span style="color:#8b929e">{{ e.src.cond }}</span></div>
+              <div style="padding:0 6px"><span style="font-size:9px;padding:0 4px;color:{{ e.src.styleColor }};background:{{ e.src.styleBg }}">{{ e.src.style }}</span></div>
+              <div style="padding:0 6px;color:#cfd3da;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.src.jockey }}</div>
+              <div style="padding:0 6px;text-align:right;color:#cfd3da">{{ e.src.wt }}</div>
+              <div style="padding:0 6px;text-align:right;font-weight:600;color:{{ e.src.finColor }}">{{ e.src.fin }}</div>
+              <div style="padding:0 8px;display:flex;gap:8px;white-space:nowrap"><span style="font-weight:600;color:{{ e.src.figColor }}">{{ e.src.fig }}</span><span style="color:{{ e.src.figColor }}">{{ e.src.len }}</span><span style="color:#8b929e">{{ e.src.time }}</span></div>
+              <div style="padding:0 8px;display:flex;gap:8px;min-width:0"><span style="color:#8b929e;font-size:10px;white-space:nowrap">{{ e.src.pos }}</span><span style="color:#c8792f;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.src.trip }}</span></div>
+              <div style="padding:0 8px;text-align:right"><a href="{{ e.src.video }}" target="_blank" rel="noopener" style="font-size:9px;color:#c8792f;border:1px solid #3d2a14;padding:0 4px">▶</a></div>
+            </div>
+            <div style="padding:5px 12px 8px 12px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f757f;border-bottom:1px solid #1e232c">SECTIONALS {{ e.src.sections }} &nbsp;·&nbsp; JUMP z <span style="color:#cfd3da">{{ e.src.jump }}</span> &nbsp;·&nbsp; GROUND LOST <span style="color:#cfd3da">{{ e.src.lost }}</span></div>
+
+            <div style="padding:7px 12px 3px 12px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#6f757f">EVERY RUN SINCE BOOKING · DID THE THESIS PLAY OUT<span style="color:#4c525c;letter-spacing:0"> — {{ e.sinceVerdict }}</span></div>
+            <sc-if value="{{ e.sinceNone }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:4px 12px 9px 12px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#4c525c">NO RUNS SINCE — FIRST ENGAGEMENT {{ e.next }}</div>
+            </sc-if>
+            <sc-for list="{{ e.since }}" as="u" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:150px 66px 78px 34px 44px 150px 1fr 40px;align-items:center;min-height:23px;border-bottom:1px solid #161a21;font-family:'IBM Plex Mono',monospace;font-size:11px;background:{{ u.bg }}">
+                <div style="padding:0 8px;color:#fafafa;white-space:nowrap">{{ u.date }} <span style="color:#8b929e">{{ u.cond }}</span></div>
+                <div style="padding:0 6px"><span style="font-size:9px;padding:0 4px;color:{{ u.styleColor }};background:{{ u.styleBg }}">{{ u.style }}</span></div>
+                <div style="padding:0 6px;color:#cfd3da;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.jockey }}</div>
+                <div style="padding:0 6px;text-align:right;color:#cfd3da">{{ u.wt }}</div>
+                <div style="padding:0 6px;text-align:right;font-weight:600;color:{{ u.finColor }}">{{ u.fin }}</div>
+                <div style="padding:0 8px;display:flex;gap:8px;white-space:nowrap"><span style="font-weight:600;color:{{ u.figColor }}">{{ u.fig }}</span><span style="color:{{ u.figColor }}">{{ u.len }}</span><span style="color:#8b929e">{{ u.time }}</span></div>
+                <div style="padding:0 8px;display:flex;gap:8px;min-width:0"><span style="color:#8b929e;font-size:10px;white-space:nowrap">{{ u.pos }}</span><span style="color:{{ u.tripColor }};font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.trip }}</span></div>
+                <div style="padding:0 8px;text-align:right"><a href="{{ u.video }}" target="_blank" rel="noopener" style="font-size:9px;color:#c8792f;border:1px solid #3d2a14;padding:0 4px">▶</a></div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="width:330px;flex:none">
+            <div style="padding:7px 12px 5px 12px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#6f757f">BETS ON THIS HORSE</div>
+            <sc-if value="{{ e.betsNone }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:0 12px 7px 12px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#4c525c">NONE PLACED SINCE BOOKING</div>
+            </sc-if>
+            <sc-for list="{{ e.bets }}" as="b" hint-placeholder-count="2">
+              <div style="display:flex;align-items:baseline;gap:7px;padding:2px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;white-space:nowrap">
+                <span style="color:#8b929e;width:44px">{{ b.date }}</span>
+                <span style="color:#cfd3da;width:34px">{{ b.type }}</span>
+                <span style="color:#8b929e">${{ b.stake }}</span>
+                <span style="margin-left:auto;color:#cfd3da">${{ b.ret }}</span>
+                <span style="width:56px;text-align:right;font-weight:600;color:{{ b.plColor }}">{{ b.pl }}</span>
+              </div>
+            </sc-for>
+
+            <div style="padding:8px 12px 5px 12px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#c9748f">MISSED — RAN, NOT BACKED<span style="color:#7a6470;letter-spacing:0"> (auto-logged)</span></div>
+            <sc-if value="{{ e.missNone }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:0 12px 7px 12px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#4c525c">NONE — EVERY RUN SINCE WAS BACKED</div>
+            </sc-if>
+            <sc-for list="{{ e.misses }}" as="m" hint-placeholder-count="2">
+              <div style="display:flex;align-items:baseline;gap:7px;padding:2px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;white-space:nowrap;background:#150f14">
+                <span style="color:#8b929e;width:44px">{{ m.date }}</span>
+                <span style="color:#cfd3da;width:34px">{{ m.fin }}</span>
+                <span style="color:#8b929e">SP {{ m.sp }}</span>
+                <span style="margin-left:auto;color:#7a6470;font-size:10px">FLAT $200 →</span>
+                <span style="width:56px;text-align:right;font-weight:600;color:{{ m.color }}">{{ m.wouldBe }}</span>
+              </div>
+            </sc-for>
+
+            <div style="margin:8px 12px 10px 12px;padding:6px 8px;border:1px solid #24323a;background:#0e1518;font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:1.6">
+              <div style="display:flex;gap:8px"><span style="color:#6f757f">BACKED</span><span style="color:#cfd3da">{{ e.backedN }} · ${{ e.staked }} → ${{ e.returned }}</span><span style="margin-left:auto;font-weight:600;color:{{ e.backedRoiColor }}">{{ e.backedRoi }}</span></div>
+              <div style="display:flex;gap:8px"><span style="color:#6f757f">MISSED</span><span style="color:#cfd3da">{{ e.missedN }} · flat ${{ e.missedStake }} → ${{ e.missedRet }}</span><span style="margin-left:auto;font-weight:600;color:{{ e.missedRoiColor }}">{{ e.missedRoi }}</span></div>
+              <div style="color:{{ e.verdictColor }};margin-top:3px">{{ e.verdict }}</div>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+      </div>
+    </sc-for>
+
+    <div style="display:flex;gap:18px;padding:9px 14px;border-top:1px solid #262a33;background:#12151b;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e;flex-wrap:wrap">
+      <span>CLICK AN ENTRY FOR THE THESIS, SOURCE RUN AND EVERY RUN SINCE</span>
+      <span style="color:#f0a824">■ DECLARED TODAY</span>
+      <span style="color:#c9748f">■ MISSED · REVIEW PROMPT AT 4+ RUNS UNRESOLVED</span>
+      <span style="margin-left:auto;color:#6f757f">RETIRING IS ONE CLICK — A BOOK THAT ONLY GROWS IS UNUSABLE BY SEPTEMBER</span>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isAnalysis }}" hint-placeholder-val="{{ false }}">
+  <div style="padding:16px 14px 28px 14px">
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;letter-spacing:.06em">BY TAG</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e">EVERY FIGURE CARRIES ITS SAMPLE · CELLS UNDER {{ cutoff }} ENTRIES ARE DIMMED AND SHOULD NOT BE READ AS SIGNAL</span>
+    </div>
+    <div style="border:1px solid #262a33">
+      <div style="display:grid;grid-template-columns:150px 54px 54px 92px 92px 168px 96px 1fr;align-items:center;height:26px;background:#12151b;border-bottom:1px solid #2b303a;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.09em;color:#8b929e">
+        <div style="padding:0 8px">TAG</div>
+        <div style="padding:0 8px;text-align:right">ENTRIES</div>
+        <div style="padding:0 8px;text-align:right">RUNS</div>
+        <div style="padding:0 8px;text-align:right">STRIKE</div>
+        <div style="padding:0 8px;text-align:right">PLACE</div>
+        <div style="padding:0 8px">A/E · 95% CI</div>
+        <div style="padding:0 8px;text-align:right">ROI</div>
+        <div style="padding:0 8px">BACKED vs MISSED</div>
+      </div>
+      <sc-for list="{{ tagRows }}" as="t" hint-placeholder-count="10">
+        <div style="display:grid;grid-template-columns:150px 54px 54px 92px 92px 168px 96px 1fr;align-items:center;min-height:30px;border-bottom:1px solid #191d24;opacity:{{ t.opacity }}">
+          <div style="padding:0 8px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:{{ t.labelColor }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.label }}</div>
+          <div style="padding:0 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ t.nColor }}">{{ t.entries }}</div>
+          <div style="padding:0 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ t.nColor }}">{{ t.runs }}</div>
+          <div style="padding:0 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px"><span style="font-weight:600;color:{{ t.srColor }}">{{ t.sr }}</span><span style="font-size:9px;color:{{ t.nColor }}"> {{ t.srN }}</span></div>
+          <div style="padding:0 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px"><span style="color:{{ t.prColor }}">{{ t.pr }}</span><span style="font-size:9px;color:{{ t.nColor }}"> {{ t.prN }}</span></div>
+          <div style="padding:0 8px;display:flex;align-items:center;gap:7px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;width:32px;color:{{ t.aeColor }}">{{ t.ae }}</span>
+            <div style="position:relative;flex:1;height:7px;background:#191d24">
+              <div style="position:absolute;left:50%;top:-2px;width:1px;height:11px;background:#3a4150"></div>
+              <div style="position:absolute;left:{{ t.ciLo }}%;width:{{ t.ciW }}%;top:0;height:7px;background:{{ t.ciColor }}"></div>
+              <div style="position:absolute;left:{{ t.aeMid }}%;top:-2px;width:2px;height:11px;background:{{ t.markColor }}"></div>
+            </div>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:{{ t.nColor }};width:52px;text-align:right;white-space:nowrap">{{ t.ciLabel }}</span>
+          </div>
+          <div style="padding:0 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:{{ t.roiColor }}">{{ t.roi }}</div>
+          <div style="padding:0 8px;display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11px">
+            <span style="color:#cfd3da;white-space:nowrap">{{ t.backedRoi }}</span>
+            <span style="color:#4c525c">v</span>
+            <span style="color:#c9748f;white-space:nowrap">{{ t.missedRoi }}</span>
+            <span style="font-size:9px;color:{{ t.gapColor }};white-space:nowrap">{{ t.gapNote }}</span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:flex;gap:18px;padding:8px 2px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e;flex-wrap:wrap">
+      <span>A/E = ACTUAL WINS ÷ WINS THE MARKET IMPLIED. 1.00 IS THE MARKET; THE TICK IS 1.00 AND THE BAR IS THE INTERVAL</span>
+      <span>ACROSS {{ cellCount }} TAG × CONDITION CELLS, {{ cleared }} CLEARED SIGNIFICANCE WHERE {{ expected }} WERE EXPECTED BY CHANCE</span>
+      <span style="margin-left:auto;color:#6f757f">A TAG THAT LOOKS LIKE IT'S WORKING ON 6 ENTRIES PROBABLY ISN'T</span>
+    </div>
+
+    <div style="display:flex;gap:14px;margin-top:20px;align-items:flex-start">
+      <div style="flex:1;border:1px solid #262a33">
+        <div style="padding:7px 12px;border-bottom:1px solid #262a33;background:#12151b;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#8b929e">BACKED vs MISSED — THE WHOLE BOOK</div>
+        <div style="padding:10px 12px">
+          <sc-for list="{{ bvm }}" as="r" hint-placeholder-count="2">
+            <div style="margin-bottom:9px">
+              <div style="display:flex;align-items:baseline;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11px">
+                <span style="color:{{ r.color }};font-weight:600;letter-spacing:.06em">{{ r.label }}</span>
+                <span style="color:#6f757f">n={{ r.n }}</span>
+                <span style="margin-left:auto;color:#cfd3da">${{ r.stake }} → ${{ r.ret }}</span>
+                <span style="width:64px;text-align:right;font-size:13px;font-weight:600;color:{{ r.roiColor }}">{{ r.roi }}</span>
+              </div>
+              <div style="height:9px;background:#191d24;margin-top:4px;display:flex"><div style="height:9px;background:{{ r.barColor }};width:{{ r.barW }}%"></div></div>
+            </div>
+          </sc-for>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.6;color:#c9748f;border-top:1px solid #1e232c;padding-top:8px">{{ sum.verdictLong }}</div>
+        </div>
+      </div>
+      <div style="width:420px;flex:none;border:1px solid #262a33">
+        <div style="padding:7px 12px;border-bottom:1px solid #262a33;background:#12151b;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#8b929e">STATUS OF THE BOOK · RESOLUTION IS THE HEALTH METRIC</div>
+        <div style="padding:10px 12px">
+          <sc-for list="{{ statusBars }}" as="s" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:8px;height:22px;font-family:'IBM Plex Mono',monospace;font-size:11px">
+              <span style="width:74px;color:{{ s.color }};letter-spacing:.06em">{{ s.label }}</span>
+              <div style="flex:1;height:9px;background:#191d24"><div style="height:9px;background:{{ s.color }};width:{{ s.w }}%"></div></div>
+              <span style="width:26px;text-align:right;color:#cfd3da;font-weight:600">{{ s.n }}</span>
+              <span style="width:70px;text-align:right;font-size:10px;color:#6f757f">{{ s.note }}</span>
+            </div>
+          </sc-for>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.6;color:#8b929e;border-top:1px solid #1e232c;margin-top:8px;padding-top:8px">{{ sum.reviewNote }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;thinTagCutoff&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:5,&quot;min&quot;:2,&quot;max&quot;:12,&quot;step&quot;:1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Analysis&quot;}}">
+const AMBER = '#f0a824', TEAL = '#2ec4b6', MUTED = '#8b929e', MAGENTA = '#c9748f';
+const WIN = '#35b37e', LOSS = '#e0637f';
+
+const TAGS = [
+  ['ability', 'ability'], ['improving', 'improving'], ['stable-change', 'stable-change'],
+  ['turn-of-foot', 'turn-of-foot'], ['incident', 'incident'], ['bad-conditions', 'bad-conditions'],
+  ['strong-race', 'strong-race'], ['trial-ability', 'trial-ability'],
+  ['trial-improving', 'trial-improving'], ['trial-profile', 'trial-profile'],
+];
+const TAG_SKIN = {
+  'ability': '#9aa7b8', 'improving': '#7fc8a9', 'stable-change': '#b7a2e8',
+  'turn-of-foot': '#e8c04a', 'incident': '#c8792f', 'bad-conditions': '#7fa7c9',
+  'strong-race': '#ff8a5c', 'trial-ability': '#8fb8d8', 'trial-improving': '#8fd8c4', 'trial-profile': '#c0a8d8',
+};
+
+const STYLE_SKIN = {
+  'Leader': { color: '#ff8a5c', bg: '#3a2013' }, 'On-Pace': { color: '#e8c04a', bg: '#3a3012' },
+  'Midfield': { color: '#9aa7b8', bg: '#1f2630' }, 'Closer': { color: '#4fb3e0', bg: '#12283a' },
+};
+
+// entry: no, name, tags, booked, status, reason, srcDate, srcCond, runs, wins, places, expWins,
+//        staked, returned, missedRuns, missedRet, today (race/off/odds or null)
+const BOOK = [
+  [8, 'FIREFOOT', ['incident', 'turn-of-foot'], '05 Jul', 'active',
+    'Closes hard once balanced. Hampered on the straight from the 300m and beaten a head — the figure understates the run. Third-up today.',
+    '04 Jul', 'ST C+3 1800 GY C4', 0, 0, 0, 0, 0, 0, 0, 0, { r: 3, off: '16:45', odds: '7.5' }],
+  [9, 'NOBLE PURSUIT', ['bad-conditions', 'turn-of-foot'], '08 Jul', 'active',
+    'Strong turn of foot from the front. Hampered at the 300m with clear running to come; the market has abandoned it and the model still rates it best in the race.',
+    '04 Jul', 'HV C 1650 G C4', 0, 0, 0, 0, 0, 0, 0, 0, { r: 3, off: '16:45', odds: '15' }],
+  [2, 'GRAND DELIGHT', ['trial-ability', 'trial-profile'], '22 Jun', 'active',
+    'Barrier trial 2nd off a soft tempo, first-time blinkers and a changed profile — sat closer than it ever has and still finished off.',
+    '18 Jun', 'ST AWT 1200 G TRIAL', 1, 0, 1, 0.34, 300, 0, 0, 0, { r: 4, off: '17:15', odds: '5.5' }],
+  [11, 'SUPER FORTUNE', ['ability', 'improving'], '14 May', 'active',
+    'Much better fresh — showed clear ability first-up and the second-up record is the only thing holding the price.',
+    '10 May', 'ST A 1400 G C4', 4, 0, 1, 0.71, 900, 420, 2, 0, { r: 5, off: '17:45', odds: '21' }],
+  [6, 'WINNING ENDEAVOUR', ['strong-race'], '30 Jun', 'active',
+    'Beaten less than two lengths in a race where the first four all won next start. Needs the 1650 — has been racing over the wrong trip.',
+    '27 Jun', 'HV C+3 1200 G C3', 1, 0, 1, 0.29, 400, 690, 0, 0, { r: 5, off: '17:45', odds: '8.1' }],
+  [4, 'SILVER HERO', ['incident'], '21 Jun', 'active',
+    'Checked hard at the 400m when making ground, no chance to recover. Drops to Class 4 off that run.',
+    '18 Jun', 'ST B 1600 G C3', 2, 1, 1, 0.42, 700, 2380, 1, 0, { r: 7, off: '18:45', odds: '9.2' }],
+  [12, 'TOUCH OF LUCK', ['bad-conditions'], '02 Jun', 'active',
+    'Wide with cover on every start this preparation and never got a look at the inside. The draw is finally kind.',
+    '29 May', 'ST C 1800 Y C4', 3, 0, 0, 0.38, 600, 0, 2, 0, { r: 7, off: '18:45', odds: '33' }],
+  [5, 'PACKING TREADMILL', ['ability'], '11 Jun', 'active',
+    'Stays 2200 better than the market thinks — ran the fastest last 600m in the race two starts back.',
+    '07 Jun', 'ST A 2000 G C4', 2, 0, 2, 0.55, 800, 1160, 0, 0, { r: 9, off: '19:45', odds: '6.4' }],
+  [3, 'HAPPY JOURNEY', ['trial-improving'], '28 Jun', 'active',
+    'Sharp improvement between the two trials — 1.2s faster over the same course and gear.',
+    '25 Jun', 'ST AWT 1000 G TRIAL', 0, 0, 0, 0, 0, 0, 0, 0, { r: 10, off: '20:15', odds: '12' }],
+  [7, 'MASSIVE MOVE', ['stable-change', 'improving'], '19 Apr', 'active',
+    'Two starts since joining the new stable, both markedly better than anything before. Profile has changed, not just the form.',
+    '14 Apr', 'HV C 1650 G C4', 5, 1, 3, 0.94, 1400, 3100, 2, 940, { r: 11, off: '20:45', odds: '18' }],
+
+  [null, 'SIGHT HERO', ['turn-of-foot'], '12 Mar', 'won out',
+    'Fastest closing 400m of the meeting when held up. Thesis was a wet-track closer at a mile.',
+    '08 Mar', 'ST AWT 1650 WS C4', 2, 1, 2, 0.46, 600, 3400, 0, 0, null],
+  [null, 'GLORY STAR', ['improving'], '01 Mar', 'retired',
+    'Looked to be improving on profile — sat closer each run. Six runs since and the profile stopped moving.',
+    '25 Feb', 'HV B 1200 G C4', 6, 0, 1, 1.08, 900, 0, 3, 0, null],
+  [null, 'SPICY GRILL', ['strong-race'], '20 Apr', 'won out',
+    'Third in a race the first two both won next start. Retrospective read; the race was better than the margin.',
+    '16 Apr', 'ST C 1800 G C4', 1, 1, 1, 0.21, 0, 0, 1, 960, null],
+  [null, 'TRIPLE MOON', ['ability'], '10 May', 'active',
+    'Showed clear ability when winning on the AWT — capable in better circumstances on turf.',
+    '06 May', 'ST AWT 1800 G C5', 3, 0, 1, 0.62, 700, 300, 1, 0, null],
+  [null, 'GOLDEN FORTUNE', ['trial-ability'], '24 Jun', 'retired',
+    'Trialled sharply against two subsequent winners. Beaten a long way on debut for the stable; thesis abandoned.',
+    '20 Jun', 'ST AWT 1200 G TRIAL', 2, 0, 0, 0.33, 400, 0, 1, 0, null],
+  [null, 'I EXCELLE', ['incident'], '04 Jul', 'active',
+    'Squeezed out at the start and never in the race. The figure is meaningless.',
+    '01 Jul', 'ST C 1650 G C4', 1, 0, 0, 0.19, 300, 0, 0, 0, null],
+  [null, 'MISTER MONACO', ['bad-conditions'], '18 Jun', 'won out',
+    'Ran on strongly against a slow tempo that never suited a closer.',
+    '14 Jun', 'HV C+3 1800 G C4', 2, 1, 2, 0.51, 500, 2650, 0, 0, null],
+  [null, 'ATOMIC FORCE', ['trial-profile'], '25 May', 'retired',
+    'Changed running profile in the trials — led where it had always closed. Five runs and it never led again.',
+    '21 May', 'ST AWT 1000 G TRIAL', 5, 0, 0, 0.77, 1000, 0, 2, 0, null],
+  [null, 'KING OPIE', ['stable-change'], '21 May', 'active',
+    'First run for the new stable was a clear personal best on figure.',
+    '17 May', 'ST B 1400 G C4', 4, 1, 2, 0.83, 900, 1980, 1, 0, null],
+  [null, 'WINNING VIBE', ['improving', 'turn-of-foot'], '05 Apr', 'won out',
+    'Improved on figure three runs in a row with a strong final sectional each time.',
+    '01 Apr', 'ST C 1600 G C4', 3, 1, 2, 0.68, 800, 2960, 1, 0, null],
+];
+
+const STATUSES = [['all', 'ALL'], ['active', 'ACTIVE'], ['won out', 'WON OUT'], ['retired', 'RETIRED']];
+// booked-date ranges, measured back from 15 Jul
+const RANGES = [['all', 'ANY TIME', 9999], ['14d', 'LAST 14d', 14], ['30d', 'LAST 30d', 30], ['90d', 'LAST 90d', 90]];
+const DAY_OF = { Mar: 0, Apr: 31, May: 61, Jun: 92, Jul: 122 };
+function daysAgo(booked) {
+  const p = String(booked).split(' ');
+  const abs = (DAY_OF[p[1]] || 0) + Number(p[0]);
+  return (DAY_OF.Jul + 15) - abs;
+}
+const STATUS_SKIN = {
+  'active': { color: TEAL, border: '#1e4a45', bg: '#12211f' },
+  'won out': { color: AMBER, border: '#4a3a18', bg: '#241d0e' },
+  'retired': { color: '#6f757f', border: '#2b303a', bg: 'transparent' },
+};
+
+const MONTH_NUM = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07' };
+const RIDERS = ['J Orman', 'K Teetan', 'M F Poon', 'C Y Ho', 'H Bowman', 'L Ferraris', 'K C Leung', 'E C W Wong', 'A Atzeni', 'B Avdulla', 'J Moreira'];
+const TRIPS = ['—', 'checked 800m', 'wide throughout', 'short of room', 'hampered straight', 'slow away', 'clear run'];
+const STYLES = ['Leader', 'On-Pace', 'Midfield', 'Closer'];
+const COND_POOL = ['ST C 1800 G C4', 'HV C+3 1650 G C4', 'ST AWT 1800 G C4', 'HV B 1200 GY C4', 'ST A 1400 G C3', 'ST C 1650 Y C4'];
+const DATE_POOL = ['12 Jul', '04 Jul', '28 Jun', '18 Jun', '07 Jun', '25 May', '11 May', '26 Apr'];
+
+function rng(seed) {
+  let s = 0; for (let i = 0; i < seed.length; i++) s = (s * 31 + seed.charCodeAt(i)) >>> 0;
+  return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+}
+function fmtTime(sec) {
+  if (sec < 60) return sec.toFixed(2);
+  const m = Math.floor(sec / 60);
+  const r = sec - m * 60;
+  return m + ':' + (r < 10 ? '0' : '') + r.toFixed(2);
+}
+function replayUrl(date) {
+  const p = String(date).split(' ');
+  const ymd = '2026' + (MONTH_NUM[p[1]] || '07') + String(p[0]).padStart(2, '0');
+  return 'https://racing.hkjc.com/contentAsset/videoplayer_v4/video-player-iframe_v4.html?type=replay-full&date=' + ymd + '&lang=eng';
+}
+function pct(v) { return (v > 0 ? '+' : (v < 0 ? '−' : '')) + Math.abs(v * 100).toFixed(0) + '%'; }
+function roi(stake, ret) { return stake === 0 ? '—' : pct((ret - stake) / stake); }
+function roiColor(stake, ret) { return stake === 0 ? '#5b616b' : (ret > stake ? WIN : (ret === stake ? '#cfd3da' : LOSS)); }
+function ordFin(n) { return n + (n === 1 ? 'st' : (n === 2 ? 'nd' : (n === 3 ? 'rd' : 'th'))); }
+
+// one run row, deterministic per horse+index — same grammar as the Form Guide
+function runRow(name, i, base) {
+  const rand = rng(name + 'since' + i);
+  const fin = 1 + Math.floor(rand() * 11);
+  const fig = Math.round((base + (rand() - 0.5) * 9) * 10) / 10;
+  const style = STYLES[Math.floor(rand() * 4)];
+  const dist = [1200, 1400, 1650, 1800, 2000][Math.floor(rand() * 5)];
+  const pos = [];
+  let p = 2 + Math.floor(rand() * 9);
+  for (let j = 0; j < 4; j++) { pos.push(p); p = Math.max(1, Math.min(12, p + Math.round((rand() - 0.6) * 2))); }
+  pos.push(fin);
+  return {
+    date: DATE_POOL[i % DATE_POOL.length],
+    cond: COND_POOL[Math.floor(rand() * COND_POOL.length)],
+    style, styleColor: STYLE_SKIN[style].color, styleBg: STYLE_SKIN[style].bg,
+    jockey: RIDERS[Math.floor(rand() * RIDERS.length)],
+    wt: 113 + Math.floor(rand() * 22),
+    fin, finColor: fin === 1 ? AMBER : (fin <= 3 ? '#fafafa' : MUTED),
+    fig: fig.toFixed(0),
+    len: (fig >= 100 ? '+' : '') + ((fig - 100) * 0.9).toFixed(1) + 'L',
+    figColor: fig >= 105 ? '#fafafa' : (fig >= 100 ? '#cfd3da' : MUTED),
+    time: fmtTime(dist === 1200 ? 69 + rand() * 2 : (dist === 1400 ? 81 + rand() * 2 : 99 + rand() * 11)),
+    pos: pos.join(' '),
+    trip: TRIPS[Math.floor(rand() * TRIPS.length)],
+    video: replayUrl(DATE_POOL[i % DATE_POOL.length]),
+    fastLast: rand() > 0.55,
+  };
+}
+
+class Component extends DCLogic {
+  state = {
+    view: 'list', tags: [], status: 'all', open: 'SUPER FORTUNE',
+    sort: { key: 'next', dir: 'asc' }, resolved: {},
+    search: '', range: 'all', todayOnly: false,
+  };
+
+  toggleTag(t) {
+    this.setState(s => ({ tags: s.tags.indexOf(t) >= 0 ? s.tags.filter(x => x !== t) : s.tags.concat([t]) }));
+  }
+  cycle(key) {
+    this.setState(s => {
+      if (!s.sort || s.sort.key !== key) return { sort: { key, dir: 'asc' } };
+      if (s.sort.dir === 'asc') return { sort: { key, dir: 'desc' } };
+      return { sort: { key: 'next', dir: 'asc' } };
+    });
+  }
+  resolve(name, status) {
+    this.setState(s => {
+      const r = Object.assign({}, s.resolved);
+      r[name] = r[name] === status ? undefined : status;
+      return { resolved: r };
+    });
+  }
+
+  book() {
+    if (this._book) return this._book;
+    this._book = BOOK.map(row => {
+      const [no, name, tags, booked, status, reason, srcDate, srcCond, runs, wins, places, expWins, staked, returned, missedRuns, missedRet, today] = row;
+      const rand = rng(name + 'src');
+      const srcFin = /TRIAL/.test(srcCond) ? 2 : 2 + Math.floor(rand() * 8);
+      const src = {
+        date: srcDate, cond: srcCond,
+        style: STYLES[Math.floor(rand() * 4)],
+        jockey: RIDERS[Math.floor(rand() * RIDERS.length)],
+        wt: 113 + Math.floor(rand() * 22),
+        fin: srcFin, fig: (98 + rand() * 10).toFixed(0),
+        time: fmtTime(96 + rand() * 14),
+        pos: [8, 7, 5, 4, srcFin].join(' '),
+        trip: tags.indexOf('incident') >= 0 ? 'checked 400m' : (tags.indexOf('bad-conditions') >= 0 ? 'wide throughout' : '—'),
+        jump: ((rand() - 0.6)).toFixed(2),
+        lost: (rand() * 5).toFixed(1) + 'm',
+        sections: [14.2, 22.6, 23.5, 23.8, 23.4].map(v => (v + (rand() - 0.5) * 0.6).toFixed(2)).join(' · '),
+      };
+      src.styleColor = STYLE_SKIN[src.style].color;
+      src.styleBg = STYLE_SKIN[src.style].bg;
+      src.finColor = src.fin === 1 ? AMBER : (src.fin <= 3 ? '#fafafa' : MUTED);
+      src.figColor = Number(src.fig) >= 105 ? '#fafafa' : (Number(src.fig) >= 100 ? '#cfd3da' : MUTED);
+      src.len = (Number(src.fig) >= 100 ? '+' : '') + ((Number(src.fig) - 100) * 0.9).toFixed(1) + 'L';
+      src.video = replayUrl(srcDate);
+      const base = 96 + Number(src.fig) % 7;
+      const since = [];
+      for (let i = 0; i < runs; i++) since.push(runRow(name, i, base));
+      const bets = [];
+      if (staked > 0) {
+        const n = staked >= 900 ? 3 : (staked >= 600 ? 2 : 1);
+        let left = staked, retLeft = returned;
+        for (let i = 0; i < n; i++) {
+          const st = i === n - 1 ? left : Math.round(staked / n / 100) * 100;
+          const rt = i === n - 1 ? retLeft : (retLeft > 0 && i === 0 ? retLeft : 0);
+          bets.push({ date: DATE_POOL[(i + 1) % DATE_POOL.length], type: ['WIN', 'PLACE', 'QPL'][i % 3], stake: st, ret: rt });
+          left -= st; retLeft -= rt;
+        }
+      }
+      const misses = [];
+      for (let i = 0; i < missedRuns; i++) {
+        const r2 = rng(name + 'miss' + i);
+        const fin = missedRet > 0 && i === 0 ? 1 : 2 + Math.floor(r2() * 9);
+        const sp = (3 + r2() * 25).toFixed(1);
+        misses.push({ date: DATE_POOL[(i + 2) % DATE_POOL.length], fin: ordFin(fin), sp, would: fin === 1 ? Math.round(200 * Number(sp)) : 0 });
+      }
+      return {
+        no, name, tags, booked, status, reason, src, since, bets, misses,
+        runs, wins, places, expWins, staked, returned, missedRuns,
+        missedStake: missedRuns * 200,
+        missedRet: misses.reduce((a, m) => a + m.would, 0),
+        today,
+      };
+    });
+    return this._book;
+  }
+
+  renderVals() {
+    const st = this.state;
+    const book = this.book().map(e => Object.assign({}, e, { status: st.resolved[e.name] || e.status }));
+    const cutoff = this.props.thinTagCutoff ?? 5;
+
+    // every filter is combinable and every one of them is visible as a chip above the grid
+    const q = st.search.trim().toLowerCase();
+    const rangeDays = (RANGES.find(r => r[0] === st.range) || RANGES[0])[2];
+    const filtered = book.filter(e => {
+      if (st.status !== 'all' && e.status !== st.status) return false;
+      if (st.tags.length && !st.tags.some(t => e.tags.indexOf(t) >= 0)) return false;
+      if (st.todayOnly && !e.today) return false;
+      if (daysAgo(e.booked) > rangeDays) return false;
+      if (q) {
+        const hay = (e.name + ' ' + e.reason + ' ' + e.tags.join(' ')).toLowerCase();
+        if (hay.indexOf(q) < 0) return false;
+      }
+      return true;
+    });
+
+    const sortVal = (e, k) => {
+      if (k === 'name') return e.name;
+      if (k === 'tags') return e.tags[0];
+      if (k === 'booked') return DATE_POOL.indexOf(e.booked);
+      if (k === 'runs') return e.runs;
+      if (k === 'record') return e.wins * 10 + e.places;
+      if (k === 'next') return e.today ? e.today.r : 99;
+      if (k === 'status') return e.status;
+      return 0;
+    };
+    const ordered = filtered.slice().sort((a, b) => {
+      const va = sortVal(a, st.sort.key), vb = sortVal(b, st.sort.key);
+      let c = typeof va === 'string' ? va.localeCompare(vb) : va - vb;
+      if (c === 0) c = (a.today ? a.today.r : 99) - (b.today ? b.today.r : 99);
+      if (c === 0) c = a.name.localeCompare(b.name);
+      return st.sort.dir === 'desc' ? -c : c;
+    });
+
+    const totStaked = book.reduce((a, e) => a + e.staked, 0);
+    const totRet = book.reduce((a, e) => a + e.returned, 0);
+    const totMissStake = book.reduce((a, e) => a + e.missedStake, 0);
+    const totMissRet = book.reduce((a, e) => a + e.missedRet, 0);
+    const backedRoiV = (totRet - totStaked) / totStaked;
+    const missedRoiV = totMissStake ? (totMissRet - totMissStake) / totMissStake : 0;
+    const nBacked = book.reduce((a, e) => a + e.bets.length, 0);
+    const nMissed = book.reduce((a, e) => a + e.missedRuns, 0);
+
+    const tagRows = TAGS.map(([k, label]) => {
+      const es = book.filter(e => e.tags.indexOf(k) >= 0);
+      const runs = es.reduce((a, e) => a + e.runs, 0);
+      const wins = es.reduce((a, e) => a + e.wins, 0);
+      const places = es.reduce((a, e) => a + e.places, 0);
+      const exp = es.reduce((a, e) => a + e.expWins, 0);
+      const stake = es.reduce((a, e) => a + e.staked, 0);
+      const ret = es.reduce((a, e) => a + e.returned, 0);
+      const mStake = es.reduce((a, e) => a + e.missedStake, 0);
+      const mRet = es.reduce((a, e) => a + e.missedRet, 0);
+      const thin = es.length < cutoff;
+      const ae = exp > 0 ? wins / exp : null;
+      const half = exp > 0 ? 1.96 * Math.sqrt(Math.max(wins, 1)) / exp : 3;
+      const scale = 100 / 3;   // bar spans A/E 0 → 3
+      const bRoi = stake ? (ret - stake) / stake : null;
+      const mRoi = mStake ? (mRet - mStake) / mStake : null;
+      const gap = bRoi != null && mRoi != null ? mRoi - bRoi : null;
+      return {
+        label, entries: es.length, runs,
+        opacity: thin ? 0.45 : 1,
+        labelColor: thin ? MUTED : TAG_SKIN[k],
+        nColor: thin ? '#4c525c' : '#6f757f',
+        sr: runs ? (wins / runs * 100).toFixed(0) + '%' : '—',
+        srN: runs ? '(' + wins + '/' + runs + ')' : '',
+        srColor: thin ? MUTED : (runs && wins / runs > 0.14 ? AMBER : '#cfd3da'),
+        pr: runs ? (places / runs * 100).toFixed(0) + '%' : '—',
+        prN: runs ? '(' + places + '/' + runs + ')' : '',
+        prColor: thin ? MUTED : '#cfd3da',
+        ae: ae == null ? '—' : ae.toFixed(2),
+        aeColor: thin ? MUTED : (ae > 1.15 ? AMBER : (ae < 0.85 ? MUTED : '#cfd3da')),
+        aeMid: ae == null ? 0 : Math.min(97, Math.max(1, ae * scale)),
+        ciLo: ae == null ? 0 : Math.max(0, (ae - half) * scale),
+        ciW: ae == null ? 0 : Math.min(100, half * 2 * scale),
+        ciColor: thin ? '#242832' : '#2b3a44',
+        markColor: thin ? MUTED : (ae > 1.15 ? AMBER : '#cfd3da'),
+        ciLabel: ae == null ? 'no runs' : (thin ? 'n=' + es.length + ' thin' : (Math.max(0, ae - half)).toFixed(2) + '–' + (ae + half).toFixed(2)),
+        roi: stake ? pct((ret - stake) / stake) : '—',
+        roiColor: !stake ? '#5b616b' : (thin ? MUTED : roiColor(stake, ret)),
+        backedRoi: bRoi == null ? 'no bets' : 'BACKED ' + pct(bRoi),
+        missedRoi: mRoi == null ? 'none missed' : 'MISSED ' + pct(mRoi),
+        gapNote: gap == null ? '' : (gap > 0.4 ? '· MISSED OUTPERFORMED' : ''),
+        gapColor: MAGENTA,
+      };
+    }).sort((a, b) => b.entries - a.entries);
+
+    const statusCount = s => book.filter(e => e.status === s).length;
+
+    return {
+      pages: [
+        ['Race Day', 'Race Day.dc.html'],
+        ['Form Guide', 'Form Guide.dc.html'],
+        ['Bets', 'Bets.dc.html'],
+        ['Blackbook', 'Blackbook.dc.html'],
+        ['Results', 'Results.dc.html'],
+        ['Lookup', 'Lookup.dc.html'],
+        ['Trials', 'Trials.dc.html'],
+      ].map(([name, href], i) => ({
+        name, color: i === 3 ? '#fafafa' : 'inherit', mark: i === 3 ? '#e63946' : 'transparent', href,
+      })),
+      statusBars: [
+        { label: 'ACTIVE', n: statusCount('active'), color: TEAL, w: statusCount('active') / book.length * 100, note: 'live theses' },
+        { label: 'WON OUT', n: statusCount('won out'), color: AMBER, w: statusCount('won out') / book.length * 100, note: 'paid off' },
+        { label: 'RETIRED', n: statusCount('retired'), color: '#6f757f', w: statusCount('retired') / book.length * 100, note: 'closed out' },
+      ],
+    };
+  }
+}
+
+</script>
+</body>
+</html>

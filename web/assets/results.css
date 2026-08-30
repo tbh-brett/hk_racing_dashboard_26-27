@@ -1,0 +1,258 @@
+/* Results — ported from web/design-source/Results.dc.html.
+ *
+ * What actually happened: the finishing order, the dividends, the stewards,
+ * and whether the money on the race came back. The filter bar, chips, section
+ * frames and panel boxes come from pages.css.
+ *
+ * Design brief 04 sets the reading requirement on the quality verdict, and the
+ * styling has to carry it: "Whether the first five go on to win is what
+ * settles this — those runs have not happened yet. The verdict above is
+ * provisional and will be revised, not backfilled silently." So a provisional
+ * verdict is drawn as provisional rather than as a result.
+ */
+
+/* The shared chrome in pages.css is painted from these. Set once, here. */
+:root {
+  --page-accent:        var(--re-accent);
+  --page-accent-ground: var(--re-rule);
+  --page-dim:           var(--re-dim);
+  --page-band:          var(--re-band);
+  --page-rule:          var(--re-rule);
+  --page-rule-2:        var(--re-rule-2);
+  --page-hover:         var(--re-hover);
+}
+
+.re-strip {
+  display: flex; align-items: center; gap: 2px; padding: 0 14px;
+  border-bottom: 1px solid var(--page-rule); background: var(--page-band);
+}
+.re-brand {
+  display: flex; align-items: center; gap: 8px; padding: 9px 14px 9px 0;
+  font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 600;
+  letter-spacing: .14em; color: var(--page-accent);
+}
+.re-brand .dot { width: 7px; height: 7px; background: var(--page-accent); }
+.re-brand .sub { color: var(--page-dim); font-weight: 400; letter-spacing: .1em; }
+.re-sum {
+  margin-left: auto; display: flex; gap: 16px; align-items: baseline;
+  font-family: var(--font-mono); font-size: var(--fs-xs);
+  letter-spacing: .08em; color: var(--text-dim);
+}
+.re-sum b { color: var(--text-2); font-weight: 600; letter-spacing: 0; }
+
+.race-picker { display: flex; gap: 1px; margin-left: 8px; }
+.race-picker button {
+  background: none; border: 1px solid var(--line-3); cursor: pointer;
+  min-width: 30px; padding: 3px 6px; font-family: var(--font-mono);
+  font-size: var(--fs-xs); color: var(--text-muted);
+}
+.race-picker button:hover { color: var(--text); background: var(--page-hover); }
+.race-picker button[aria-pressed="true"] {
+  background: var(--text); color: var(--bg); border-color: var(--text);
+}
+/* A race that has not been run yet. Dimmed and still clickable — the page has
+   something to say about it, which is that it has not been run. */
+.race-picker button.pending { color: var(--text-faint); border-style: dashed; }
+
+.race-line {
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  padding: 8px 14px; border-bottom: 1px solid var(--line-2);
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
+}
+.race-line .k {
+  font-size: var(--fs-xs); letter-spacing: .1em; color: var(--page-dim);
+}
+.race-line .v { color: var(--text-2); }
+.race-line .big { color: var(--text); font-weight: 600; }
+.race-line .right { margin-left: auto; color: var(--text-faint); font-size: var(--fs-xs); }
+
+.not-run {
+  padding: 40px 14px; font-family: var(--font-mono); font-size: var(--fs-md);
+  color: var(--text-dim); line-height: 1.7;
+}
+.not-run .sub { display: block; font-size: var(--fs-sm); color: var(--text-faint); }
+
+/* ── the finishing order ─────────────────────────────────────────────────── */
+
+.res-head, .res-row {
+  display: grid; align-items: center;
+  grid-template-columns: 34px 30px minmax(150px, 1fr) 100px 30px 100px 62px
+    38px 60px 56px 56px 62px 96px;
+  gap: 9px; padding: 0 14px;
+}
+.res-head {
+  height: 28px; border-bottom: 1px solid var(--line-2);
+  background: var(--surface); font-family: var(--font-mono);
+  font-size: var(--fs-xs); letter-spacing: .08em; color: var(--text-dim);
+  white-space: nowrap;
+}
+.res-head .r { text-align: right; }
+.res-row {
+  min-height: 28px; border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
+  white-space: nowrap;
+}
+.res-row:hover { background: var(--page-hover); }
+.res-row .fin { font-weight: 600; text-align: right; }
+.res-row .fin.win { color: var(--win); }
+.res-row .fin.plc { color: var(--text-2); }
+.res-row .horse { color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+.res-row .jockey, .res-row .trainer {
+  overflow: hidden; text-overflow: ellipsis;
+}
+.res-row .r { text-align: right; }
+.res-row .fig { text-align: right; color: var(--text-2); }
+.res-row .pos { color: var(--text-dim); letter-spacing: .04em; }
+.res-row .bb {
+  color: var(--book); border: 1px solid var(--book-ground); padding: 0 3px;
+  font-size: var(--fs-xs); margin-left: 5px;
+}
+/* Money was on this horse. A join, not something anyone had to log. */
+.res-row .backed { color: var(--edge); margin-left: 4px; }
+
+/* ── panels ──────────────────────────────────────────────────────────────── */
+
+.div-row {
+  display: grid; grid-template-columns: 58px 1fr 80px; gap: 10px;
+  align-items: baseline; padding: 3px 0;
+  border-bottom: 1px solid var(--line);
+}
+.div-row .pool { color: var(--text-2); letter-spacing: .06em; }
+.div-row .combo { color: var(--text-muted); }
+.div-row .amt { text-align: right; color: var(--text); }
+.div-row .amt.big { color: var(--win); font-weight: 600; }
+
+.stew-row { padding: 5px 0; border-bottom: 1px solid var(--line); }
+.stew-row .who {
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: var(--fs-xs); letter-spacing: .06em; color: var(--text-dim);
+}
+.stew-row .who .name { color: var(--text-2); letter-spacing: 0; }
+.stew-row .text {
+  margin-top: 2px; color: var(--text-muted); line-height: 1.5;
+  font-size: var(--fs-xs); max-width: 92ch;
+}
+
+.bet-row {
+  display: grid; grid-template-columns: 96px 1fr 62px 62px 62px;
+  gap: 10px; align-items: baseline; padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+.bet-row .type { color: var(--text-2); }
+.bet-row .sel { color: var(--text-muted); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.bet-row .r { text-align: right; }
+.bet-row .pnl.pos { color: var(--win); font-weight: 600; }
+.bet-row .pnl.neg { color: var(--loss); }
+/* An all-up passing through this race. Its stake rides on other races too, so
+   its P/L is not this race's to claim. */
+.bet-row.spanning { opacity: .72; }
+.bet-row .spans {
+  font-size: var(--fs-xs); color: var(--edge); letter-spacing: .06em;
+}
+
+.book-row {
+  display: grid; grid-template-columns: 30px 1fr 54px 74px 1fr;
+  gap: 10px; align-items: baseline; padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+.book-row .name { color: var(--text); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.book-row .fin { text-align: right; }
+.book-row .fin.win { color: var(--win); font-weight: 600; }
+.book-row .tags { color: var(--text-faint); font-size: var(--fs-xs);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.book-row .backed { color: var(--edge); letter-spacing: .06em; font-size: var(--fs-xs); }
+/* The whole point of brief 06: a booked horse ran and no money was on it. */
+.book-row.missed { background: var(--miss-ground); }
+.book-row .missed-mark { color: var(--loss-dim); letter-spacing: .06em;
+  font-size: var(--fs-xs); }
+
+.q-row {
+  display: grid; grid-template-columns: 26px 1fr 1fr; gap: 10px;
+  align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--line);
+}
+.q-row .p { color: var(--text-dim); text-align: right; }
+.q-row .name { color: var(--text-2); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.q-row .next { color: var(--text-muted); font-size: var(--fs-xs); }
+.q-row .next .won { color: var(--win); font-weight: 600; }
+.q-row .next .none { color: var(--text-faint); }
+/* Provisional by construction: those runs may not have happened yet. */
+.provisional {
+  font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--edge);
+  letter-spacing: .06em; margin-top: 6px;
+}
+
+/* ── one runner, expanded ────────────────────────────────────────────────── */
+
+.res-row { cursor: pointer; }
+.res-row .noted { color: var(--book); margin-left: 5px; }
+
+/* Named `result-detail`, not `run-detail`: formguide.css already styles
+   `.run-detail` as a two-column flex block for the expanded past run, and a
+   page that ever loaded both sheets would get whichever won. */
+.result-detail {
+  border-bottom: 1px solid var(--line-2); background: var(--detail);
+  padding: 9px 14px 11px;
+}
+.sect-band { margin-bottom: 8px; }
+.sect-band .k {
+  display: block; font-family: var(--font-mono); font-size: var(--fs-xs);
+  letter-spacing: .1em; color: var(--page-dim); margin-bottom: 4px;
+}
+.sect { display: flex; gap: 4px; flex-wrap: wrap; }
+/* A time without a position is a clock reading; a position without a time is
+   a shape. They are drawn as one cell because they are one fact. */
+.sect .seg {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  min-width: 58px; padding: 3px 6px; border: 1px solid var(--line-2);
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+}
+.sect .seg .t { color: var(--text-2); }
+.sect .seg .p { color: var(--text-faint); font-size: var(--fs-xs); }
+
+.facts { display: flex; flex-wrap: wrap; gap: 6px 22px; }
+.fact { display: flex; align-items: baseline; gap: 7px;
+  font-family: var(--font-mono); font-size: var(--fs-sm); }
+.fact .k { font-size: var(--fs-xs); letter-spacing: .1em; color: var(--page-dim); }
+.fact .v { color: var(--text-2); }
+
+.run-stewards { margin-top: 8px; }
+.run-stewards .k {
+  display: block; font-family: var(--font-mono); font-size: var(--fs-xs);
+  letter-spacing: .1em; color: var(--page-dim); margin-bottom: 3px;
+}
+.run-stewards .text {
+  font-family: var(--font-mono); font-size: var(--fs-xs); line-height: 1.5;
+  color: var(--text-muted); max-width: 96ch;
+}
+
+.run-actions { display: flex; align-items: center; gap: 12px; margin-top: 9px; }
+.run-actions .act {
+  font-family: var(--font-mono); font-size: var(--fs-xs); cursor: pointer;
+  color: var(--book); border: 1px solid var(--book-ground);
+  background: var(--pop-act); padding: 3px 9px; letter-spacing: .06em;
+}
+.run-actions .act:hover { color: var(--text); }
+.run-actions .hint {
+  font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint);
+}
+
+/* A section the runner beat the field's median over by 0.25 s/400m or more.
+   Measured: below that the band stops separating from the field. */
+.sect .seg.notable { border-color: var(--page-accent); }
+.sect .seg .m {
+  display: flex; gap: 5px; align-items: baseline;
+  font-size: var(--fs-xs); color: var(--text-faint);
+}
+.sect .seg .m .rk { color: var(--text-dim); }
+.sect .seg .m .up { color: var(--win); }
+.sect .seg .m .down { color: var(--loss-dim); }
+.sect-band .k .sub { color: var(--text-faint); letter-spacing: .06em; }
+/* The one-line read of the run. The pairing of time and places is the point,
+   so it is a sentence rather than another number. */
+.sect-read {
+  margin-top: 5px; font-family: var(--font-mono); font-size: var(--fs-xs);
+  color: var(--page-accent); letter-spacing: .02em;
+}

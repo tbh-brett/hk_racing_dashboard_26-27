@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<template id="__bundler_thumbnail" data-bg-color="#0e1117">
+  <svg viewBox="0 0 120 56" xmlns="http://www.w3.org/2000/svg">
+    <rect width="120" height="56" fill="#0e1117"/>
+    <circle cx="14" cy="12" r="3" fill="#e63946"/>
+    <rect x="8" y="24" width="30" height="6" fill="#8b929e"/>
+    <rect x="8" y="34" width="104" height="14" fill="#12151b" stroke="#2b303a"/>
+    <rect x="8" y="34" width="104" height="4" fill="#f0a824"/>
+  </svg>
+</template>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; padding:0; background:#0e1117; }
+  * { box-sizing: border-box; }
+  a { color:#f0a824; text-decoration:none; }
+  a:hover { color:#ffc75a; }
+  input, select { outline:none; }
+  ::-webkit-scrollbar { width:9px; height:9px; }
+  ::-webkit-scrollbar-track { background:#0e1117; }
+  ::-webkit-scrollbar-thumb { background:#2b303a; }
+  @keyframes tick { 0%,100% { opacity:1 } 50% { opacity:.35 } }
+</style>
+</helmet>
+<div style="min-height:100vh;background:#0e1117;color:#fafafa;font-family:'IBM Plex Sans',system-ui,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;-webkit-font-smoothing:antialiased">
+
+  <div style="display:flex;align-items:stretch;height:32px;border-bottom:1px solid #1c202a;background:#0b0e13;overflow-x:auto">
+    <div style="display:flex;align-items:center;gap:9px;padding:0 14px;border-right:1px solid #1c202a;flex:none">
+      <div style="width:9px;height:9px;background:#e63946;flex:none"></div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:12px;letter-spacing:.16em">RACEDAY</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;padding:0 16px;flex:none;min-width:max-content;font-family:'IBM Plex Mono',monospace;font-size:12px;white-space:nowrap">
+      <span style="font-weight:600">HV</span>
+      <span style="color:#cfd3da">15 Jul 2026</span>
+      <span style="color:#8b929e">11 races</span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:#8b929e"><span style="width:6px;height:6px;border-radius:50%;background:#35b37e;animation:tick 1.6s infinite;flex:none"></span>active meeting · 16:22</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;padding:0 14px;border-left:1px solid #1c202a;flex:none;min-width:max-content;margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px">
+      <span style="color:#6f757f;letter-spacing:.1em">DATA</span>
+      <sc-for list="{{ freshness }}" as="f" hint-placeholder-count="5">
+        <span onClick="{{ f.go }}" style="display:flex;align-items:baseline;gap:4px;cursor:pointer;padding:1px 5px;border:1px solid {{ f.border }};background:{{ f.bg }};white-space:nowrap" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.07)">
+          <span style="color:#8b929e">{{ f.name }}</span>
+          <span style="color:{{ f.color }};font-weight:600">{{ f.mark }}</span>
+          <span style="color:{{ f.color }}">{{ f.age }}</span>
+        </span>
+      </sc-for>
+      <sc-if value="{{ refreshMsg }}" hint-placeholder-val="{{ false }}">
+        <span style="color:#2ec4b6;white-space:nowrap">{{ refreshMsg }}</span>
+      </sc-if>
+    </div>
+  </div>
+
+  <nav style="display:flex;align-items:stretch;height:34px;border-bottom:1px solid #262a33;background:#12151b">
+    <sc-for list="{{ pages }}" as="p" hint-placeholder-count="6">
+      <a href="{{ p.href }}" style="display:flex;align-items:center;padding:0 16px;font-size:12px;font-weight:500;letter-spacing:.03em;cursor:pointer;color:#8b929e;border-right:1px solid #1c202a;text-decoration:none" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.06)">
+        <span style="color:{{ p.color }};border-bottom:2px solid {{ p.mark }};padding-bottom:1px">{{ p.name }}</span>
+      </a>
+    </sc-for>
+  </nav>
+
+  <div style="display:flex;align-items:center;gap:14px;padding:7px 14px;border-bottom:1px solid #262a33;background:#101820;font-family:'IBM Plex Mono',monospace;font-size:11px;flex-wrap:wrap">
+    <span style="color:#8b929e">DB last updated <span style="color:#cfd3da">{{ dbMeta.updated }}</span></span>
+    <span style="color:#2b303a">·</span>
+    <span style="color:#cfd3da">{{ dbMeta.runs }} runs</span>
+    <span style="color:#8b929e">{{ dbMeta.races }} races</span>
+    <span style="color:#2b303a">·</span>
+    <span style="color:#8b929e">pace-labelled <span style="color:{{ dbMeta.paceColor }}">{{ dbMeta.paceLabelled }}/{{ dbMeta.races }} ({{ dbMeta.pacePct }}%)</span></span>
+    <span style="margin-left:auto;color:#5b616b">every page carries this line — it states what is current and quantifies what is missing</span>
+  </div>
+
+  <div style="display:flex;align-items:stretch;height:32px;border-bottom:1px solid #262a33;background:#12151b">
+    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+      <div onClick="{{ t.go }}" style="display:flex;align-items:center;padding:0 16px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.07em;border-right:1px solid #1c202a;color:{{ t.fg }};background:{{ t.bg }};border-bottom:2px solid {{ t.mark }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.07)">{{ t.label }}</div>
+    </sc-for>
+    <div style="flex:1"></div>
+    <div style="display:flex;align-items:center;gap:12px;padding:0 14px;border-left:1px solid #1c202a;font-family:'IBM Plex Mono',monospace;font-size:11px">
+      <span style="color:#8b929e">MATCHING</span>
+      <span style="font-size:14px;font-weight:600;color:{{ ins.nColor }}">{{ matchCount }}</span>
+      <span style="color:#5b616b">of {{ dbMeta.runs }}</span>
+      <span style="padding:1px 7px;letter-spacing:.06em;color:{{ ins.weightColor }};border:1px solid {{ ins.weightBorder }};background:{{ ins.weightBg }}">{{ ins.weight }}</span>
+    </div>
+  </div>
+
+  <div style="position:relative">
+    <div style="position:relative;z-index:26;display:flex;align-items:center;gap:7px;padding:7px 14px;border-bottom:1px solid #262a33;background:#12151b;font-family:'IBM Plex Mono',monospace;font-size:11px;flex-wrap:wrap">
+      <span onClick="{{ toggleFilters }}" style="cursor:pointer;display:flex;align-items:center;gap:6px;padding:3px 10px;letter-spacing:.08em;color:{{ filterBtn.fg }};background:{{ filterBtn.bg }};border:1px solid {{ filterBtn.border }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">
+        <span>FILTERS</span>
+        <sc-if value="{{ activeCount }}" hint-placeholder-val="{{ false }}">
+          <span style="font-weight:600">· {{ activeCount }}</span>
+        </sc-if>
+        <span style="font-size:9px">{{ filtersChevron }}</span>
+      </span>
+
+      <sc-for list="{{ activeChips }}" as="c" hint-placeholder-count="3">
+        <span style="display:flex;align-items:center;gap:4px;padding:2px 3px 2px 8px;color:#cfd3da;background:#1a1f27;border:1px solid #2b303a;white-space:nowrap;font-size:10px">
+          <span>{{ c.text }}</span>
+          <span onClick="{{ c.remove }}" style="cursor:pointer;padding:0 5px;color:#8b929e" style-hover="color:#fafafa">×</span>
+        </span>
+      </sc-for>
+
+      <sc-if value="{{ noActiveChips }}" hint-placeholder-val="{{ false }}">
+        <span style="color:#4c525c;font-size:10px">no filters active</span>
+      </sc-if>
+
+      <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+        <select value="{{ presetPick }}" onChange="{{ loadPreset }}" style="background:#0b0e13;border:1px solid #2b303a;color:#cfd3da;font-family:'IBM Plex Mono',monospace;font-size:10px;padding:3px 4px;max-width:150px">
+          <sc-for list="{{ presetOptions }}" as="o" hint-placeholder-count="4">
+            <option value="{{ o.value }}">{{ o.label }}</option>
+          </sc-for>
+        </select>
+        <input value="{{ presetName }}" onChange="{{ setPresetName }}" placeholder="name preset" style="width:104px;background:#0b0e13;border:1px solid #2b303a;color:#fafafa;font-family:'IBM Plex Mono',monospace;font-size:10px;padding:3px 6px" />
+        <span onClick="{{ savePreset }}" style="font-size:10px;padding:3px 8px;cursor:pointer;white-space:nowrap;color:{{ saveColor }};border:1px solid {{ saveBorder }};background:{{ saveBg }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ saveLabel }}</span>
+        <span onClick="{{ clearAll }}" style="font-size:10px;padding:3px 8px;cursor:pointer;color:#f0a824;border:1px solid #4a3a18" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">Clear all</span>
+      </div>
+    </div>
+
+    <sc-if value="{{ filtersOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeFilters }}" style="position:fixed;inset:0;background:rgba(4,6,10,0.6);z-index:24"></div>
+    <div style="position:absolute;top:100%;left:14px;right:14px;z-index:26;background:#12151b;border:1px solid #2b303a;box-shadow:0 26px 70px rgba(0,0,0,.7);max-height:min(76vh,660px);overflow-y:auto">
+      <div style="display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid #262a33;background:#161a21;position:sticky;top:0;z-index:1">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;color:#8b929e">FILTER PANEL</span>
+        <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#4c525c">changes apply live · click outside or press Esc to close</span>
+        <span onClick="{{ closeFilters }}" style="margin-left:12px;cursor:pointer;padding:2px 9px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e;border:1px solid #2b303a" style-hover="color:#fafafa;border-color:#4c525c">Close ✕</span>
+      </div>
+
+      <div style="padding:9px 12px;border-bottom:1px solid #1e232c">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;letter-spacing:.07em;margin-bottom:4px">HORSE NAME</div>
+        <input value="{{ horseQuery }}" onChange="{{ setHorse }}" placeholder="substring match" style="width:280px;max-width:100%;background:#0b0e13;border:1px solid #2b303a;color:#fafafa;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:4px 7px" />
+      </div>
+
+      <div style="padding:9px 12px;border-bottom:1px solid #1e232c">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;letter-spacing:.07em;margin-bottom:5px">DATE MODE</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+          <sc-for list="{{ dateModes }}" as="m" hint-placeholder-count="4">
+            <span onClick="{{ m.go }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:1px 7px;cursor:pointer;color:{{ m.fg }};background:{{ m.bg }};border:1px solid {{ m.border }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ m.label }}</span>
+          </sc-for>
+          <sc-if value="{{ dateDetail }}" hint-placeholder-val="{{ true }}">
+            <sc-for list="{{ dateOptions }}" as="o" hint-placeholder-count="3">
+              <span onClick="{{ o.go }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:1px 7px;cursor:pointer;white-space:nowrap;color:{{ o.fg }};background:{{ o.bg }};border:1px solid {{ o.border }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ o.label }}</span>
+            </sc-for>
+            <sc-if value="{{ dateIsExact }}" hint-placeholder-val="{{ false }}">
+              <input value="{{ dateValue }}" onChange="{{ setDateValue }}" placeholder="DD Mon" style="width:80px;background:#0b0e13;border:1px solid #2b303a;color:#fafafa;font-family:'IBM Plex Mono',monospace;font-size:10px;padding:2px 6px" />
+            </sc-if>
+          </sc-if>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))">
+        <sc-for list="{{ multiFacets }}" as="f" hint-placeholder-count="9">
+          <div style="padding:9px 12px;border-bottom:1px solid #1e232c;border-right:1px solid #1e232c">
+            <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:4px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;letter-spacing:.07em">{{ f.label }}</span>
+              <sc-if value="{{ f.count }}" hint-placeholder-val="{{ false }}">
+                <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#0e1117;background:#8b929e;padding:0 4px">{{ f.count }}</span>
+              </sc-if>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:3px">
+              <sc-for list="{{ f.options }}" as="o" hint-placeholder-count="5">
+                <span onClick="{{ o.go }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:1px 5px;cursor:pointer;white-space:nowrap;color:{{ o.fg }};background:{{ o.bg }};border:1px solid {{ o.border }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ o.label }}</span>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">
+        <sc-for list="{{ modeFacets }}" as="f" hint-placeholder-count="4">
+          <div style="padding:9px 12px;border-bottom:1px solid #1e232c;border-right:1px solid #1e232c">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;letter-spacing:.07em;margin-bottom:4px">{{ f.label }}</div>
+            <div style="display:flex;gap:3px;flex-wrap:wrap">
+              <sc-for list="{{ f.modes }}" as="m" hint-placeholder-count="3">
+                <span onClick="{{ m.go }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:1px 6px;cursor:pointer;color:{{ m.fg }};background:{{ m.bg }};border:1px solid {{ m.border }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ m.label }}</span>
+              </sc-for>
+            </div>
+            <sc-if value="{{ f.hasValues }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:5px">
+                <sc-for list="{{ f.values }}" as="v" hint-placeholder-count="4">
+                  <span onClick="{{ v.go }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:1px 5px;cursor:pointer;white-space:nowrap;color:{{ v.fg }};background:{{ v.bg }};border:1px solid {{ v.border }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ v.label }}</span>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ f.note }}" hint-placeholder-val="{{ false }}">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#4c525c;margin-top:4px;line-height:1.5">{{ f.note }}</div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="padding:9px 12px;border-bottom:1px solid #1e232c;display:flex;align-items:center;gap:8px">
+        <span onClick="{{ toggleOutliers }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:2px 8px;cursor:pointer;letter-spacing:.05em;color:{{ outlierChip.fg }};background:{{ outlierChip.bg }};border:1px solid {{ outlierChip.border }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">OUTLIERS ONLY</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#4c525c">|Fin Δ| ≥ 6</span>
+      </div>
+
+      <div style="padding:9px 12px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#8b929e;margin-bottom:6px">TRACKED SLICES</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:7px">
+          <sc-for list="{{ slices }}" as="s" hint-placeholder-count="3">
+            <div onClick="{{ s.load }}" style="padding:6px 7px;cursor:pointer;border:1px solid #2b303a;border-left:2px solid {{ s.rule }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.05)">
+              <div style="display:flex;align-items:baseline;gap:6px">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ s.name }}</span>
+                <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f;flex:none">n={{ s.n }}</span>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:6px;margin-top:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;white-space:nowrap">
+                <span style="color:#6f757f">A/E</span>
+                <span style="color:#8b929e">{{ s.aeThen }}</span>
+                <span style="color:#4c525c">→</span>
+                <span style="font-weight:600;color:{{ s.aeColor }}">{{ s.aeNow }}</span>
+                <span style="margin-left:auto;color:{{ s.driftColor }}">{{ s.drift }}</span>
+              </div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#4c525c;margin-top:2px">{{ s.since }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+  </div>
+
+  <div style="display:flex;align-items:stretch;min-height:calc(100vh - 130px)">
+
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+
+      <sc-if value="{{ isResults }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:1;min-width:0;overflow-x:auto">
+        <div style="display:grid;grid-template-columns:74px 26px 32px 36px 42px 30px 46px 40px 30px 34px 120px 36px 30px 30px 67px 67px 62px 88px 100px 62px 46px;align-items:center;height:26px;background:#12151b;border-bottom:1px solid #2b303a;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.05em;color:#8b929e">
+          <sc-for list="{{ cols }}" as="c" hint-placeholder-count="21">
+            <div onClick="{{ c.go }}" style="padding:0 4px;text-align:{{ c.a }};height:26px;line-height:26px;cursor:pointer;user-select:none;white-space:nowrap;overflow:hidden;color:{{ c.fg }};background:{{ c.bg }};border-bottom:1px solid {{ c.rule }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.07)">{{ c.t }}<span style="font-size:7px;color:{{ c.indColor }};margin-left:2px">{{ c.ind }}</span></div>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{ noRows }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:34px 14px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6f757f;line-height:1.7">NO RUNS MATCH THIS FILTER SET.<br /><span style="color:#4c525c">Filters combine as AND across groups. Remove one in the panel on the left.</span></div>
+        </sc-if>
+
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="26">
+          <div style="display:grid;grid-template-columns:74px 26px 32px 36px 42px 30px 46px 40px 30px 34px 120px 36px 30px 30px 67px 67px 62px 88px 100px 62px 46px;align-items:center;height:25px;border-bottom:1px solid #191d24;font-family:'IBM Plex Mono',monospace;font-size:11px" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.035)">
+            <div style="padding:0 4px;color:#cfd3da;white-space:nowrap">{{ r.date }}</div>
+            <div style="padding:0 4px;text-align:center;color:#8b929e">{{ r.raceNo }}</div>
+            <div style="padding:0 4px;color:#cfd3da">{{ r.venue }}</div>
+            <div style="padding:0 4px;color:#8b929e">{{ r.course }}</div>
+            <div style="padding:0 4px;color:#8b929e">{{ r.surface }}</div>
+            <div style="padding:0 4px;text-align:center;color:#8b929e">{{ r.cls }}</div>
+            <div style="padding:0 4px;text-align:right;color:#cfd3da">{{ r.dist }}</div>
+            <div style="padding:0 4px;color:#8b929e">{{ r.going }}</div>
+            <div style="padding:0 4px;text-align:right;color:#8b929e">{{ r.field }}</div>
+            <div style="padding:0 4px;text-align:right;font-weight:600;color:{{ r.finColor }}">{{ r.fin }}</div>
+            <div style="padding:0 5px;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ r.horseColor }}">{{ r.horse }}</div>
+            <div style="padding:0 3px;text-align:center;color:#cfd3da">{{ r.draw }}</div>
+            <div style="padding:0 3px;text-align:right;color:#8b929e">{{ r.rating }}</div>
+            <div style="padding:0 3px;text-align:right;color:#8b929e">{{ r.wt }}</div>
+            <div style="padding:0 4px;color:#cfd3da;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.jockey }}</div>
+            <div style="padding:0 4px;color:#8b929e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.trainer }}</div>
+            <div style="padding:0 4px"><span style="display:inline-block;max-width:100%;font-size:9px;padding:1px 4px;white-space:nowrap;overflow:hidden;color:{{ r.styleColor }};background:{{ r.styleBg }}">{{ r.style }}</span></div>
+            <div style="padding:0 4px;color:#cfd3da;letter-spacing:.03em;white-space:nowrap">{{ r.runPos }}</div>
+            <div style="padding:0 4px;display:flex;align-items:baseline;gap:4px;white-space:nowrap">
+              <span style="color:{{ r.paceColor }};font-size:10px">{{ r.paceLabel }}</span>
+              <span style="color:#6f757f;font-size:10px">{{ r.paceDev }}</span>
+            </div>
+            <div style="padding:0 4px;text-align:right;color:#cfd3da">{{ r.time }}</div>
+            <div style="padding:0 5px;text-align:right;font-weight:600;color:{{ r.deltaColor }}">{{ r.delta }}</div>
+          </div>
+        </sc-for>
+
+        <sc-if value="{{ truncated }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:7px 14px;border-bottom:1px solid #262a33;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f757f">Showing first {{ shown }} of {{ matchCount }} matching runs · every panel and tab is computed on all {{ matchCount }}</div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isInsights }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;padding:12px 14px 20px 14px;overflow-y:auto">
+        <div style="display:flex;align-items:center;gap:12px;padding:8px 12px;border:1px solid {{ chance.border }};background:{{ chance.bg }};border-left:2px solid {{ chance.rule }};flex-wrap:wrap">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:{{ chance.rule }}">EXPECTED BY CHANCE</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e">{{ chance.cells }} cells shown</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px"><span style="color:#6f757f">cleared p&lt;.05 </span><span style="font-size:15px;font-weight:600;color:{{ chance.clearedColor }}">{{ chance.cleared }}</span></span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px"><span style="color:#6f757f">expected at random </span><span style="font-size:15px;font-weight:600;color:#cfd3da">{{ chance.expected }}</span></span>
+          <span style="flex:1;min-width:200px;font-size:12px;line-height:1.5;color:#cfd3da">{{ chance.note }}</span>
+          <div style="display:flex;align-items:center;gap:7px;font-family:'IBM Plex Mono',monospace;font-size:10px">
+            <span style="color:#6f757f;letter-spacing:.06em">MIN SAMPLE</span>
+            <sc-for list="{{ minSampleChips }}" as="m" hint-placeholder-count="4">
+              <span onClick="{{ m.go }}" style="padding:1px 7px;cursor:pointer;color:{{ m.fg }};background:{{ m.bg }};border:1px solid {{ m.border }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ m.label }}</span>
+            </sc-for>
+          </div>
+        </div>
+
+        <sc-for list="{{ breakdowns }}" as="b" hint-placeholder-count="5">
+          <div style="margin-top:14px;border:1px solid #262a33">
+            <div style="display:flex;align-items:baseline;gap:10px;padding:7px 12px;border-bottom:1px solid #262a33;background:#12151b">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.1em">{{ b.title }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e">{{ b.subtitle }}</span>
+              <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f757f">{{ b.hiddenNote }}{{ b.limitNote }}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:180px 54px 46px 74px 92px 1fr 76px;align-items:center;height:23px;border-bottom:1px solid #1e232c;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.07em;color:#6f757f">
+              <div style="padding:0 10px">{{ b.dimLabel }}</div>
+              <div style="padding:0 6px;text-align:right">RUNS</div>
+              <div style="padding:0 6px;text-align:right">W / P</div>
+              <div style="padding:0 6px;text-align:right">WIN % / PLC %</div>
+              <div style="padding:0 6px;text-align:right">BASELINE</div>
+              <div style="padding:0 10px">Δ vs BASE · 95% CI (place below, quieter)</div>
+              <div style="padding:0 8px;text-align:right">READ</div>
+            </div>
+            <sc-for list="{{ b.rows }}" as="r" hint-placeholder-count="6">
+              <div style="border-bottom:1px solid #191d24;background:{{ r.bg }};opacity:{{ r.opacity }}">
+                <div style="display:grid;grid-template-columns:180px 54px 46px 74px 92px 1fr 76px;align-items:center;min-height:23px">
+                  <div style="padding:0 10px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:{{ r.labelColor }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.label }}</div>
+                  <div style="padding:0 6px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:{{ r.nColor }}">{{ r.n }}</div>
+                  <div style="padding:0 6px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e">{{ r.wins }}</div>
+                  <div style="padding:0 6px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:{{ r.srColor }}">{{ r.sr }}</div>
+                  <div style="padding:0 6px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6f757f">{{ r.baseline }}</div>
+                  <div style="padding:0 10px;display:flex;align-items:center;gap:8px">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;width:96px;color:{{ r.deltaColor }};white-space:nowrap">{{ r.delta }}</span>
+                    <div style="position:relative;flex:1;height:7px;background:#191d24">
+                      <div style="position:absolute;left:50%;top:-2px;width:1px;height:11px;background:#3a4150"></div>
+                      <div style="position:absolute;left:{{ r.ciLeft }}%;width:{{ r.ciW }}%;top:0;height:7px;background:{{ r.ciColor }}"></div>
+                      <div style="position:absolute;left:{{ r.mid }}%;top:-2px;width:2px;height:11px;background:{{ r.markColor }}"></div>
+                    </div>
+                  </div>
+                  <div style="padding:0 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.05em;color:{{ r.verdictColor }};white-space:nowrap">{{ r.verdict }}</div>
+                </div>
+                <div style="display:grid;grid-template-columns:180px 54px 46px 74px 92px 1fr 76px;align-items:center;min-height:17px;padding-bottom:2px">
+                  <div style="padding:0 10px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.06em;color:#4c525c">PLACE</div>
+                  <div></div>
+                  <div style="padding:0 6px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5b616b">{{ r.plc }}</div>
+                  <div style="padding:0 6px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e">{{ r.plcPct }}</div>
+                  <div style="padding:0 6px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#4c525c">{{ r.plcBaseline }}</div>
+                  <div style="padding:0 10px;display:flex;align-items:center;gap:8px">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;width:96px;color:{{ r.plcDeltaColor }};white-space:nowrap">{{ r.plcDelta }}</span>
+                    <div style="position:relative;flex:1;height:4px;background:#15181e">
+                      <div style="position:absolute;left:50%;top:-1px;width:1px;height:6px;background:#2b303a"></div>
+                      <div style="position:absolute;left:{{ r.plcCiLeft }}%;width:{{ r.plcCiW }}%;top:0;height:4px;background:#232a33"></div>
+                      <div style="position:absolute;left:{{ r.plcMid }}%;top:-1px;width:2px;height:6px;background:{{ r.plcMarkColor }}"></div>
+                    </div>
+                  </div>
+                  <div style="padding:0 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:8px;letter-spacing:.05em;color:#4c525c;white-space:nowrap">{{ r.plcVerdict }}</div>
+                </div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ b.emptyNote }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4c525c">{{ b.emptyNote }}</div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isPivot }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;padding:12px 14px 20px 14px;overflow:auto">
+        <div style="display:flex;align-items:center;gap:16px;padding:8px 12px;border:1px solid #262a33;background:#12151b;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:7px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.09em;color:#6f757f">ROWS</span>
+            <sc-for list="{{ pivot.rowDims }}" as="d" hint-placeholder-count="5">
+              <span onClick="{{ d.go }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:1px 7px;cursor:pointer;color:{{ d.fg }};background:{{ d.bg }};border:1px solid {{ d.border }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ d.label }}</span>
+            </sc-for>
+          </div>
+          <div style="display:flex;align-items:center;gap:7px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.09em;color:#6f757f">COLUMNS</span>
+            <sc-for list="{{ pivot.colDims }}" as="d" hint-placeholder-count="5">
+              <span onClick="{{ d.go }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:1px 7px;cursor:pointer;color:{{ d.fg }};background:{{ d.bg }};border:1px solid {{ d.border }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ d.label }}</span>
+            </sc-for>
+          </div>
+          <div style="display:flex;align-items:center;gap:7px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.09em;color:#6f757f">METRIC</span>
+            <sc-for list="{{ pivot.metrics }}" as="m" hint-placeholder-count="3">
+              <span onClick="{{ m.go }}" style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:1px 7px;cursor:pointer;color:{{ m.fg }};background:{{ m.bg }};border:1px solid {{ m.border }}" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.09)">{{ m.label }}</span>
+            </sc-for>
+          </div>
+          <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f757f">{{ pivot.cellCount }} cells · {{ pivot.thinCount }} under n={{ minSample }}</span>
+        </div>
+
+        <div style="margin-top:12px;border:1px solid #262a33;display:inline-block;min-width:100%">
+          <div style="display:flex;align-items:stretch;background:#12151b;border-bottom:1px solid #2b303a">
+            <div style="width:150px;flex:none;padding:6px 10px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.07em;color:#8b929e;border-right:1px solid #1e232c">{{ pivot.rowLabel }} ↓ / {{ pivot.colLabel }} →</div>
+            <sc-for list="{{ pivot.headers }}" as="h" hint-placeholder-count="5">
+              <div style="width:104px;flex:none;padding:6px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.05em;color:#cfd3da;border-right:1px solid #1e232c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ h.label }}</div>
+            </sc-for>
+            <div style="width:104px;flex:none;padding:6px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.05em;color:#8b929e">ROW TOTAL</div>
+          </div>
+          <sc-for list="{{ pivot.rows }}" as="r" hint-placeholder-count="4">
+            <div style="display:flex;align-items:stretch;border-bottom:1px solid #191d24">
+              <div style="width:150px;flex:none;padding:7px 10px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:{{ r.labelColor }};background:{{ r.labelBg }};border-right:1px solid #1e232c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.label }}</div>
+              <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="5">
+                <div style="width:104px;flex:none;padding:6px 8px;border-right:1px solid #191d24;background:{{ c.bg }};opacity:{{ c.opacity }}">
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;text-align:right;color:{{ c.color }}">{{ c.value }}</div>
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;text-align:right;color:{{ c.nColor }};margin-top:1px">{{ c.n }}</div>
+                </div>
+              </sc-for>
+              <div style="width:104px;flex:none;padding:6px 8px;background:#101820">
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;text-align:right;color:{{ r.totalColor }}">{{ r.total }}</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;text-align:right;color:#6f757f;margin-top:1px">{{ r.totalN }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f757f;line-height:1.6;max-width:820px">Every cell carries its n underneath, and cells under the minimum sample are dimmed to 40%. A pivot is the easiest way in this whole tool to manufacture a false finding: {{ pivot.cellCount }} cells means roughly {{ pivot.expectedNotable }} will look notable at p&lt;.05 with nothing behind them.</div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isOutliers }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;padding:12px 14px 20px 14px;overflow-y:auto">
+        <div style="display:flex;align-items:center;gap:12px;padding:8px 12px;border:1px solid #4a2733;background:#1a1218;border-left:2px solid #c9748f;flex-wrap:wrap">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#c9748f">ONE RUN IS A STORY, NOT A SIGNAL</span>
+          <span style="flex:1;min-width:240px;font-size:12px;line-height:1.5;color:#cfd3da">These are runs where the finishing position most disagrees with the market's expectation. That makes them worth watching and worth a blackbook note — it does not make them a pattern. A horse appearing here twice is the only thing on this tab that starts to mean something.</span>
+          <div style="display:flex;align-items:baseline;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11px">
+            <span style="color:#6f757f">REPEAT OFFENDERS</span>
+            <span style="font-size:16px;font-weight:600;color:#f0a824">{{ outliers.repeatCount }}</span>
+            <span style="color:#5b616b">of {{ outliers.horseCount }} horses · base rate {{ outliers.baseRate }}</span>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;border:1px solid #262a33">
+          <div style="display:grid;grid-template-columns:74px 26px 118px 132px 42px 62px 76px 66px 62px minmax(200px,1fr);align-items:center;height:23px;background:#12151b;border-bottom:1px solid #2b303a;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.06em;color:#8b929e">
+            <div style="padding:0 6px">DATE</div>
+            <div style="padding:0 4px;text-align:center">R</div>
+            <div style="padding:0 6px">CONDITIONS</div>
+            <div style="padding:0 6px">HORSE</div>
+            <div style="padding:0 4px;text-align:right">FIN</div>
+            <div style="padding:0 6px;text-align:right">SP · RANK</div>
+            <div style="padding:0 6px">STYLE</div>
+            <div style="padding:0 6px;text-align:right">FIGURE</div>
+            <div style="padding:0 6px;text-align:right">FIN Δ ≥6</div>
+            <div style="padding:0 8px">WHAT MADE IT AN OUTLIER</div>
+          </div>
+          <sc-for list="{{ outliers.rows }}" as="o" hint-placeholder-count="16">
+            <div style="display:grid;grid-template-columns:74px 26px 118px 132px 42px 62px 76px 66px 62px minmax(200px,1fr);align-items:center;min-height:26px;border-bottom:1px solid #191d24;background:{{ o.bg }};font-family:'IBM Plex Mono',monospace;font-size:11px" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.035)">
+              <div style="padding:0 6px;color:#cfd3da;white-space:nowrap">{{ o.date }}</div>
+              <div style="padding:0 4px;text-align:center;color:#8b929e">{{ o.raceNo }}</div>
+              <div style="padding:0 6px;color:#8b929e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ o.cond }}</div>
+              <div style="padding:0 6px;display:flex;align-items:baseline;gap:5px;white-space:nowrap;overflow:hidden">
+                <span style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis">{{ o.horse }}</span>
+                <sc-if value="{{ o.repeat }}" hint-placeholder-val="{{ false }}">
+                  <span style="flex:none;font-size:8px;padding:0 3px;color:#f0a824;border:1px solid #4a3a18;letter-spacing:.05em">{{ o.repeatLabel }}</span>
+                </sc-if>
+              </div>
+              <div style="padding:0 4px;text-align:right;font-weight:600;color:{{ o.finColor }}">{{ o.fin }}</div>
+              <div style="padding:0 6px;text-align:right;color:#cfd3da;white-space:nowrap">{{ o.sp }}</div>
+              <div style="padding:0 6px"><span style="display:inline-block;max-width:100%;font-size:9px;padding:1px 4px;white-space:nowrap;overflow:hidden;color:{{ o.styleColor }};background:{{ o.styleBg }}">{{ o.style }}</span></div>
+              <div style="padding:0 6px;text-align:right;font-weight:600;color:{{ o.figColor }}">{{ o.fig }}</div>
+              <div style="padding:0 6px;text-align:right;font-size:12px;font-weight:600;color:{{ o.deltaColor }}">{{ o.delta }}</div>
+              <div style="padding:0 8px;font-size:11px;color:#8b929e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ o.why }}</div>
+            </div>
+          </sc-for>
+          <sc-if value="{{ outliers.none }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:20px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4c525c">No run in this slice deviates by 6 places or more from its market expectation.</div>
+          </sc-if>
+        </div>
+      </div>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{ showInsightRail }}" hint-placeholder-val="{{ true }}">
+    <aside style="width:326px;flex:none;border-left:1px solid #262a33;background:#12151b;overflow-y:auto">
+      <div style="padding:10px 12px;border-bottom:1px solid #262a33;background:#101820">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#6f757f">THIS SLICE</div>
+        <div style="display:flex;align-items:baseline;gap:8px;margin-top:3px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:32px;font-weight:600;line-height:1;color:{{ ins.nColor }}">{{ matchCount }}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8b929e">RUNS</span>
+          <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;padding:2px 7px;color:{{ ins.weightColor }};border:1px solid {{ ins.weightBorder }};background:{{ ins.weightBg }}">{{ ins.weight }}</span>
+        </div>
+        <div style="height:6px;background:#191d24;margin-top:7px"><div style="height:6px;background:{{ ins.nColor }};width:{{ ins.nBarW }}%"></div></div>
+      </div>
+
+      <div style="padding:9px 12px;border-bottom:1px solid #262a33">
+        <sc-for list="{{ ins.headline }}" as="h" hint-placeholder-count="2">
+          <div style="display:flex;align-items:baseline;gap:8px;height:24px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e;width:48px;letter-spacing:.06em">{{ h.label }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:600;color:{{ h.color }};width:56px;text-align:right">{{ h.value }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6f757f">{{ h.n }}</span>
+            <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6f757f">{{ h.base }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="padding:10px 12px;border-bottom:1px solid #262a33">
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#6f757f">A/E · ACTUAL ÷ MARKET-IMPLIED</span>
+          <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;color:{{ ins.aeColor }}">{{ ins.ae }}</span>
+        </div>
+        <div style="position:relative;height:10px;background:#191d24;margin-top:8px">
+          <div style="position:absolute;left:{{ ins.ciLo }}%;width:{{ ins.ciW }}%;top:0;height:10px;background:{{ ins.ciColor }}"></div>
+          <div style="position:absolute;left:33.3%;top:-3px;width:1px;height:16px;background:#5b616b"></div>
+          <div style="position:absolute;left:{{ ins.aeMid }}%;top:-3px;width:2px;height:16px;background:{{ ins.aeColor }}"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#4c525c;margin-top:3px">
+          <span>0.00</span><span style="color:#8b929e">1.00 = THE MARKET</span><span>3.00</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:8px;margin-top:6px;font-family:'IBM Plex Mono',monospace;font-size:10px">
+          <span style="color:#6f757f">95% CI</span>
+          <span style="color:#cfd3da">{{ ins.ciLabel }}</span>
+          <span style="margin-left:auto;color:{{ ins.sigColor }}">{{ ins.sigLabel }}</span>
+        </div>
+      </div>
+
+      <div style="padding:10px 12px;border-bottom:1px solid #262a33">
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:7px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#6f757f">FIN Δ DISTRIBUTION</span>
+          <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8b929e">mean {{ ins.deltaMean }}</span>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:2px;height:56px">
+          <sc-for list="{{ ins.deltaHist }}" as="b" hint-placeholder-count="9">
+            <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:56px">
+              <div style="height:{{ b.h }}px;background:{{ b.color }}"></div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;gap:2px;margin-top:3px">
+          <sc-for list="{{ ins.deltaHist }}" as="b" hint-placeholder-count="9">
+            <div style="flex:1;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:8px;color:{{ b.labelColor }}">{{ b.label }}</div>
+          </sc-for>
+        </div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#4c525c;margin-top:5px;line-height:1.5">Positive means the horse beat its market rank. A slice skewed right has been finding runs the market got wrong.</div>
+      </div>
+
+      <div style="padding:10px 12px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#6f757f;margin-bottom:7px">BY RUNNING STYLE · WITH n</div>
+        <sc-for list="{{ ins.byStyle }}" as="s" hint-placeholder-count="4">
+          <div style="display:flex;align-items:center;gap:7px;height:23px;opacity:{{ s.opacity }}">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;width:58px;padding:1px 4px;color:{{ s.color }};background:{{ s.bg }};white-space:nowrap">{{ s.style }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:{{ s.nColor }};width:50px;text-align:right">n={{ s.n }}</span>
+            <div style="flex:1;height:8px;background:#191d24;position:relative">
+              <div style="position:absolute;left:33.3%;top:-2px;width:1px;height:12px;background:#3a4150"></div>
+              <div style="position:absolute;left:{{ s.ciLo }}%;width:{{ s.ciW }}%;top:0;height:8px;background:{{ s.ciColor }}"></div>
+              <div style="position:absolute;left:{{ s.mid }}%;top:-2px;width:2px;height:12px;background:{{ s.markColor }}"></div>
+            </div>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:{{ s.aeColor }};width:34px;text-align:right">{{ s.ae }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </aside>
+    </sc-if>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+const AMBER = '#f0a824', TEAL = '#2ec4b6', MUTED = '#8b929e', MAGENTA = '#c9748f';
+const WIN_C = '#35b37e', LOSS = '#e0637f', COPPER = '#c8792f';
+
+const STYLE_SKIN = {
+  'Leader': { color: '#ff8a5c', bg: '#3a2013' }, 'On-Pace': { color: '#e8c04a', bg: '#3a3012' },
+  'Midfield': { color: '#9aa7b8', bg: '#1f2630' }, 'Closer': { color: '#4fb3e0', bg: '#12283a' },
+};
+const STYLES = ['Leader', 'On-Pace', 'Midfield', 'Closer'];
+// pace carries its numeric deviation — the label alone is not checkable
+const PACE_LABEL = ['V.Slow', 'Sl.Slow', 'Neutral', 'Sl.Fast', 'V.Fast'];
+const PACE_COLOR = ['#4a7fb5', '#6f9fbf', '#8b929e', '#d3843f', '#e0562f'];
+
+const VENUES = ['ST', 'HV'];
+const COURSES = { ST: ['A', 'B', 'C', 'C+3', 'AWT'], HV: ['A', 'B', 'C', 'C+3'] };
+const GOINGS = ['G', 'GF', 'GY', 'Y', 'WS'];
+const DISTS = [1000, 1200, 1400, 1600, 1650, 1800, 2000, 2200];
+const CLASSES = [1, 2, 3, 4, 5];
+const HORSES = ['FIREFOOT', 'NOBLE PURSUIT', 'KYRUS TREASURE', 'CASA ROCHESTER', 'OCEAN IMPACT', 'ROMANTIC LAOS', 'HARMONY GALAXY', 'STORM RUNNER', 'NORTHERN BEAST', 'VOLCANIC SPARK', 'SERANGOON', 'FAST SPEED', 'SIGHT HERO', 'GLORY STAR', 'ROYAL RACER', 'TRIPLE MOON', 'MR ANDERSON', 'SUPER FORTUNE', 'WINNING ENDEAVOUR', 'KING OPIE', 'HAPPY JOURNEY', 'SOUND GUARD', 'GOLD MOUNT', 'ATOMIC FORCE', 'SPICY GRILL', 'MISTER MONACO', 'DIAMOND SOARES', 'SUPER TALENT', 'LUCKY PRIDE', 'GOOD FIT', 'BRAVE POWER', 'TOP HOPE', 'WINNING VIBE', 'MASSIVE MOVE', 'SILVER HERO', 'TOUCH OF LUCK', 'PACKING TREADMILL', 'GRAND DELIGHT', 'GOLDEN FORTUNE', 'I EXCELLE'];
+const JOCKEYS = ['J Moreira', 'Z Purton', 'K Teetan', 'L Ferraris', 'M F Poon', 'C Y Ho', 'H Bowman', 'A Atzeni', 'B Avdulla', 'K C Leung', 'E C W Wong', 'J Orman', 'P N Wong'];
+const TRAINERS = ['J Size', 'C Fownes', 'A S Cruz', 'D J Whyte', 'F C Lor', 'R Gibson', 'P F Yiu', 'M Newnham', 'W Y So', 'C H Yip', 'K H Ting', 'D Hall'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const SOURCES = [
+  { k: 'card', name: 'Card', mins: 122, normal: 720, rows: '47 runners · 12 gear · 4 scratchings' },
+  { k: 'odds', name: 'Odds', mins: 47, normal: 15, rows: '132 win · 132 place · 2 matrices' },
+  { k: 'results', name: 'Results', mins: 37, normal: 240, rows: '24 runners · 10 dividends · 5 comments' },
+  { k: 'trials', name: 'Trials', mins: 4320, normal: 10080, rows: '38 trials · 38 comments' },
+  { k: 'vet', name: 'Vet', mins: 118, normal: 720, rows: '6 records · 2 significant' },
+];
+function ageLabel(mins) {
+  if (mins == null) return '—';
+  if (mins < 60) return mins + 'm';
+  if (mins < 1440) return Math.round(mins / 60) + 'h';
+  return Math.round(mins / 1440) + 'd';
+}
+function rng(seed) {
+  let s = 0; for (let i = 0; i < String(seed).length; i++) s = (s * 31 + String(seed).charCodeAt(i)) >>> 0;
+  s = s || 7;
+  return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+}
+function pick(rand, arr) { return arr[Math.floor(rand() * arr.length)]; }
+function fmtSp(v) { return v >= 10 ? String(Math.round(v)) : v.toFixed(1); }
+// race times as m:ss.xx; sectionals stay in plain seconds elsewhere
+function fmtTime(sec) {
+  const m = Math.floor(sec / 60);
+  const r = sec - m * 60;
+  return m + ':' + (r < 10 ? '0' : '') + r.toFixed(2);
+}
+function signed(v, dp) { return (v > 0 ? '+' : (v < 0 ? '−' : '')) + Math.abs(v).toFixed(dp == null ? 0 : dp); }
+
+const OVERROUND = 1.17;
+
+// Built race by race: merit = ability + styleBias + noise, finishing order is a
+// Plackett-Luce draw over merit. The market prices ability ONLY and cannot see the
+// bias, so the bias is the one real effect in here; sp is derived from the market's
+// own probability, which is what makes unfiltered A/E land on 1.00 by construction.
+let DB = null;
+function db() {
+  if (DB) return DB;
+  const rand = rng('lookup-db-v4');
+  const out = [];
+  const SCALE = 1.2, BIAS_K = 0.10;
+  let idx = 0;
+
+  for (let race = 0; race < 1712; race++) {
+    const venue = pick(rand, VENUES);
+    const course = pick(rand, COURSES[venue]);
+    const dist = pick(rand, DISTS);
+    const cls = pick(rand, CLASSES);
+    const going = pick(rand, GOINGS);
+    const field = 8 + Math.floor(rand() * 7);
+    const paceDev = Math.round((rand() * 2 - 1) * 0.62 * 100) / 100;
+    const pace = paceDev <= -0.35 ? 0 : (paceDev <= -0.12 ? 1 : (paceDev < 0.12 ? 2 : (paceDev < 0.35 ? 3 : 4)));
+    const paceLabelled = rand() > 0.049;   // 84 of 1712 races have no pace index yet
+    const y = rand() < 0.5 ? 25 : (rand() < 0.6 ? 24 : 26);
+    const month = pick(rand, MONTHS);
+    const day = 1 + Math.floor(rand() * 28);
+    const raceNo = 1 + Math.floor(rand() * 11);
+    const baseSec = dist / 16.4 + rand() * 1.6;
+
+    const runners = [];
+    for (let k = 0; k < field; k++) {
+      const style = pick(rand, STYLES);
+      const ability = rand() * 2.2;
+      const bias = style === 'Closer' ? (pace - 2) * BIAS_K
+        : (style === 'Leader' ? -(pace - 2) * BIAS_K * 0.9 : 0);
+      runners.push({
+        style, ability, bias,
+        horse: pick(rand, HORSES), jockey: pick(rand, JOCKEYS), trainer: pick(rand, TRAINERS),
+        draw: k + 1, wt: 113 + Math.floor(rand() * 22), rating: 40 + Math.floor(rand() * 60),
+      });
+    }
+    const mkt = runners.map(r => Math.exp(r.ability * SCALE));
+    const mktSum = mkt.reduce((a, b) => a + b, 0);
+    const tru = runners.map(r => Math.exp((r.ability + r.bias) * SCALE));
+    const truSum = tru.reduce((a, b) => a + b, 0);
+    runners.forEach((r, k) => { r.pMkt = mkt[k] / mktSum; r.pTrue = tru[k] / truSum; });
+    // market rank: 1 is the favourite. Fin Δ is measured against this.
+    runners.slice().sort((a, b) => b.pMkt - a.pMkt).forEach((r, k) => { r.mktRank = k + 1; });
+
+    const pool = runners.slice(), weights = pool.map(r => r.pTrue), order = [];
+    while (pool.length) {
+      const total = weights.reduce((a, b) => a + b, 0);
+      let t = rand() * total, j = 0;
+      while (j < pool.length - 1 && t > weights[j]) { t -= weights[j]; j++; }
+      order.push(pool[j]); pool.splice(j, 1); weights.splice(j, 1);
+    }
+    order.forEach((r, k) => { r.fin = k + 1; });
+
+    runners.forEach(r => {
+      const posSeq = [];
+      let p = Math.max(1, Math.min(field, r.fin + Math.round((rand() - 0.35) * 5)));
+      for (let j = 0; j < 3; j++) {
+        posSeq.push(p);
+        p = Math.max(1, Math.min(field, p + Math.round((rand() - 0.5) * 3)));
+      }
+      posSeq.push(r.fin);
+      out.push({
+        i: idx++, race, raceNo,
+        date: String(day).padStart(2, '0') + ' ' + month + ' ' + y,
+        year: y, month, venue, course, dist, cls, going, field,
+        surface: course === 'AWT' ? 'AWT' : 'Turf',
+        horse: r.horse, jockey: r.jockey, trainer: r.trainer,
+        draw: r.draw, wt: r.wt, rating: r.rating,
+        style: r.style, pace, paceDev, paceLabelled,
+        fig: Math.round((100 + (field / 2 - r.fin) * 1.5 + r.bias * 4 + (rand() - 0.5) * 9) * 10) / 10,
+        fin: r.fin, mktRank: r.mktRank,
+        delta: r.mktRank - r.fin,
+        sp: Math.max(1.2, Math.min(99, Math.round(1 / (OVERROUND * r.pMkt) * 10) / 10)),
+        time: baseSec + (r.fin - 1) * 0.16,
+        runPos: posSeq.join(' '),
+        won: r.fin === 1, placed: r.fin <= 3,
+      });
+    });
+  }
+  DB = out;
+  return DB;
+}
+
+// ≥4 places retained a quarter of every slice, so the word "outlier" was doing no work.
+// ≥6 selects roughly one run in ten — a threshold the label can actually stand behind.
+const OUTLIER_MIN = 6;
+
+function impliedP(sp) { return Math.min(0.95, 1 / (OVERROUND * sp)); }
+function figColor(f) { return f >= 105 ? '#fafafa' : (f >= 100 ? '#cfd3da' : MUTED); }
+
+// selected / default declared as complete triples; hover is a static wash elsewhere
+function chipSkin(on, tone) {
+  const t = tone || '#cfd3da';
+  return on ? { fg: '#0e1117', bg: t, border: t } : { fg: MUTED, bg: 'transparent', border: '#2b303a' };
+}
+
+const MULTI = [
+  { k: 'venue', label: 'TRACK', opts: [['Sha Tin', r => r.venue === 'ST'], ['Happy Valley', r => r.venue === 'HV']] },
+  { k: 'course', label: 'COURSE', opts: [['A', r => r.course === 'A'], ['B', r => r.course === 'B'], ['C', r => r.course === 'C'], ['C+3', r => r.course === 'C+3'], ['AWT', r => r.course === 'AWT']] },
+  { k: 'cls', label: 'CLASS', opts: [['1', r => r.cls === 1], ['2', r => r.cls === 2], ['3', r => r.cls === 3], ['4', r => r.cls === 4], ['5', r => r.cls === 5]] },
+  { k: 'dist', label: 'DISTANCE', opts: DISTS.map(d => [String(d), r => r.dist === d]) },
+  { k: 'going', label: 'GOING', opts: [['Good', r => r.going === 'G'], ['Good/Firm', r => r.going === 'GF'], ['Good/Yield', r => r.going === 'GY'], ['Yielding', r => r.going === 'Y'], ['Wet Slow', r => r.going === 'WS']] },
+  { k: 'jockey', label: 'JOCKEY', opts: JOCKEYS.slice(0, 8).map(j => [j.replace(/^[A-Z] /, '').replace(/^[A-Z] [A-Z] /, ''), r => r.jockey === j]) },
+  { k: 'trainer', label: 'TRAINER', opts: TRAINERS.slice(0, 8).map(t => [t.replace(/^[A-Z] /, '').replace(/^[A-Z] [A-Z] /, ''), r => r.trainer === t]) },
+  { k: 'style', label: 'RUNNING STYLE', opts: STYLES.map(s => [s, r => r.style === s]) },
+  { k: 'pace', label: 'RACE PACE', opts: PACE_LABEL.map((l, i) => [l, r => r.pace === i]) },
+];
+
+class Component extends DCLogic {
+  state = {
+    tab: 'results',
+    sel: { style: ['Closer'], pace: ['Sl.Fast', 'V.Fast'] },
+    horseQuery: '',
+    dateMode: 'All', dateValue: null,
+    gateMode: 'Any', gateValue: null,
+    ratingMode: 'Any', ratingValue: null,
+    finishMode: 'Any', finishValue: null,
+    timeMode: 'Any', timeValue: null,
+    outliersOnly: false,
+    minSample: 20,
+    sort: { key: 'delta', dir: 'desc' },
+    presetName: '', presetPick: '',
+    // default to dimensions the opening filter does not already pin, so the grid opens populated
+    pivotRow: 'gate', pivotCol: 'cls', pivotMetric: 'ae',
+    presets: [
+      { name: 'Closers into a fast pace', aeThen: 1.19, savedOn: '02 Jun', racesSince: 41,
+        state: { sel: { style: ['Closer'], pace: ['Sl.Fast', 'V.Fast'] } } },
+      { name: 'Sha Tin C+3, wide draws', aeThen: 1.44, savedOn: '18 May', racesSince: 63,
+        state: { sel: { venue: ['Sha Tin'], course: ['C+3'] }, gateMode: 'Bands', gateValue: '9+' } },
+      { name: 'Top-rated at 1650', aeThen: 0.71, savedOn: '05 Apr', racesSince: 128,
+        state: { sel: { dist: ['1650'] }, ratingMode: 'Bands', ratingValue: '76+' } },
+    ],
+    viewed: 14, refreshed: null, dbMsg: '', paceBuilt: false,
+    filtersOpen: false,
+  };
+
+  componentDidMount() {
+    this._onKey = (e) => { if (e.key === 'Escape' && this.state.filtersOpen) this.setState({ filtersOpen: false }); };
+    window.addEventListener('keydown', this._onKey);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('keydown', this._onKey);
+  }
+
+  toggleMulti(facet, label) {
+    this.setState(s => {
+      const sel = Object.assign({}, s.sel);
+      const cur = sel[facet] || [];
+      const next = cur.indexOf(label) >= 0 ? cur.filter(x => x !== label) : cur.concat([label]);
+      if (next.length) sel[facet] = next; else delete sel[facet];
+      return { sel, viewed: s.viewed + 1 };
+    });
+  }
+  cycle(key) {
+    this.setState(s => {
+      if (!s.sort || s.sort.key !== key) return { sort: { key, dir: 'desc' } };
+      if (s.sort.dir === 'desc') return { sort: { key, dir: 'asc' } };
+      return { sort: { key: 'delta', dir: 'desc' } };
+    });
+  }
+
+  predicates() {
+    const st = this.state;
+    const preds = [];
+    MULTI.forEach(f => {
+      const chosen = st.sel[f.k];
+      if (!chosen || !chosen.length) return;
+      const opts = f.opts.filter(o => chosen.indexOf(o[0]) >= 0).map(o => o[1]);
+      preds.push(r => opts.some(p => p(r)));   // OR within a facet, AND across facets
+    });
+    const q = st.horseQuery.trim().toUpperCase();
+    if (q) preds.push(r => r.horse.indexOf(q) >= 0);
+    if (st.dateMode === 'Month' && st.dateValue) preds.push(r => r.month === st.dateValue);
+    if (st.dateMode === 'Range' && st.dateValue) {
+      const y = Number(st.dateValue);
+      preds.push(r => r.year === y);
+    }
+    if (st.dateMode === 'Exact date' && st.dateValue) preds.push(r => r.date.indexOf(st.dateValue) === 0);
+    if (st.gateMode === 'Bands' && st.gateValue) {
+      const f = { '1–4': r => r.draw <= 4, '5–8': r => r.draw >= 5 && r.draw <= 8, '9+': r => r.draw >= 9 }[st.gateValue];
+      if (f) preds.push(f);
+    }
+    if (st.gateMode === 'Specific' && st.gateValue) preds.push(r => r.draw === Number(st.gateValue));
+    if (st.ratingMode === 'Bands' && st.ratingValue) {
+      const f = { '≤55': r => r.rating <= 55, '56–75': r => r.rating >= 56 && r.rating <= 75, '76+': r => r.rating >= 76 }[st.ratingValue];
+      if (f) preds.push(f);
+    }
+    if (st.ratingMode === 'Range' && st.ratingValue) {
+      const lo = Number(String(st.ratingValue).split('-')[0]), hi = Number(String(st.ratingValue).split('-')[1]);
+      preds.push(r => r.rating >= lo && r.rating <= hi);
+    }
+    if (st.finishMode === 'Win') preds.push(r => r.won);
+    if (st.finishMode === 'Place (1-3)') preds.push(r => r.placed);
+    if (st.finishMode === 'Top-5') preds.push(r => r.fin <= 5);
+    if (st.finishMode === 'Specific' && st.finishValue) preds.push(r => r.fin === Number(st.finishValue));
+    if (st.timeMode === 'Top X%' && st.timeValue) {
+      const frac = Number(st.timeValue) / 100;
+      preds.push(r => r.fin / r.field <= frac);
+    }
+    if (st.timeMode === 'Speed fig ≤' && st.timeValue) preds.push(r => r.fig <= Number(st.timeValue));
+    if (st.timeMode === 'Custom range' && st.timeValue) {
+      const lo = Number(String(st.timeValue).split('-')[0]), hi = Number(String(st.timeValue).split('-')[1]);
+      preds.push(r => r.fig >= lo && r.fig <= hi);
+    }
+    if (st.outliersOnly) preds.push(r => Math.abs(r.delta) >= OUTLIER_MIN);
+    return preds;
+  }
+
+  query(overrideState) {
+    if (overrideState) {
+      const saved = {};
+      Object.keys(overrideState).forEach(k => { saved[k] = this.state[k]; });
+      const prev = this.state;
+      this.state = Object.assign({}, prev, overrideState);
+      const preds = this.predicates();
+      this.state = prev;
+      return db().filter(r => preds.every(p => p(r)));
+    }
+    const preds = this.predicates();
+    return db().filter(r => preds.every(p => p(r)));
+  }
+
+  stats(rows) {
+    const n = rows.length;
+    const wins = rows.filter(r => r.won).length;
+    const places = rows.filter(r => r.placed).length;
+    const exp = rows.reduce((a, r) => a + impliedP(r.sp), 0);
+    const ae = exp > 0 ? wins / exp : null;
+    const half = exp > 0 ? 1.96 * Math.sqrt(Math.max(wins, 1)) / exp : null;
+    return { n, wins, places, exp, ae, half };
+  }
+
+  // Full-database baselines depend only on the DB, which never changes — so they are
+  // computed once per predicate and reused, rather than re-scanning 18,716 rows on
+  // every keystroke and chip click.
+  baseStats(key, pred) {
+    if (!this._baseCache) this._baseCache = {};
+    if (!this._baseCache[key]) this._baseCache[key] = this.stats(db().filter(pred));
+    return this._baseCache[key];
+  }
+  presetStats(p) {
+    if (!this._presetCache) this._presetCache = {};
+    if (!this._presetCache[p.name]) this._presetCache[p.name] = this.stats(this.query(p.state));
+    return this._presetCache[p.name];
+  }
+
+  // strike-rate delta against the dimension's own full-database baseline, with a
+  // 95% interval on the difference of two proportions
+  deltaRow(sub, baseKey, basePred) {
+    return this.deltaRowMetric(sub, baseKey, basePred, 'wins');
+  }
+  // same difference-of-proportions interval, generalised to either 'wins' or 'places'
+  // so place rate gets the same honesty treatment as win rate, not a bare percentage
+  deltaRowMetric(sub, baseKey, basePred, metric) {
+    const s = this.stats(sub), b = this.baseStats(baseKey, basePred);
+    const p1 = s.n ? s[metric] / s.n : 0;
+    const p0 = b.n ? b[metric] / b.n : 0;
+    const se = Math.sqrt((p1 * (1 - p1) / Math.max(1, s.n)) + (p0 * (1 - p0) / Math.max(1, b.n)));
+    const half = 1.96 * se * 100;
+    return { s, b, p1, p0, diff: (p1 - p0) * 100, half };
+  }
+
+  renderVals() {
+    const st = this.state;
+    const all = db();
+    const activeChips = [];
+    MULTI.forEach(f => {
+      (st.sel[f.k] || []).forEach(label => {
+        activeChips.push({ text: f.label + ': ' + label, remove: () => this.toggleMulti(f.k, label) });
+      });
+    });
+    if (st.horseQuery) activeChips.push({ text: 'Horse: "' + st.horseQuery + '"', remove: () => this.setState({ horseQuery: '' }) });
+    if (st.dateMode !== 'All') activeChips.push({ text: st.dateMode + (st.dateValue ? ' ' + st.dateValue : ''), remove: () => this.setState({ dateMode: 'All', dateValue: null }) });
+    if (st.gateMode !== 'Any') activeChips.push({ text: 'Gate: ' + (st.gateValue || st.gateMode), remove: () => this.setState({ gateMode: 'Any', gateValue: null }) });
+    if (st.ratingMode !== 'Any') activeChips.push({ text: 'Rating: ' + (st.ratingValue || st.ratingMode), remove: () => this.setState({ ratingMode: 'Any', ratingValue: null }) });
+    if (st.finishMode !== 'Any') activeChips.push({ text: 'Finish: ' + st.finishMode + (st.finishValue ? ' ' + st.finishValue : ''), remove: () => this.setState({ finishMode: 'Any', finishValue: null }) });
+    if (st.timeMode !== 'Any') activeChips.push({ text: st.timeMode + (st.timeValue ? ' ' + st.timeValue : ''), remove: () => this.setState({ timeMode: 'Any', timeValue: null }) });
+    if (st.outliersOnly) activeChips.push({ text: 'Outliers only', remove: () => this.setState({ outliersOnly: false }) });
+    const rows = this.query();
+    const s = this.stats(rows);
+    const base = this.stats(all);
+    const sort = st.sort;
+    const minSample = st.minSample;
+    const races = 1712;
+    const paceMissing = st.paceBuilt ? 0 : 84;
+
+    const sortVal = (r, k) => {
+      if (k === 'date') return (r.year * 1000) + MONTHS.indexOf(r.month) * 31 + Number(r.date.slice(0, 2));
+      if (k === 'horse' || k === 'jockey' || k === 'trainer' || k === 'style' || k === 'going' || k === 'course' || k === 'venue') return r[k];
+      return r[k] != null ? r[k] : 0;
+    };
+    const ordered = rows.slice().sort((a, b) => {
+      const va = sortVal(a, sort.key), vb = sortVal(b, sort.key);
+      let c = typeof va === 'string' ? va.localeCompare(vb) : va - vb;
+      if (c === 0) c = a.i - b.i;
+      return sort.dir === 'desc' ? -c : c;
+    });
+
+    const aeScale = 100 / 3;
+    const byStyle = STYLES.map(style => {
+      const sub = rows.filter(r => r.style === style);
+      const ss = this.stats(sub);
+      const thin = ss.n < minSample;
+      return {
+        style, n: ss.n,
+        opacity: thin ? 0.45 : 1,
+        color: STYLE_SKIN[style].color, bg: STYLE_SKIN[style].bg,
+        nColor: thin ? '#4c525c' : '#8b929e',
+        ae: ss.ae == null ? '—' : ss.ae.toFixed(2),
+        aeColor: ss.ae == null ? MUTED : (thin ? MUTED : (ss.ae > 1.15 ? AMBER : (ss.ae < 0.85 ? MUTED : '#cfd3da'))),
+        mid: ss.ae == null ? 0 : Math.min(97, Math.max(1, ss.ae * aeScale)),
+        ciLo: ss.ae == null ? 0 : Math.max(0, (ss.ae - ss.half) * aeScale),
+        ciW: ss.ae == null ? 0 : Math.min(100, ss.half * 2 * aeScale),
+        ciColor: thin ? '#242832' : '#2b3a44',
+        markColor: thin ? MUTED : (ss.ae > 1.15 ? AMBER : '#cfd3da'),
+      };
+    });
+
+    const deltas = rows.map(r => r.delta);
+    const dMean = deltas.length ? deltas.reduce((a, b) => a + b, 0) / deltas.length : 0;
+    const dBins = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+    deltas.forEach(d => {
+      const idx = Math.max(0, Math.min(8, Math.round(d / 2) + 4));
+      dBins[idx]++;
+    });
+    const dMax = Math.max.apply(null, dBins.concat([1]));
+
+    const significant = s.ae != null && s.half != null && (s.ae - s.half > 1 || s.ae + s.half < 1);
+
+    // Insights breakdowns, each against its own baseline
+    const buildBreakdown = (title, subtitle, dimLabel, groups, limit) => {
+      const kept = [], hidden = [];
+      groups.forEach(g => {
+        const sub = rows.filter(g.pred);
+        if (sub.length < minSample) { hidden.push(g); return; }
+        const d = this.deltaRow(sub, title + '|' + g.label, g.pred);
+        const notable = Math.abs(d.diff) > d.half;
+        const dp = this.deltaRowMetric(sub, title + '|' + g.label, g.pred, 'places');
+        const plcNotable = Math.abs(dp.diff) > dp.half;
+        kept.push({
+          label: g.label, n: d.s.n, wins: d.s.wins,
+          sr: (d.p1 * 100).toFixed(1) + '%',
+          baseline: (d.p0 * 100).toFixed(1) + '%',
+          delta: signed(d.diff, 1) + ' ± ' + d.half.toFixed(1),
+          diff: d.diff, half: d.half, notable,
+          labelColor: '#fafafa',
+          nColor: '#cfd3da',
+          srColor: d.diff > 0 ? '#fafafa' : '#cfd3da',
+          deltaColor: notable ? (d.diff > 0 ? AMBER : LOSS) : '#8b929e',
+          opacity: 1,
+          bg: notable ? 'rgba(240,168,36,0.04)' : 'transparent',
+          ciColor: '#2b3a44',
+          markColor: notable ? (d.diff > 0 ? AMBER : LOSS) : '#cfd3da',
+          mid: Math.min(98, Math.max(2, 50 + d.diff * 2.2)),
+          ciLeft: Math.max(0, 50 + (d.diff - d.half) * 2.2),
+          ciW: Math.min(100, d.half * 4.4),
+          verdict: notable ? 'CLEARS' : 'SPANS ZERO',
+          verdictColor: notable ? AMBER : '#5b616b',
+          plc: dp.s.places,
+          plcPct: (dp.p1 * 100).toFixed(1) + '%',
+          plcBaseline: (dp.p0 * 100).toFixed(1) + '%',
+          plcDelta: signed(dp.diff, 1) + ' ± ' + dp.half.toFixed(1),
+          plcDeltaColor: plcNotable ? (dp.diff > 0 ? 'rgba(240,168,36,0.7)' : 'rgba(224,99,127,0.7)') : '#5b616b',
+          plcMid: Math.min(98, Math.max(2, 50 + dp.diff * 2.2)),
+          plcCiLeft: Math.max(0, 50 + (dp.diff - dp.half) * 2.2),
+          plcCiW: Math.min(100, dp.half * 4.4),
+          plcMarkColor: plcNotable ? (dp.diff > 0 ? 'rgba(240,168,36,0.7)' : 'rgba(224,99,127,0.7)') : '#4c525c',
+          plcVerdict: plcNotable ? 'clears' : 'spans zero',
+        });
+      });
+      // "top jockeys" means the ones with enough runs in this slice to read, not all of them
+      kept.sort((a, b) => b.n - a.n);
+      const shown = limit ? kept.slice(0, limit) : kept;
+      const cleared = shown.filter(k => k.notable).length;
+      return {
+        title, subtitle, dimLabel, rows: shown, cleared, cells: shown.length,
+        hiddenNote: hidden.length ? hidden.length + ' rows hidden under n=' + minSample : 'no rows below n=' + minSample,
+        limitNote: limit && kept.length > limit ? ' · top ' + limit + ' of ' + kept.length + ' by runs' : '',
+        emptyNote: kept.length === 0 ? 'Every group in this breakdown falls under the minimum sample of ' + minSample + ' runs. Nothing here is readable — widen the slice or lower the threshold.' : '',
+      };
+    };
+
+    // Only the visible tab pays for its own analysis.
+    const breakdowns = st.tab !== 'insights' ? [] : [
+      buildBreakdown('BY GATE BAND', 'draw position against the same band across the whole database', 'GATE BAND', [
+        { label: '1–4', pred: r => r.draw <= 4 },
+        { label: '5–8', pred: r => r.draw >= 5 && r.draw <= 8 },
+        { label: '9–11', pred: r => r.draw >= 9 && r.draw <= 11 },
+        { label: '12+', pred: r => r.draw >= 12 },
+      ]),
+      buildBreakdown('BY RUNNING STYLE', 'each style against its own database-wide strike rate', 'STYLE', STYLES.map(x => ({ label: x, pred: r => r.style === x }))),
+      buildBreakdown('BY RATING BAND', 'official rating band against its own baseline', 'RATING BAND', [
+        { label: '≤55', pred: r => r.rating <= 55 },
+        { label: '56–75', pred: r => r.rating >= 56 && r.rating <= 75 },
+        { label: '76+', pred: r => r.rating >= 76 },
+      ]),
+      buildBreakdown('TOP JOCKEYS', 'a jockey at 23.7% means nothing until you know their own baseline', 'JOCKEY', JOCKEYS.map(j => ({ label: j, pred: r => r.jockey === j })), 8),
+      buildBreakdown('TOP TRAINERS', 'same treatment — the delta is the only column worth reading', 'TRAINER', TRAINERS.map(t => ({ label: t, pred: r => r.trainer === t })), 8),
+    ];
+    const totalCells = breakdowns.reduce((a, b) => a + b.cells, 0);
+    const totalCleared = breakdowns.reduce((a, b) => a + b.cleared, 0);
+    const expectedCells = totalCells * 0.05;
+
+    // Pivot designer
+    const DIMS = {
+      style: { label: 'Style', keys: STYLES, of: r => r.style },
+      pace: { label: 'Pace', keys: PACE_LABEL, of: r => PACE_LABEL[r.pace] },
+      gate: { label: 'Gate band', keys: ['1–4', '5–8', '9+'], of: r => (r.draw <= 4 ? '1–4' : (r.draw <= 8 ? '5–8' : '9+')) },
+      cls: { label: 'Class', keys: ['1', '2', '3', '4', '5'], of: r => String(r.cls) },
+      going: { label: 'Going', keys: ['G', 'GF', 'GY', 'Y', 'WS'], of: r => r.going },
+      venue: { label: 'Track', keys: ['ST', 'HV'], of: r => r.venue },
+    };
+    const rowDim = DIMS[st.pivotRow], colDim = DIMS[st.pivotCol];
+    const metricOf = (sub) => {
+      const ss = this.stats(sub);
+      if (st.pivotMetric === 'ae') return { v: ss.ae == null ? '—' : ss.ae.toFixed(2), good: ss.ae != null && ss.ae > 1.15, n: ss.n };
+      if (st.pivotMetric === 'sr') return { v: ss.n ? (ss.wins / ss.n * 100).toFixed(1) + '%' : '—', good: ss.n && ss.wins / ss.n > base.wins / base.n, n: ss.n };
+      const d = sub.length ? sub.reduce((a, r) => a + r.delta, 0) / sub.length : 0;
+      return { v: sub.length ? signed(d, 2) : '—', good: d > 0.4, n: sub.length };
+    };
+    let thinCells = 0;
+    const pivotRows = st.tab !== 'pivot' ? [] : rowDim.keys.map(rk => {
+      const rowRuns = rows.filter(r => rowDim.of(r) === rk);
+      const cells = colDim.keys.map(ck => {
+        const sub = rowRuns.filter(r => colDim.of(r) === ck);
+        const m = metricOf(sub);
+        const thin = m.n < minSample;
+        if (thin) thinCells++;
+        return {
+          value: m.v, n: 'n=' + m.n,
+          opacity: thin ? 0.4 : 1,
+          color: thin ? MUTED : (m.good ? AMBER : '#fafafa'),
+          nColor: thin ? '#4c525c' : '#6f757f',
+          bg: !thin && m.good ? 'rgba(240,168,36,0.05)' : 'transparent',
+        };
+      });
+      const rt = metricOf(rowRuns);
+      return {
+        label: rk, cells,
+        labelColor: rowDim === DIMS.style ? (STYLE_SKIN[rk] ? STYLE_SKIN[rk].color : '#cfd3da') : '#cfd3da',
+        labelBg: rowDim === DIMS.style && STYLE_SKIN[rk] ? STYLE_SKIN[rk].bg : 'transparent',
+        total: rt.v, totalN: 'n=' + rt.n,
+        totalColor: rt.n < minSample ? MUTED : '#fafafa',
+      };
+    });
+
+    // Outliers
+    const needOutliers = st.tab === 'outliers' || st.outliersOnly;
+    const outlierRuns = !needOutliers ? [] : rows.filter(r => Math.abs(r.delta) >= OUTLIER_MIN)
+      .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || b.fig - a.fig);
+    // A raw repeat count is meaningless — a horse with many runs in the slice will show up
+    // here by volume alone. Flag only when a horse's outlier RATE is well clear of the
+    // slice's own base rate, and always show the denominator.
+    const counts = {}, runCounts = {};
+    outlierRuns.forEach(r => { counts[r.horse] = (counts[r.horse] || 0) + 1; });
+    rows.forEach(r => { runCounts[r.horse] = (runCounts[r.horse] || 0) + 1; });
+    const baseOutlierRate = rows.length ? outlierRuns.length / rows.length : 0;
+    const isRepeat = (h) => {
+      const k = counts[h] || 0, n = runCounts[h] || 0;
+      return k >= 3 && n >= 6 && (k / n) > baseOutlierRate * 1.6;
+    };
+    const repeatNames = Object.keys(counts).filter(isRepeat);
+
+    const modeChips = (list, cur, setter) => list.map(label => {
+      const c = chipSkin(label === cur);
+      return { label, fg: c.fg, bg: c.bg, border: c.border, go: () => setter(label) };
+    });
+    const valueChips = (list, cur, setter, tone) => list.map(label => {
+      const c = chipSkin(String(label) === String(cur), tone);
+      return { label: String(label), fg: c.fg, bg: c.bg, border: c.border, go: () => setter(String(label)) };
+    });
+
+    const activeCount = MULTI.reduce((a, f) => a + ((st.sel[f.k] || []).length), 0)
+      + (st.horseQuery.trim() ? 1 : 0)
+      + (st.dateMode !== 'All' ? 1 : 0) + (st.gateMode !== 'Any' ? 1 : 0)
+      + (st.ratingMode !== 'Any' ? 1 : 0) + (st.finishMode !== 'Any' ? 1 : 0)
+      + (st.timeMode !== 'Any' ? 1 : 0) + (st.outliersOnly ? 1 : 0);
+    const nameTaken = st.presets.some(p => p.name.toLowerCase() === st.presetName.trim().toLowerCase());
+    const canSave = st.presetName.trim().length > 0 && activeCount > 0 && !nameTaken;
+
+    return {
+      pages: [
+        ['Race Day', 'Race Day.dc.html'],
+        ['Form Guide', 'Form Guide.dc.html'],
+        ['Bets', 'Bets.dc.html'],
+        ['Blackbook', 'Blackbook.dc.html'],
+        ['Results', 'Results.dc.html'],
+        ['Lookup', 'Lookup.dc.html'],
+        ['Trials', 'Trials.dc.html'],
+      ].map(([name, href], i) => ({
+        name, color: i === 5 ? '#fafafa' : 'inherit', mark: i === 5 ? '#e63946' : 'transparent', href,
+      })),
+
+      freshness: SOURCES.map(s => {
+        const stale = s.mins == null ? false : s.mins > s.normal;
+        const missing = s.mins == null;
+        return {
+          name: s.name, mark: missing ? '—' : (stale ? '⚠' : '✓'), age: missing ? '' : ageLabel(s.mins),
+          color: missing ? '#6f757f' : (stale ? '#c8792f' : '#35b37e'),
+          border: stale ? '#3d2a14' : 'transparent', bg: stale ? 'rgba(200,121,47,0.10)' : 'transparent',
+          go: () => this.setState({ refreshed: s.k }),
+        };
+      }),
+      refreshMsg: st.refreshed
+        ? (SOURCES.find(x => x.k === st.refreshed) || {}).name + ' refreshed · ' + (SOURCES.find(x => x.k === st.refreshed) || {}).rows
+        : '',
+
+      dbMeta: {
+        updated: '22 Aug, 06:14', runs: all.length.toLocaleString('en-US'), races,
+        paceLabelled: races - paceMissing,
+        pacePct: (((races - paceMissing) / races) * 100).toFixed(1),
+        paceColor: paceMissing ? COPPER : WIN_C,
+      },
+
+      tabs: [['Results', 'results'], ['Insights', 'insights'], ['Pivot designer', 'pivot'], ['Outliers', 'outliers']].map(([label, k]) => ({
+        label, go: () => this.setState({ tab: k }),
+        fg: st.tab === k ? '#fafafa' : MUTED, bg: 'transparent',
+        mark: st.tab === k ? '#e63946' : 'transparent',
+      })),
+      isResults: st.tab === 'results', isInsights: st.tab === 'insights',
+      isPivot: st.tab === 'pivot', isOutliers: st.tab === 'outliers',
+      showInsightRail: st.tab === 'results' || st.tab === 'outliers',
+
+      toggleFilters: () => this.setState(s => ({ filtersOpen: !s.filtersOpen })),
+      closeFilters: () => this.setState({ filtersOpen: false }),
+      filtersOpen: st.filtersOpen,
+      filtersChevron: st.filtersOpen ? '▾' : '▸',
+      filterBtn: st.filtersOpen
+        ? { fg: '#0e1117', bg: '#cfd3da', border: '#cfd3da' }
+        : { fg: '#cfd3da', bg: 'transparent', border: '#2b303a' },
+      activeChips,
+      activeCount: activeChips.length,
+      noActiveChips: activeChips.length === 0,
+
+      dateModes: modeChips(['All', 'Month', 'Range', 'Exact date'], st.dateMode, (v) => this.setState({ dateMode: v, dateValue: null })),
+      dateDetail: st.dateMode !== 'All',
+      dateIsExact: st.dateMode === 'Exact date',
+      dateValue: st.dateValue || '',
+      setDateValue: (e) => this.setState({ dateValue: e.target.value }),
+      dateOptions: st.dateMode === 'Month' ? valueChips(MONTHS, st.dateValue, (v) => this.setState({ dateValue: v }))
+        : st.dateMode === 'Range' ? valueChips(['2023', '2024', '2025', '2026'], st.dateValue, (v) => this.setState({ dateValue: v }))
+        : [],
+
+      multiFacets: MULTI.map(f => {
+        const chosen = st.sel[f.k] || [];
+        return {
+          label: f.label, count: chosen.length,
+          options: f.opts.map(([label]) => {
+            const c = chipSkin(chosen.indexOf(label) >= 0);
+            return { label, go: () => this.toggleMulti(f.k, label), fg: c.fg, bg: c.bg, border: c.border };
+          }),
+        };
+      }),
+
+      modeFacets: [
+        {
+          label: 'GATE MODE',
+          modes: modeChips(['Any', 'Bands', 'Specific'], st.gateMode, (v) => this.setState({ gateMode: v, gateValue: null })),
+          hasValues: st.gateMode !== 'Any',
+          values: st.gateMode === 'Bands' ? valueChips(['1–4', '5–8', '9+'], st.gateValue, (v) => this.setState({ gateValue: v }))
+            : st.gateMode === 'Specific' ? valueChips([1, 4, 8, 12], st.gateValue, (v) => this.setState({ gateValue: v })) : [],
+          note: '',
+        },
+        {
+          label: 'RATING MODE',
+          modes: modeChips(['Any', 'Bands', 'Range'], st.ratingMode, (v) => this.setState({ ratingMode: v, ratingValue: null })),
+          hasValues: st.ratingMode !== 'Any',
+          values: st.ratingMode === 'Bands' ? valueChips(['≤55', '56–75', '76+'], st.ratingValue, (v) => this.setState({ ratingValue: v }))
+            : st.ratingMode === 'Range' ? valueChips(['40-55', '56-70', '71-85', '86-100'], st.ratingValue, (v) => this.setState({ ratingValue: v })) : [],
+          note: '',
+        },
+        {
+          label: 'FINISH',
+          modes: modeChips(['Any', 'Win', 'Place (1-3)', 'Top-5', 'Specific'], st.finishMode, (v) => this.setState({ finishMode: v, finishValue: null })),
+          hasValues: st.finishMode === 'Specific',
+          values: st.finishMode === 'Specific' ? valueChips([1, 2, 3, 4, 5, 6], st.finishValue, (v) => this.setState({ finishValue: v })) : [],
+          note: '',
+        },
+        {
+          label: 'TIME FILTER',
+          modes: modeChips(['Any', 'Top X%'], st.timeMode, (v) => this.setState({ timeMode: v, timeValue: null })),
+          hasValues: st.timeMode === 'Top X%',
+          values: st.timeMode === 'Top X%' ? valueChips([10, 20, 30], st.timeValue, (v) => this.setState({ timeValue: v })) : [],
+          note: st.timeMode === 'Top X%' ? 'fastest X% of finishing time within the current slice' : '',
+        },
+      ],
+
+      outlierChip: st.outliersOnly
+        ? { fg: '#0e1117', bg: MAGENTA, border: MAGENTA }
+        : { fg: MAGENTA, bg: 'transparent', border: '#4a2733' },
+      toggleOutliers: () => this.setState(x => ({ outliersOnly: !x.outliersOnly, viewed: x.viewed + 1 })),
+
+      clearAll: () => this.setState({
+        sel: {}, horseQuery: '', dateMode: 'All', dateValue: null, gateMode: 'Any', gateValue: null,
+        ratingMode: 'Any', ratingValue: null, finishMode: 'Any', finishValue: null,
+        timeMode: 'Any', timeValue: null, outliersOnly: false, filtersOpen: false,
+      }),
+      presetName: st.presetName,
+      setPresetName: (e) => this.setState({ presetName: e.target.value }),
+      presetPick: st.presetPick,
+      presetOptions: [{ value: '', label: 'load a preset…' }].concat(st.presets.map(p => ({ value: p.name, label: p.name }))),
+      loadPreset: (e) => {
+        const p = st.presets.find(x => x.name === e.target.value);
+        if (!p) { this.setState({ presetPick: '' }); return; }
+        this.setState(Object.assign({
+          presetPick: p.name, sel: {}, horseQuery: '', dateMode: 'All', dateValue: null,
+          gateMode: 'Any', gateValue: null, ratingMode: 'Any', ratingValue: null,
+          finishMode: 'Any', finishValue: null, timeMode: 'Any', timeValue: null, outliersOnly: false,
+          viewed: st.viewed + 1, filtersOpen: false,
+        }, p.state));
+      },
+      saveLabel: nameTaken ? 'Name taken' : 'Save preset',
+      saveColor: canSave ? TEAL : '#5b616b',
+      saveBorder: canSave ? '#1e4a45' : '#2b303a',
+      saveBg: canSave ? '#12211f' : 'transparent',
+      savePreset: () => {
+        if (!canSave) return;
+        this.setState(x => ({
+          presets: [{
+            name: x.presetName.trim(), aeThen: s.ae == null ? 0 : s.ae, savedOn: '22 Aug', racesSince: 0,
+            state: {
+              sel: Object.assign({}, x.sel), horseQuery: x.horseQuery,
+              dateMode: x.dateMode, dateValue: x.dateValue,
+              gateMode: x.gateMode, gateValue: x.gateValue,
+              ratingMode: x.ratingMode, ratingValue: x.ratingValue,
+              finishMode: x.finishMode, finishValue: x.finishValue,
+              timeMode: x.timeMode, timeValue: x.timeValue, outliersOnly: x.outliersOnly,
+            },
+          }].concat(x.presets),
+          presetName: '',
+        }));
+      },
+      slices: st.presets.map(p => {
+        const sub = this.presetStats(p);
+        const now = sub.ae == null ? 0 : sub.ae;
+        const drift = now - p.aeThen;
+        return {
+          name: p.name, n: sub.n,
+          aeThen: p.aeThen.toFixed(2), aeNow: now.toFixed(2),
+          aeColor: now > 1.15 ? AMBER : (now < 0.85 ? MUTED : '#cfd3da'),
+          drift: signed(drift, 2),
+          driftColor: Math.abs(drift) < 0.08 ? '#6f757f' : (drift < 0 ? MAGENTA : WIN_C),
+          since: p.racesSince === 0 ? 'saved today · nothing tracked yet' : p.racesSince + ' races since ' + p.savedOn,
+          rule: Math.abs(drift) >= 0.2 ? MAGENTA : '#2b303a',
+          load: () => this.setState(Object.assign({ viewed: st.viewed + 1, filtersOpen: false }, p.state)),
+        };
+      }),
+
+      cols: [
+        { t: 'DATE', k: 'date', a: 'left' }, { t: 'R', k: 'raceNo', a: 'center' },
+        { t: 'TRK', k: 'venue', a: 'left' }, { t: 'CRS', k: 'course', a: 'left' },
+        { t: 'SURF', k: 'surface', a: 'left' }, { t: 'CL', k: 'cls', a: 'center' },
+        { t: 'DIST', k: 'dist', a: 'right' }, { t: 'GNG', k: 'going', a: 'left' },
+        { t: 'FLD', k: 'field', a: 'right' }, { t: 'PL', k: 'fin', a: 'right' },
+        { t: 'HORSE', k: 'horse', a: 'left' }, { t: 'GATE', k: 'draw', a: 'center' },
+        { t: 'RT', k: 'rating', a: 'right' }, { t: 'WT', k: 'wt', a: 'right' },
+        { t: 'JOCKEY', k: 'jockey', a: 'left' }, { t: 'TRAINER', k: 'trainer', a: 'left' },
+        { t: 'STYLE', k: 'style', a: 'left' }, { t: 'RUN POS.', k: 'runPos', a: 'left' },
+        { t: 'PACE', k: 'pace', a: 'left' }, { t: 'TIME', k: 'time', a: 'right' },
+        { t: 'FIN Δ', k: 'delta', a: 'right' },
+      ].map(c => {
+        const on = sort.key === c.k;
+        return Object.assign({}, c, {
+          go: () => this.cycle(c.k),
+          fg: on ? '#fafafa' : MUTED,
+          bg: on ? '#1a1d23' : 'transparent',
+          ind: on ? (sort.dir === 'asc' ? '▲' : '▼') : '',
+          indColor: on ? AMBER : 'transparent',
+          rule: on ? AMBER : 'transparent',
+        });
+      }),
+
+      matchCount: rows.length.toLocaleString('en-US'),
+      noRows: rows.length === 0,
+      shown: Math.min(60, rows.length),
+      truncated: rows.length > 60,
+      rows: ordered.slice(0, 60).map(r => ({
+        date: r.date, raceNo: 'R' + r.raceNo, venue: r.venue, course: r.course,
+        surface: r.surface, cls: r.cls, dist: r.dist, going: r.going, field: r.field,
+        fin: r.fin, finColor: r.fin === 1 ? AMBER : (r.fin <= 3 ? '#fafafa' : MUTED),
+        horse: r.horse, horseColor: '#fafafa',
+        draw: r.draw, rating: r.rating, wt: r.wt, jockey: r.jockey, trainer: r.trainer,
+        style: r.style, styleColor: STYLE_SKIN[r.style].color, styleBg: STYLE_SKIN[r.style].bg,
+        runPos: r.runPos,
+        paceLabel: r.paceLabelled ? PACE_LABEL[r.pace] : 'unlabelled',
+        paceDev: r.paceLabelled ? '(' + signed(r.paceDev, 2) + ')' : '',
+        paceColor: r.paceLabelled ? PACE_COLOR[r.pace] : '#4c525c',
+        time: fmtTime(r.time),
+        delta: signed(r.delta, 0),
+        deltaColor: r.delta > 0 ? WIN_C : (r.delta < 0 ? LOSS : '#6f757f'),
+      })),
+
+      minSample,
+      minSampleChips: [10, 20, 30, 50].map(v => {
+        const c = chipSkin(v === minSample);
+        return { label: String(v), fg: c.fg, bg: c.bg, border: c.border, go: () => this.setState({ minSample: v }) };
+      }),
+      breakdowns,
+      chance: {
+        cells: totalCells, cleared: totalCleared, expected: expectedCells.toFixed(1),
+        clearedColor: totalCleared > expectedCells * 1.8 ? AMBER : '#cfd3da',
+        rule: totalCleared > expectedCells * 1.8 ? AMBER : MAGENTA,
+        bg: totalCleared > expectedCells * 1.8 ? '#1c1608' : '#1a1218',
+        border: totalCleared > expectedCells * 1.8 ? '#4a3a18' : '#4a2733',
+        note: totalCleared > expectedCells * 1.8
+          ? 'More cells cleared than chance predicts, so something in here is probably real — but which one is not determined by this table.'
+          : 'That is what random slicing looks like: raise the minimum sample or widen the slice before treating any single row as a finding.',
+      },
+
+      pivot: {
+        rowDims: Object.keys(DIMS).map(k => {
+          const c = chipSkin(k === st.pivotRow);
+          return { label: DIMS[k].label, fg: c.fg, bg: c.bg, border: c.border, go: () => this.setState({ pivotRow: k }) };
+        }),
+        colDims: Object.keys(DIMS).map(k => {
+          const c = chipSkin(k === st.pivotCol);
+          return { label: DIMS[k].label, fg: c.fg, bg: c.bg, border: c.border, go: () => this.setState({ pivotCol: k }) };
+        }),
+        metrics: [['A/E', 'ae'], ['Win %', 'sr'], ['Mean Fin Δ', 'delta']].map(([label, k]) => {
+          const c = chipSkin(k === st.pivotMetric);
+          return { label, fg: c.fg, bg: c.bg, border: c.border, go: () => this.setState({ pivotMetric: k }) };
+        }),
+        rowLabel: rowDim.label, colLabel: colDim.label,
+        headers: colDim.keys.map(k => ({ label: k })),
+        rows: pivotRows,
+        cellCount: rowDim.keys.length * colDim.keys.length,
+        thinCount: thinCells,
+        expectedNotable: (rowDim.keys.length * colDim.keys.length * 0.05).toFixed(1),
+      },
+
+      outliers: {
+        rows: outlierRuns.slice(0, 40).map(r => ({
+          date: r.date, raceNo: 'R' + r.raceNo,
+          cond: r.venue + ' ' + r.course + ' ' + r.dist + ' ' + r.going,
+          horse: r.horse,
+          repeat: isRepeat(r.horse),
+          repeatLabel: counts[r.horse] + ' of ' + runCounts[r.horse],
+          fin: r.fin + '/' + r.field,
+          finColor: r.fin === 1 ? AMBER : (r.fin <= 3 ? '#fafafa' : MUTED),
+          sp: fmtSp(r.sp) + ' · ' + r.mktRank,
+          style: r.style, styleColor: STYLE_SKIN[r.style].color, styleBg: STYLE_SKIN[r.style].bg,
+          fig: r.fig.toFixed(0), figColor: figColor(r.fig),
+          delta: signed(r.delta, 0),
+          deltaColor: r.delta > 0 ? WIN_C : LOSS,
+          bg: isRepeat(r.horse) ? 'rgba(240,168,36,0.04)' : 'transparent',
+          why: r.delta > 0
+            ? 'started ' + r.mktRank + 'th in the market and finished ' + r.fin + ' — figure ' + r.fig.toFixed(0) + ' backs it up'
+            : 'market rated it ' + r.mktRank + 'th and it ran ' + r.fin + ' — no excuse in the figure',
+        })),
+        none: outlierRuns.length === 0,
+        repeatCount: repeatNames.length,
+        horseCount: Object.keys(runCounts).length,
+        baseRate: (baseOutlierRate * 100).toFixed(0) + '%',
+      },
+
+      ins: {
+        nColor: s.n >= 200 ? '#fafafa' : (s.n >= 60 ? '#cfd3da' : (s.n >= 25 ? COPPER : LOSS)),
+        nBarW: Math.max(0.4, s.n / all.length * 100),
+        weight: s.n >= 200 ? 'READABLE' : (s.n >= 60 ? 'THIN' : (s.n >= 25 ? 'VERY THIN' : 'NOT A FINDING')),
+        weightColor: s.n >= 200 ? WIN_C : (s.n >= 60 ? '#cfd3da' : (s.n >= 25 ? COPPER : LOSS)),
+        weightBorder: s.n >= 200 ? '#1e4a3a' : (s.n >= 60 ? '#2b303a' : (s.n >= 25 ? '#3d2a14' : '#4a2027')),
+        weightBg: s.n >= 200 ? 'rgba(53,179,126,0.08)' : (s.n >= 25 ? 'rgba(200,121,47,0.08)' : 'rgba(224,99,127,0.10)'),
+        headline: [
+          {
+            label: 'STRIKE', value: s.n ? (s.wins / s.n * 100).toFixed(1) + '%' : '—',
+            n: s.n ? '(' + s.wins + '/' + s.n + ')' : '',
+            color: s.n && s.wins / s.n > base.wins / base.n ? AMBER : '#cfd3da',
+            base: 'db ' + (base.wins / base.n * 100).toFixed(1) + '%',
+          },
+          {
+            label: 'PLACE', value: s.n ? (s.places / s.n * 100).toFixed(1) + '%' : '—',
+            n: s.n ? '(' + s.places + '/' + s.n + ')' : '',
+            color: '#cfd3da',
+            base: 'db ' + (base.places / base.n * 100).toFixed(1) + '%',
+          },
+        ],
+        ae: s.ae == null ? '—' : s.ae.toFixed(2),
+        aeColor: s.ae == null ? MUTED : (s.ae > 1.15 ? AMBER : (s.ae < 0.85 ? MUTED : '#cfd3da')),
+        aeMid: s.ae == null ? 0 : Math.min(98, Math.max(1, s.ae * aeScale)),
+        ciLo: s.ae == null ? 0 : Math.max(0, (s.ae - s.half) * aeScale),
+        ciW: s.ae == null ? 0 : Math.min(100, s.half * 2 * aeScale),
+        ciColor: s.n >= 60 ? '#2b3a44' : '#242832',
+        ciLabel: s.ae == null ? 'no runs' : Math.max(0, s.ae - s.half).toFixed(2) + ' … ' + (s.ae + s.half).toFixed(2),
+        sigLabel: s.ae == null ? '' : (significant ? 'EXCLUDES 1.00' : 'INTERVAL SPANS 1.00'),
+        sigColor: significant ? AMBER : '#6f757f',
+        deltaMean: signed(dMean, 2),
+        deltaHist: dBins.map((c, b) => ({
+          h: Math.max(c ? 2 : 0, c / dMax * 54).toFixed(0),
+          color: b > 4 ? '#2f6b52' : (b < 4 ? '#6b3340' : '#3a4150'),
+          label: (b - 4) * 2,
+          labelColor: b === 4 ? '#8b929e' : '#4c525c',
+        })),
+        byStyle,
+      },
+    };
+  }
+}
+
+</script>
+</body>
+</html>

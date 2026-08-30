@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/pages.css">
+<link rel="stylesheet" href="../assets/login.css">
+</head>
+<body class="login-page">
+
+<form class="login" method="post" action="/api/login">
+  <div class="brand"><span class="dot"></span>RACEDAY</div>
+  <!-- Shown only when the server sent us back here with ?bad=1. The page is a
+       static file, so the error is read from the URL rather than templated in
+       — api/ serialises data and does not build markup. -->
+  <p class="err" id="err" hidden>Wrong password.</p>
+  <input type="password" name="password" placeholder="password" autofocus
+         autocomplete="current-password" aria-label="Password">
+  <input type="hidden" name="next" id="next" value="/">
+  <button type="submit">SIGN IN</button>
+  <p class="note">
+    This dashboard holds a complete betting ledger and blackbook. It is not
+    public.
+  </p>
+</form>
+
+<script type="module">
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('bad')) document.getElementById('err').hidden = false;
+  // Come back to where the browser was headed, but only ever to a path on
+  // this site — an absolute URL here would make the login form an open
+  // redirect for anyone who could get the owner to click it.
+  const next = params.get('next') ?? '';
+  if (next.startsWith('/') && !next.startsWith('//')) {
+    document.getElementById('next').value = next;
+  }
+</script>
+</body>
+</html>

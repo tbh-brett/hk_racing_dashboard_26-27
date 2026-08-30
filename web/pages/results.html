@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Results</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/pages.css">
+<link rel="stylesheet" href="../assets/results.css">
+</head>
+<body>
+
+<!-- Layer 1. Rendered by context.js and identical on every page; no page
+     writes into it. See design brief 08 §1. -->
+<div class="chrome-meeting"></div>
+
+<nav class="chrome-nav" id="nav"></nav>
+
+<div class="re-strip">
+  <div class="re-brand">
+    <span class="dot"></span>RESULTS
+    <span class="sub">WHAT ACTUALLY HAPPENED</span>
+  </div>
+  <div class="race-picker" id="race-picker" role="group" aria-label="Race"></div>
+  <div class="re-sum" id="re-sum"></div>
+</div>
+
+<div class="race-line" id="race-line"></div>
+
+<section id="result">
+  <div class="res-head" id="res-head" role="row"></div>
+  <div id="res-rows"></div>
+</section>
+
+<div class="panels" id="panels"></div>
+
+<!-- The run-note / promote form. Shared with the Form Guide —
+     "reviewing and booking is one action". See review.js. -->
+<div class="popover" id="popover" hidden></div>
+
+<script type="module" src="../assets/results.js"></script>
+</body>
+</html>

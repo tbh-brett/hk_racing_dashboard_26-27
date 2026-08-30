@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Race Day</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/pages.css">
+<link rel="stylesheet" href="../assets/raceday.css">
+</head>
+<body>
+
+<!-- Layer 1. Rendered by context.js and identical on every page; no page
+     writes into it. See design brief 08 §1. -->
+<div class="chrome-meeting"></div>
+
+<nav class="chrome-nav" id="nav"></nav>
+
+<div class="race-strip">
+  <div class="label">RACE</div>
+  <div class="race-chips" id="race-chips"></div>
+  <div class="strip-right" id="strip-right"></div>
+</div>
+
+<div class="band band-bb" id="band-bb"></div>
+<div class="band band-h2h" id="band-h2h"></div>
+
+<div class="race-bar" id="race-bar"></div>
+
+<div class="card-wrap">
+  <div class="card-scroll">
+    <table class="card">
+      <thead><tr id="card-head"></tr></thead>
+      <tbody id="card-body"></tbody>
+    </table>
+    <div class="card-foot" id="card-foot"></div>
+  </div>
+  <aside class="detail" id="detail"></aside>
+</div>
+
+<script type="module" src="../assets/race-day.js"></script>
+</body>
+</html>

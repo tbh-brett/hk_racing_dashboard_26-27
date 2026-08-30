@@ -1,0 +1,53 @@
+# Litestream — continuous replication of the SQLite file to object storage.
+#
+# This is what makes a single SQLite file safe to depend on: it streams the WAL
+# to S3-compatible storage as writes happen, so the recovery point is seconds
+# rather than the last manual copy. It runs as a sidecar process, not a Python
+# dependency, and the application is unaware of it.
+#
+#   litestream replicate -config ops/litestream.yml
+#   litestream restore -config ops/litestream.yml /data/hkrd.db
+#
+# The database still needs WAL mode enabled, which store/connect.py sets.
+
+# Every value below comes from the environment, so the bucket and its keys are
+# Fly secrets and never appear in the repo. Litestream expands ${...} itself.
+#
+# LITESTREAM_ENDPOINT is what makes this work with something other than AWS.
+# Cloudflare R2, Backblaze B2 and Tigris are all S3-compatible but none of them
+# lives at an AWS hostname, and with the endpoint unset Litestream would try
+# Amazon and fail with a credentials error that names the wrong problem. Left
+# empty it does mean AWS S3, which is the correct default.
+
+# THE ENDPOINT IS THE HOST ONLY. R2's bucket page shows a URL with the bucket
+# on the end — https://<account>.r2.cloudflarestorage.com/hkrd-backups — and
+# pasting that whole thing here doubles it. Litestream appends the bucket from
+# the replica URL itself, so the request becomes
+#   /hkrd-backups/hkrd-backups?prefix=hkrd/generations/
+# Observed against the 0.3.13 binary pointed at a local server, both forms. The
+# bucket belongs in LITESTREAM_REPLICA_URL and nowhere else.
+
+dbs:
+  - path: ${HKRD_DB}
+    replicas:
+      - url: ${LITESTREAM_REPLICA_URL}
+        endpoint: ${LITESTREAM_ENDPOINT}
+        region: ${LITESTREAM_REGION}
+
+        # Named here rather than left to the environment. Litestream's S3
+        # client falls through to the AWS SDK's default credential chain, and
+        # AWS_ACCESS_KEY_ID in the container SILENTLY WINS over
+        # LITESTREAM_ACCESS_KEY_ID — measured: with both set the request went
+        # out signed with the ambient one, and R2 rejected a key of the wrong
+        # length. Fly sets no AWS credentials today, so this is not a live
+        # fault; it is one env var away from being one, and the symptom would
+        # be replication failing against an account nobody configured.
+        access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
+        secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}
+
+        retention: 720h          # 30 days
+        # 10s is the recovery point: the most that can be lost is the last ten
+        # seconds of writes. A scrape takes minutes, so a machine dying
+        # mid-scrape costs the tail of one meeting, which the next run re-fetches
+        # anyway — every write is an upsert.
+        sync-interval: 10s

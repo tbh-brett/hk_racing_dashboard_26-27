@@ -1,0 +1,175 @@
+/* Trials — ported from web/design-source/Trials.dc.html.
+ *
+ * The batches, the standouts feed, and what the rating actually predicts. The
+ * filter bar, chips, section frames and panel boxes come from pages.css.
+ *
+ * The five quality marks are the page's whole vocabulary, and they are the
+ * same five the Form Guide's inline band draws — one engine, two surfaces. So
+ * the colours live here once and formguide.css mirrors them rather than each
+ * page inventing a scale.
+ */
+
+/* The shared chrome in pages.css is painted from these. Set once, here. */
+:root {
+  --page-accent:        var(--tr-accent);
+  --page-accent-ground: var(--tr-rule);
+  --page-dim:           var(--tr-dim);
+  --page-band:          var(--tr-band);
+  --page-rule:          var(--tr-rule);
+  --page-rule-2:        var(--tr-rule-2);
+  --page-hover:         var(--tr-hover);
+}
+
+.tr-strip {
+  display: flex; align-items: center; gap: 2px; padding: 0 14px;
+  border-bottom: 1px solid var(--page-rule); background: var(--page-band);
+}
+.tr-brand {
+  display: flex; align-items: center; gap: 8px; padding: 9px 14px 9px 0;
+  font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 600;
+  letter-spacing: .14em; color: var(--page-accent);
+}
+.tr-brand .dot { width: 7px; height: 7px; background: var(--page-accent); }
+.tr-brand .sub { color: var(--page-dim); font-weight: 400; letter-spacing: .1em; }
+.tr-strip .seg { display: flex; border: 1px solid var(--line-3); margin: 0 12px 0 2px; }
+.tr-strip .seg button {
+  background: none; border: 0; cursor: pointer; padding: 4px 12px;
+  font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .1em;
+  color: var(--text-muted);
+}
+.tr-strip .seg button:hover { color: var(--text); }
+.tr-strip .seg button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+.tr-sum {
+  margin-left: auto; display: flex; gap: 16px; align-items: baseline;
+  font-family: var(--font-mono); font-size: var(--fs-xs);
+  letter-spacing: .08em; color: var(--text-dim);
+}
+.tr-sum b { color: var(--text-2); font-weight: 600; letter-spacing: 0; }
+
+/* ── the quality mark ────────────────────────────────────────────────────── */
+
+.q {
+  display: inline-block; width: 18px; text-align: center; font-weight: 600;
+  font-family: var(--font-mono);
+}
+.q-standout { color: var(--win); }
+.q-positive { color: var(--book); }
+.q-neutral  { color: var(--text-faint); }
+.q-negative { color: var(--loss); }
+/* A trial the horse was not asked to win. Measured on the baseline, so it is
+   drawn as neither credit nor debit rather than as a quiet negative. */
+.q-untested { color: var(--text-faint); }
+
+/* ── batches ─────────────────────────────────────────────────────────────── */
+
+.batch { border-bottom: 1px solid var(--line-2); }
+.batch-head {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  padding: 8px 14px; background: var(--page-band);
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-dim);
+}
+.batch-head .d { color: var(--text-2); font-weight: 600; }
+.batch-head .no { color: var(--page-accent); }
+.batch-head .k { font-size: var(--fs-xs); letter-spacing: .1em; color: var(--page-dim); }
+.batch-head .splits { color: var(--text-muted); }
+.batch-head .right { margin-left: auto; color: var(--text-faint); font-size: var(--fs-xs); }
+
+.tr-head, .tr-row {
+  display: grid; align-items: center;
+  grid-template-columns: 30px 30px minmax(140px, 1fr) 62px 56px 64px 58px
+    minmax(200px, 1.6fr) minmax(140px, 1fr);
+  gap: 10px; padding: 0 14px;
+}
+.tr-head {
+  height: 26px; border-bottom: 1px solid var(--line-2);
+  font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .08em;
+  color: var(--text-dim); white-space: nowrap;
+}
+.tr-head .r { text-align: right; }
+.tr-row {
+  min-height: 26px; border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
+  white-space: nowrap;
+}
+.tr-row:hover { background: var(--page-hover); }
+.tr-row .horse { color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+.tr-row .r { text-align: right; }
+.tr-row .comment {
+  color: var(--text-dim); overflow: hidden; text-overflow: ellipsis;
+}
+/* What the horse did at the RACES after this trial — never another trial. */
+.tr-row .next { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
+.tr-row .next .won { color: var(--win); font-weight: 600; }
+.tr-row .next .plc { color: var(--text-2); }
+.tr-row .next .none { color: var(--text-faint); }
+.tr-row .booked { color: var(--book); margin-left: 5px; }
+
+/* ── standouts ───────────────────────────────────────────────────────────── */
+
+.so-note {
+  padding: 10px 14px; border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: var(--fs-sm); line-height: 1.6;
+  color: var(--text-dim); max-width: 96ch;
+}
+.so-note b { color: var(--text-2); font-weight: 600; }
+
+.standout {
+  border-bottom: 1px solid var(--line-2); padding: 9px 14px 11px;
+}
+.standout:hover { background: var(--page-hover); }
+.so-line {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-dim);
+}
+.so-line .name { color: var(--text); font-weight: 600; letter-spacing: .02em; }
+.so-line .where { color: var(--text-muted); }
+.so-line .right { margin-left: auto; }
+.so-reasons {
+  margin-top: 3px; font-family: var(--font-mono); font-size: var(--fs-xs);
+  color: var(--text-faint);
+}
+.so-comment {
+  margin-top: 3px; font-family: var(--font-mono); font-size: var(--fs-xs);
+  color: var(--text-muted); max-width: 96ch;
+}
+.so-batch {
+  margin-top: 6px; padding-left: 18px; border-left: 1px solid var(--line-2);
+}
+.so-batch .k {
+  font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .1em;
+  color: var(--page-dim); display: block; margin-bottom: 2px;
+}
+.so-batch .row {
+  display: flex; align-items: baseline; gap: 8px;
+  font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint);
+}
+.so-batch .row .n { color: var(--text-dim); width: 150px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.so-batch .row .won { color: var(--win); }
+.so-badge {
+  font-size: var(--fs-xs); letter-spacing: .06em; padding: 0 4px;
+  border: 1px solid var(--book-ground); color: var(--book);
+}
+
+/* ── calibration ─────────────────────────────────────────────────────────── */
+
+.cal-tab { border-collapse: collapse; font-family: var(--font-mono);
+  font-size: var(--fs-sm); }
+.cal-tab th {
+  text-align: left; padding: 6px 14px 6px 10px; font-weight: 400;
+  font-size: var(--fs-xs); letter-spacing: .1em; color: var(--text-dim);
+  border-bottom: 1px solid var(--line-2); background: var(--surface);
+  white-space: nowrap;
+}
+.cal-tab th.r, .cal-tab td.r { text-align: right; }
+.cal-tab td {
+  padding: 5px 14px 5px 10px; border-bottom: 1px solid var(--line);
+  color: var(--text-muted); white-space: nowrap;
+}
+.cal-tab td.label { color: var(--text-2); }
+.cal-tab tr.baseline td { color: var(--text-faint); border-top: 1px solid var(--line-2); }
+.cal-tab .bar { display: block; height: 7px; background: var(--line); width: 120px; }
+.cal-tab .bar i { display: block; height: 7px; }
+.cal-tab .bar i.up { background: var(--win); }
+.cal-tab .bar i.down { background: var(--loss); }
+.cal-tab .bar i.flat { background: var(--text-faint); }
