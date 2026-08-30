@@ -26,7 +26,29 @@ It replaces the old Streamlit app — 135 files, ~120,000 lines, with a
 things that were wrong in it were found by measurement and fixed; the things
 that were guesses were deleted.
 
-## 2. How to open it
+## 2. Getting it onto your PC the first time
+
+Open **PowerShell** (press Start, type PowerShell, Enter) and paste this one
+line:
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/tbh-brett/hk_racing_dashboard_26-27/main/ops/first-run.ps1 | iex
+```
+
+It finds your old dashboard folder, downloads this one next to it, and starts
+it. Nothing else to type.
+
+It has to be one line, and it has to arrive this way rather than as a file, for
+two reasons that both bite otherwise:
+
+- **Pasting several lines into PowerShell does not work.** The console reads
+  one line at a time, so a block with `if {...}` on one line and `else {...}`
+  on the next runs the first half and then errors on the orphan.
+- **Windows refuses to run `.ps1` files by default.** A script that arrives as
+  text is not a file, so it runs — and the first thing it does is lift that
+  restriction for that window only, so `.\ops\start.ps1` works afterwards.
+
+## 3. How to open it after that
 
 Open **PowerShell**, go to this folder, and run one command:
 
@@ -50,7 +72,7 @@ If it cannot find the old repo, tell it where that is:
 **No accounts are involved.** No Fly.io, no Cloudflare, no password. This runs
 entirely on your machine.
 
-## 3. What hosting is for, and why you do not need it yet
+## 4. What hosting is for, and why you do not need it yet
 
 You asked what platforms you would need to *host* this. Hosting means putting
 it on the internet, and it buys exactly two things:
@@ -75,7 +97,7 @@ know whether you want it on your phone.
 If you decide not to host it, cancel Fly and delete the R2 bucket. You lose
 nothing — the dashboard keeps working on your laptop exactly as it does now.
 
-## 4. If you do want to host it
+## 5. If you do want to host it
 
 One command, from PowerShell in this folder:
 
@@ -91,7 +113,7 @@ partway.
 `docs/deploy.md` is the detail: what to do if a scrape fails, how to restore
 from backup, and what each error means.
 
-## 5. What happens on a race day
+## 6. What happens on a race day
 
 **On your laptop.** Nothing is automatic. Start the dashboard, then run this
 when you want the latest meeting:
@@ -108,7 +130,7 @@ itself. The **Model Analysis** page tells you whether that is working — if the
 last scrape failed, it says so there rather than quietly showing you last
 week's card.
 
-## 6. Things worth knowing
+## 7. Things worth knowing
 
 **Every view is a URL.** `?date=2026-07-15&race=4` — a page can be bookmarked
 or shared exactly as you left it.
@@ -125,7 +147,7 @@ written on the Model Analysis page rather than hidden. The dashboard is for
 finding horses and understanding races; the staking advice that the old system
 implied was never supported by its own numbers.
 
-## 7. If something goes wrong
+## 8. If something goes wrong
 
 Stop the dashboard (Ctrl+C) and start it again. That fixes most things.
 
