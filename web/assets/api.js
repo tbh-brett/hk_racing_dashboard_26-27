@@ -54,6 +54,13 @@ export const api = {
     `/bets/analysis${account ? `?account=${encodeURIComponent(account)}` : ''}`),
   betsReconciliation: (account) => get(
     `/bets/reconciliation${account ? `?account=${encodeURIComponent(account)}` : ''}`),
+  // Entry. `prebet` prices a ticket without writing it; `placeBet` writes.
+  betAccounts: () => get('/bets/accounts'),
+  betRaceday: (date, account) => get(
+    `/bets/raceday/${date}${account ? `?account=${encodeURIComponent(account)}` : ''}`),
+  betCard: (date, no) => get(`/bets/card/${date}/${no}`),
+  prebet: (body) => post('/bets/prebet', body),
+  placeBet: (body) => post('/bets', body),
   lookup: (q) => get(`/lookup?${q}`),
   lookupInsight: (q) => get(`/lookup/insight?${q}`),
   lookupFilters: () => get('/lookup/filters'),

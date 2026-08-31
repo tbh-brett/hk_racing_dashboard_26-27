@@ -18,6 +18,7 @@
  */
 import { api, num } from './api.js';
 import { context } from './context.js';
+import { initEntry, loadEntry, renderEntry } from './bets-entry.js';
 import { install as installPalette } from './palette.js';
 
 const NAV = [
@@ -56,7 +57,7 @@ const SOURCES = [['all', 'ALL'], ['confirmed', 'STATEMENT'],
                  ['quoted', 'LOG ONLY']];
 
 const state = {
-  view: 'ledger', bets: [], analysis: null, recon: null,
+  view: 'entry', bets: [], analysis: null, recon: null,
   search: '', type: null, result: 'all', source: 'all',
 };
 
@@ -72,8 +73,10 @@ function renderNav() {
 }
 
 function renderViewToggle() {
-  const views = [['ledger', 'LEDGER'], ['analysis', 'ANALYSIS'],
-                 ['recon', 'RECONCILE']];
+  // Entry first: the page's own subject is the decision, and the ledger is
+  // what that decision left behind.
+  const views = [['entry', 'ENTRY'], ['ledger', 'LEDGER'],
+                 ['analysis', 'ANALYSIS'], ['recon', 'RECONCILE']];
   $('view-toggle').replaceChildren(...views.map(([key, label]) => {
     const b = el('button', null, label);
     b.setAttribute('aria-pressed', String(state.view === key));
@@ -531,9 +534,11 @@ function renderRecon() {
 function render() {
   renderViewToggle();
   renderSummary();
+  $('view-entry').hidden = state.view !== 'entry';
   $('view-ledger').hidden = state.view !== 'ledger';
   $('view-analysis').hidden = state.view !== 'analysis';
   $('view-recon').hidden = state.view !== 'recon';
+  if (state.view === 'entry') renderEntry($('entry-host'));
   if (state.view === 'ledger') renderLedger();
   if (state.view === 'analysis') renderAnalysis();
   if (state.view === 'recon') renderRecon();
@@ -559,7 +564,15 @@ async function boot() {
   renderNav();
   wireSearch();
   installPalette();
+  initEntry(render);
+  context.onChange(async (what) => {
+    if (what === 'meeting' || what === 'date') {
+      await loadEntry(context.date, context.summary);
+      render();
+    }
+  });
   await context.init();
+  if (context.date) await loadEntry(context.date, context.summary);
   render();
   const [ledger, analysis, recon] = await Promise.all([
     api.bets('?limit=2000'), api.betsAnalysis(), api.betsReconciliation(),

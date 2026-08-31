@@ -112,6 +112,22 @@
   /* Bets band. The page's accent is AMBER, which is already the model-edge
      hue -- the two never appear on the same page, and the alternative was a
      ninth colour for a page whose subject is the money the edge was bet at. */
+  /* Account identity on the Bets page. Design brief 07 §3.1 keeps a persistent
+     colour band per account because "logging a bet to the wrong account is a
+     real and costly error" and a dropdown alone is not loud enough. Two hues
+     rather than two brightnesses, for the reason brief 05 §2 gives about
+     running style: a brightness step reads as intensity of one thing, not as
+     two different things. Blue and orchid are far apart at a glance.
+     Both hue families are claimed elsewhere -- pace and trainer-change -- and
+     neither of those renders on this page, the same trade the bet band below
+     already makes. */
+  --acct-1:       #5aa9e6;   /* Brett                                      */
+  --acct-1-band:  #101a24;
+  --acct-1-rule:  #1d3348;
+  --acct-2:       #c78ad9;   /* Kelvin                                     */
+  --acct-2-band:  #1d1524;
+  --acct-2-rule:  #2e2140;
+
   --bet-band:     #171410;
   --bet-rule:     #2a2419;
   --bet-rule-2:   #231e16;

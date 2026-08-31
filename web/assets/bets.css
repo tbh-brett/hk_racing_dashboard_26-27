@@ -203,3 +203,298 @@
 }
 .recon-tile .v { color: var(--text); font-size: var(--fs-md); }
 .recon-tiles { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+
+/* ── entry ────────────────────────────────────────────────────────────────
+ * Brief 06 Part 2 and 07 §3-4. Two columns: the ticket being built, and the
+ * pre-bet panel that prices it. The panel does not move as the ticket changes
+ * -- a figure that jumps under the cursor is a figure nobody reads.           */
+
+.entry-wrap {
+  display: grid; grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 14px; padding: 12px 14px; align-items: start;
+}
+@media (max-width: 1180px) { .entry-wrap { grid-template-columns: minmax(0, 1fr); } }
+
+.entry-left { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+/* The account band. Its colour is the account's, everywhere, because logging
+   to the wrong one is a real and costly error and a dropdown is too quiet. */
+.entry-acct {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 12px; border: 1px solid var(--line);
+  border-left-width: 5px;
+}
+.entry-acct.acct-1 { background: var(--acct-1-band); border-left-color: var(--acct-1); }
+.entry-acct.acct-2 { background: var(--acct-2-band); border-left-color: var(--acct-2); }
+.entry-acct.acct-1 .acct-pick { color: var(--acct-1); border-color: var(--acct-1-rule); }
+.entry-acct.acct-2 .acct-pick { color: var(--acct-2); border-color: var(--acct-2-rule); }
+.entry-acct .lab { font-size: var(--fs-xs); letter-spacing: .08em; color: var(--text-muted); }
+.entry-acct .acct-pick {
+  background: var(--bg-deep); border: 1px solid var(--line-2);
+  padding: 4px 8px; font-family: var(--font); font-size: 12px; font-weight: 600;
+}
+.entry-acct .acct-pl { font-family: var(--font-mono); font-size: 12px; }
+.entry-acct .acct-pl.up { color: var(--win); }
+.entry-acct .acct-pl.down { color: var(--loss); }
+
+.entry-day { display: flex; align-items: baseline; gap: 6px; margin-left: auto; }
+.entry-day .lab { font-size: var(--fs-xs); letter-spacing: .08em; color: var(--text-muted); }
+.entry-day .v { font-family: var(--font-mono); font-size: 14px; color: var(--text); }
+.entry-day .of { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); }
+.entry-day .note { font-size: var(--fs-xs); color: var(--text-muted); }
+.entry-day.over .v { color: var(--alert); }
+.entry-day.over .note { color: var(--alert); }
+
+.entry-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.entry-lab {
+  font-size: var(--fs-xs); letter-spacing: .08em; color: var(--text-muted);
+  min-width: 132px;
+}
+.entry-chips { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.entry-chips.wrap { gap: 8px; }
+
+/* Every interactive element defines all four states as complete pairs --
+   default, hover, selected, selected+hover -- because brief 07 §3.5 traced the
+   white-on-white bug to a hover rule that set a foreground on its own. Hover
+   here only ever moves the background or the border. */
+.entry-chip {
+  background: var(--surface); color: var(--text-2);
+  border: 1px solid var(--line-2); padding: 4px 9px;
+  font-family: var(--font); font-size: 11px; font-weight: 600;
+  letter-spacing: .04em; cursor: pointer;
+}
+.entry-chip:hover { background: var(--surface-2); border-color: var(--line-3); }
+.entry-chip.on { background: var(--edge-ground); color: var(--edge); border-color: var(--edge); }
+.entry-chip.on:hover { background: var(--edge-ground-2); }
+.entry-chip.sm { padding: 3px 7px; font-size: 10px; }
+.entry-chip.ghost { background: none; color: var(--text-muted); }
+.entry-chip.ghost:hover { background: var(--surface); }
+.banker-note { font-size: 11px; color: var(--text-dim); }
+
+.entry-card { border: 1px solid var(--line); }
+.entry-chead, .entry-crow {
+  display: grid;
+  grid-template-columns: 30px 30px 30px minmax(140px, 1fr) 76px 30px 92px
+                         52px 52px 52px 118px 96px;
+  gap: 6px; align-items: center; padding: 0 8px;
+  font-variant-numeric: tabular-nums;
+}
+.entry-chead {
+  height: 26px; background: var(--bet-band); border-bottom: 1px solid var(--bet-rule);
+  font-size: var(--fs-xs); letter-spacing: .04em; color: var(--text-muted);
+}
+/* One line per header. A wrapped label doubles the head's height and breaks
+   the fixed row rhythm the whole grid depends on. */
+.entry-chead > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.entry-chead .placep, .entry-chead .linear, .entry-chead .winp,
+.entry-chead .win, .entry-chead .place { text-align: right; }
+.entry-crow { height: 28px; border-bottom: 1px solid var(--bet-rule-2); font-size: 12px; }
+.entry-crow:hover { background: var(--bet-hover); }
+.entry-crow.scr { opacity: .45; }
+.entry-crow .no, .entry-crow .dr { font-family: var(--font-mono); color: var(--text-dim); }
+.entry-crow .horse { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.entry-crow .horse .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entry-crow .bb {
+  font-size: 9px; padding: 1px 3px; color: var(--book);
+  border: 1px solid var(--book-ground);
+}
+.entry-crow .fav { font-size: 9px; padding: 1px 3px; color: var(--edge); }
+.entry-crow .scr-tag { font-size: 9px; padding: 1px 3px; color: var(--loss); }
+.entry-crow .jockey { color: var(--text-dim); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.entry-crow .win, .entry-crow .place, .entry-crow .winp {
+  font-family: var(--font-mono); text-align: right;
+}
+.entry-crow .place { color: var(--text-dim); }
+.entry-crow .placep { font-family: var(--font-mono); text-align: right; color: var(--text); }
+.entry-crow .linear {
+  display: flex; gap: 5px; justify-content: flex-end; align-items: baseline;
+  font-family: var(--font-mono); color: var(--text-muted);
+}
+.entry-crow .linear .over { color: var(--alert); font-size: 10px; }
+.entry-crow .linear .under { color: var(--cool); font-size: 10px; }
+
+.pick {
+  width: 20px; height: 20px; line-height: 1; cursor: pointer;
+  background: var(--bg-deep); border: 1px solid var(--line-2);
+  color: var(--text); font-size: 11px;
+}
+.pick:hover { border-color: var(--line-3); background: var(--surface-2); }
+.pick.on { background: var(--edge-ground); border-color: var(--edge); color: var(--edge); }
+.pick.on:hover { background: var(--edge-ground-2); border-color: var(--edge); }
+.pick.banker.on { background: var(--book-ground); border-color: var(--book); color: var(--book); }
+.pick.banker.on:hover { background: var(--book-ground); border-color: var(--book); }
+
+.entry-foot, .entry-count {
+  font-size: var(--fs-xs); letter-spacing: .04em; color: var(--text-muted);
+  line-height: 1.5;
+}
+.entry-empty {
+  padding: 18px; border: 1px dashed var(--line-2); color: var(--text-muted);
+  font-size: 12px;
+}
+.entry-step { display: flex; align-items: baseline; gap: 8px; }
+.entry-step .n {
+  font-size: var(--fs-xs); letter-spacing: .1em; color: var(--edge);
+  border: 1px solid var(--edge-ground); padding: 1px 5px;
+}
+.entry-step .t { font-size: 12px; font-weight: 600; letter-spacing: .06em; }
+
+/* All-up legs sit beside each other: comparing selections across legs is the
+   whole task, and a vertical stack makes that comparison impossible. */
+.entry-rail {
+  display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px;
+  align-items: flex-start;
+}
+.leg { flex: 0 0 300px; border: 1px solid var(--line); background: var(--surface); }
+.leg-head {
+  display: flex; align-items: baseline; gap: 8px; padding: 6px 8px;
+  background: var(--bet-band); border-bottom: 1px solid var(--bet-rule);
+}
+.leg-head .r { font-size: 12px; font-weight: 600; }
+.leg-head .meta { font-size: 10px; color: var(--text-muted); }
+.leg-rm {
+  margin-left: auto; background: none; border: none; cursor: pointer;
+  color: var(--text-muted); font-size: 9px; letter-spacing: .08em;
+  font-family: var(--font);
+}
+.leg-rm:hover { color: var(--loss); }
+.leg-types { display: flex; gap: 4px; padding: 6px 8px; flex-wrap: wrap; }
+.leg-chead, .leg-row {
+  display: grid; grid-template-columns: 24px 26px 26px minmax(0, 1fr) 42px 42px;
+  gap: 4px; align-items: center; padding: 0 8px;
+  font-variant-numeric: tabular-nums;
+}
+.leg-chead {
+  height: 22px; font-size: 9px; letter-spacing: .06em; color: var(--text-muted);
+  border-bottom: 1px solid var(--bet-rule);
+}
+.leg-row { height: 26px; font-size: 11px; border-bottom: 1px solid var(--bet-rule-2); }
+.leg-row:hover { background: var(--bet-hover); }
+.leg-row.scr { opacity: .45; }
+.leg-row .no { font-family: var(--font-mono); color: var(--text-dim); }
+.leg-row .horse { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.leg-row .horse .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leg-row .fav { font-size: 8px; color: var(--edge); }
+.leg-row .scr-tag { font-size: 8px; color: var(--loss); }
+.leg-row .win, .leg-row .place { font-family: var(--font-mono); text-align: right; }
+.leg-row .place { color: var(--text-dim); }
+
+.entry-formula {
+  display: flex; flex-direction: column; gap: 2px; text-align: left;
+  background: var(--surface); border: 1px solid var(--line-2);
+  padding: 6px 10px; cursor: pointer; font-family: var(--font);
+}
+.entry-formula:hover { background: var(--surface-2); border-color: var(--line-3); }
+.entry-formula.on { background: var(--edge-ground); border-color: var(--edge); }
+.entry-formula.on:hover { background: var(--edge-ground-2); border-color: var(--edge); }
+.entry-formula .lab { font-family: var(--font-mono); font-size: 13px; color: var(--text); }
+.entry-formula .legs { font-size: 10px; color: var(--text-dim); }
+.entry-formula .combos { font-size: 10px; color: var(--text-muted); }
+
+.stake-field {
+  display: inline-flex; align-items: center; gap: 3px;
+  border: 1px solid var(--line-2); background: var(--bg-deep); padding: 2px 6px;
+}
+.stake-field .cur { color: var(--text-muted); font-family: var(--font-mono); }
+.stake-input {
+  width: 76px; background: none; border: none; color: var(--text);
+  font-family: var(--font-mono); font-size: 13px; padding: 2px 0;
+}
+
+/* HKJC's own three figures, in HKJC's order -- it is what the user reads on
+   the official site, and the count is the number people misjudge. */
+.entry-calc {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  padding: 8px 12px; background: var(--bet-band);
+  border: 1px solid var(--bet-rule); font-variant-numeric: tabular-nums;
+}
+.entry-calc .k { font-size: var(--fs-xs); color: var(--text-muted); }
+.entry-calc .v { font-family: var(--font-mono); font-size: 13px; margin-right: 10px; }
+.entry-calc .v.big { font-size: 16px; color: var(--edge); }
+.entry-calc .f { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+
+/* ── pre-bet ─────────────────────────────────────────────────────────────── */
+
+.entry-right { position: sticky; top: 8px; }
+.pre-wrap {
+  display: flex; flex-direction: column; gap: 8px;
+  border: 1px solid var(--line); background: var(--surface); padding: 10px;
+}
+.pre-head {
+  font-size: var(--fs-xs); letter-spacing: .12em; color: var(--edge);
+  border-bottom: 1px solid var(--line-2); padding-bottom: 6px;
+}
+.pre-panel { border: 1px solid var(--line-2); padding: 8px; }
+.pre-title {
+  font-size: var(--fs-xs); letter-spacing: .06em; color: var(--text-muted);
+  margin-bottom: 5px;
+}
+.pre-note { font-size: 10px; color: var(--text-muted); line-height: 1.5; }
+.pre-thin { font-size: 10px; color: var(--text-faint); line-height: 1.5; }
+.pre-grid {
+  display: grid; grid-template-columns: 1fr auto; gap: 3px 8px;
+  align-items: baseline; font-variant-numeric: tabular-nums;
+}
+.pre-grid .k { font-size: 11px; color: var(--text-dim); }
+.pre-grid .v { font-family: var(--font-mono); font-size: 13px; text-align: right; }
+.pre-grid .v.sm { font-size: 11px; color: var(--text-dim); }
+.pre-grid .v.big { font-size: 17px; color: var(--edge); }
+.pre-grid .v.band-strong { color: var(--win); }
+.pre-grid .v.band-moderate { color: var(--edge); }
+.pre-grid .v.band-weak { color: var(--text-dim); }
+
+.pre-compare {
+  display: flex; justify-content: space-between; gap: 6px; margin-top: 5px;
+  padding-top: 5px; border-top: 1px solid var(--line-2); font-size: 10px;
+}
+.pre-compare .old { color: var(--text-faint); font-family: var(--font-mono); }
+.pre-compare .over { color: var(--alert); }
+.pre-compare .under { color: var(--cool); }
+
+.pre-pair {
+  display: grid; grid-template-columns: 16px 1fr auto 56px; gap: 6px;
+  align-items: baseline; font-size: 11px; padding: 2px 0;
+  font-variant-numeric: tabular-nums;
+}
+.pre-pair .r { color: var(--text-muted); font-family: var(--font-mono); }
+.pre-pair .l { font-family: var(--font-mono); color: var(--text-dim); }
+.pre-pair .p { font-family: var(--font-mono); }
+.pre-pair .in { font-size: 9px; color: var(--text-faint); text-align: right; }
+.pre-pair.in .l { color: var(--text); }
+.pre-pair.in .in { color: var(--edge); }
+
+.pre-flag {
+  display: flex; flex-direction: column; gap: 3px; padding: 6px 0;
+  border-bottom: 1px solid var(--line-2);
+}
+.pre-flag:last-child { border-bottom: none; }
+.pre-flag .ft { font-size: 10px; letter-spacing: .06em; color: var(--alert); }
+.pre-flag .fd { font-size: 10px; color: var(--text-dim); line-height: 1.5; }
+.pre-flag .ov {
+  display: flex; align-items: center; gap: 5px; font-size: 10px;
+  color: var(--text-muted); cursor: pointer;
+}
+
+.pre-act { display: flex; gap: 6px; }
+.pre-place {
+  flex: 1; padding: 9px; cursor: pointer; font-family: var(--font);
+  font-size: 12px; font-weight: 600; letter-spacing: .06em;
+  background: var(--edge-ground); color: var(--edge); border: 1px solid var(--edge);
+}
+.pre-place:hover:not(:disabled) { background: var(--edge-ground-2); border-color: var(--edge); }
+.pre-place:disabled { background: var(--surface-2); color: var(--text-faint);
+  border-color: var(--line-2); cursor: not-allowed; }
+.pre-clear {
+  padding: 9px 12px; cursor: pointer; font-family: var(--font); font-size: 11px;
+  background: none; color: var(--text-muted); border: 1px solid var(--line-2);
+}
+.pre-clear:hover { background: var(--surface-2); border-color: var(--line-3); }
+
+.pre-placed {
+  display: flex; flex-direction: column; gap: 2px; font-size: 10px;
+  padding: 6px; border: 1px solid var(--line-2); color: var(--text-dim);
+}
+.pre-placed .ok { color: var(--win); font-family: var(--font-mono); }
+.pre-placed .ov { color: var(--alert); }
+.pre-error { font-size: 11px; color: var(--loss); padding: 6px 0; }
