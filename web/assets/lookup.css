@@ -64,11 +64,42 @@
 .lk-body { display: flex; align-items: flex-start; min-height: 0; }
 .lk-main { flex: 1; min-width: 0; }
 
+/* Brief 10: a floating overlay, not a sidebar. The table does not resize,
+   reflow or move to make room, and on close nothing of the panel remains. A
+   wide overlay keeps the form's multi-column grid intact; a side drawer would
+   force those rows into a single column. */
 .filter-panel {
-  width: 232px; flex: none; align-self: stretch;
-  border-right: 1px solid var(--page-rule); background: var(--page-band);
+  width: min(940px, calc(100vw - 48px));
+  max-height: min(70vh, 640px); overflow-y: auto;
+  left: 24px; top: 96px;
+  border: 1px solid var(--page-rule); background: var(--page-band);
   font-family: var(--font-mono); font-size: var(--fs-sm);
 }
+.fp-x {
+  margin-left: auto; background: none; border: 0; cursor: pointer;
+  color: var(--text-muted); font-size: 15px; line-height: 1; padding: 0 2px;
+}
+.fp-x:hover { color: var(--text); }
+
+/* The only thing always on screen. Chips stay reviewable with the panel shut,
+   so a filter cannot be forgotten just because the form is hidden. */
+.fbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 7px 12px; border-bottom: 1px solid var(--page-rule-2);
+}
+.fbar-open {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--surface); border: 1px solid var(--line-2);
+  color: var(--text-2); font-family: var(--font-mono);
+  font-size: var(--fs-sm); padding: 4px 10px; cursor: pointer;
+}
+.fbar-open:hover, .fbar-open:focus-visible {
+  background: var(--surface-2); border-color: var(--page-accent);
+  color: var(--text);
+}
+.fbar-open .n { color: var(--page-accent); }
+.fbar-open .caret { color: var(--text-muted); font-size: 10px; }
+.fbar-open:hover .caret { color: var(--page-accent); }
 .fp-head {
   display: flex; align-items: baseline; gap: 8px; padding: 8px 12px 6px;
   border-bottom: 1px solid var(--page-rule-2);

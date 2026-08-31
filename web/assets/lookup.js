@@ -21,6 +21,7 @@
  */
 import { api, num } from './api.js';
 import { el, $, DASH, MINUS, renderNav, styleBadge } from './vocab.js';
+import { flyout } from './overlay.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 
@@ -173,8 +174,59 @@ function field(name) {
   return row;
 }
 
+/* ── the filter flyout ──────────────────────────────────────────────────────
+ * Brief 10 supersedes the earlier collapsible-panel note. The table is the
+ * product on this page; filters shape it and must never share vertical space
+ * with it, open or closed. So the form floats above the table on its own layer
+ * and, on close, is completely gone — what remains is the slim bar and the
+ * table at full height.
+ *
+ * The scrim is semi-transparent on purpose: filters apply live, and watching
+ * the row count move underneath while a value changes is the entire payoff of
+ * a non-modal overlay over a modal one.
+ */
+let closeFlyout = null;
+
+function filtersOpen() {
+  return closeFlyout !== null;
+}
+
+function openFilters() {
+  if (filtersOpen()) return;
+  const panel = el('div', 'filter-panel open');
+  const head = el('div', 'fp-head');
+  head.append(el('span', 't', 'FILTERS'));
+  head.append(el('span', 'n', `${Object.keys(state.filters).length || 'no'} active`));
+  const x = el('button', 'fp-x', '×');
+  x.type = 'button';
+  x.title = 'close — or press Escape, or click the table';
+  x.addEventListener('click', () => closeFilters());
+  head.append(x);
+  panel.append(head);
+  panel.append(el('div', 'fp-note', 'changes apply live — the table updates underneath'));
+
+  const groups = el('div', null);
+  groups.id = 'filter-groups';
+  panel.append(groups);
+
+  closeFlyout = flyout(panel, { onClose: () => { closeFlyout = null; syncBar(); } });
+  renderFilterPanel();
+}
+
+function closeFilters() {
+  if (closeFlyout) closeFlyout();
+}
+
+/** The always-present bar: trigger, removable chips, clear. */
+function syncBar() {
+  const active = Object.keys(state.filters).length;
+  $('filter-count').textContent = active ? ` · ${active} active` : '';
+  $('open-filters').setAttribute('aria-expanded', String(filtersOpen()));
+}
+
 function renderFilterPanel() {
   const host = $('filter-groups');
+  if (!host) { syncBar(); return; }
   host.replaceChildren();
   Object.entries(state.vocab.groups).forEach(([group, names]) => {
     const box = el('div', 'fp-group');
@@ -198,8 +250,7 @@ function renderFilterPanel() {
   box.append(row);
   host.append(box);
 
-  const active = Object.keys(state.filters).length;
-  $('filter-count').textContent = active ? `· ${active}` : '';
+  syncBar();
 }
 
 function renderActiveFilters() {
@@ -723,10 +774,15 @@ async function boot() {
   state.delta = vocab.outlier_delta;
   readUrl();
   renderCorpus();
-  renderFilterPanel();
+  syncBar();
+  $('open-filters').addEventListener('click', () => {
+    if (filtersOpen()) closeFilters();
+    else openFilters();
+  });
   $('clear-filters').addEventListener('click', () => {
     state.filters = {};
     renderFilterPanel();
+    renderActiveFilters();
     load();
   });
   await load();

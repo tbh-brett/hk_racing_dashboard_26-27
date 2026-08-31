@@ -35,18 +35,20 @@
 </div>
 
 <div class="lk-body">
-  <aside class="filter-panel" id="filter-panel">
-    <div class="fp-head">
-      <span class="t">FILTERS</span>
-      <span class="n" id="filter-count"></span>
-      <button class="fp-clear" id="clear-filters">Clear all</button>
-    </div>
-    <div class="fp-note">changes apply live</div>
-    <div id="filter-groups"></div>
-  </aside>
-
   <main class="lk-main">
-    <div class="active-filters" id="active-filters"></div>
+    <!-- Brief 10: the table is the product on this page, and filters exist to
+         shape it rather than compete with it for space. The only thing always
+         present is this slim bar; the form itself floats above the table and
+         vanishes completely on close. -->
+    <div class="fbar">
+      <button class="fbar-open" id="open-filters" type="button"
+              aria-haspopup="dialog">
+        Filters<span class="n" id="filter-count"></span>
+        <span class="caret">▾</span>
+      </button>
+      <div class="active-filters" id="active-filters"></div>
+      <button class="fp-clear" id="clear-filters" type="button">Clear all</button>
+    </div>
 
     <section id="tab-runs">
       <div class="lk-head" id="lk-head" role="row"></div>

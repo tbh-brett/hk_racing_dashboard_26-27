@@ -55,13 +55,6 @@ def bets_accounts() -> dict:
     return {"accounts": prebet.accounts()}
 
 
-@router.get("/api/bets/types")
-def bets_types() -> dict:
-    """Bet types, and the accounts and stake presets entry offers."""
-    return {"types": list(prebet.BET_TYPES),
-            "single_race": list(prebet.SINGLE_RACE_TYPES)}
-
-
 @router.get("/api/bets/raceday/{date}")
 def bets_raceday(date: str, account: str | None = None) -> dict:
     """Running total for the meeting against the ceiling. A ceiling warns."""
