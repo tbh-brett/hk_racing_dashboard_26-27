@@ -22,7 +22,7 @@ from __future__ import annotations
 from typing import Any
 
 from hkrd.derive.probability import actual_over_expected
-from hkrd.query.lookup import _where
+from hkrd.query.lookup import _PACE_BAND, _where
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["breakdown", "pivot", "outliers", "corpus", "DIMENSIONS",
@@ -43,12 +43,10 @@ DIMENSIONS: dict[str, str] = {
     # from the field's early-pace deviation at read time, so there is one
     # definition of it rather than a second copy in a table that could drift
     # from derive/pace.py.
-    "pace": ("CASE WHEN p.early_dev IS NULL THEN NULL"
-             "      WHEN p.early_dev <= -1.0 THEN 'Very Slow'"
-             "      WHEN p.early_dev <= -0.35 THEN 'Slow'"
-             "      WHEN p.early_dev <   0.35 THEN 'Neutral'"
-             "      WHEN p.early_dev <   1.0 THEN 'Fast'"
-             "      ELSE 'Very Fast' END"),
+    # Imported, not repeated: the same expression the pace FILTER uses, so a
+    # race cannot be "Fast" in the grid and "Neutral" in a breakdown over the
+    # very same rows.
+    "pace": _PACE_BAND,
     "jockey": "r.jockey",
     "trainer": "r.trainer",
     "field size": ("(SELECT count(*) FROM runners f WHERE f.race_date = r.race_date"

@@ -89,6 +89,10 @@ class RunnerLine:
     et_figure: float | None = None
     et_len_vs_par: float | None = None
     et_len_vs_race: float | None = None
+    # Seconds against the race's par, which is the axis the old Lookup's
+    # "Fin Δ" column showed. Par is a property of the RACE, so every
+    # runner is measured against the same number.
+    et_sec_vs_par: float | None = None
     et_n_eff: int | None = None
     et_confidence: str | None = None
     pace_style: str | None = None

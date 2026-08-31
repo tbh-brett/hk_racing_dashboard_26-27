@@ -169,3 +169,63 @@ export function ordinal(place) {
   if (tens >= 11 && tens <= 13) return `${n}th`;
   return `${n}${({ 1: 'st', 2: 'nd', 3: 'rd' })[n % 10] ?? 'th'}`;
 }
+
+
+/* ── HKJC deep links ──────────────────────────────────────────────────────
+ * The replay URL pattern is the one the old dashboard used; design note 04 §4
+ * carries it verbatim and asks for a play control per run. It needs no
+ * scraping and no storage — the race identifies the video.
+ */
+export function replayUrl(raceDate, raceNo) {
+  if (!raceDate || !raceNo) return null;
+  const ymd = String(raceDate).replace(/-/g, '');
+  const no = String(raceNo).padStart(2, '0');
+  return 'https://racing.hkjc.com/contentAsset/videoplayer_v4/'
+    + 'video-player-iframe_v4.html'
+    + `?type=replay-full&date=${ymd}&no=${no}&lang=eng`
+    + '&noPTbar=false&noLeading=false&videoParam=P';
+}
+
+/** The official result page for a race, for checking a figure against source. */
+export function hkjcResultUrl(raceDate, raceNo, venue) {
+  if (!raceDate || !raceNo) return null;
+  const track = (venue ?? '').toUpperCase() === 'ST' ? 'ST' : 'HV';
+  return 'https://racing.hkjc.com/racing/information/English/Racing/'
+    + `LocalResults.aspx?RaceDate=${raceDate}&Racecourse=${track}`
+    + `&RaceNo=${raceNo}`;
+}
+
+/** A small link that opens in a new tab, with the rel a new tab needs. */
+export function externalLink(href, text, cls) {
+  const a = el('a', cls, text);
+  a.href = href;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  return a;
+}
+
+/** Running positions as the sequence they are: `10 9 6 3 2`. */
+export function positionsText(positions) {
+  return (positions ?? []).length ? positions.join(' ') : DASH;
+}
+
+/** Race pace with its signed deviation — "Sl.Fast (-0.25)".
+ *  Brief 08 §4: the number is what makes the label checkable. */
+export const PACE_SHORT = {
+  'Very Slow': 'V.Slow', Slow: 'Sl.Slow', Neutral: 'Neutral',
+  Fast: 'Sl.Fast', 'Very Fast': 'V.Fast',
+};
+
+export function paceCell(pace, { cls = 'pace' } = {}) {
+  const box = el('span', cls);
+  if (!pace || !pace.band) {
+    box.append(el('span', 'dim', DASH));
+    return box;
+  }
+  const key = (pace.band || '').toLowerCase().replace(/[^a-z]/g, '');
+  box.append(el('span', `pace-band p-${key}`, PACE_SHORT[pace.band] ?? pace.band));
+  if (pace.z != null) {
+    box.append(el('span', 'z', ` (${pace.z > 0 ? '+' : ''}${pace.z.toFixed(2)})`));
+  }
+  return box;
+}

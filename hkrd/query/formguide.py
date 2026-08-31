@@ -14,13 +14,14 @@ about the ET figure or the pace style, because there is only one of them.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Sequence
 from typing import Any
 
 from hkrd.query.race import get_horse_form, get_race
 from hkrd.query.types import FormGuide, RunnerLine
 from hkrd.store.connect import Connection, get_conn
 
-__all__ = ["build_form_guide", "race_pace", "race_quality", "gear_timeline",
+__all__ = ["build_form_guide", "race_pace", "race_pace_bulk", "race_quality", "gear_timeline",
            "condition_fit", "head_to_head", "notes_for_horses",
            "ConditionCell"]
 
@@ -53,6 +54,9 @@ def build_form_guide(date: str, race_no: int, *, history: int = 6,
 # invented CRAWL/SLOW/EVEN/STRONG/HOT, which is a different scale wearing the
 # same shape.
 PACE_BANDS = ("Very Slow", "Slow", "Neutral", "Fast", "Very Fast")
+
+# A z-score against eleven races is not a tempo reading.
+MIN_PACE_PEERS = 30
 
 # A projection for a race not yet run has no sectionals to measure, so it is
 # built from the field's running styles instead: leaders plus half the
@@ -395,7 +399,7 @@ def _measured_pace(conn: Connection, date: str, race_no: int) -> dict[str, Any] 
         WHERE a.distance = ? AND p.early_pace IS NOT NULL
         GROUP BY p.race_date, p.race_no
     """, (race["distance"],)) if r["v"] is not None]
-    if len(peers) < 30:
+    if len(peers) < MIN_PACE_PEERS:
         return None
 
     mean = sum(peers) / len(peers)
@@ -470,6 +474,70 @@ def gear_timeline(horse_names: list[str], *, before: str | None = None,
                 if new:
                     out.setdefault(horse, {})[key] = new
             known |= tokens
+        return out
+    finally:
+        if own:
+            conn.close()
+
+
+def race_pace_bulk(keys: Sequence[tuple[str, int]], *,
+                   conn: Connection | None = None
+                   ) -> dict[tuple[str, int], dict[str, Any]]:
+    """Measured pace for many races at once, for a table that spans them.
+
+    `race_pace` answers one race and costs three queries plus a scan of every
+    race at that distance. A Lookup grid of 500 runs spans fifty races, and
+    calling it per row would be fifty scans and well past the 500ms an endpoint
+    is allowed. This does the same arithmetic in two queries regardless of how
+    many races are asked for.
+
+    Only MEASURED pace is returned. The projection `race_pace` falls back to is
+    an estimate from running styles, and labelling a historic run with an
+    estimate — beside its actual time — would read as a measurement.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        wanted = {(str(d), int(n)) for d, n in keys}
+        if not wanted:
+            return {}
+
+        # Every race's own average early sectional, and its distance.
+        rows = conn.execute("""
+            SELECT p.race_date, p.race_no, a.distance, avg(p.early_pace) v
+              FROM runner_pace p
+              JOIN races a ON a.race_date = p.race_date AND a.race_no = p.race_no
+             WHERE p.early_pace IS NOT NULL AND a.distance IS NOT NULL
+             GROUP BY p.race_date, p.race_no
+        """).fetchall()
+
+        by_distance: dict[int, list[float]] = {}
+        own_value: dict[tuple[str, int], tuple[int, float]] = {}
+        for r in rows:
+            by_distance.setdefault(r["distance"], []).append(r["v"])
+            key = (r["race_date"], r["race_no"])
+            if key in wanted:
+                own_value[key] = (r["distance"], r["v"])
+
+        stats: dict[int, tuple[float, float, int]] = {}
+        for distance, values in by_distance.items():
+            # Fewer than thirty comparable races is not a distribution, and a
+            # z-score against eleven of them is a bare number wearing a label.
+            if len(values) < MIN_PACE_PEERS:
+                continue
+            mean = sum(values) / len(values)
+            sd = (sum((v - mean) ** 2 for v in values) / len(values)) ** 0.5
+            if sd:
+                stats[distance] = (mean, sd, len(values))
+
+        out: dict[tuple[str, int], dict[str, Any]] = {}
+        for key, (distance, value) in own_value.items():
+            if distance not in stats:
+                continue
+            mean, sd, peers = stats[distance]
+            z = (value - mean) / sd
+            out[key] = {"band": _band_from_z(z), "z": round(z, 2),
+                        "measured": True, "peers": peers}
         return out
     finally:
         if own:

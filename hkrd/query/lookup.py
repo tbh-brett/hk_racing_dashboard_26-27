@@ -25,7 +25,14 @@ from hkrd.query.race import _LINE_SQL, _to_line
 from hkrd.query.types import RunnerLine
 from hkrd.store.connect import Connection, get_conn
 
-__all__ = ["search_runs", "insight", "FILTERS", "SOURCES"]
+__all__ = ["search_runs", "insight", "filter_options", "FILTERS",
+           "SOURCES", "STYLE_ORDER", "PACE_BANDS", "MULTI"]
+
+# Front of the field to the back, matching the ordinal the pages sort on.
+STYLE_ORDER = ("Leader", "On-Pace", "Midfield", "Closer")
+
+# Slowest to fastest, so the chips read as a scale rather than a list.
+PACE_BANDS = ("Very Slow", "Slow", "Neutral", "Fast", "Very Fast")
 
 SOURCES = ("race", "trial", "both")
 
@@ -33,16 +40,28 @@ SOURCES = ("race", "trial", "both")
 # them holding a second copy of the list.
 FILTERS = {
     "race context": ("date_from", "date_to", "venue", "course", "surface",
-                     "going", "distance_min", "distance_max", "race_class",
+                     "going", "distance", "distance_min", "distance_max",
+                     "race_class",
                      "field_size_min", "field_size_max"),
     "runner": ("horse", "jockey", "trainer", "draw_min", "draw_max",
                "weight_min", "weight_max"),
-    "derived": ("pace_style", "et_min", "et_max", "tag", "sarr_rank_max"),
+    "derived": ("pace_style", "race_pace", "et_min", "et_max", "tag",
+               "sarr_rank_max"),
     "outcome": ("place", "placed", "won", "odds_min", "odds_max"),
 }
 
 # Every entry is (sql fragment, how to bind). Keeping them in one table is what
 # makes "nothing filtered in pandas" checkable rather than a good intention.
+# The race's own pace, banded from the field's early deviation at read time.
+# Imported by slices.py too: one definition, so a race cannot be "Fast" in
+# the grid and "Neutral" in the breakdown computed over the same rows.
+_PACE_BAND = ("CASE WHEN p.early_dev IS NULL THEN NULL"
+              "      WHEN p.early_dev <= -1.0 THEN 'Very Slow'"
+              "      WHEN p.early_dev <= -0.35 THEN 'Slow'"
+              "      WHEN p.early_dev <   0.35 THEN 'Neutral'"
+              "      WHEN p.early_dev <   1.0 THEN 'Fast'"
+              "      ELSE 'Very Fast' END")
+
 _CLAUSES: dict[str, str] = {
     "date_from": "r.race_date >= ?",
     "date_to": "r.race_date <= ?",
@@ -53,6 +72,7 @@ _CLAUSES: dict[str, str] = {
     "distance_min": "a.distance >= ?",
     "distance_max": "a.distance <= ?",
     "race_class": "a.race_class = ?",
+    "distance": "a.distance = ?",
     "horse": "r.horse_name = ?",
     "jockey": "r.jockey = ?",
     "trainer": "r.trainer = ?",
@@ -61,6 +81,7 @@ _CLAUSES: dict[str, str] = {
     "weight_min": "r.actual_weight >= ?",
     "weight_max": "r.actual_weight <= ?",
     "pace_style": "p.pace_style = ?",
+    "race_pace": _PACE_BAND + " = ?",
     "et_min": "e.figure >= ?",
     "et_max": "e.figure <= ?",
     "sarr_rank_max": "s.sarr_rank <= ?",
@@ -83,14 +104,50 @@ _FIELD_CLAUSES: dict[str, str] = {
 _UPPER = {"horse", "venue", "course"}
 
 
+# Filters the interface offers as a multi-select. The design's filter panel is
+# a grid of chip groups, not a column of single-value inputs: a punter asks for
+# "Sha Tin AND Happy Valley, class 3 or 4" in one pass, and forcing that into
+# one value per key turns one question into four searches.
+MULTI = frozenset({"venue", "course", "surface", "going", "race_class",
+                   "jockey", "trainer", "pace_style", "distance",
+                   "race_pace"})
+
+
+def _expand(key: str, value: Any) -> tuple[str, list[Any]]:
+    """One clause for a filter, whether it carries one value or several.
+
+    A list becomes `col IN (?, ?, ?)` rather than several ANDed equalities,
+    which would match nothing the moment a second value was chosen — the bug
+    this shape exists to make impossible.
+    """
+    sql = _CLAUSES[key]
+    values = value if isinstance(value, (list, tuple, set)) else [value]
+    values = [v for v in values if v not in (None, "")]
+    if not values:
+        return "", []
+    prepared = [str(v).upper() if key in _UPPER else v for v in values]
+    if len(prepared) == 1:
+        return sql, prepared
+    if key not in MULTI or " = ?" not in sql:
+        # A range bound has no plural reading; take the first and say so by
+        # ignoring the rest rather than silently ANDing contradictions.
+        return sql, prepared[:1]
+    column = sql.split(" = ?")[0]
+    marks = ", ".join("?" * len(prepared))
+    return f"{column} IN ({marks})", prepared
+
+
 def _where(filters: dict[str, Any]) -> tuple[str, list[Any]]:
     clauses, params = ["1 = 1"], []
     for key, value in filters.items():
-        if value is None or value == "":
+        if value is None or value == "" or value == []:
             continue
         if key in _CLAUSES:
-            clauses.append(_CLAUSES[key])
-            params.append(str(value).upper() if key in _UPPER else value)
+            sql, bound = _expand(key, value)
+            if not sql:
+                continue
+            clauses.append(sql)
+            params.extend(bound)
         elif key in _FIELD_CLAUSES:
             clauses.append(_FIELD_CLAUSES[key])
             params.append(value)
@@ -285,6 +342,54 @@ def insight(*, source: str = "race", conn: Connection | None = None,
             "expected_by_chance": 0.05,
             "clears": bool(ae["ae"] is not None
                            and (ae["ae_lo"] > 1.0 or ae["ae_hi"] < 1.0)),
+        }
+    finally:
+        if own:
+            conn.close()
+
+
+def filter_options(*, top: int = 14,
+                   conn: Connection | None = None) -> dict[str, list[Any]]:
+    """The values each chip group offers, read from the archive itself.
+
+    The design's filter panel is a grid of chips carrying real names — Moreira,
+    Purton, Teetan — not a free-text box. Those have to come from the data or
+    they go stale the first time a jockey leaves, and a chip for a value the
+    archive does not contain is a filter that always returns nothing.
+
+    Jockeys and trainers are capped at the busiest `top`, because the full list
+    is hundreds long and a chip grid that needs scrolling is a dropdown wearing
+    a costume. The free-text box beside them reaches the rest.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        def distinct(sql: str, params: tuple = ()) -> list[Any]:
+            return [r[0] for r in conn.execute(sql, params) if r[0] not in (None, "")]
+
+        return {
+            "venue": distinct("SELECT DISTINCT venue FROM races ORDER BY venue"),
+            "course": distinct("SELECT DISTINCT course FROM races ORDER BY course"),
+            "surface": distinct("SELECT DISTINCT surface FROM races ORDER BY surface"),
+            "going": distinct("SELECT DISTINCT going FROM races ORDER BY going"),
+            # Class is the categorisation this page filters on. Rating bands are
+            # deliberately not offered: `rating` stopped populating in April
+            # 2026 alongside horse_id, so a rating filter would quietly exclude
+            # every recent run rather than narrowing anything.
+            "race_class": distinct(
+                "SELECT DISTINCT race_class FROM races "
+                "WHERE race_class IS NOT NULL ORDER BY race_class"),
+            "distance": distinct(
+                "SELECT DISTINCT distance FROM races "
+                "WHERE distance IS NOT NULL ORDER BY distance"),
+            "jockey": distinct(
+                "SELECT jockey FROM runners WHERE jockey IS NOT NULL "
+                "GROUP BY jockey ORDER BY count(*) DESC LIMIT ?", (top,)),
+            "trainer": distinct(
+                "SELECT trainer FROM runners WHERE trainer IS NOT NULL "
+                "GROUP BY trainer ORDER BY count(*) DESC LIMIT ?", (top,)),
+            "pace_style": list(STYLE_ORDER),
+            "race_pace": list(PACE_BANDS),
         }
     finally:
         if own:

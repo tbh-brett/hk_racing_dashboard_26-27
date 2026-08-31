@@ -20,7 +20,9 @@
  * can be sent to someone else exactly as it was seen.
  */
 import { api, num } from './api.js';
-import { el, $, DASH, MINUS, renderNav, styleBadge } from './vocab.js';
+import { el, $, DASH, MINUS, renderNav, styleBadge, compactDate,
+         positionsText, paceCell, replayUrl, hkjcResultUrl,
+         externalLink, PACE_SHORT } from './vocab.js';
 import { flyout } from './overlay.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
@@ -29,18 +31,31 @@ import { install as installPalette } from './palette.js';
 const TABS = [['runs', 'RUNS'], ['breakdown', 'BREAKDOWN'], ['pivot', 'PIVOT'],
               ['outliers', 'OUTLIERS'], ['insight', 'THIS SLICE']];
 
+/* The old dashboard's Race Lookup carried these and the owner prefers them:
+ * every fact about a run, on one line, with the two links that let a figure be
+ * checked against the source. RT (rating) is deliberately NOT here — the
+ * scraper stopped populating `rating` from April 2026 alongside horse_id, so
+ * the column would be mostly blank, and the owner's instruction is to
+ * categorise by CLASS instead.
+ */
 const COLS = [
   { k: 'date', label: 'DATE' }, { k: 'r', label: 'R', cls: 'r' },
-  { k: 'venue', label: 'MTG' }, { k: 'course', label: 'CRS' },
-  { k: 'surface', label: 'SURF' }, { k: 'dist', label: 'DIST', cls: 'r' },
-  { k: 'going', label: 'GOING' }, { k: 'class', label: 'CLASS' },
-  { k: 'field', label: 'FLD', cls: 'r' }, { k: 'fin', label: 'FIN', cls: 'r' },
-  { k: 'horse', label: 'HORSE' }, { k: 'draw', label: 'DR', cls: 'r' },
+  { k: 'venue', label: 'TRACK' }, { k: 'course', label: 'CRS' },
+  { k: 'surface', label: 'SURF' }, { k: 'class', label: 'CLASS' },
+  { k: 'dist', label: 'DIST', cls: 'r' }, { k: 'going', label: 'GOING' },
+  { k: 'field', label: 'FLD', cls: 'r' }, { k: 'fin', label: 'PL', cls: 'r' },
+  { k: 'horse', label: 'HORSE' }, { k: 'draw', label: 'GATE', cls: 'r' },
+  { k: 'wt', label: 'WT', cls: 'r' },
   { k: 'jockey', label: 'JOCKEY' }, { k: 'trainer', label: 'TRAINER' },
-  { k: 'style', label: 'STYLE' }, { k: 'sp', label: 'SP', cls: 'r' },
+  { k: 'style', label: 'STYLE' }, { k: 'pos', label: 'RUN POS.' },
+  { k: 'pace', label: 'PACE' }, { k: 'time', label: 'TIME', cls: 'r' },
+  { k: 'delta', label: 'FIN \u0394', cls: 'r' },
+  { k: 'lbw', label: 'LBW', cls: 'r' },
+  { k: 'sp', label: 'ODDS', cls: 'r' }, { k: 'gear', label: 'GEAR' },
   { k: 'fig', label: 'FIGURE', cls: 'r' },
+  { k: 'replay', label: '\u25b6', cls: 'c' },
+  { k: 'hkjc', label: 'HKJC', cls: 'c' },
 ];
-
 // Rendered from the API's own vocabulary, so the panel cannot drift from what
 // the query layer accepts. The type of each control is decided by its suffix.
 const SELECTS = {
@@ -51,7 +66,7 @@ const SELECTS = {
 };
 
 const state = {
-  tab: 'runs', filters: {}, source: 'race',
+  tab: 'runs', filters: {}, source: 'race', dateMode: 'all',
   runs: null, insight: null, corpus: null, vocab: null,
   breakdown: null, pivot: null, outliers: null,
   dimension: 'draw', pivotRows: 'style', pivotCols: 'venue',
@@ -146,32 +161,102 @@ function readUrl() {
   if (tab && TABS.some(([key]) => key === tab)) state.tab = tab;
 }
 
-function field(name) {
+/* ── filter controls ────────────────────────────────────────────────────────
+ * The design's panel is a grid of chip groups, not a column of inputs. That is
+ * not decoration: a punter asks "Sha Tin and Happy Valley, class 3 or 4, into a
+ * fast pace" in one gesture, and a single-value input turns that one question
+ * into four searches whose results have to be held in the head.
+ *
+ * So every categorical filter is a multi-select chip group, and the values come
+ * from the archive rather than a hardcoded list.
+ */
+
+/** Is `value` currently chosen for `name`? Handles single and multi alike. */
+function chosen(name, value) {
+  const cur = state.filters[name];
+  if (cur === undefined) return false;
+  return Array.isArray(cur) ? cur.includes(value) : cur === value;
+}
+
+/** Add or remove one value from a multi-select filter. */
+function toggleValue(name, value) {
+  const cur = state.filters[name];
+  const list = cur === undefined ? [] : (Array.isArray(cur) ? [...cur] : [cur]);
+  const i = list.indexOf(value);
+  if (i >= 0) list.splice(i, 1);
+  else list.push(value);
+  if (!list.length) delete state.filters[name];
+  else state.filters[name] = list.length === 1 ? list[0] : list;
+  renderFilterPanel();
+  renderActiveFilters();
+  load();
+}
+
+function countFor(name) {
+  const cur = state.filters[name];
+  if (cur === undefined) return 0;
+  return Array.isArray(cur) ? cur.length : 1;
+}
+
+/** One labelled group of toggle chips. */
+function chipGroup(name, label, values, { format = String } = {}) {
+  const box = el('div', 'fp-group');
+  const head = el('div', 'fp-k');
+  head.append(el('span', null, label));
+  const n = countFor(name);
+  if (n) head.append(el('span', 'badge', String(n)));
+  box.append(head);
+
+  const chips = el('div', 'fp-chips');
+  values.forEach((v) => {
+    const on = chosen(name, v);
+    const b = el('button', `fchip${on ? ' on' : ''}`, format(v));
+    b.type = 'button';
+    b.setAttribute('aria-pressed', String(on));
+    b.addEventListener('click', () => toggleValue(name, v));
+    chips.append(b);
+  });
+  box.append(chips);
+  return box;
+}
+
+/** A free-text or numeric field, for the values a chip grid cannot carry. */
+function field(name, label) {
   const row = el('div', 'fp-field');
-  row.append(el('label', null, name.replace(/_/g, ' ')));
-  const options = SELECTS[name];
-  const input = el(options ? 'select' : 'input');
+  row.append(el('label', null, label ?? name.replace(/_/g, ' ')));
+  const input = el('input');
   input.id = `f-${name}`;
-  if (options) {
-    options.forEach((o) => {
-      const opt = el('option', null, o || 'any');
-      opt.value = o;
-      input.append(opt);
-    });
-  } else {
-    input.type = /_(min|max)$/.test(name) ? 'number' : 'text';
-    input.placeholder = /^date_/.test(name) ? 'YYYY-MM-DD' : '';
-  }
+  input.type = /_(min|max)$/.test(name) ? 'number' : 'text';
+  input.placeholder = /^date_/.test(name) ? 'YYYY-MM-DD'
+    : name === 'horse' ? 'substring match' : '';
   input.value = state.filters[name] ?? '';
   const apply = () => {
     const v = input.value.trim();
     if (v === '') delete state.filters[name];
     else state.filters[name] = v;
+    renderActiveFilters();
     load();
   };
   input.addEventListener('change', apply);
   row.append(input);
   return row;
+}
+
+/** An exclusive mode switch — Any / Bands / Specific and friends. */
+function modeGroup(label, options, current, onPick) {
+  const box = el('div', 'fp-group');
+  box.append(el('div', 'fp-k', label));
+  const chips = el('div', 'fp-chips');
+  options.forEach(([key, text]) => {
+    const on = current === key;
+    const b = el('button', `fchip${on ? ' on' : ''}`, text);
+    b.type = 'button';
+    b.setAttribute('aria-pressed', String(on));
+    b.addEventListener('click', () => onPick(key));
+    chips.append(b);
+  });
+  box.append(chips);
+  return box;
 }
 
 /* ── the filter flyout ──────────────────────────────────────────────────────
@@ -227,28 +312,114 @@ function syncBar() {
 function renderFilterPanel() {
   const host = $('filter-groups');
   if (!host) { syncBar(); return; }
+  const opt = state.vocab.options ?? {};
   host.replaceChildren();
-  Object.entries(state.vocab.groups).forEach(([group, names]) => {
-    const box = el('div', 'fp-group');
-    box.append(el('span', 'k', group.toUpperCase()));
-    names.forEach((n) => box.append(field(n)));
-    host.append(box);
+
+  // Free text first: a horse name is the one filter with no finite vocabulary.
+  const top = el('div', 'fp-row');
+  top.append(field('horse', 'HORSE NAME'));
+  top.append(modeGroup('DATE MODE', [
+    ['all', 'All'], ['month', 'Month'], ['range', 'Range'], ['exact', 'Exact date'],
+  ], state.dateMode, (k) => {
+    state.dateMode = k;
+    if (k === 'all') {
+      delete state.filters.date_from;
+      delete state.filters.date_to;
+      renderActiveFilters();
+      load();
+    }
+    renderFilterPanel();
+  }));
+  if (state.dateMode === 'range') {
+    top.append(field('date_from', 'FROM'));
+    top.append(field('date_to', 'TO'));
+  } else if (state.dateMode === 'exact') {
+    top.append(field('date_from', 'ON'));
+  } else if (state.dateMode === 'month') {
+    top.append(field('date_from', 'MONTH FROM'));
+  }
+  host.append(top);
+
+  // The grid the design lays out: every categorical filter as a chip group,
+  // several visible at once, so a compound question is one gesture.
+  const grid = el('div', 'fp-grid');
+  grid.append(chipGroup('venue', 'TRACK', opt.venue ?? [],
+    { format: (v) => (v === 'ST' ? 'Sha Tin' : v === 'HV' ? 'Happy Valley' : v) }));
+  grid.append(chipGroup('course', 'COURSE', opt.course ?? []));
+  grid.append(chipGroup('race_class', 'CLASS', opt.race_class ?? []));
+  grid.append(chipGroup('distance', 'DISTANCE', opt.distance ?? []));
+  grid.append(chipGroup('going', 'GOING', opt.going ?? []));
+  grid.append(chipGroup('surface', 'SURFACE', opt.surface ?? []));
+  grid.append(chipGroup('jockey', 'JOCKEY', opt.jockey ?? []));
+  grid.append(chipGroup('trainer', 'TRAINER', opt.trainer ?? []));
+  grid.append(chipGroup('pace_style', 'RUNNING STYLE', opt.pace_style ?? []));
+  // Pace and style are different axes — one per race, one per horse per
+  // run — and the design's own worked example, "Closers into a fast pace",
+  // is the two of them combined. They are separate groups, never merged.
+  grid.append(chipGroup('race_pace', 'RACE PACE', opt.race_pace ?? [],
+    { format: (v) => PACE_SHORT[v] ?? v }));
+  host.append(grid);
+
+  // Gate, finish and the numeric ranges. Rating mode is deliberately absent:
+  // `rating` stopped populating in April 2026, so the filter would exclude
+  // every recent run rather than narrow anything. Class is the categorisation.
+  const modes = el('div', 'fp-grid');
+
+  const gate = el('div', 'fp-group');
+  gate.append(el('div', 'fp-k', 'GATE'));
+  const gateRow = el('div', 'fp-chips');
+  gateRow.append(field('draw_min', 'from'));
+  gateRow.append(field('draw_max', 'to'));
+  gate.append(gateRow);
+  modes.append(gate);
+
+  modes.append(modeGroup('FINISH', [
+    ['any', 'Any'], ['won', 'Win'], ['placed', 'Place (1-3)'],
+  ], state.filters.won ? 'won' : state.filters.placed ? 'placed' : 'any',
+  (k) => {
+    delete state.filters.won;
+    delete state.filters.placed;
+    if (k !== 'any') state.filters[k] = true;
+    renderFilterPanel();
+    renderActiveFilters();
+    load();
+  }));
+
+  const fig = el('div', 'fp-group');
+  fig.append(el('div', 'fp-k', 'FIGURE'));
+  const figRow = el('div', 'fp-chips');
+  figRow.append(field('et_min', 'from'));
+  figRow.append(field('et_max', 'to'));
+  fig.append(figRow);
+  modes.append(fig);
+
+  const price = el('div', 'fp-group');
+  price.append(el('div', 'fp-k', 'ODDS'));
+  const priceRow = el('div', 'fp-chips');
+  priceRow.append(field('odds_min', 'from'));
+  priceRow.append(field('odds_max', 'to'));
+  price.append(priceRow);
+  modes.append(price);
+
+  const src = el('div', 'fp-group');
+  src.append(el('div', 'fp-k', 'SOURCE'));
+  const srcRow = el('div', 'fp-chips');
+  (state.vocab.sources ?? []).forEach((v) => {
+    const on = state.source === v;
+    const b = el('button', `fchip${on ? ' on' : ''}`,
+      v === 'race' ? 'Races' : v === 'trial' ? 'Trials' : 'Both');
+    b.type = 'button';
+    b.setAttribute('aria-pressed', String(on));
+    b.addEventListener('click', () => {
+      state.source = v;
+      renderFilterPanel();
+      load();
+    });
+    srcRow.append(b);
   });
-  const box = el('div', 'fp-group');
-  box.append(el('span', 'k', 'SOURCE'));
-  const row = el('div', 'fp-field');
-  row.append(el('label', null, 'runs from'));
-  const sel = el('select');
-  state.vocab.sources.forEach((s) => {
-    const o = el('option', null, s);
-    o.value = s;
-    sel.append(o);
-  });
-  sel.value = state.source;
-  sel.addEventListener('change', () => { state.source = sel.value; load(); });
-  row.append(sel);
-  box.append(row);
-  host.append(box);
+  src.append(srcRow);
+  modes.append(src);
+  host.append(modes);
 
   syncBar();
 }
@@ -288,36 +459,84 @@ function runRow(r) {
   const trial = r.source === 'trial';
   const row = el('div', `lk-row${trial ? ' trial' : ''}`);
   const cell = (cls, text) => row.append(el('div', cls, text ?? DASH));
-  cell('date', r.race_date);
+  cell('date', compactDate(r.race_date));
   cell('r', trial ? 'T' : `R${r.race_no}`);
   cell(null, r.venue);
   cell(null, r.course);
   cell(null, r.surface);
+  cell(null, r.race_class);
   cell('r', r.distance ? `${r.distance}` : DASH);
   cell(null, r.going);
-  cell(null, r.race_class);
   cell('r', r.field_size ? String(r.field_size) : DASH);
+
   const fin = el('div', 'r fin', r.place_display ?? r.place ?? DASH);
   if (r.place === 1) fin.classList.add('win');
   else if (r.placed) fin.classList.add('plc');
   row.append(fin);
+
   const horse = el('div', 'horse', r.horse_name);
   horse.title = r.horse_name;
   row.append(horse);
   cell('r', r.draw ? String(r.draw) : DASH);
+  cell('r', r.actual_weight ? String(r.actual_weight) : DASH);
   cell(null, r.jockey);
   cell(null, r.trainer);
-  // `cell` takes text; a badge is a node, so it is appended directly. This was
-  // plain text here and a coloured badge on every other page — the same run
-  // reading differently depending on where you happened to look at it.
+
   const style = el('div');
   style.append(styleBadge(r.pace_style));
   row.append(style);
+
+  // The sequence through the race: 10 9 6 3 2 is a closer, 4 3 3 3 1 is
+  // on-pace. It is the evidence the style badge is a summary of.
+  cell('pos', positionsText(r.running_positions));
+
+  // Race pace, with its signed deviation. One value per RACE, so it is looked
+  // up by race rather than recomputed per row.
+  const pace = el('div');
+  pace.append(paceCell(state.runs?.pace?.[`${r.race_date}:${r.race_no}`]));
+  row.append(pace);
+
+  // m:ss.xx for a full race time; sectionals stay plain seconds elsewhere.
+  cell('r', r.finish_time_display);
+
+  // Seconds against the race's par. Negative is faster, and it is coloured the
+  // same way a result is not -- this is a measurement, not a win or a loss.
+  const d = r.et_sec_vs_par;
+  const delta = el('div', 'r delta',
+    d == null ? DASH : `${d > 0 ? '+' : MINUS}${Math.abs(d).toFixed(2)}`);
+  if (d != null) delta.classList.add(d <= 0 ? 'faster' : 'slower');
+  row.append(delta);
+
+  cell('r', r.lengths_behind == null ? DASH : num(r.lengths_behind, 2));
   cell('r', r.win_odds ? num(r.win_odds, 1) : DASH);
+  cell('gear', r.gear);
+
   const fig = el('div', 'r', r.et_figure === null || r.et_figure === undefined
     ? DASH : num(r.et_figure, 1));
   if (r.figure_display) fig.title = r.figure_display;
   row.append(fig);
+
+  // Two links out. A figure that cannot be checked against the source is a
+  // number the reader has to take on trust, and the replay is what the trip
+  // tags are a summary of.
+  const rep = el('div', 'c');
+  const rurl = trial ? null : replayUrl(r.race_date, r.race_no);
+  if (rurl) {
+    const a = externalLink(rurl, '\u25b6', 'lk-link');
+    a.title = `replay — ${r.race_date} race ${r.race_no}`;
+    rep.append(a);
+  } else { rep.append(document.createTextNode(DASH)); }
+  row.append(rep);
+
+  const off = el('div', 'c');
+  const hurl = trial ? null : hkjcResultUrl(r.race_date, r.race_no, r.venue);
+  if (hurl) {
+    const a = externalLink(hurl, 'open', 'lk-link');
+    a.title = 'the official result for this race';
+    off.append(a);
+  } else { off.append(document.createTextNode(DASH)); }
+  row.append(off);
+
   return row;
 }
 
