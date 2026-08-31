@@ -19,6 +19,12 @@ dependencies = [
 # openpyxl is needed ONLY by jobs/migrate_legacy.py, which runs once.
 # It must never appear on a hot path — see AGENTS.md, Data rules.
 migrate = ["openpyxl>=3.1"]
+# playwright is needed ONLY by jobs/scrape_odds, because the odds are
+# rendered by JavaScript and no plain HTTP fetch can see them. An extra
+# rather than a dependency: it pulls a ~400MB browser, and every other
+# page in the dashboard works without it.
+#     pip install -e ".[odds]" && playwright install chromium
+odds = ["playwright>=1.40"]
 dev = ["pytest>=8.0", "httpx>=0.27"]
 
 [build-system]

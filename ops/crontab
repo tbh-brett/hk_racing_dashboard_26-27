@@ -42,3 +42,25 @@
 # appear late morning; noon and evening cover a late publication.
 0  12 * * *   python -m hkrd.jobs.scrape_trials --db /data/hkrd.db
 0  20 * * *   python -m hkrd.jobs.scrape_trials --db /data/hkrd.db
+
+# Live odds. A different cadence again, because odds are the only signal here
+# that moves minute to minute — the favourite changes between morning and post
+# time in 44% of races, and every odds-dependent figure on the dashboard is
+# required to read the LATEST snapshot rather than the morning's.
+#
+# Every 15 minutes across the widest window racing plausibly occupies. That is
+# ~46 runs a day and almost all of them do nothing: the job reads the card,
+# finds no meeting today or no race still to run, and returns without opening a
+# browser. Same principle as `nightly` above — the schedule stays dumb so the
+# race calendar lives in one place, which is the database.
+#
+# A race is dropped 30 minutes after its off time. Its price cannot move again,
+# and this is the one table nothing prunes, so re-capturing a settled market
+# would grow it forever without recording a single new fact.
+# NOT ARMED YET. The image carries no browser, so this line would fail every
+# 15 minutes -- loud, useless noise rather than a working capture. Uncomment
+# once the Dockerfile installs playwright and chromium (~400MB, and chromium
+# wants roughly 512MB of RAM while it runs, so revisit the Fly machine size
+# at the same time). Until then it runs on the PC by hand:
+#     .\.venv\Scripts\python -m hkrd.jobs.scrape_odds
+# */15 12-23 * * *   python -m hkrd.jobs.scrape_odds --db /data/hkrd.db

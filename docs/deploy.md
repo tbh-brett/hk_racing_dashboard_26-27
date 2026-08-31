@@ -356,11 +356,37 @@ cookie is signed with the password as the key, so a changed password makes
 every outstanding cookie fail its signature check. That is the logout-everywhere
 button.
 
-### What is not deployed
+### Live odds
 
-Live odds capture. `ingest/odds.py` parses a snapshot payload but nothing
-fetches one on a schedule yet, so `odds_snapshots` only holds what the legacy
-import brought over. Every odds-dependent figure therefore reads the last
-snapshot the archive has, not the current market. Worth building before the
-season proper; it is the one gap between what is scheduled and what the pages
-assume.
+`hkrd.jobs.scrape_odds` runs every 15 minutes between 12:00 and 23:59 Hong Kong
+time. It is the one job that needs a browser: odds are rendered by JavaScript on
+`bet.hkjc.com`, so Playwright drives a real Chromium, which is the single
+sanctioned use of a browser in this codebase.
+
+Almost every run does nothing. The job reads the card first: no meeting today,
+or no race still to run, and it returns without launching anything. A race is
+dropped 30 minutes past its off time, because its price cannot move again and
+`odds_snapshots` is the one table nothing prunes.
+
+Two failure modes are worth knowing, because both were real in the old scraper:
+
+**Stale DOM.** The betting site is a single-page app, and after routing to a new
+race the previous race's table can still be on screen. The job fingerprints the
+rendered page and, if the fingerprint has not changed, waits and then forces a
+reload. If it still has not changed, the race is **skipped and reported**, not
+stored — storing it would file race 3's prices under race 4's number in the one
+table that cannot be rebuilt. `1 SKIPPED` in the run line is this.
+
+**A changed page shape.** The parser finds the win/place table by its header
+text and raises if that header is absent, rather than returning an empty list.
+An empty list is indistinguishable from a race with no market, and that
+ambiguity is what let a parser put a trainer's name in the horse column for
+three days.
+
+Run it by hand for one meeting:
+
+```powershell
+.\.venv\Scripts\python -m hkrd.jobs.scrape_odds --date 2026-07-15
+```
+
+Add `--headed` to watch the browser when a capture is coming back empty.
