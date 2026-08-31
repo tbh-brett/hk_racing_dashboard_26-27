@@ -7,7 +7,12 @@ Rebuild of the previous Streamlit dashboard (`tbh-brett/hk_race_dashboard`), whi
 It is written in plain English: one command to open the dashboard, and what the
 hosting is for.
 
-**If you are an AI agent working on this, read `AGENTS.md` first.** It is the working
+**If you are an AI agent picking this up fresh, read
+[`docs/handover.md`](docs/handover.md) first** — it says what is built, what is
+missing, which decisions are already settled, and the one file you need to ask
+the owner for before writing anything.
+
+**Then read `AGENTS.md`.** It is the working
 contract, and `tests/test_smoke.py` enforces the parts of it that can be checked
 mechanically.
 
