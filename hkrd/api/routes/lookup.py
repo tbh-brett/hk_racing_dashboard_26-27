@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
 
-from hkrd.query import (formguide as fg_q, lookup as lookup_q,
+from hkrd.query import (lookup as lookup_q, pace as pace_q,
                         slices as slices_q)
 
 router = APIRouter()
@@ -49,7 +49,7 @@ def lookup(request: Request, source: str = "race", limit: int = 500,
     # the result set rather than once per row. Brief 08 §4 wants the label and
     # its signed deviation together -- "Sl.Fast (-0.25)" -- because the number
     # is what makes the label checkable.
-    pace = fg_q.race_pace_bulk([(r.race_date, r.race_no) for r in runs])
+    pace = pace_q.race_pace_bulk([(r.race_date, r.race_no) for r in runs])
     return {"runs": [r.to_dict() for r in runs], "count": len(runs),
             "filters": filters, "source": source,
             "pace": {f"{d}:{n}": v for (d, n), v in pace.items()},

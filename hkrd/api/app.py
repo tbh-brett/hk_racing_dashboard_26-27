@@ -15,7 +15,8 @@ from hkrd.api import auth, routes
 from hkrd.query import (blackbook as bb_q, formguide as fg_q,
                         health as health_q, market as market_q, model,
                         race as race_q, raceday as raceday_q,
-                        vet as vet_q, freshness as fresh_q)
+                        vet as vet_q, freshness as fresh_q,
+                        pace as pace_q)
 
 WEB = Path(__file__).resolve().parent.parent.parent / "web"
 
@@ -154,6 +155,15 @@ def form_guide(date: str, race_no: int, history: int = 6) -> dict:
     # as first-time. Design note 03 §3.
     out["gear_first"] = fg_q.gear_timeline(
         [r.horse_name for r in guide.race.runners], before=date)
+
+    # How fast away each run was, standardised inside its own race. The old
+    # dashboard's ESZ column and the design's "JUMP z". Computed for every run
+    # on screen in one pass rather than per row.
+    keys = {(r.race_date, r.race_no) for r in guide.race.runners}
+    for runs in guide.history.values():
+        keys |= {(r.race_date, r.race_no) for r in runs}
+    out["esz"] = {f"{d}:{n}:{h}": v
+                  for (d, n, h), v in pace_q.early_speed_z(sorted(keys)).items()}
     return out
 
 
@@ -164,7 +174,7 @@ def race_pace(date: str, race_no: int) -> dict:
     Measured from the race's own sectionals where it has been run; projected
     from the field's running styles where it has not, and flagged as such.
     """
-    out = fg_q.race_pace(date, race_no)
+    out = pace_q.race_pace(date, race_no)
     if not out["field_size"]:
         raise HTTPException(404, f"no race {race_no} on {date}")
     return out

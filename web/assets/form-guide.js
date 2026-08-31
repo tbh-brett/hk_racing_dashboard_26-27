@@ -10,7 +10,8 @@
  * one run's sectionals and the quality of the race it came from.
  */
 import { api, num, signed } from './api.js';
-import { el, $, DASH, renderNav, styleClass, styleOrdinal } from './vocab.js';
+import { el, $, DASH, MINUS, renderNav, styleClass, styleOrdinal,
+         replayUrl, externalLink, compactDate } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 import { conditionLabel, loadTags, renderReview } from './review.js';
@@ -347,6 +348,16 @@ function trialBand(runner) {
     txt.title = `${t.quality_band}${t.quality_reasons.length
       ? ` — ${t.quality_reasons.join('; ')}` : ''}`;
     row.append(txt);
+
+    // The footage the mark is a summary of. A ++ nobody can watch is a score
+    // taken on trust, which is the opposite of how every other figure here is
+    // treated.
+    const turl = replayUrl(t.trial_date, t.trial_no);
+    if (turl) {
+      const play = externalLink(turl, '▶', 'icon play');
+      play.title = `trial replay — ${t.trial_date} batch ${t.trial_no}`;
+      row.append(play);
+    }
     band.append(row);
   });
   return band;
@@ -406,7 +417,9 @@ function runRow(runner, run, index) {
 
   const when = el('div', 'when');
   when.append(el('span', 'caret', open ? '▼' : '▶'));
-  when.append(el('span', null, run.race_date));
+  // One date format, defined once — brief 08 §1. An ISO date on screen is
+  // a storage format that escaped.
+  when.append(el('span', null, compactDate(run.race_date)));
   when.append(el('span', 'cond', conditionLabel(run)));
   row.append(when);
 
@@ -469,6 +482,17 @@ function runRow(runner, run, index) {
   pen.title = note ? note.note : 'note on this run';
   pen.addEventListener('click', (e) => { e.stopPropagation(); showNote(e, runner, run); });
   marks.append(pen);
+
+  // Watch the run. Design note 04 §4 asks for a play control per run and gives
+  // the URL pattern; it earns its keep most on the rows a trip tag flags,
+  // because that is the moment you want to see what actually happened.
+  const url = replayUrl(run.race_date, run.race_no);
+  if (url) {
+    const play = externalLink(url, '▶', 'icon play');
+    play.title = `replay — ${run.race_date} race ${run.race_no}`;
+    play.addEventListener('click', (e) => e.stopPropagation());
+    marks.append(play);
+  }
   trail.append(marks);
 
   row.append(trail);
@@ -569,7 +593,20 @@ function runDetail(runner, run) {
     return d;
   };
   const first = positions[0];
+  // JUMP is where it was at the first call; ESZ is how fast it got there,
+  // standardised inside this race. The position alone cannot tell a slow
+  // beginner from one that was simply drawn wide in a fast-run race.
+  const esz = state.guide?.esz?.[`${run.race_date}:${run.race_no}:${run.horse_no}`];
   facts.append(fact('JUMP', first ? `P${first}` : null));
+  const eszFact = fact('ESZ', esz == null ? null
+    : `${esz > 0 ? '+' : MINUS}${Math.abs(esz).toFixed(2)}`);
+  if (esz != null) {
+    eszFact.classList.add(esz >= 0 ? 'esz-fast' : 'esz-slow');
+    eszFact.title = esz >= 0
+      ? 'faster away than this race\u2019s field, in standard deviations'
+      : 'slower away than this race\u2019s field, in standard deviations';
+  }
+  facts.append(eszFact);
   facts.append(fact('LANE', (run.lane_notes ?? []).join(' · ') || null));
   facts.append(fact('GEAR', run.gear || null));
   facts.append(fact('SARR', run.sarr === null || run.sarr === undefined

@@ -7,7 +7,10 @@
  */
 
 :root {
-  --fg-grid: 34px 182px 76px 26px 86px 80px 32px 52px 164px 1fr;
+  /* Widened with the type. The columns were measured against 9px text and
+     truncated their own headers at 10px — the density was winning over the
+     legibility it exists to serve. */
+  --fg-grid: 36px 194px 82px 30px 94px 92px 36px 58px 196px 1fr;
 }
 
 /* ── strip additions ─────────────────────────────────────────────────────── */
@@ -67,7 +70,7 @@
 /* Gear that changed since the previous run, and gear applied for the first
    time — design note 03 §3 asks for both, and the second distinctly. */
 .gear-flag {
-  font-size: 9px; padding: 0 3px; margin-left: 4px; white-space: nowrap;
+  font-size: var(--fs-xs); padding: 0 3px; margin-left: 4px; white-space: nowrap;
   color: var(--gear); border: 1px solid var(--violet-ground);
 }
 .gear-flag.first { color: var(--gear-first); border-color: var(--gear); }
@@ -99,7 +102,7 @@
 }
 .fg-head button:hover { color: var(--text); background: var(--surface-2); }
 .fg-head button[aria-sort] { color: var(--text); background: var(--surface-2); }
-.fg-head .ind { font-size: 8px; color: var(--edge); margin-left: 4px; }
+.fg-head .ind { font-size: var(--fs-xs); color: var(--edge); margin-left: 4px; }
 .fg-head .r, .fg-row .r { text-align: right; }
 .fg-head .c, .fg-row .c { text-align: center; }
 
@@ -115,7 +118,7 @@
 .fg-row > * { padding: 0 8px; min-width: 0; }
 .fg-row .no { padding: 0 6px; text-align: center; font-size: var(--fs); font-weight: 600; }
 .fg-row .name-cell { display: flex; align-items: baseline; gap: 6px; }
-.fg-row .caret { font-size: 9px; width: 7px; color: var(--text-faint); }
+.fg-row .caret { font-size: var(--fs-xs); width: 7px; color: var(--text-faint); }
 .fg-row.open .caret { color: var(--edge); }
 .fg-row .nm { font-size: var(--fs); font-weight: 600; white-space: nowrap; }
 .fg-row .nm.booked { color: var(--book); }
@@ -126,7 +129,7 @@
 }
 .fg-row .trainer.changed { background: var(--violet-ground); color: var(--violet); font-weight: 600; }
 .fg-row .wt { padding: 0 6px; text-align: right; color: var(--text-2); }
-.fg-row .odds { text-align: right; font-size: 14px; font-weight: 600; }
+.fg-row .odds { text-align: right; font-size: 15px; font-weight: 600; }
 
 /* The six-figure sequence, newest left, with the trend as a tint under it.
    A trend drawn as a line would claim more precision than six figures carry. */
@@ -202,7 +205,7 @@
 
 .run-head {
   height: 22px; background: var(--surface); border-bottom: 1px solid var(--line-2);
-  font-size: 9px; letter-spacing: .09em; color: var(--text-faint);
+  font-size: var(--fs-xs); letter-spacing: .09em; color: var(--text-faint);
 }
 /* A label that wraps grows past the 22px row and hangs over the run beneath
    it, swallowing that run's clicks. Clip instead. */
@@ -219,7 +222,7 @@
 .run-row > * { padding: 0 8px; min-width: 0; }
 .run-row .n { padding: 0 6px; text-align: center; color: var(--text-faint); }
 .run-row .when { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
-.run-row .when .caret { font-size: 8px; width: 7px; color: var(--text-faint); }
+.run-row .when .caret { font-size: var(--fs-xs); width: 7px; color: var(--text-faint); }
 .run-row .when .cond { color: var(--text-muted); }
 .run-row .dr { padding: 0 4px; text-align: center; color: var(--text-2); }
 .run-row .jockey, .run-row .trainer {
@@ -267,12 +270,12 @@
 }
 .run-detail .left { flex: 1; min-width: 0; padding: 9px 12px 10px; border-right: 1px solid var(--line-2); }
 .run-detail .cap {
-  font-family: var(--font-mono); font-size: 9px; letter-spacing: .1em;
+  font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .1em;
   color: var(--text-faint); margin-bottom: 6px;
 }
 .splits { display: flex; gap: 4px; }
 .split-box { flex: 1; border: 1px solid var(--box-rule); background: var(--box); padding: 4px 6px; }
-.split-box .seg { font-family: var(--font-mono); font-size: 9px; color: var(--text-faint); letter-spacing: .06em; }
+.split-box .seg { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint); letter-spacing: .06em; }
 .split-box .val { display: flex; align-items: baseline; gap: 6px; margin-top: 2px; }
 .split-box .t { font-family: var(--font-mono); font-size: var(--fs); font-weight: 600; }
 .split-box .p { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted); }

@@ -25,6 +25,7 @@ from typing import Any
 from hkrd.derive import sectionals as sx
 from hkrd.query import bets as bets_q
 from hkrd.query import formguide as fg_q
+from hkrd.query import pace as pace_q
 from hkrd.query.race import get_race
 from hkrd.store.connect import Connection, get_conn
 
@@ -208,7 +209,7 @@ def race_result(date: str, race_no: int, *, conn: Connection | None = None
         body["dividends"] = dividends(date, race_no, conn=conn)
         body["stewards"] = stewards(date, race_no, conn=conn)
         body["money"] = race_money(date, race_no, conn=conn)
-        body["pace"] = fg_q.race_pace(date, race_no, conn=conn)
+        body["pace"] = pace_q.race_pace(date, race_no, conn=conn)
         # The retrospective: what the first five did NEXT. Provisional by
         # construction -- those runs may not have happened yet.
         quality = fg_q.race_quality(date, race_no, conn=conn)

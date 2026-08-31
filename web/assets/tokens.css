@@ -178,7 +178,11 @@
   /* ── type ──────────────────────────────────────────────────────────── */
   --font: 'IBM Plex Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
-  --fs-xs: 9px;  --fs-sm: 11px;  --fs: 12px;  --fs-md: 13px;
+  /* Raised one step across the board. The pages lean hard on --fs-xs, and at
+     9px a dense grid is compact and unreadable — which is the wrong half of
+     the trade the density was made for. One scale, so a page cannot quietly
+     grow a second one. */
+  --fs-xs: 10px; --fs-sm: 12px; --fs: 13px;  --fs-md: 14px;
 
   /* ── spacing: one scale ────────────────────────────────────────────── */
   --sp-1: 4px; --sp-2: 6px; --sp-3: 9px; --sp-4: 14px; --sp-5: 16px; --sp-6: 24px;

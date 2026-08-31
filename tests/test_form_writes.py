@@ -11,6 +11,7 @@ import pytest
 
 from hkrd.jobs import write_notes
 from hkrd.query import formguide as fg
+from hkrd.query import pace as pace_q
 from hkrd.store import upsert
 from hkrd.store.connect import get_conn, init_db, transaction
 
@@ -50,7 +51,7 @@ def test_pace_is_projected_from_the_field_not_measured(db):
     """A race that has not been run has no sectionals; its pace can only come
     from who is in it."""
     conn = get_conn(db)
-    p = fg.race_pace("2026-06-01", 1, conn=conn)
+    p = pace_q.race_pace("2026-06-01", 1, conn=conn)
     conn.close()
     # 2 leaders + 2 on-pace over 9 classified = (2 + 1) / 9
     assert p["pressure"] == pytest.approx(3 / 9, abs=1e-3)
@@ -63,7 +64,7 @@ def test_an_unclassified_runner_is_excluded_not_counted_as_slow(db):
     """Dividing by the whole field would make every thin field look slow —
     missing evidence read as evidence of no pace."""
     conn = get_conn(db)
-    p = fg.race_pace("2026-06-01", 1, conn=conn)
+    p = pace_q.race_pace("2026-06-01", 1, conn=conn)
     conn.close()
     assert p["field_size"] == 10 and p["unknown"] == 1
     assert p["pressure"] == pytest.approx(3 / 9, abs=1e-3)   # 9, not 10
@@ -73,7 +74,7 @@ def test_a_mostly_unclassified_field_is_not_confident(db):
     conn = get_conn(db)
     with transaction(conn):
         conn.execute("DELETE FROM runner_pace WHERE horse_no > 3")
-    p = fg.race_pace("2026-06-01", 1, conn=conn)
+    p = pace_q.race_pace("2026-06-01", 1, conn=conn)
     conn.close()
     assert p["band"] is not None      # still projected
     assert p["confident"] is False    # but flagged as thin
@@ -84,7 +85,7 @@ def test_a_field_with_no_styles_at_all_reads_nothing(db):
     conn = get_conn(db)
     with transaction(conn):
         conn.execute("DELETE FROM runner_pace")
-    p = fg.race_pace("2026-06-01", 1, conn=conn)
+    p = pace_q.race_pace("2026-06-01", 1, conn=conn)
     conn.close()
     assert p["band"] is None and p["pressure"] is None
     assert p["unknown"] == p["field_size"] == 10
@@ -201,7 +202,7 @@ def test_a_source_run_with_no_date_still_records_the_race(db):
 def test_the_pace_scale_is_the_one_the_brief_specifies():
     """Design note 03 §7 names the five steps. An earlier version invented
     CRAWL/SLOW/EVEN/STRONG/HOT — a different scale wearing the same shape."""
-    assert fg.PACE_BANDS == ("Very Slow", "Slow", "Neutral", "Fast", "Very Fast")
+    assert pace_q.PACE_BANDS == ("Very Slow", "Slow", "Neutral", "Fast", "Very Fast")
 
 
 def test_a_run_race_is_measured_not_projected(db):
@@ -226,7 +227,7 @@ def test_a_run_race_is_measured_not_projected(db):
             "pace_style, derive_version) VALUES ('2026-06-01', 1, ?, ?, ?, 't')",
             [(h, 22.9, "Leader") for h in range(1, 11)])
 
-    p = fg.race_pace("2026-06-01", 1, conn=conn)
+    p = pace_q.race_pace("2026-06-01", 1, conn=conn)
     conn.close()
     assert p["measured"] is True
     assert p["z"] < -1.2 and p["band"] == "Very Fast"
@@ -241,7 +242,7 @@ def test_too_few_comparable_races_falls_back_rather_than_inventing_a_z(db):
             "INSERT INTO runner_pace (race_date, race_no, horse_no, early_pace, "
             "pace_style, derive_version) VALUES ('2026-06-01', 1, ?, 23.0, ?, 't')",
             [(h, "Leader") for h in range(1, 11)])
-    p = fg.race_pace("2026-06-01", 1, conn=conn)
+    p = pace_q.race_pace("2026-06-01", 1, conn=conn)
     conn.close()
     assert p["measured"] is False          # projected from styles instead
     assert p["z"] is None
