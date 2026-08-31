@@ -162,3 +162,20 @@ def test_a_real_window_reports_observed_movement(db):
     conn.close()
     assert all(m["observed"] is True for m in moves)
     assert moves[0]["window_minutes"] > market.MIN_WINDOW_MINUTES
+
+
+def test_a_tz_aware_capture_does_not_crash_the_age():
+    """`ingest/odds.py` stores `scraped_at` verbatim and only checks it parses.
+
+    A scraper emitting "...+08:00" is therefore accepted at ingest and used to
+    reach here, where subtracting it from a naive race-day clock raised
+    TypeError -- taking concentration, and every pre-bet panel reading it, down.
+    """
+    naive = market.snapshot_age_hours("2026-07-15", "2026-07-15T09:00:00")
+    aware = market.snapshot_age_hours("2026-07-15", "2026-07-15T09:00:00+08:00")
+    assert naive == aware == 4.0
+
+
+def test_a_capture_in_another_offset_lands_on_the_hong_kong_clock():
+    """01:00 UTC is 09:00 in Hong Kong, four hours before the 13:00 reference."""
+    assert market.snapshot_age_hours("2026-07-15", "2026-07-15T01:00:00+00:00") == 4.0

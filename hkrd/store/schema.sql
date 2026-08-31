@@ -359,6 +359,48 @@ CREATE TABLE IF NOT EXISTS job_runs (
 
 CREATE INDEX IF NOT EXISTS ix_job_runs_recent ON job_runs(job, started_at DESC);
 
+-- ── bet entry ────────────────────────────────────────────────────────────────
+-- Design brief 06 Part 2 and 07 §3. A guardrail FLAGS, it never blocks, and the
+-- override is the useful record: "reviewing which flags were overridden and how
+-- those bets performed is a genuine analysis, and it's only possible if the
+-- override is logged rather than the bet blocked." So a fired guardrail that the
+-- user went past writes a row here, keyed to the bet it was fired against.
+CREATE TABLE IF NOT EXISTS bet_overrides (
+  bet_id        TEXT    NOT NULL,
+  flag          TEXT    NOT NULL,        -- raceday_ceiling | max_combinations | ...
+  detail        TEXT,                    -- what the flag said at the time
+  overridden_at TEXT    NOT NULL,        -- ISO-8601 UTC
+  PRIMARY KEY (bet_id, flag),
+  FOREIGN KEY (bet_id) REFERENCES bets(bet_id)
+);
+
+-- The thresholds those guardrails read. One row per key so a value can change
+-- without a migration, and so the interface can show what it is warning against
+-- rather than asserting a number the user never set.
+CREATE TABLE IF NOT EXISTS bet_settings (
+  key        TEXT PRIMARY KEY,           -- raceday_ceiling | max_combinations
+  value      REAL NOT NULL,
+  updated_at TEXT
+);
+
+-- Which thesis a bet was placed ON, recorded at entry rather than inferred.
+-- backed-versus-missed already derives a link structurally, from the selection
+-- join: that answers "was this booked horse backed". This answers a different
+-- question -- "was this bet placed BECAUSE of that entry" -- and only the user
+-- knows it, so it is captured when the ticket is built or not at all.
+-- A separate table rather than a column on `bets`: the schema is applied as
+-- CREATE ... IF NOT EXISTS, so a new column would never reach a database that
+-- already has the table, while a new table does.
+CREATE TABLE IF NOT EXISTS bet_blackbook_links (
+  bet_id   TEXT NOT NULL,
+  entry_id TEXT NOT NULL,
+  PRIMARY KEY (bet_id, entry_id),
+  FOREIGN KEY (bet_id) REFERENCES bets(bet_id),
+  FOREIGN KEY (entry_id) REFERENCES blackbook(id)
+);
+
+CREATE INDEX IF NOT EXISTS ix_bets_account_date ON bets(account, race_date);
+
 -- ── indexes ──────────────────────────────────────────────────────────────────
 -- History is looked up by horse across dates constantly (form guide, lookup,
 -- horse page); the meeting index serves race day.

@@ -15,21 +15,26 @@ systematic under-covering of exactly the races a top-3 box performs best in.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from hkrd.derive.probability import devig
+from hkrd.derive.probability import devig, pair_probability, place_probability
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["concentration", "band", "price_movement", "odds_coverage",
            "latest_prices", "snapshot_age_hours", "STALE_AFTER_HOURS",
-           "MIN_WINDOW_MINUTES", "warm"]
+           "MIN_WINDOW_MINUTES", "warm", "place_probabilities",
+           "ranked_pairs", "PLACE_PAYING_FIELD"]
 
 # A price captured well before the off is not the price the rule was measured
 # on. Concentration moves from a mean of 0.539 in the morning to 0.637 at post
 # time, so a figure computed from a stale snapshot understates it and
 # under-covers exactly the races a top-3 box performs best in.
 STALE_AFTER_HOURS = 3.0
+
+# Race dates are plain dates and their times are Hong Kong local. Named so a
+# tz-aware capture lands on the same clock rather than eight hours out.
+_HKT = timezone(timedelta(hours=8))
 
 # Two captures closer together than this observed nothing. Reporting 0%
 # movement from them claims the market held steady, which is a different
@@ -51,6 +56,14 @@ def snapshot_age_hours(race_date: str, captured_at: str | None) -> float | None:
         raceday = datetime.fromisoformat(f"{race_date}T13:00:00")
     except ValueError:
         return None
+    # `ingest/odds.py` stores the scraper's `scraped_at` verbatim and validates
+    # only that it parses, so a snapshot can arrive tz-aware ("...+08:00") or
+    # naive. `race_date` is a plain date whose 13:00 is Hong Kong local, so an
+    # aware capture is converted into that clock rather than subtracted across
+    # kinds -- which raised TypeError and took the concentration figure, and
+    # every pre-bet panel reading it, down with it.
+    if captured.tzinfo is not None:
+        captured = captured.astimezone(_HKT).replace(tzinfo=None)
     return round((raceday - captured).total_seconds() / 3600.0, 1)
 
 
@@ -238,3 +251,75 @@ def warm() -> None:
     query/ and must not import derive/ itself.
     """
     devig([2.0, 3.0, 4.0])
+
+
+# HKJC pays three places in fields of seven or more, two below that. The
+# transform depends on it, so it is named once here rather than inlined at each
+# call site with a different guess.
+PLACE_PAYING_FIELD = 7
+
+
+def place_probabilities(date: str, race_no: int, *, at: str = "latest",
+                        conn: Connection | None = None) -> dict[str, Any]:
+    """P(top three) per runner, and what the 3× rule of thumb would have said.
+
+    The correct transform is Harville with the Henery discount. The linear one
+    -- `p / sum(p) * 3` -- is not a transform at all, and on a real card it
+    overstates a short-priced banker by around 34 points: it will tell you a
+    horse places 94.5% of the time when the honest figure is 60.3%.
+
+    Both are returned deliberately. Design brief 06 Part 2 puts them side by
+    side on the pre-bet panel, and a wrong number the user can SEE being wrong
+    is worth more than one that was quietly corrected, because the rule of thumb
+    is the thing they would otherwise reach for.
+    """
+    prices = latest_prices(date, race_no, at=at, conn=conn)
+    live = [p for p in prices if p["win_odds"]]
+    if len(live) < 2:
+        return {"race_date": date, "race_no": race_no, "runners": [],
+                "captured_at": None, "places": None,
+                "note": "fewer than two priced runners"}
+
+    odds = [p["win_odds"] for p in live]
+    places = 3 if len(live) >= PLACE_PAYING_FIELD else 2
+    win = devig(odds)
+    harville = place_probability(odds, places=places)
+    # The rule of thumb, reproduced exactly as it is usually applied so the
+    # comparison is honest: win probability scaled by the number of places.
+    linear = [min(1.0, float(w) * places) for w in win]
+
+    runners = []
+    for p, w, hv, ln in zip(live, win, harville, linear):
+        runners.append({
+            "horse_no": p["horse_no"],
+            "win_odds": p["win_odds"], "place_odds": p["place_odds"],
+            "win_pct": round(100 * float(w), 1),
+            "place_pct": round(100 * float(hv), 1),
+            "linear_pct": round(100 * ln, 1),
+            "gap_points": round(100 * (ln - float(hv)), 1),
+        })
+    return {"race_date": date, "race_no": race_no,
+            "captured_at": live[0]["captured_at"], "places": places,
+            "field_priced": len(live), "runners": runners}
+
+
+def ranked_pairs(date: str, race_no: int, *, top: int = 5, at: str = "latest",
+                 conn: Connection | None = None) -> list[dict[str, Any]]:
+    """The most likely quinella pairs, best first.
+
+    Ranking pairs is worth about +25 ROI points over taking them at random
+    within the pool. It does not clear the ~17.5% takeout -- nothing here does
+    -- but it is the right way to choose which combinations to take, and the
+    design shows it next to the ticket so the chosen set can be compared
+    against the ranking rather than assumed to match it.
+    """
+    prices = latest_prices(date, race_no, at=at, conn=conn)
+    live = [p for p in prices if p["win_odds"]]
+    if len(live) < 2:
+        return []
+    pairs = pair_probability([p["win_odds"] for p in live])
+    ordered = sorted(pairs.items(), key=lambda kv: kv[1], reverse=True)[:top]
+    return [{"rank": i + 1,
+             "horse_nos": [live[a]["horse_no"], live[b]["horse_no"]],
+             "prob": round(100 * prob, 1)}
+            for i, ((a, b), prob) in enumerate(ordered)]
