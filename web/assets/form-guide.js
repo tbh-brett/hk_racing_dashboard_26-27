@@ -11,7 +11,7 @@
  */
 import { api, num, signed } from './api.js';
 import { el, $, DASH, MINUS, renderNav, styleClass, styleOrdinal,
-         replayUrl, externalLink, compactDate } from './vocab.js';
+         replayUrl, externalLink, compactDate, tripTags } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 import { conditionLabel, loadTags, renderReview } from './review.js';
@@ -199,7 +199,10 @@ function flagsFor(runner) {
   const runs = history(runner);
   const last = runs[0];
   if (last?.tags?.length) {
-    const trip = last.tags.filter((t) => t !== 'sampling' && t !== 'vet_routine');
+    // `tripTags` is the rule. Written out here it kept only two of the four
+    // routine tags, so this flag fired on a run where the stewards reported
+    // nothing at all.
+    const trip = tripTags(last.tags);
     if (trip.length) out.push({ kind: 'trip', text: 'TRIP', title: trip.join(' · ') });
   }
   const race = state.guide?.race;
@@ -391,7 +394,8 @@ function h2hBand(runner) {
 const RUN_HEAD = [
   ['RUN', 'c'], ['DATE · TRK CRS DIST GOING CL', ''], ['STYLE', ''], ['DR', 'c'],
   ['JOCKEY', ''], ['TRAINER', ''], ['WT', 'r'], ['FIN', 'r'],
-  ['FIGURE · MARGIN · TIME', ''], ['PACE · GEAR · POSITIONS · TRIP · NOTE', ''],
+  ['FIGURE · MARGIN · TIME · PLACE DIV', ''],
+  ['PACE · GEAR · POSITIONS · TRIP · BB · NOTE · VID', ''],
 ];
 
 function runKey(horseNo, run) {
@@ -452,6 +456,15 @@ function runRow(runner, run, index) {
   fg.append(el('span', `len ${figCls}`, run.lengths_behind === null
     || run.lengths_behind === undefined ? DASH : `${run.lengths_behind.toFixed(2)}L`));
   fg.append(el('span', 't', run.finish_time_display ?? DASH));
+  // What a $10 place ticket on this run paid. A placed run at 4.5 and a placed
+  // run at 60 are not the same result, and FIN alone hides the difference —
+  // which is why the design puts the dividend on the line beside it. Blank,
+  // not a dash, when the horse did not place: there was no ticket to pay.
+  if (run.place_dividend !== null && run.place_dividend !== undefined) {
+    const div = el('span', 'plc-div', `$${run.place_dividend.toFixed(1)}`);
+    div.title = `place dividend, per $10 — ${run.race_date} race ${run.race_no}`;
+    fg.append(div);
+  }
   row.append(fg);
 
   const trail = el('div', 'trail');

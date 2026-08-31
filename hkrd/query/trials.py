@@ -92,6 +92,11 @@ def _runner(row, field_size: int, best: float | None) -> dict[str, Any]:
         "finish_time": row["finish_time"], "margin": margin,
         "venue": row["venue"], "surface": row["surface"],
         "gear": row["gear"], "comment": row["comment_text"],
+        # Scraped since the first trials run, stored on every row, and dropped
+        # here until now — so the page could not show a draw or a jockey even
+        # though both were sitting in the table. The design asks for both.
+        "draw": _column(row, "draw"), "jockey": _column(row, "jockey"),
+        "trainer": _column(row, "trainer"), "going": _column(row, "going"),
         "section_times": list(_split(row["section_times"], float)),
         "running_positions": list(_split(row["running_positions"], int)),
         "field_size": field_size,

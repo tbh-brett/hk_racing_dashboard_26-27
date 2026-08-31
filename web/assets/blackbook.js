@@ -47,7 +47,7 @@ const state = {
   view: 'list', entries: [], tags: [], summary: null, tagMeta: null,
   search: '', tag: null, status: 'all', range: 'all', today: null,
   todayOnly: false, declared: new Set(), open: new Set(), details: {},
-  backedMissed: null, account: null,
+  backedMissed: null, account: null, tagBvm: null,
   sort: 'added', sortDir: -1, busy: new Set(),
 };
 
@@ -662,6 +662,38 @@ function aeCell(t) {
   return cell;
 }
 
+/** One tag's backed-versus-missed reading, or a why-not when it has none. */
+function tagBackedVsMissed(d) {
+  const box = el('div', 'bvm');
+  if (!d || !d.runs) {
+    box.append(el('span', 'none', 'NO RUNS SINCE BOOKING'));
+    return box;
+  }
+  const side = (roi, runs, cls) => {
+    const s = el('span', cls);
+    // "36 runs · −15.0%". Without the unit and the separator the two numbers
+    // ran together and read as one — "36-15.0%".
+    s.append(el('span', 'n', `${runs} run${runs === 1 ? '' : 's'}`));
+    s.append(el('span', 'v', roi === null || roi === undefined
+      ? DASH : signedPct(roi)));
+    return s;
+  };
+  box.append(side(d.backed_roi, d.backed_runs, 'backed'));
+  box.append(el('span', 'v-sep', 'v'));
+  box.append(side(d.missed_roi, d.missed_runs, 'missed'));
+  // The gap is the finding. A tag whose MISSED side outperforms is one the
+  // book is right about and the ledger is not — brief 06's whole argument,
+  // read one reason at a time.
+  if (d.gap !== null && d.gap !== undefined) {
+    const note = el('span', `gap ${d.gap >= 0 ? 'pos' : 'neg'}`,
+      d.gap >= 0 ? 'backed ahead' : 'missed ahead');
+    note.title = `${signedPct(d.gap)} between the two sides`;
+    box.append(note);
+  }
+  box.title = d.verdict ?? '';
+  return box;
+}
+
 function renderAnalysis() {
   const meta = state.tagMeta ?? {};
   const rows = [...state.tags].sort((a, b) => b.runs - a.runs);
@@ -695,7 +727,12 @@ function renderAnalysis() {
     roi.title = `${t.priced_runs} runs carried a price`;
     row.append(roi);
 
-    row.append(el('div', 'def', t.definition ?? meta[t.tag] ?? ''));
+    // BACKED vs MISSED per booking reason — the artboard's own last column.
+    // "Runs I booked for trip trouble and then did not back" is a sharper
+    // question than the same one over the whole book, because it names the
+    // reason the entry was made. The definition has not been dropped: it is
+    // the tag label's hover, two columns to the left, where it always was.
+    row.append(tagBackedVsMissed(state.tagBvm?.[t.tag]));
     return row;
   }));
 
@@ -935,7 +972,8 @@ async function init() {
   state.today = latest;
 
   try {
-    const [list, tags, summary, declared, backedMissed] = await Promise.all([
+    const [list, tags, summary, declared, backedMissed, tagBvm]
+      = await Promise.all([
       api.blackbook(),
       api.blackbookTags(),
       api.blackbookSummary(latest),
@@ -944,6 +982,10 @@ async function init() {
               latest ? api.blackbookDeclared(latest).catch(() => ({ entries: [] }))
         : Promise.resolve({ entries: [] }),
       api.backedVsMissed().catch(() => null),
+      // A per-tag pass over the ledger. Failing it must not take the page
+      // down: the column reads "no runs since booking" and everything else
+      // on the analysis view still renders.
+      api.tagsBackedVsMissed().catch(() => ({ tags: {} })),
     ]);
     state.entries = list.entries;
     state.tags = tags.tags;
@@ -954,6 +996,7 @@ async function init() {
       tags.tags.map((t) => [t.tag, t.definition]).filter(([, d]) => d));
     state.summary = summary;
     state.backedMissed = backedMissed;
+    state.tagBvm = tagBvm?.tags ?? {};
     state.declared = new Set(declared.entries.map((d) => d.horse_name));
   } catch (e) {
     $('entries').replaceChildren(el('div', 'no-match', `failed to load: ${e.message}`));

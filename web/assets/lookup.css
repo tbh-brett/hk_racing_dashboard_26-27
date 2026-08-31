@@ -246,8 +246,8 @@
 .ol-note b { color: var(--text-2); font-weight: 600; }
 .ol-head, .ol-row {
   display: grid; align-items: center;
-  grid-template-columns: 88px 34px minmax(150px, 1fr) minmax(140px, 1.2fr)
-    40px 78px 74px 60px 58px;
+  grid-template-columns: 78px 30px minmax(130px, 0.9fr) minmax(130px, 1fr)
+    38px 74px 62px 74px 52px minmax(200px, 1.5fr);
   gap: 10px; padding: 0 14px;
 }
 .ol-head {
@@ -266,6 +266,11 @@
 .ol-row .horse { color: var(--text); overflow: hidden; text-overflow: ellipsis; }
 .ol-row .cond { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; }
 .ol-row .r { text-align: right; }
+/* The sentence is built in query/slices.py — see WHAT MADE IT AN OUTLIER. */
+.ol-row .why {
+  color: var(--text-dim); font-size: var(--fs-xs);
+  overflow: hidden; text-overflow: ellipsis;
+}
 .ol-row .delta.up { color: var(--win); font-weight: 600; }
 .ol-row .delta.down { color: var(--loss); font-weight: 600; }
 /* "A horse appearing here twice is the only thing on this tab that starts to

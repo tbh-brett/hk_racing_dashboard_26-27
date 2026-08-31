@@ -253,6 +253,26 @@
 .tag-row .of { font-size: 9px; color: var(--text-faint); }
 .tag-row .roi.pos { color: var(--win); }
 .tag-row .roi.neg { color: var(--loss); }
+/* BACKED vs MISSED, one reason at a time. Backed reads neutral and missed in
+   the loss tone — not because a missed run lost, but because the missed side
+   outperforming is the finding the column exists to expose. */
+.tag-row .bvm {
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--fs-xs); min-width: 0; overflow: hidden; white-space: nowrap;
+}
+.tag-row .bvm .backed { color: var(--text-2); }
+.tag-row .bvm .missed { color: var(--loss-dim); }
+.tag-row .bvm .backed, .tag-row .bvm .missed {
+  display: inline-flex; align-items: baseline; gap: 5px;
+}
+.tag-row .bvm .n { font-size: 9px; color: var(--text-faint); }
+.tag-row .bvm .v { font-weight: 600; }
+.tag-row .bvm .v-sep { color: var(--text-faint); }
+.tag-row .bvm .none { color: var(--text-faint); letter-spacing: .06em; }
+.tag-row .bvm .gap { font-size: 9px; letter-spacing: .04em; }
+.tag-row .bvm .gap.pos { color: var(--win); }
+.tag-row .bvm .gap.neg { color: var(--edge); }
+
 .tag-row .def {
   font-size: var(--fs-xs); color: var(--text-faint); white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis;

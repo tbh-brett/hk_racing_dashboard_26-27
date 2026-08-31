@@ -320,6 +320,63 @@ def pivot(rows: str, cols: str, *, metric: str = "strike_rate",
             conn.close()
 
 
+def _trip_tags(conn: Connection, row: dict[str, Any]) -> list[str]:
+    """What the stewards recorded about this run, routine entries dropped.
+
+    ROUTINE is the same set vocab.js filters on. A run flagged for `sampling`
+    is a run where nothing happened.
+    """
+    routine = {"sampling", "vet_routine", "no_report", "jumped_fairly"}
+    return [t["tag"] for t in conn.execute(
+        "SELECT tag FROM runner_tags WHERE race_date = ? AND race_no = ? "
+        "AND horse_no = ? ORDER BY tag",
+        (row["race_date"], row["race_no"], row["horse_no"]))
+        if t["tag"] not in routine]
+
+
+def _why_outlier(row: dict[str, Any]) -> str:
+    """The sentence the artboard puts in WHAT MADE IT AN OUTLIER.
+
+    Assembled here rather than in the page, for the same reason
+    `figure_display` is: a reading built in the browser is a second opinion
+    that drifts from the first one.
+
+    The design writes "no excuse in the figure" for every under-performance.
+    That is wrong on the runs where the stewards recorded one, and those are
+    precisely the runs worth keeping — so trouble in running is named when
+    there was any, and the flat verdict is reserved for when there was not.
+    """
+    rank = _ordinal(row.get("market_rank"))
+    fin = _ordinal(row.get("place"))
+    fig = row.get("figure")
+    tags = row.get("tags") or []
+    trouble = ", ".join(t.replace("_", " ") for t in tags[:2])
+
+    if (row.get("fin_delta") or 0) > 0:
+        beat = f"started {rank} in the market and finished {fin}"
+        if fig is not None:
+            return f"{beat} — figure {fig:.0f} backs it up"
+        return f"{beat} — no figure to check it against"
+
+    under = f"market rated it {rank} and it ran {fin}"
+    if trouble:
+        return f"{under} — {trouble} in running"
+    if fig is not None:
+        return f"{under} — no excuse in the figure"
+    return f"{under} — no figure and no trouble reported"
+
+
+def _ordinal(n: Any) -> str:
+    """1 -> 1st. The market rank reads as a placing, because it is one."""
+    try:
+        n = int(n)
+    except (TypeError, ValueError):
+        return "—"
+    if 11 <= n % 100 <= 13:
+        return f"{n}th"
+    return f"{n}{ {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th') }"
+
+
 def outliers(*, delta: int = OUTLIER_DELTA, limit: int = 200,
              conn: Connection | None = None,
              **filters: Any) -> dict[str, Any]:
@@ -355,6 +412,8 @@ def outliers(*, delta: int = OUTLIER_DELTA, limit: int = 200,
         for row in rows:
             # Positive means the horse beat its market rank.
             row["fin_delta"] = row["market_rank"] - row["place"]
+            row["tags"] = _trip_tags(conn, row)
+            row["why"] = _why_outlier(row)
 
         # How many runs each horse had in the slice at all, so "appeared twice"
         # can be read against how often it ran rather than in isolation.

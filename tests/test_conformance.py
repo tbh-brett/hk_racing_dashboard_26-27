@@ -15,6 +15,13 @@ disagree — the design predates measurements that changed decisions — but the
 disagreement has to be written down with its reason, or it is indistinguishable
 from an omission. Adding an entry is cheap; adding one without a reason should
 feel wrong.
+
+The first version of this file read only a `COLS` array, found none in six of
+the eight artboards, and SKIPPED them — so it covered two pages while reporting
+green on all eight, and the Trials page went on shipping without the draw or
+the jockey the design asks for. `TABLELESS` below is now the only way an
+artboard escapes the check, and it is a named list with a reason rather than
+whatever the extractor happened to fail on.
 """
 from __future__ import annotations
 
@@ -22,6 +29,8 @@ import re
 from pathlib import Path
 
 import pytest
+
+from design_headers import header_parts, headers
 
 ROOT = Path(__file__).resolve().parent.parent
 DESIGN = ROOT / "web" / "design-source"
@@ -37,6 +46,19 @@ PAGES = {
     "Results": "results.js",
     "Trials": "trials.js",
     "Model Analysis": "model-analysis.js",
+}
+
+# The page each module drives. A column header may live in the static markup
+# rather than be appended by script, and both are equally rendered.
+PAGE_HTML = {
+    "race-day.js": "raceday.html",
+    "form-guide.js": "form-guide.html",
+    "lookup.js": "lookup.html",
+    "bets.js": "bets.html",
+    "blackbook.js": "blackbook.html",
+    "results.js": "results.html",
+    "trials.js": "trials.html",
+    "model-analysis.js": "model-analysis.html",
 }
 
 # A page's own module plus anything it imports for rendering. A header may be
@@ -58,28 +80,41 @@ DIVERGENCES: dict[str, dict[str, str]] = {
     #     "Race Day": {"SOME COLUMN": "dropped because <measurement>"},
 }
 
+# Artboards with no tabular columns to check, each with the reason. An artboard
+# NOT on this list that yields no headers is a broken extractor, and the test
+# says so rather than passing quietly — which is how six pages went unchecked.
+TABLELESS: dict[str, str] = {
+    "Model Analysis": "the lab page is panels and charts; it declares no grid "
+                      "table anywhere in the artboard",
+}
+
 
 def _design_headers(artboard: str) -> set[str]:
-    """Column headers the design declares, from its own COLS array.
+    """Column headers the design declares — see tests/design_headers.py.
 
     Read from the declaration rather than from rendered text: the artboards
     carry sample data, and scraping every uppercase string would pick up the
     horse names and the footnotes along with the headers.
     """
-    src = (DESIGN / f"{artboard}.dc.html").read_text(encoding="utf-8")
-    out: set[str] = set()
-    for block in re.findall(r"const COLS = \[(.*?)\n\];", src, re.S):
-        out |= {m.group(1) for m in re.finditer(r"t:\s*'([^']+)'", block)}
-        out |= {m.group(1) for m in re.finditer(r't:\s*"([^"]+)"', block)}
-    return {h.strip() for h in out if h.strip()}
+    return headers(DESIGN / f"{artboard}.dc.html")
 
 
 def _built_text(page: str) -> str:
+    """Everything the built page renders from: its module, its helpers, and its
+    own HTML.
+
+    A static header row in the .html is as rendered as one appended in JS —
+    the Blackbook writes its table head in markup and its rows in script — so
+    reading only the module reported four columns missing that are on screen.
+    """
     parts = [(ASSETS / page).read_text(encoding="utf-8")]
     for extra in EXTRA_SOURCES.get(page, []):
         candidate = ASSETS / extra
         if candidate.is_file():
             parts.append(candidate.read_text(encoding="utf-8"))
+    html = ROOT / "web" / "pages" / PAGE_HTML.get(page, "")
+    if html.is_file():
+        parts.append(html.read_text(encoding="utf-8"))
     return "\n".join(parts)
 
 
@@ -87,8 +122,16 @@ def _built_text(page: str) -> str:
 def test_every_design_column_is_ported_or_recorded(artboard: str, page: str) -> None:
     """A column in the design is in the build, or in DIVERGENCES with a reason."""
     declared = _design_headers(artboard)
-    if not declared:
-        pytest.skip(f"{artboard} declares no COLS array")
+    if artboard in TABLELESS:
+        assert not declared, (
+            f"{artboard} is listed as TABLELESS but declares {sorted(declared)}"
+            " — remove it from that list.")
+        return
+    assert declared, (
+        f"{artboard} declares no columns the extractor can read. Either it is "
+        "genuinely tableless — add it to TABLELESS with the reason — or "
+        "tests/design_headers.py no longer understands this artboard, in which "
+        "case this page is UNCHECKED and must not pass.")
 
     built = _built_text(page)
     allowed = DIVERGENCES.get(artboard, {})
@@ -96,7 +139,20 @@ def test_every_design_column_is_ported_or_recorded(artboard: str, page: str) -> 
     for header in sorted(declared):
         if header in built or header in allowed:
             continue
-        missing.append(header)
+        # The design packs several columns under one heading. Each side of the
+        # middot is its own column, so each is checked on its own; a heading is
+        # satisfied when every part of it is.
+        # A chunk with no checkable words is a caption, not a column — "95% CI",
+        # "HARVILLE-HENERY v OLD 3× RULE". Reporting those as gaps produced
+        # failures for columns that are on screen, and a check that cries wolf
+        # is one people start exempting. Chunks that ARE column names are still
+        # required, which is what caught the missing draw and jockey.
+        gaps = [chunk for chunk, words in header_parts(header)
+                if words and chunk not in built
+                and not all(w in built for w in words)]
+        if gaps:
+            missing.append(header if header == gaps[0]
+                           else f"{header}  (missing: {', '.join(gaps)})")
 
     assert not missing, (
         f"{artboard} declares columns the built {page} does not render:\n"

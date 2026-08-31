@@ -25,7 +25,7 @@ from typing import Any
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["ledger", "bets_for_race", "bets_for_horse", "backed_and_missed",
-           "backed_by_account",
+           "backed_and_missed_by_tag", "backed_by_account",
            "summary"]
 
 # What a missed run is priced at, so the two sides of the comparison are
@@ -221,8 +221,50 @@ _RUNS_SINCE = """
 """
 
 
+def backed_and_missed_by_tag(*, account: str | None = None,
+                             conn: Connection | None = None
+                             ) -> dict[str, dict[str, Any]]:
+    """The same comparison, one reading per booking reason.
+
+    The design puts BACKED vs MISSED beside each tag in the analysis table, and
+    that is where the comparison earns most: "runs I booked for TRIP TROUBLE
+    that I then did not back" is a sharper question than the same question over
+    the whole book, because it names the reason the entry was made.
+
+    Each tag goes through `backed_and_missed` itself rather than through a
+    second aggregate. Slower, and correct — a per-tag figure computed its own
+    way would disagree with the whole-book one and neither would be wrong
+    enough to notice.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        tags = [r["tag"] for r in conn.execute(
+            "SELECT DISTINCT tag FROM blackbook_tags ORDER BY tag")]
+        out: dict[str, dict[str, Any]] = {}
+        for tag in tags:
+            d = backed_and_missed(account=account, tag=tag, conn=conn)
+            b, m = d["backed"], d["missed"]
+            out[tag] = {
+                "runs": d["runs"],
+                "backed_runs": b["runs"], "missed_runs": m["runs"],
+                "backed_roi": b["roi"], "missed_roi": m["roi"],
+                # The gap is the finding, so it is named rather than left to be
+                # read off two numbers: a tag whose MISSED side outperforms is
+                # one the book is right about and the ledger is not.
+                "gap": (None if b["roi"] is None or m["roi"] is None
+                        else round(b["roi"] - m["roi"], 3)),
+                "verdict": d["verdict"],
+            }
+        return out
+    finally:
+        if own:
+            conn.close()
+
+
 def backed_and_missed(*, entry_id: str | None = None,
                       account: str | None = None,
+                      tag: str | None = None,
                       conn: Connection | None = None) -> dict[str, Any]:
     """The falsifiability requirement: what was backed, what was not, and how
     each did.
@@ -257,6 +299,14 @@ def backed_and_missed(*, entry_id: str | None = None,
         if entry_id:
             where += " AND b.id = :entry_id"
             params["entry_id"] = entry_id
+        if tag:
+            # Restricts the comparison to entries carrying this tag. The
+            # arithmetic is unchanged, which is the point: a per-tag figure
+            # computed a second way would drift from the whole-book one within
+            # a season and nobody would know which to believe.
+            where += (" AND b.id IN (SELECT id FROM blackbook_tags "
+                      "WHERE tag = :tag)")
+            params["tag"] = tag
 
         runs = _rows(conn, f"""
             SELECT b.id, b.horse_name, r.race_date, r.race_no, r.horse_no,
@@ -298,6 +348,7 @@ def backed_and_missed(*, entry_id: str | None = None,
         out = {
             "runs": len(runs),
             "account": account.lower() if account else None,
+            "tag": tag,
             "backed": side(backed, notional=True),
             "missed": side(missed, notional=True),
             "notional_stake": NOTIONAL_STAKE,

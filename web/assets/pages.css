@@ -230,6 +230,28 @@ select:hover, .btn:hover { background: var(--line-2); color: var(--text); }
 .style-unknown  { color: var(--text-faint); background: var(--line); }
 
 
+/* ── trip trouble ────────────────────────────────────────────────────────────
+ *
+ * What the stewards said about a run, wherever a run is shown. Copper, which
+ * this palette reserves for the stewards, and never a result colour: trouble
+ * in running is not a win and not a loss, it is the reason to look again.
+ *
+ * The chips shrink and the caller's own control does not — a cell that runs
+ * out of room loses a tag to an ellipsis, never the play button beside it.
+ */
+.trip-tags {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  min-width: 0; flex: 0 1 auto; overflow: hidden;
+}
+.trip-tag {
+  flex: 0 1 auto; min-width: 0; padding: 0 4px;
+  font-size: var(--fs-xs); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+  color: var(--incident); border: 1px solid var(--incident); cursor: help;
+}
+.trip-tag.more { border-style: dashed; }
+
+
 /* ── command palette ─────────────────────────────────────────────────────────
  *
  * retain_discard.md §3.3, the Linear reference: a short nav, and every meeting,

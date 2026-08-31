@@ -237,6 +237,12 @@
 .run-row .fig-group { display: flex; align-items: baseline; gap: 8px; }
 .run-row .fig-group .fig { width: 34px; text-align: right; font-size: var(--fs); font-weight: 600; }
 .run-row .fig-group .len { width: 46px; text-align: right; }
+/* Neutral, not a result colour. The dividend is what the tote paid, a fact
+   about the run rather than a verdict on it — and adding a ninth hue for it
+   is the trade tokens.css spends its comments refusing. */
+.run-row .fig-group .plc-div {
+  color: var(--text-2); font-size: var(--fs-xs); white-space: nowrap;
+}
 .run-row .fig-group .t { width: 54px; text-align: right; color: var(--text-muted); }
 .run-row .above { color: var(--win); }
 .run-row .below { color: var(--loss); }

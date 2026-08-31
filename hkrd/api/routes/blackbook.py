@@ -82,6 +82,17 @@ def blackbook_by_account(entry_id: str | None = None) -> dict:
     return bets_q.backed_by_account(entry_id=entry_id)
 
 
+@router.get("/api/blackbook/tags/backed-vs-missed")
+def blackbook_tags_backed_vs_missed(account: str | None = None) -> dict:
+    """BACKED vs MISSED for each booking reason.
+
+    The artboard puts it beside every tag, and that is where the comparison is
+    sharpest: "runs I booked for trip trouble and then did not back" names the
+    reason the entry was made, which the whole-book number cannot.
+    """
+    return {"tags": bets_q.backed_and_missed_by_tag(account=account)}
+
+
 @router.get("/api/blackbook/declared/{date}")
 def blackbook_declared(date: str) -> dict:
     """Booked horses declared across one meeting."""

@@ -112,6 +112,13 @@ class RunnerLine:
     place_odds: float | None = None
     p_place: float | None = None
 
+    # What a $10 place ticket on this run actually returned. Scraped with the
+    # results since the first meeting and never shown: the design puts it on
+    # the Form Guide's run line, because a placed run at 4.5 and a placed run
+    # at 60 are not the same result and the finishing position hides that.
+    # Settled money, not a price — it is what the tote paid, after the fact.
+    place_dividend: float | None = None
+
     @property
     def finish_time_display(self) -> str | None:
         return format_race_time(self.finish_time)

@@ -30,7 +30,15 @@ SELECT r.race_date, r.race_no, r.horse_no, r.horse_name, r.draw, r.jockey,
        p.pace_style, p.early_dev, p.late_dev,
        s.sarr, s.sarr_rank,
        (SELECT count(*) FROM runners f
-         WHERE f.race_date = r.race_date AND f.race_no = r.race_no) AS field_size
+         WHERE f.race_date = r.race_date AND f.race_no = r.race_no) AS field_size,
+       -- The tote's PLACE payout for THIS horse, per $10. `combination` is the
+       -- horse number as published, so it is compared as text on both sides
+       -- rather than cast: a cast would turn an unparseable combination into a
+       -- silent zero, and a dividend that reads 0 is a losing ticket.
+       (SELECT d.dividend_per_10 FROM dividends d
+         WHERE d.race_date = r.race_date AND d.race_no = r.race_no
+           AND d.pool = 'PLACE'
+           AND trim(d.combination) = cast(r.horse_no AS TEXT)) AS place_dividend
 FROM runners r
 JOIN races a       ON a.race_date = r.race_date AND a.race_no = r.race_no
 LEFT JOIN runner_et e   USING (race_date, race_no, horse_no)
@@ -100,6 +108,7 @@ def _to_line(row, tags: tuple[str, ...] = (), lane_notes: tuple[str, ...] = (),
         tags=tags, lane_notes=lane_notes,
         running_comment=comments[0], incident_comment=comments[1],
         win_odds=row["win_odds"],
+        place_dividend=row["place_dividend"],
     )
 
 

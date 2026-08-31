@@ -113,3 +113,72 @@ def test_all_three_views_arrive_together(db):
     assert set(out) == {"combined", "brett", "kelvin"}
     assert out["combined"]["backed"]["runs"] == 2
     assert out["brett"]["backed"]["runs"] == 1
+
+
+# ── the same comparison, one booking reason at a time ────────────────────────
+
+def _tag(path, tag_id="bb_1", tag="trip"):
+    conn = get_conn(path)
+    try:
+        with transaction(conn):
+            conn.execute("INSERT OR REPLACE INTO blackbook_tags (id, tag) "
+                         "VALUES (?, ?)", (tag_id, tag))
+    finally:
+        conn.close()
+
+
+def _by_tag(path, account=None):
+    conn = get_conn(path)
+    try:
+        return bq.backed_and_missed_by_tag(account=account, conn=conn)
+    finally:
+        conn.close()
+
+
+def test_a_tag_reading_uses_the_same_arithmetic_as_the_whole_book(db):
+    """Every tag goes through `backed_and_missed` itself.
+
+    A per-tag figure computed its own way would disagree with the whole-book
+    one and neither would be wrong enough for anyone to notice which.
+    """
+    _tag(db)
+    conn = get_conn(db)
+    try:
+        direct = bq.backed_and_missed(tag="trip", conn=conn)
+    finally:
+        conn.close()
+    got = _by_tag(db)["trip"]
+    assert got["backed_roi"] == direct["backed"]["roi"]
+    assert got["runs"] == direct["runs"]
+
+
+def test_backed_plus_missed_holds_per_tag_too(db):
+    """The invariant the whole page rests on, one reason at a time."""
+    _tag(db)
+    for account in (None, "brett", "kelvin"):
+        d = _by_tag(db, account)["trip"]
+        assert d["backed_runs"] + d["missed_runs"] == d["runs"], account
+
+
+def test_a_tag_on_no_entries_is_absent_rather_than_zero(db):
+    """A tag nobody has used is not a tag that failed."""
+    assert "trip" not in _by_tag(db)
+
+
+def test_the_tag_filter_actually_narrows(db):
+    """A filter that silently matched everything would make every tag show the
+    whole book's numbers, and the column would look plausible and mean
+    nothing."""
+    conn = get_conn(db)
+    try:
+        with transaction(conn):
+            conn.execute(
+                "INSERT OR REPLACE INTO blackbook (id, horse_name, added_date, "
+                "status) VALUES ('bb_2', 'OTHER 2', '2026-04-01', 'active')")
+            conn.execute("INSERT OR REPLACE INTO blackbook_tags (id, tag) "
+                         "VALUES ('bb_1', 'trip')")
+        whole = bq.backed_and_missed(conn=conn)["runs"]
+        tagged = bq.backed_and_missed(tag="trip", conn=conn)["runs"]
+    finally:
+        conn.close()
+    assert 0 < tagged < whole

@@ -18,7 +18,8 @@
  * second.
  */
 import { api, num } from './api.js';
-import { el, $, DASH, MINUS, renderNav, paceCell } from './vocab.js';
+import { el, $, DASH, MINUS, renderNav, paceCell,
+         tripTagChips } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 import { loadTags, renderReview } from './review.js';
@@ -27,7 +28,7 @@ import { loadTags, renderReview } from './review.js';
 const COLS = [
   ['FIN', 'r'], ['NO', 'r'], ['HORSE', ''], ['JOCKEY', ''], ['DR', 'r'],
   ['TRAINER', ''], ['STYLE', ''], ['WT', 'r'], ['MARGIN', 'r'],
-  ['WIN SP', 'r'], ['PLC SP', 'r'], ['ET FIGURE', 'r'], ['POSITIONS', ''],
+  ['WIN SP', 'r'], ['PLC SP', 'r'], ['ET FIGURE', 'r'], ['POSITIONS · TRIP', ''],
 ];
 
 const state = {
@@ -314,10 +315,19 @@ function resultRow(runner, booked, backed) {
   if (runner.figure_display) fig.title = runner.figure_display;
   row.append(fig);
 
-  const pos = el('div', 'pos', (runner.running_positions ?? []).join(' ') || DASH);
+  const pos = el('div', 'pos');
+  pos.append(el('span', 'seq',
+    (runner.running_positions ?? []).join(' ') || DASH));
   if (runner.section_times && runner.section_times.length) {
     pos.title = `sectionals ${runner.section_times.map((t) => num(t, 2)).join(' · ')}`;
   }
+  // The design's header for this column is POSITIONS · TRIP, and the tags were
+  // on the RunnerLine the whole time. Where a horse ran in the field and what
+  // happened to it there are one fact — a horse that sat last and was checked
+  // at the 800m did not run a bad race, and the positions alone say it did.
+  const trip = tripTagChips(runner.tags,
+    { comment: runner.incident_comment || runner.running_comment });
+  if (trip) pos.append(trip);
   row.append(pos);
   row.addEventListener('click', () => {
     if (state.open.has(runner.horse_no)) state.open.delete(runner.horse_no);

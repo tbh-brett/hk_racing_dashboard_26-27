@@ -76,8 +76,8 @@
 
 .tr-head, .tr-row {
   display: grid; align-items: center;
-  grid-template-columns: 30px 30px minmax(140px, 1fr) 62px 56px 64px 58px
-    minmax(180px, 1.4fr) minmax(215px, 1.25fr);
+  grid-template-columns: 26px 26px 26px minmax(132px, 1fr) 46px 92px 64px
+    56px 58px minmax(170px, 1.35fr) minmax(215px, 1.2fr);
   gap: 10px; padding: 0 14px;
 }
 .tr-head {
@@ -105,6 +105,17 @@
 .tr-row .next .plc { color: var(--text-2); }
 .tr-row .next .none { color: var(--text-faint); }
 .tr-row .booked { color: var(--book); margin-left: 5px; }
+.tr-row .jockey {
+  color: var(--text-2); overflow: hidden; text-overflow: ellipsis;
+}
+/* A zero margin is arithmetic; WON is the fact. */
+.tr-row .won { color: var(--win); font-weight: 600; }
+.batch-head .going { color: var(--text-muted); }
+.batch-head .batch-replay {
+  margin-left: 10px; color: var(--tr-accent); text-decoration: none;
+  font-size: var(--fs-xs); letter-spacing: .06em; white-space: nowrap;
+}
+.batch-head .batch-replay:hover { color: var(--text); }
 
 /* ── standouts ───────────────────────────────────────────────────────────── */
 
@@ -181,15 +192,9 @@
 .next { display: flex; align-items: center; gap: 5px; min-width: 0; }
 /* Everything but the tags holds its size. */
 .next > * { flex: 0 0 auto; }
-.next .ns-tags {
-  display: flex; align-items: center; gap: 5px;
-  flex: 0 1 auto; min-width: 0; overflow: hidden;
-}
-.next .ns-tag {
-  padding: 0 4px; font-size: var(--fs-xs); white-space: nowrap;
-  color: var(--incident); border: 1px solid var(--incident); cursor: help;
-  flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
-}
+/* The chips are pages.css's `.trip-tag`; this is only where they sit — they
+   shrink so the play control beside them never has to. */
+.next .trip-tags { flex: 0 1 auto; min-width: 0; }
 .next .ns-play {
   margin-left: 1px; color: var(--tr-accent); text-decoration: none;
   font-size: var(--fs-xs);

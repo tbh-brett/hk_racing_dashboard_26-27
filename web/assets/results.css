@@ -76,8 +76,8 @@
 
 .res-head, .res-row {
   display: grid; align-items: center;
-  grid-template-columns: 34px 30px minmax(150px, 1fr) 100px 30px 100px 62px
-    38px 60px 56px 56px 62px 96px;
+  grid-template-columns: 34px 30px minmax(140px, 1fr) 100px 30px 100px 62px
+    38px 60px 56px 56px 62px minmax(160px, 1.15fr);
   gap: 9px; padding: 0 14px;
 }
 .res-head {
@@ -102,7 +102,14 @@
 }
 .res-row .r { text-align: right; }
 .res-row .fig { text-align: right; color: var(--text-2); }
-.res-row .pos { color: var(--text-dim); letter-spacing: .04em; }
+/* POSITIONS · TRIP is one cell: where the horse ran and what happened to it
+   there. The sequence holds its width; the tags are what gives way. */
+.res-row .pos {
+  display: flex; align-items: center; gap: var(--sp-2);
+  min-width: 0; overflow: hidden;
+  color: var(--text-dim); letter-spacing: .04em;
+}
+.res-row .pos .seq { flex: 0 0 auto; white-space: nowrap; }
 .res-row .bb {
   color: var(--book); border: 1px solid var(--book-ground); padding: 0 3px;
   font-size: var(--fs-xs); margin-left: 5px;

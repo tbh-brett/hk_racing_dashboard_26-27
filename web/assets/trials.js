@@ -24,8 +24,8 @@
  * nothing about it either way.
  */
 import { api, num } from './api.js';
-import { el, $, DASH, renderNav, tripTags, tagLabel,
-         replayUrl, externalLink } from './vocab.js';
+import { el, $, DASH, renderNav, tripTagChips,
+         replayUrl, externalLink, compactDate, ordinal } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 
@@ -37,8 +37,9 @@ const BANDS = ['STANDOUT', 'POSITIVE', 'NEUTRAL', 'NEGATIVE', 'UNTESTED'];
 const VENUES = [['all', 'ALL'], ['ST', 'ST'], ['HV', 'HV']];
 
 const COLS = [
-  ['', ''], ['P', 'r'], ['HORSE', ''], ['MARGIN', 'r'], ['TIME', 'r'],
-  ['POSITIONS', ''], ['GEAR', ''], ['COMMENT', ''], ['NEXT ACTUAL START', ''],
+  ['DR', 'r'], ['', ''], ['P', 'r'], ['HORSE', ''], ['GEAR', ''],
+  ['JOCKEY', ''], ['POSITIONS', ''], ['MGN', 'r'], ['TIME', 'r'],
+  ['COMMENT', ''], ['NEXT ACTUAL START', ''],
 ];
 
 const state = {
@@ -76,8 +77,10 @@ function nextStart(nxt) {
   const cls = nxt.place === 1 ? 'won' : placed ? 'plc' : null;
   // No padding spaces: the cell is a flex row and would collapse them, which
   // ran the date into the finishing position. The gap is the stylesheet's.
-  box.append(el('span', null, nxt.race_date));
-  box.append(el('span', cls, `${nxt.place}/${nxt.field_size}`));
+  // The date and the ordinal both come from vocab.js — the design reads
+  // "28 May · 5th/11", and every other page already spells them that way.
+  box.append(el('span', null, compactDate(nxt.race_date)));
+  box.append(el('span', cls, `${ordinal(nxt.place)}/${nxt.field_size}`));
   box.append(el('span', null,
     `${nxt.venue} ${nxt.distance ?? ''}m${nxt.race_class ? ` Cl${nxt.race_class}` : ''}`));
   box.title = `${nxt.race_date} R${nxt.race_no} — finished ${nxt.place} of `
@@ -87,20 +90,12 @@ function nextStart(nxt) {
   // well, ran 7th, and was checked at the 800m". The second is what keeps a
   // horse worth following, so the tags travel with the result rather than
   // being a click away on another page.
-  const trouble = tripTags(nxt.tags);
-  if (trouble.length) {
-    // The tags are the part that gives way when the column is narrow, which
-    // is why they live in their own shrinking box. Losing "wide no cover" to
-    // an ellipsis costs a detail the hover still carries; losing the play
-    // control costs the thing the column is for.
-    const tags = el('span', 'ns-tags');
-    trouble.slice(0, 2).forEach((t) => {
-      const chip = el('span', 'ns-tag', tagLabel(t));
-      if (nxt.comment) chip.title = nxt.comment;
-      tags.append(chip);
-    });
-    box.append(tags);
-  }
+  // The tags are the part that gives way when the column is narrow, which is
+  // why they live in their own shrinking box. Losing "wide no cover" to an
+  // ellipsis costs a detail the hover still carries; losing the play control
+  // costs the thing the column is for.
+  const tags = tripTagChips(nxt.tags, { comment: nxt.comment });
+  if (tags) box.append(tags);
 
   // And the footage of it, because a trial mark is a claim about what the
   // horse can do and the next start is where that claim gets tested. It is
@@ -154,6 +149,11 @@ function matches(r) {
 
 function runnerRow(r) {
   const row = el('div', 'tr-row');
+  // Draw first, as the design has it: a trial is barrier practice as much as
+  // it is a time, and the gate the horse came out of is the context for the
+  // positions three columns along.
+  row.append(el('div', 'r', r.draw === null || r.draw === undefined
+    ? DASH : String(r.draw)));
   row.append(qMark(r.quality_band, r.quality_mark));
   row.append(el('div', 'r', r.place === null ? DASH : String(r.place)));
   const horse = el('div', 'horse');
@@ -161,14 +161,24 @@ function runnerRow(r) {
   horse.title = `${r.quality_band}${r.quality_reasons.length
     ? ` — ${r.quality_reasons.join('; ')}` : ''}`;
   row.append(horse);
+  row.append(el('div', null, r.gear || DASH));
+  const jockey = el('div', 'jockey', r.jockey || DASH);
+  // Who rode a trial is how you read the intent behind it, and the trainer is
+  // the other half of that; the design puts the rider in the column and the
+  // stable on the hover rather than spending a column on it.
+  if (r.trainer) jockey.title = `trained by ${r.trainer}`;
+  row.append(jockey);
+  row.append(el('div', null, r.running_positions.join(' ') || DASH));
   // Margin is shown because it is useful context on a row. It does not move
   // the band: measured, it carries no signal once the finish is held constant.
-  row.append(el('div', 'r',
-    r.margin === null || r.margin === undefined ? DASH : `${num(r.margin, 1)}L`));
+  // The winner reads WON rather than 0.0L — a zero margin is arithmetic, and
+  // the design says the fact instead.
+  row.append(el('div', r.place === 1 ? 'r won' : 'r',
+    r.place === 1 ? 'WON'
+      : r.margin === null || r.margin === undefined ? DASH
+        : `${num(r.margin, 1)}L`));
   row.append(el('div', 'r',
     r.finish_time === null ? DASH : num(r.finish_time, 2)));
-  row.append(el('div', null, r.running_positions.join(' ') || DASH));
-  row.append(el('div', null, r.gear || DASH));
   const comment = el('div', 'comment', r.comment ?? DASH);
   comment.title = r.comment ?? '';
   row.append(comment);
@@ -189,9 +199,15 @@ function renderBatches() {
     shown += runners.length;
     const box = el('div', 'batch');
     const head = el('div', 'batch-head');
-    head.append(el('span', 'd', b.trial_date));
+    // The date as it is spoken, through the shared formatter. An ISO date on
+    // screen is a storage format that escaped — brief 08 §1, and this page was
+    // the one still printing one.
+    head.append(el('span', 'd', compactDate(b.trial_date)));
     head.append(el('span', 'no', `T${b.trial_no}`));
     head.append(el('span', null, `${b.venue} ${b.surface}`));
+    // Going was stored on every trial row and never read. A trial time means
+    // nothing without the surface it was run on.
+    if (b.going) head.append(el('span', 'going', b.going));
     head.append(el('span', 'k', 'RUNNERS'));
     head.append(el('span', null, String(b.field_size)));
     head.append(el('span', 'k', 'WIN TIME'));
@@ -207,6 +223,15 @@ function renderBatches() {
     // HKJC publishes no trial distance, and inferring one from the clock would
     // be a guess dressed as a fact.
     head.append(el('span', 'right', 'no distance is published for a trial'));
+    // The footage of the batch itself. The Form Guide has linked trial replays
+    // since it was built, from this same helper — the Trials page, which is
+    // where someone goes to watch trials, did not.
+    const turl = replayUrl(b.trial_date, b.trial_no);
+    if (turl) {
+      const play = externalLink(turl, '▶ REPLAY', 'batch-replay');
+      play.title = `trial replay — ${b.trial_date} batch ${b.trial_no}`;
+      head.append(play);
+    }
     box.append(head);
 
     const cols = el('div', 'tr-head');

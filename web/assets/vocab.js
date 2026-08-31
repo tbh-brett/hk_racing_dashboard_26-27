@@ -114,6 +114,36 @@ export function tagLabel(tag) {
   return (tag ?? '').replace(/_/g, ' ');
 }
 
+/** The trip tags as chips, with the commentary they came from on hover.
+ *
+ *  One renderer, because the filter is the part that was drifting: the Form
+ *  Guide dropped `sampling` and `vet_routine` inline and kept `no_report` and
+ *  `jumped_fairly`, so its TRIP flag fired on runs where the stewards said
+ *  nothing happened. A rule written twice is a rule that disagrees with
+ *  itself; `ROUTINE_TAGS` is the rule, and this is the only way to draw it.
+ *
+ *  `limit` is how many fit the cell — the rest stay on the hover rather than
+ *  overflowing, which is what the caller's layout can actually promise.
+ */
+export function tripTagChips(tags, { comment = null, limit = 2,
+                                     cls = 'trip-tag' } = {}) {
+  const trouble = tripTags(tags);
+  if (!trouble.length) return null;
+  const box = el('span', `${cls}s`);
+  const title = comment || trouble.map(tagLabel).join(' · ');
+  trouble.slice(0, limit).forEach((t) => {
+    const chip = el('span', cls, tagLabel(t));
+    chip.title = title;
+    box.append(chip);
+  });
+  if (trouble.length > limit) {
+    const more = el('span', `${cls} more`, `+${trouble.length - limit}`);
+    more.title = trouble.map(tagLabel).join(' · ');
+    box.append(more);
+  }
+  return box;
+}
+
 /* ── figures ──────────────────────────────────────────────────────────────
  * `figure_display` is built in query/types.py so the figure, its length
  * equivalent and its confidence are assembled once, server side. This renders

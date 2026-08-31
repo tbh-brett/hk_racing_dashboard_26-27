@@ -781,8 +781,10 @@ function renderOutliers() {
   host.append(bar);
 
   const head = el('div', 'ol-head');
-  ['DATE', 'R', 'CONDITIONS', 'HORSE', 'FIN', 'MKT RANK', 'SP', 'STYLE', 'FIN Δ']
-    .forEach((h, i) => head.append(el('div', i >= 4 ? 'r' : null, h)));
+  ['DATE', 'R', 'CONDITIONS', 'HORSE', 'FIN', 'MKT RANK', 'SP', 'STYLE',
+   'FIN Δ', 'WHAT MADE IT AN OUTLIER']
+    .forEach((h, i) => head.append(
+      el('div', i >= 4 && i <= 8 ? 'r' : null, h)));
   host.append(head);
 
   if (!o.runs.length) {
@@ -793,7 +795,7 @@ function renderOutliers() {
   }
   o.runs.forEach((r) => {
     const row = el('div', 'ol-row');
-    row.append(el('div', 'date', r.race_date));
+    row.append(el('div', 'date', compactDate(r.race_date)));
     row.append(el('div', null, `R${r.race_no}`));
     row.append(el('div', 'cond',
       `${r.venue} ${r.distance}m ${r.surface} ${r.going ?? ''} `
@@ -806,9 +808,20 @@ function renderOutliers() {
     row.append(el('div', 'r', String(r.place)));
     row.append(el('div', 'r', String(r.market_rank)));
     row.append(el('div', 'r', num(r.win_odds, 1)));
-    row.append(el('div', 'r', r.pace_style ?? DASH));
+    // A badge, like every other page. This table was showing the running style
+    // as bare text, which is the exact divergence the shared vocabulary exists
+    // to stop — same run, different reading depending where you looked.
+    const style = el('div');
+    style.append(styleBadge(r.pace_style));
+    row.append(style);
     row.append(el('div', `r delta ${r.fin_delta >= 0 ? 'up' : 'down'}`,
       `${r.fin_delta >= 0 ? '+' : MINUS}${Math.abs(r.fin_delta)}`));
+    // WHAT MADE IT AN OUTLIER, built in query/slices.py. The sentence is not
+    // assembled here: a reading written in the browser is a second opinion
+    // that drifts from the first one.
+    const why = el('div', 'why', r.why ?? DASH);
+    why.title = r.why ?? '';
+    row.append(why);
     row.title = `finished ${r.place} of ${r.field_size}, ranked `
       + `${r.market_rank} by the market at ${r.win_odds}`;
     host.append(row);
