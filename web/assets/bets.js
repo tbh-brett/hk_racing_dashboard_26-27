@@ -17,26 +17,11 @@
  * been shown.
  */
 import { api, num } from './api.js';
+import { el, $, DASH, MINUS, renderNav } from './vocab.js';
 import { context } from './context.js';
 import { initEntry, loadEntry, renderEntry } from './bets-entry.js';
 import { install as installPalette } from './palette.js';
 
-const NAV = [
-  ['Race Day', 'raceday.html'], ['Form Guide', 'form-guide.html'],
-  ['Lookup', 'lookup.html'], ['Bets', 'bets.html'],
-  ['Blackbook', 'blackbook.html'], ['Results', 'results.html'],
-  ['Trials', 'trials.html'], ['Model Analysis', 'model-analysis.html'],
-];
-
-const $ = (id) => document.getElementById(id);
-const DASH = '—';
-const MINUS = '−';
-const el = (tag, cls, text) => {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text !== undefined) n.textContent = text;
-  return n;
-};
 
 const COLS = [
   { key: 'date', label: 'DATE' },
@@ -62,15 +47,6 @@ const state = {
 };
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
-
-function renderNav() {
-  $('nav').replaceChildren(...NAV.map(([name, href]) => {
-    const a = el('a', null, name);
-    a.href = href;
-    if (href === 'bets.html') a.setAttribute('aria-current', 'page');
-    return a;
-  }));
-}
 
 function renderViewToggle() {
   // Entry first: the page's own subject is the decision, and the ledger is
@@ -561,7 +537,7 @@ function wireSearch() {
 }
 
 async function boot() {
-  renderNav();
+  renderNav($('nav'), 'bets.html');
   wireSearch();
   installPalette();
   initEntry(render);

@@ -23,6 +23,7 @@ SELECT r.race_date, r.race_no, r.horse_no, r.horse_name, r.draw, r.jockey,
        r.place_code, r.dead_heat, r.finish_time, r.lengths_behind,
        r.running_positions, r.section_times, r.win_odds,
        a.venue, a.course, a.surface, a.going, a.distance, a.race_class,
+       a.off_time,
        e.figure AS et_figure, e.len_vs_par AS et_len_vs_par,
        e.len_vs_race AS et_len_vs_race, e.et_n_eff, e.confidence AS et_confidence,
        p.pace_style, p.early_dev, p.late_dev,
@@ -119,6 +120,10 @@ def get_race(date: str, race_no: int, *, conn: Connection | None = None) -> Race
             race_date=date, race_no=race_no, venue=head["venue"],
             course=head["course"], surface=head["surface"], going=head["going"],
             distance=head["distance"], race_class=head["race_class"],
+            # RaceLine has carried an off_time field all along and nothing
+            # filled it, so the Race Day header had no time to show and put the
+            # venue in the slot instead — a value the global chrome already has.
+            off_time=head["off_time"],
             field_size=len(runners), runners=runners,
         )
     finally:

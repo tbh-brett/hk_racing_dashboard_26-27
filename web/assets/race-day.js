@@ -9,24 +9,11 @@
  * (AUC .785 against .727), which the footer states outright.
  */
 import { api, num } from './api.js';
+import { el, $, DASH, renderNav, styleBadge, styleOrdinal, compactDate,
+         ordinal } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 
-const NAV = [
-  ['Race Day', 'raceday.html'], ['Form Guide', 'form-guide.html'],
-  ['Lookup', 'lookup.html'], ['Bets', 'bets.html'],
-  ['Blackbook', 'blackbook.html'], ['Results', 'results.html'],
-  ['Trials', 'trials.html'], ['Model Analysis', 'model-analysis.html'],
-];
-
-const $ = (id) => document.getElementById(id);
-const DASH = '—';
-const el = (tag, cls, text) => {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text !== undefined) n.textContent = text;
-  return n;
-};
 const svg = (tag, attrs) => {
   const n = document.createElementNS('http://www.w3.org/2000/svg', tag);
   Object.entries(attrs).forEach(([k, v]) => n.setAttribute(k, String(v)));
@@ -42,23 +29,14 @@ const state = {
 const COLS = [
   ['no', 'NO', 'c-num'], ['name', 'HORSE', ''], ['style', 'STYLE', ''],
   ['draw', 'DR', 'c-num'], ['jockey', 'JOCKEY', ''], ['trainer', 'TRAINER', ''],
-  ['wt', 'WT', 'c-right'], ['odds', 'ODDS', 'c-right'],
-  ['move', 'MOVE', 'c-right'], ['win', 'WIN%', 'c-right'],
+  ['wt', 'WT', 'c-right'], ['odds', 'WIN / PLACE', 'c-right'],
+  ['move', 'MOVE · MONEY', 'c-right'], ['win', 'WIN%', 'c-right'],
   ['mkt', 'MKT', 'c-num'], ['sarr', 'SARR', 'c-num'],
-  ['edge', 'EDGE', 'c-num'], ['fig', 'LAST FIGURE', ''],
+  ['edge', 'EDGE', 'c-num'], ['fig', 'LAST-RUN FIGURE', ''],
   ['last', 'LAST RUN', ''], ['bb', 'BB', 'c-num'],
 ];
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
-
-function renderNav() {
-  $('nav').replaceChildren(...NAV.map(([name, href]) => {
-    const a = el('a', null, name);
-    a.href = href;
-    if (href === 'raceday.html') a.setAttribute('aria-current', 'page');
-    return a;
-  }));
-}
 
 /* ── race strip ──────────────────────────────────────────────────────────── */
 
@@ -206,15 +184,18 @@ function renderH2HBand() {
   pairs.slice(0, 4).forEach((p) => {
     const c = el('div', 'h2h-cell');
     const l1 = el('div', 'h2h-line');
-    l1.append(el('span', 'who', `${p.a_no} ${p.a_name.split(' ')[0]}`));
+    // Full names. Taking the first word turned TO INFINITY into "TO" and
+    // OUR LUCKY GLORY into "OUR" — two horses in the same field can share a
+    // first word, so the short form was ambiguous as well as unreadable.
+    l1.append(el('span', 'who', `${p.a_no} ${p.a_name}`));
     l1.append(el('span', 'v', 'v'));
-    l1.append(el('span', 'who', `${p.b_no} ${p.b_name.split(' ')[0]}`));
+    l1.append(el('span', 'who', `${p.b_no} ${p.b_name}`));
     l1.append(el('span', 'rec', p.record));
     c.append(l1);
 
     const l2 = el('div', 'h2h-meta');
     l2.append(el('span', 'k', 'LAST'));
-    l2.append(el('span', 'v2', p.last_date));
+    l2.append(el('span', 'v2', compactDate(p.last_date)));
     l2.append(el('span', null, p.last_cond));
     l2.append(el('span', 'v2', p.last_line));
     c.append(l2);
@@ -245,7 +226,9 @@ function renderRaceBar() {
   if (!c) { bar.replaceChildren(); return; }
   const nt = el('div', 'no-time');
   nt.append(el('span', 'rno', `R${c.race_no}`));
-  nt.append(el('span', 'rtime', c.venue ?? ''));
+  // The venue is Layer 1 chrome and is already on screen once. This slot is
+  // named rtime because the design puts the off time here: "R3 16:45".
+  nt.append(el('span', 'rtime', c.off_time ?? ''));
   bar.replaceChildren(nt);
 
   const conds = el('div', 'conds');
@@ -427,9 +410,7 @@ function cardRow(r, index) {
   tr.append(name);
 
   const st = el('td');
-  const s = r.last_run?.pace_style;
-  st.append(el('span', `style style-${(s ?? 'unknown').toLowerCase().replace('-', '')}`,
-    s ?? DASH));
+  st.append(styleBadge(r.last_run?.pace_style, { chip: false }));
   tr.append(st);
 
   tr.append(el('td', 'c-num', String(r.draw ?? DASH)));
@@ -480,7 +461,9 @@ function cardRow(r, index) {
   tr.append(fg);
 
   tr.append(el('td', null, lr
-    ? `${lr.place ?? DASH} · ${lr.days_ago}d` : DASH));
+    // "10th, 45d" — a finishing position is spoken as an ordinal, and the
+    // design writes it that way. A bare 10 reads as a count.
+    ? `${ordinal(lr.place)}, ${lr.days_ago}d` : DASH));
 
   const bb = el('td', 'c-num');
   if (r.blackbook) {
@@ -685,7 +668,7 @@ function onKey(e) {
 }
 
 async function init() {
-  renderNav();
+  renderNav($('nav'), 'raceday.html');
   installPalette();
   document.addEventListener('keydown', onKey);
   context.onChange(onContext);

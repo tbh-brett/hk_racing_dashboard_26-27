@@ -11,29 +11,15 @@
  * rather than buried in a commit message.
  */
 import { api, num, signed } from './api.js';
+import { el, $, DASH, renderNav } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
-
-const NAV = [
-  ['Race Day', 'raceday.html'], ['Form Guide', 'form-guide.html'],
-  ['Lookup', 'lookup.html'], ['Bets', 'bets.html'],
-  ['Blackbook', 'blackbook.html'], ['Results', 'results.html'],
-  ['Trials', 'trials.html'], ['Model Analysis', 'model-analysis.html'],
-];
 
 const VIEWS = [['sarr', 'SARR'], ['blend', 'BLEND'],
                ['backtest', 'DOES IT BEAT THE PRICE'], ['et', 'ET'],
                ['all', 'ALL']];
 const WEIGHTS = [0, 0.1, 0.32, 1];
 
-const $ = (id) => document.getElementById(id);
-const DASH = '—';
-const el = (tag, cls, text) => {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text !== undefined) n.textContent = text;
-  return n;
-};
 
 const state = {
   date: null, race: 1, races: [], view: 'all', weight: null,
@@ -42,15 +28,6 @@ const state = {
 };
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
-
-function renderNav() {
-  $('nav').replaceChildren(...NAV.map(([name, href]) => {
-    const a = el('a', null, name);
-    a.href = href;
-    if (href === 'model-analysis.html') a.setAttribute('aria-current', 'page');
-    return a;
-  }));
-}
 
 function renderViewToggle() {
   $('view-toggle').replaceChildren(...VIEWS.map(([key, label]) => {
@@ -661,7 +638,7 @@ function onKey(e) {
 }
 
 async function init() {
-  renderNav();
+  renderNav($('nav'), 'model-analysis.html');
   renderViewToggle();
   installPalette();
   $('rebuild-et').addEventListener('click', onRebuild);

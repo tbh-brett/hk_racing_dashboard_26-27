@@ -14,13 +14,8 @@
  * grows is unusable within a season.
  */
 import { api } from './api.js';
+import { el } from './vocab.js';
 
-const el = (tag, cls, text) => {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text !== undefined) n.textContent = text;
-  return n;
-};
 
 /* The tag vocabulary is the one the imported book actually uses, loaded once
    from the API rather than hard-coded here — the real one has 19 definitions

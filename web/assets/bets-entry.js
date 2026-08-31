@@ -27,14 +27,8 @@
  * blocks. Going past one is a checkbox that gets recorded, not a wall.
  */
 import { api } from './api.js';
+import { el, DASH } from './vocab.js';
 
-const el = (tag, cls, text) => {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text !== undefined) n.textContent = text;
-  return n;
-};
-const DASH = '—';
 const money = (v) => (v == null ? DASH : `$${Number(v).toLocaleString('en-HK',
   { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`);
 const pct = (v) => (v == null ? DASH : `${Number(v).toFixed(1)}%`);

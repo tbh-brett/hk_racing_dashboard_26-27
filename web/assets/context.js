@@ -17,6 +17,7 @@
  * (brief §3.4, the Datasette point).
  */
 import { api } from './api.js';
+import { el } from './vocab.js';
 
 const LAYER_1 = '.chrome-meeting';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -29,12 +30,6 @@ export function formatMeetingDate(iso) {
   return `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}`;
 }
 
-const el = (tag, cls, text) => {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text !== undefined) n.textContent = text;
-  return n;
-};
 
 class MeetingContext {
   constructor() {

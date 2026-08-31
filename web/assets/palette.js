@@ -10,6 +10,7 @@
  * picker is not a control on a page — it is this.
  */
 import { api } from './api.js';
+import { el } from './vocab.js';
 import { context, formatMeetingDate } from './context.js';
 
 const PAGES = [
@@ -19,12 +20,6 @@ const PAGES = [
   ['Trials', 'trials.html'], ['Model Analysis', 'model-analysis.html'],
 ];
 
-const el = (tag, cls, text) => {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text !== undefined) n.textContent = text;
-  return n;
-};
 
 /** Subsequence match with a score, the shape every palette uses: "st15" finds
  *  "Sha Tin 15 Jul". Contiguous runs and word starts score higher, so the

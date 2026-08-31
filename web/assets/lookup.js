@@ -20,25 +20,10 @@
  * can be sent to someone else exactly as it was seen.
  */
 import { api, num } from './api.js';
+import { el, $, DASH, MINUS, renderNav, styleBadge } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 
-const NAV = [
-  ['Race Day', 'raceday.html'], ['Form Guide', 'form-guide.html'],
-  ['Lookup', 'lookup.html'], ['Bets', 'bets.html'],
-  ['Blackbook', 'blackbook.html'], ['Results', 'results.html'],
-  ['Trials', 'trials.html'], ['Model Analysis', 'model-analysis.html'],
-];
-
-const $ = (id) => document.getElementById(id);
-const DASH = '—';
-const MINUS = '−';
-const el = (tag, cls, text) => {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text !== undefined) n.textContent = text;
-  return n;
-};
 
 const TABS = [['runs', 'RUNS'], ['breakdown', 'BREAKDOWN'], ['pivot', 'PIVOT'],
               ['outliers', 'OUTLIERS'], ['insight', 'THIS SLICE']];
@@ -74,15 +59,6 @@ const state = {
 };
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
-
-function renderNav() {
-  $('nav').replaceChildren(...NAV.map(([name, href]) => {
-    const a = el('a', null, name);
-    a.href = href;
-    if (href === 'lookup.html') a.setAttribute('aria-current', 'page');
-    return a;
-  }));
-}
 
 function renderTabs() {
   $('tab-toggle').replaceChildren(...TABS.map(([key, label]) => {
@@ -280,7 +256,12 @@ function runRow(r) {
   cell('r', r.draw ? String(r.draw) : DASH);
   cell(null, r.jockey);
   cell(null, r.trainer);
-  cell(null, r.pace_style);
+  // `cell` takes text; a badge is a node, so it is appended directly. This was
+  // plain text here and a coloured badge on every other page — the same run
+  // reading differently depending on where you happened to look at it.
+  const style = el('div');
+  style.append(styleBadge(r.pace_style));
+  row.append(style);
   cell('r', r.win_odds ? num(r.win_odds, 1) : DASH);
   const fig = el('div', 'r', r.et_figure === null || r.et_figure === undefined
     ? DASH : num(r.et_figure, 1));
@@ -730,7 +711,7 @@ async function load() {
 }
 
 async function boot() {
-  renderNav();
+  renderNav($('nav'), 'lookup.html');
   installPalette();
   await context.init();
   const [vocab, corpus] = await Promise.all([

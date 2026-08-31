@@ -24,24 +24,10 @@
  * nothing about it either way.
  */
 import { api, num } from './api.js';
+import { el, $, DASH, renderNav } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 
-const NAV = [
-  ['Race Day', 'raceday.html'], ['Form Guide', 'form-guide.html'],
-  ['Lookup', 'lookup.html'], ['Bets', 'bets.html'],
-  ['Blackbook', 'blackbook.html'], ['Results', 'results.html'],
-  ['Trials', 'trials.html'], ['Model Analysis', 'model-analysis.html'],
-];
-
-const $ = (id) => document.getElementById(id);
-const DASH = '—';
-const el = (tag, cls, text) => {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text !== undefined) n.textContent = text;
-  return n;
-};
 
 const VIEWS = [['batches', 'BATCHES'], ['standouts', 'STANDOUTS'],
                ['calibration', 'DOES IT HOLD']];
@@ -60,15 +46,6 @@ const state = {
 };
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
-
-function renderNav() {
-  $('nav').replaceChildren(...NAV.map(([name, href]) => {
-    const a = el('a', null, name);
-    a.href = href;
-    if (href === 'trials.html') a.setAttribute('aria-current', 'page');
-    return a;
-  }));
-}
 
 function renderViewToggle() {
   $('view-toggle').replaceChildren(...VIEWS.map(([key, label]) => {
@@ -429,7 +406,7 @@ async function load() {
 }
 
 async function boot() {
-  renderNav();
+  renderNav($('nav'), 'trials.html');
   wireSearch();
   installPalette();
   await context.init();
