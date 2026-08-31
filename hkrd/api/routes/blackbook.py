@@ -59,14 +59,27 @@ def set_blackbook_status(entry_id: str, body: dict = Body(...)) -> dict:
 
 
 @router.get("/api/blackbook/backed-vs-missed")
-def blackbook_backed_vs_missed(entry_id: str | None = None) -> dict:
+def blackbook_backed_vs_missed(entry_id: str | None = None,
+                               account: str | None = None) -> dict:
     """What was backed, what was not, and how each did.
 
     Design brief 06 calls this "the single most important feature on the page":
     without it only the hits are visible. It is a join over the bets ledger, so
     nothing has to be logged by hand.
     """
-    return bets_q.backed_and_missed(entry_id=entry_id)
+    return bets_q.backed_and_missed(entry_id=entry_id, account=account)
+
+
+@router.get("/api/blackbook/by-account")
+def blackbook_by_account(entry_id: str | None = None) -> dict:
+    """The same comparison per account, and combined.
+
+    One book, two ledgers. The blackbook is shared — a horse is followed for
+    what it did, not for whose money is on it — but "was this run backed" has a
+    different answer per account, and the difference between them is a finding
+    about each book's own discipline rather than about the horses.
+    """
+    return bets_q.backed_by_account(entry_id=entry_id)
 
 
 @router.get("/api/blackbook/declared/{date}")

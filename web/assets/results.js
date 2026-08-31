@@ -18,7 +18,7 @@
  * second.
  */
 import { api, num } from './api.js';
-import { el, $, DASH, MINUS, renderNav } from './vocab.js';
+import { el, $, DASH, MINUS, renderNav, paceCell } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 import { loadTags, renderReview } from './review.js';
@@ -80,7 +80,15 @@ function renderRaceLine() {
   const race = r.race;
   const bit = (k, v, cls) => {
     host.append(el('span', 'k', k));
-    host.append(el('span', cls ?? 'v', v ?? DASH));
+    // A value may be text or a built node — the pace cell is a node, because
+    // its band and its number carry different colours.
+    if (v instanceof Node) {
+      const box = el('span', cls ?? 'v');
+      box.append(v);
+      host.append(box);
+    } else {
+      host.append(el('span', cls ?? 'v', v ?? DASH));
+    }
   };
   host.append(el('span', 'big', `R${race.race_no}`));
   bit('DIST', race.distance ? `${race.distance}m` : null);
@@ -91,7 +99,18 @@ function renderRaceLine() {
   if (r.run) {
     bit('WIN TIME', r.winning_time_display, 'big');
     if (r.pace && r.pace.band) {
-      bit('RACE PACE', `${r.pace.band}${r.pace.confident ? '' : ' (thin)'}`);
+      // Brief 09 §6: the label AND its signed deviation. "Fast" alone is an
+      // assertion; "Fast (-0.61)" is a measurement the reader can check. The
+      // band was always calculated — only the number was being dropped.
+      const cell = paceCell(r.pace);
+      if (!r.pace.measured) {
+        // A projection from running styles is not a reading of the race that
+        // was run, and on a RESULTS page that distinction is the whole point.
+        cell.append(el('span', 'projected', ' projected'));
+      } else if (!r.pace.confident) {
+        cell.append(el('span', 'thin', ' thin'));
+      }
+      bit('RACE PACE', cell);
     }
   }
   host.append(el('span', 'right',

@@ -120,8 +120,8 @@ def _next_starts(conn: Connection, pairs: list[tuple[str, str]]
     out: dict[tuple[str, str], dict[str, Any]] = {}
     for horse, after in pairs:
         row = conn.execute("""
-            SELECT r.race_date, r.race_no, r.place, r.place_code, r.win_odds,
-                   a.venue, a.distance, a.race_class,
+            SELECT r.race_date, r.race_no, r.horse_no, r.place, r.place_code,
+                   r.win_odds, a.venue, a.distance, a.race_class,
                    (SELECT count(*) FROM runners f
                      WHERE f.race_date = r.race_date
                        AND f.race_no = r.race_no) field_size
@@ -129,7 +129,26 @@ def _next_starts(conn: Connection, pairs: list[tuple[str, str]]
             JOIN races a ON a.race_date = r.race_date AND a.race_no = r.race_no
             WHERE r.horse_name = ? AND r.race_date > ?
             ORDER BY r.race_date, r.race_no LIMIT 1""", (horse, after)).fetchone()
-        out[(horse, after)] = dict(row) if row else None
+        if row is None:
+            out[(horse, after)] = None
+            continue
+
+        start = dict(row)
+        # The tags the stewards' commentary produced for that run, and the
+        # comment itself. "It trialled well and then ran 7th" is a different
+        # fact from "it trialled well, ran 7th, and was checked at the 800m" —
+        # and the second is the one that keeps a horse in the book.
+        start["tags"] = [
+            t["tag"] for t in conn.execute(
+                "SELECT tag FROM runner_tags WHERE race_date = ? AND race_no = ? "
+                "AND horse_no = ? ORDER BY tag",
+                (row["race_date"], row["race_no"], row["horse_no"]))]
+        comment = conn.execute(
+            "SELECT comment_text FROM runner_comments WHERE race_date = ? "
+            "AND race_no = ? AND horse_no = ?",
+            (row["race_date"], row["race_no"], row["horse_no"])).fetchone()
+        start["comment"] = comment["comment_text"] if comment else None
+        out[(horse, after)] = start
     return out
 
 

@@ -25,6 +25,7 @@ from typing import Any
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["ledger", "bets_for_race", "bets_for_horse", "backed_and_missed",
+           "backed_by_account",
            "summary"]
 
 # What a missed run is priced at, so the two sides of the comparison are
@@ -213,6 +214,7 @@ _RUNS_SINCE = """
     LEFT JOIN (
         SELECT DISTINCT bt.race_date, s.race_no, s.horse_no
         FROM bets bt JOIN bet_selections s ON s.bet_id = bt.bet_id
+        WHERE (:account IS NULL OR lower(bt.account) = :account)
     ) backed ON backed.race_date = r.race_date
             AND backed.race_no = r.race_no
             AND backed.horse_no = r.horse_no
@@ -220,21 +222,41 @@ _RUNS_SINCE = """
 
 
 def backed_and_missed(*, entry_id: str | None = None,
+                      account: str | None = None,
                       conn: Connection | None = None) -> dict[str, Any]:
     """The falsifiability requirement: what was backed, what was not, and how
     each did.
 
     "If the missed ones outperform the backed ones, that's a finding about the
     user's own selection, not about the horses." — design brief 06.
+
+    ONE BOOK, TWO LEDGERS. The blackbook is shared: a horse is followed because
+    of what it did, not because of whose money is on it. The bets are not — so
+    "was this run backed" has a different honest answer depending on who is
+    asking, and `account` chooses which question is being asked:
+
+      account="brett"   backed means backed ON BRETT. A run backed only on
+                        Kelvin counts as MISSED here, which is the reading
+                        that measures Brett's own selection discipline —
+                        the thing this whole comparison exists to measure.
+      account="kelvin"  the mirror.
+      account=None      backed means backed on EITHER. This is the book's own
+                        hit rate, independent of which wallet paid.
+
+    Those two readings must never be summed. A run backed on Kelvin and not on
+    Brett is missed-for-Brett AND backed-overall; both are true, they answer
+    different questions, and adding them would break the one invariant this
+    page rests on — backed + missed equals runs since booking.
     """
     own = conn is None
     conn = conn or get_conn()
     try:
         where = "WHERE r.place IS NOT NULL"
-        params: list[Any] = []
+        params: dict[str, Any] = {
+            "account": account.lower() if account else None}
         if entry_id:
-            where += " AND b.id = ?"
-            params.append(entry_id)
+            where += " AND b.id = :entry_id"
+            params["entry_id"] = entry_id
 
         runs = _rows(conn, f"""
             SELECT b.id, b.horse_name, r.race_date, r.race_no, r.horse_no,
@@ -275,9 +297,13 @@ def backed_and_missed(*, entry_id: str | None = None,
         # is the bet type rather than the selection.
         out = {
             "runs": len(runs),
+            "account": account.lower() if account else None,
             "backed": side(backed, notional=True),
             "missed": side(missed, notional=True),
             "notional_stake": NOTIONAL_STAKE,
+            # Per account, always — so the page can show "Brett had it, Kelvin
+            # did not" without asking three times and reconciling the answers.
+            "by_account": _backed_by_account(conn, runs),
         }
         b_roi, m_roi = out["backed"]["roi"], out["missed"]["roi"]
         out["verdict"] = (
@@ -365,6 +391,50 @@ def summary(*, account: str | None = None,
             "accounts": [r["account"] for r in conn.execute(
                 "SELECT DISTINCT account FROM bets ORDER BY account")],
         }
+    finally:
+        if own:
+            conn.close()
+
+
+def _backed_by_account(conn: Connection, runs: list[dict]) -> dict[str, int]:
+    """How many of these runs each account backed.
+
+    Counted per account rather than summed: a run both accounts backed is one
+    run, and it appears in both counts. Adding them would double it.
+    """
+    if not runs:
+        return {}
+    keys = {(r["race_date"], r["race_no"], r["horse_no"]) for r in runs}
+    out: dict[str, int] = {}
+    rows = conn.execute("""
+        SELECT DISTINCT lower(bt.account) acct, bt.race_date, s.race_no, s.horse_no
+        FROM bets bt JOIN bet_selections s ON s.bet_id = bt.bet_id
+        WHERE bt.account IS NOT NULL
+    """).fetchall()
+    for r in rows:
+        if (r["race_date"], r["race_no"], r["horse_no"]) in keys:
+            out[r["acct"]] = out.get(r["acct"], 0) + 1
+    return out
+
+
+def backed_by_account(*, entry_id: str | None = None,
+                      conn: Connection | None = None) -> dict[str, Any]:
+    """The same comparison run once per account, plus the combined view.
+
+    Returned together so the page never has to reconcile three separate calls,
+    and so the difference between them — a run one book took and the other did
+    not — is visible rather than something the reader has to infer.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        from hkrd.query.prebet import ACCOUNTS
+
+        out = {"combined": backed_and_missed(entry_id=entry_id, conn=conn)}
+        for a in ACCOUNTS:
+            out[a["key"]] = backed_and_missed(
+                entry_id=entry_id, account=a["key"], conn=conn)
+        return out
     finally:
         if own:
             conn.close()

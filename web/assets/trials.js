@@ -24,7 +24,8 @@
  * nothing about it either way.
  */
 import { api, num } from './api.js';
-import { el, $, DASH, renderNav } from './vocab.js';
+import { el, $, DASH, renderNav, tripTags, tagLabel,
+         replayUrl, externalLink } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 
@@ -73,12 +74,45 @@ function nextStart(nxt) {
   }
   const placed = nxt.place <= (nxt.field_size >= 7 ? 3 : 2);
   const cls = nxt.place === 1 ? 'won' : placed ? 'plc' : null;
-  box.append(el('span', null, `${nxt.race_date} `));
+  // No padding spaces: the cell is a flex row and would collapse them, which
+  // ran the date into the finishing position. The gap is the stylesheet's.
+  box.append(el('span', null, nxt.race_date));
   box.append(el('span', cls, `${nxt.place}/${nxt.field_size}`));
   box.append(el('span', null,
-    ` ${nxt.venue} ${nxt.distance ?? ''}m${nxt.race_class ? ` Cl${nxt.race_class}` : ''}`));
+    `${nxt.venue} ${nxt.distance ?? ''}m${nxt.race_class ? ` Cl${nxt.race_class}` : ''}`));
   box.title = `${nxt.race_date} R${nxt.race_no} — finished ${nxt.place} of `
     + `${nxt.field_size}${nxt.win_odds ? ` at ${nxt.win_odds}` : ''}`;
+
+  // "It trialled well and then ran 7th" is a different fact from "it trialled
+  // well, ran 7th, and was checked at the 800m". The second is what keeps a
+  // horse worth following, so the tags travel with the result rather than
+  // being a click away on another page.
+  const trouble = tripTags(nxt.tags);
+  if (trouble.length) {
+    // The tags are the part that gives way when the column is narrow, which
+    // is why they live in their own shrinking box. Losing "wide no cover" to
+    // an ellipsis costs a detail the hover still carries; losing the play
+    // control costs the thing the column is for.
+    const tags = el('span', 'ns-tags');
+    trouble.slice(0, 2).forEach((t) => {
+      const chip = el('span', 'ns-tag', tagLabel(t));
+      if (nxt.comment) chip.title = nxt.comment;
+      tags.append(chip);
+    });
+    box.append(tags);
+  }
+
+  // And the footage of it, because a trial mark is a claim about what the
+  // horse can do and the next start is where that claim gets tested. It is
+  // pinned to the end of the row rather than queued behind the tags: a
+  // replay that scrolls out of the cell is a replay nobody watches.
+  const url = replayUrl(nxt.race_date, nxt.race_no);
+  if (url) {
+    const play = externalLink(url, '▶', 'ns-play');
+    play.title = `replay — ${nxt.race_date} race ${nxt.race_no}`;
+    play.addEventListener('click', (e) => e.stopPropagation());
+    box.append(play);
+  }
   return box;
 }
 

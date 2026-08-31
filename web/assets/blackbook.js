@@ -47,7 +47,7 @@ const state = {
   view: 'list', entries: [], tags: [], summary: null, tagMeta: null,
   search: '', tag: null, status: 'all', range: 'all', today: null,
   todayOnly: false, declared: new Set(), open: new Set(), details: {},
-  backedMissed: null,
+  backedMissed: null, account: null,
   sort: 'added', sortDir: -1, busy: new Set(),
 };
 
@@ -715,6 +715,51 @@ function renderAnalysis() {
   renderStatusPanel();
 }
 
+/* The account this comparison is being asked about.
+ *
+ * BOTH is the book's own hit rate, independent of which wallet paid. A single
+ * account is that account's selection discipline: a run the OTHER book took
+ * counts as missed here, which is the honest reading and the whole reason the
+ * split is worth having.
+ *
+ * The two readings must never be summed. A run Kelvin took and Brett did not
+ * is missed-for-Brett and backed-overall; both are true, and adding them
+ * breaks the invariant the page rests on — backed + missed equals runs since.
+ */
+const ACCOUNTS = [
+  ['', 'BOTH', 'the book itself, whoever paid'],
+  ['brett', 'BRETT', 'backed on Brett; a Kelvin-only run counts as missed'],
+  ['kelvin', 'KELVIN', 'backed on Kelvin; a Brett-only run counts as missed'],
+];
+
+function accountSwitch() {
+  const bar = el('div', `bm-acct${state.account ? ` acct-${state.account}` : ''}`);
+  bar.append(el('span', 'lab', 'LEDGER'));
+  ACCOUNTS.forEach(([key, label, why]) => {
+    const on = (state.account ?? '') === key;
+    const b = el('button', `bm-chip${on ? ' on' : ''}`, label);
+    b.type = 'button';
+    b.title = why;
+    b.setAttribute('aria-pressed', String(on));
+    b.addEventListener('click', async () => {
+      state.account = key || null;
+      state.backedMissed = null;
+      renderWholeBook();
+      state.backedMissed = await api.backedVsMissed(null, state.account);
+      renderWholeBook();
+    });
+    bar.append(b);
+  });
+  const split = state.backedMissed?.by_account ?? {};
+  if (Object.keys(split).length) {
+    // Counted per account, never summed: a run both books took is one run and
+    // appears in both counts.
+    bar.append(el('span', 'split', Object.entries(split)
+      .map(([a, n]) => `${a} ${n}`).join(' · ')));
+  }
+  return bar;
+}
+
 function renderWholeBook() {
   const s = state.summary;
   const bm = state.backedMissed;
@@ -748,6 +793,12 @@ function renderWholeBook() {
     host.append(el('div', 'closing', 'LOADING THE BETS LEDGER'));
     return;
   }
+
+  // ONE BOOK, TWO LEDGERS. The book is shared — a horse is followed for what
+  // it did, not for whose money is on it — but "was this run backed" has a
+  // different answer per account, and the gap between them is a finding about
+  // each book's discipline rather than about the horses.
+  host.append(accountSwitch());
 
   // Both sides priced at the SAME notional flat win stake. The real ledger is
   // quinellas and multi-leg tickets; comparing those against a notional win

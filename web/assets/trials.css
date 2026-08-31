@@ -77,7 +77,7 @@
 .tr-head, .tr-row {
   display: grid; align-items: center;
   grid-template-columns: 30px 30px minmax(140px, 1fr) 62px 56px 64px 58px
-    minmax(200px, 1.6fr) minmax(140px, 1fr);
+    minmax(180px, 1.4fr) minmax(215px, 1.25fr);
   gap: 10px; padding: 0 14px;
 }
 .tr-head {
@@ -97,8 +97,10 @@
 .tr-row .comment {
   color: var(--text-dim); overflow: hidden; text-overflow: ellipsis;
 }
-/* What the horse did at the RACES after this trial — never another trial. */
-.tr-row .next { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
+/* What the horse did at the RACES after this trial — never another trial.
+   A flex row, not flowed text, so the shrinking is something this file decides
+   rather than whatever happens to be last. */
+.tr-row .next { color: var(--text-muted); overflow: hidden; }
 .tr-row .next .won { color: var(--win); font-weight: 600; }
 .tr-row .next .plc { color: var(--text-2); }
 .tr-row .next .none { color: var(--text-faint); }
@@ -173,3 +175,23 @@
 .cal-tab .bar i.up { background: var(--win); }
 .cal-tab .bar i.down { background: var(--loss); }
 .cal-tab .bar i.flat { background: var(--text-faint); }
+
+/* The next start's own story: what the stewards said, and the footage. A trial
+   mark is a claim about what a horse can do; this is where it gets tested. */
+.next { display: flex; align-items: center; gap: 5px; min-width: 0; }
+/* Everything but the tags holds its size. */
+.next > * { flex: 0 0 auto; }
+.next .ns-tags {
+  display: flex; align-items: center; gap: 5px;
+  flex: 0 1 auto; min-width: 0; overflow: hidden;
+}
+.next .ns-tag {
+  padding: 0 4px; font-size: var(--fs-xs); white-space: nowrap;
+  color: var(--incident); border: 1px solid var(--incident); cursor: help;
+  flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+}
+.next .ns-play {
+  margin-left: 1px; color: var(--tr-accent); text-decoration: none;
+  font-size: var(--fs-xs);
+}
+.next .ns-play:hover { color: var(--text); }

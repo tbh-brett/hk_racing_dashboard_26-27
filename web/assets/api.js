@@ -45,8 +45,14 @@ export const api = {
   blackbookEntry: (id) => get(`/blackbook/${encodeURIComponent(id)}`),
   blackbookTags: () => get('/blackbook/tags'),
   blackbookDeclared: (date) => get(`/blackbook/declared/${date}`),
-  backedVsMissed: (entryId) => get(
-    `/blackbook/backed-vs-missed${entryId ? `?entry_id=${entryId}` : ''}`),
+  backedVsMissed: (entryId, account) => get(
+    '/blackbook/backed-vs-missed'
+    + (entryId || account
+      ? `?${[entryId ? `entry_id=${entryId}` : '',
+             account ? `account=${account}` : ''].filter(Boolean).join('&')}`
+      : '')),
+  blackbookByAccount: (entryId) => get(
+    `/blackbook/by-account${entryId ? `?entry_id=${entryId}` : ''}`),
   bets: (q = '') => get(`/bets${q}`),
   betsSummary: () => get('/bets/summary'),
   betsForRace: (date, no) => get(`/bets/race/${date}/${no}`),

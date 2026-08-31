@@ -286,3 +286,28 @@
 
 .pos { color: var(--win); }
 .neg { color: var(--loss); }
+
+/* One book, two ledgers. The band takes the account's colour from the Bets
+   page, so the colour means the same thing wherever an account is named. */
+.bm-acct {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 6px 10px; margin-bottom: 8px;
+  border-left: 5px solid var(--line-2); background: var(--surface);
+}
+.bm-acct.acct-brett { border-left-color: var(--acct-1); background: var(--acct-1-band); }
+.bm-acct.acct-kelvin { border-left-color: var(--acct-2); background: var(--acct-2-band); }
+.bm-acct .lab {
+  font-size: var(--fs-xs); letter-spacing: .08em; color: var(--text-muted);
+}
+.bm-chip {
+  background: var(--bg-deep); border: 1px solid var(--line-2);
+  color: var(--text-dim); font-family: var(--font-mono);
+  font-size: var(--fs-xs); padding: 2px 8px; cursor: pointer;
+}
+.bm-chip:hover { background: var(--surface-2); border-color: var(--line-3); }
+.bm-chip.on { background: var(--book-ground); border-color: var(--book); color: var(--book); }
+.bm-chip.on:hover { background: var(--book-ground); border-color: var(--book); }
+.bm-acct .split {
+  margin-left: auto; font-size: var(--fs-xs); color: var(--text-faint);
+  font-family: var(--font-mono);
+}
