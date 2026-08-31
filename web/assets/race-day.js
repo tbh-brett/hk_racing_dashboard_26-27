@@ -24,6 +24,7 @@ const svg = (tag, attrs) => {
 const state = {
   date: null, race: 1, summary: null, card: null,
   selected: 0, sort: null, sortDir: 1, bbOpen: false, h2hOpen: true,
+  seenAt: null,
   blackbook: null, blackbookError: null,
 };
 
@@ -51,9 +52,89 @@ function renderStrip() {
     b.addEventListener('click', () => selectRace(r.race_no));
     return b;
   }));
+  renderChanges();
+}
+
+/* ── what changed since I last looked ────────────────────────────────────────
+ * Brief 01 lists this as one of the four questions the page exists to answer
+ * twenty minutes before a race, and says the current dashboard does not show
+ * it at all. The favourite changes between morning and post time in 44% of
+ * races, which makes a fav swap the single most informative thing on screen.
+ *
+ * Brief 08 §1 puts it HERE rather than in the global chrome: it is Race Day
+ * content, and a page-level fact rendering globally was the "button alternates
+ * across pages" fault that brief was written to fix.
+ *
+ * "Since I last looked" is per-person, so the baseline is this browser's own
+ * last visit to this meeting. With no earlier visit there is nothing to diff,
+ * and the strip says so rather than inventing a baseline — a change count
+ * measured from an arbitrary moment looks informative and is not.
+ */
+const SEEN_KEY = 'hkrd:last-seen';
+
+function lastSeen(date) {
+  try {
+    return JSON.parse(localStorage.getItem(SEEN_KEY) || '{}')[date] ?? null;
+  } catch {
+    // A browser with site data blocked is not an error worth surfacing; it
+    // just means there is no baseline, which the strip already handles.
+    return null;
+  }
+}
+
+function markSeen(date) {
+  try {
+    const all = JSON.parse(localStorage.getItem(SEEN_KEY) || '{}');
+    all[date] = new Date().toISOString().slice(0, 19);
+    localStorage.setItem(SEEN_KEY, JSON.stringify(all));
+  } catch { /* nothing to remember on is not a failure */ }
+}
+
+async function renderChanges() {
+  const host = $('strip-right');
+  const races = state.summary?.races ?? [];
   const withOdds = races.filter((r) => r.concentration !== null).length;
-  $('strip-right').textContent =
-    `${races.length} RACES · ${withOdds} PRICED`;
+  host.replaceChildren();
+
+  const since = state.seenAt;
+  if (!since) {
+    host.append(el('span', 'ch-none',
+      `${races.length} RACES · ${withOdds} PRICED`));
+    return;
+  }
+  let ch;
+  try {
+    ch = await api.changes(state.date, since);
+  } catch (err) {
+    host.append(el('span', 'ch-none', `CHANGES UNAVAILABLE — ${err.message}`));
+    return;
+  }
+  if (!ch.observed || !ch.runners_compared) {
+    host.append(el('span', 'ch-none',
+      `${races.length} RACES · ${withOdds} PRICED`));
+    return;
+  }
+
+  host.append(el('span', 'ch-k', 'CHANGES'));
+  host.append(el('span', 'ch-since', `SINCE ${since.slice(11, 16)}`));
+  if (ch.drifts) host.append(el('span', 'ch-drift', `${ch.drifts} DRIFTS`));
+  if (ch.firmers) host.append(el('span', 'ch-firm', `${ch.firmers} FIRMERS`));
+  if (ch.fav_swaps.length) {
+    const swap = el('span', 'ch-swap',
+      `${ch.fav_swaps.length} FAV SWAP${ch.fav_swaps.length > 1 ? 'S' : ''}`);
+    swap.title = ch.fav_swaps
+      .map((f) => `R${f.race_no}: ${f.from} → ${f.to}`).join('\n');
+    host.append(swap);
+  }
+  if (ch.scratched.length) {
+    const scr = el('span', 'ch-scr',
+      `${ch.scratched.map((x) => `R${x.race_no}`).join(' ')} · ${ch.scratched.length} SCR`);
+    scr.title = 'priced when you last looked, unpriced now';
+    host.append(scr);
+  }
+  if (!ch.drifts && !ch.firmers && !ch.fav_swaps.length && !ch.scratched.length) {
+    host.append(el('span', 'ch-none', 'nothing moved'));
+  }
 }
 
 /* ── bands ───────────────────────────────────────────────────────────────── */
@@ -682,9 +763,16 @@ async function loadRace() {
 /* The page no longer owns the meeting. It reads context and re-renders when
    context changes — brief 01: "chosen once. Every part of the page obeys it." */
 async function onContext(_ctx, what) {
+  const changedMeeting = state.date !== context.date;
   state.date = context.date;
   state.summary = context.summary;
   state.race = context.race;
+  if (changedMeeting && context.date) {
+    // Read the baseline BEFORE stamping this visit, or the diff would always
+    // be against a moment two milliseconds ago and always read "nothing moved".
+    state.seenAt = lastSeen(context.date);
+    markSeen(context.date);
+  }
   if (what === 'date') {                    // a new meeting is loading
     state.card = null;
     state.blackbook = null;

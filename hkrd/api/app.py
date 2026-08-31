@@ -15,7 +15,7 @@ from hkrd.api import auth, routes
 from hkrd.query import (blackbook as bb_q, formguide as fg_q,
                         health as health_q, market as market_q, model,
                         race as race_q, raceday as raceday_q,
-                        vet as vet_q)
+                        vet as vet_q, freshness as fresh_q)
 
 WEB = Path(__file__).resolve().parent.parent.parent / "web"
 
@@ -78,6 +78,29 @@ def ops_status() -> dict:
     difference is written down.
     """
     return health_q.status()
+
+
+@app.get("/api/freshness")
+def freshness() -> dict:
+    """Per-source freshness, judged against what is normal FOR THAT SOURCE.
+
+    Odds go stale in minutes and barrier trials are published weekly, so one
+    shared threshold would call odds fine and trials broken, or the reverse.
+    Design brief 07 §6: the system says what needs attention rather than the
+    user remembering to check, which is how the pace column went missing for
+    weeks in the old system.
+    """
+    return fresh_q.strip()
+
+
+@app.get("/api/changes/{date}")
+def changes(date: str, since: str | None = None) -> dict:
+    """What moved across the meeting since the viewer last looked.
+
+    `since` is per-person state and comes from the page. Without it there is
+    nothing to diff, and the answer says so rather than inventing a baseline.
+    """
+    return market_q.changes_since(date, since)
 
 
 @app.get("/api/meetings")

@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from hkrd.ingest import odds as odds_ingest
-from hkrd.store import upsert
+from hkrd.store import job_log, upsert
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
 __all__ = ["run", "OddsRun"]
@@ -171,6 +171,13 @@ def run(date: str | None = None, venue: str | None = None, *,
                 report.win_place += upsert.upsert_odds_snapshots(conn, win_place)
                 report.pairs += upsert.upsert_odds_pairs(conn, pairs)
             report.races += 1
+
+        # Recorded so the freshness strip can say when odds last landed, and
+        # so a run that stored nothing is visible as such rather than as
+        # silence indistinguishable from a run that never happened.
+        with transaction(conn):
+            job_log.record_source(
+                conn, "scrape_odds", ok=report.races > 0, detail=report.line())
         return report
     finally:
         conn.close()

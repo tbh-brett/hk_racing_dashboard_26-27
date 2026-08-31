@@ -36,6 +36,7 @@ class MeetingContext {
     this.date = null;
     this.race = null;
     this.meetings = [];
+    this.freshness = null;
     this.summary = null;
     this.status = null;
     this._listeners = new Set();
@@ -171,15 +172,34 @@ class MeetingContext {
     host.append(hint);
   }
 
+  /* Per SOURCE, not per derived table.
+   *
+   * This strip read `/api/status` — the MODEL status endpoint — and rendered
+   * its `tables` key, so it showed et/pace/sarr/tags: how much of the archive
+   * has been derived. Useful, but not the question. Design brief 07 §6 asks
+   * what is CURRENT: Card, Odds, Results, Trials, Vet, each judged against
+   * what is normal for it, because odds go stale in minutes and trials are
+   * published weekly.
+   *
+   * Clicking a stale source is how you refresh just that source — the brief's
+   * inversion, where the system says what needs attention instead of the user
+   * remembering to check.
+   */
   _freshness() {
     const box = el('div', 'freshness');
-    if (!this.status) return box;
-    Object.entries(this.status.tables ?? {}).forEach(([table, info]) => {
-      const chip = el('span', 'src');
-      chip.append(el('span', 'name', table.replace('runner_', '')));
-      chip.append(el('span', info.current ? 'ok' : 'stale',
-        info.rows ? (info.current ? '✓' : '⚠') : '—'));
-      chip.title = `${info.rows.toLocaleString()} rows, through ${info.through ?? 'never'}`;
+    const sources = this.freshness?.sources;
+    if (!sources) return box;
+    sources.forEach((s) => {
+      const chip = el('span', `src${s.stale ? ' is-stale' : ''}`);
+      chip.append(el('span', 'name', s.name));
+      chip.append(el('span', s.stale ? 'stale' : s.minutes === null ? 'never' : 'ok',
+        `${s.mark}${s.minutes === null ? '' : ` ${s.age}`}`));
+      // Never a bare mark: what the last run wrote travels with it, because a
+      // job that ran and stored nothing is the failure this strip exists for.
+      chip.title = s.minutes === null
+        ? `${s.name}: no successful run on record (normal: every ${s.normal})`
+        : `${s.name}: last landed ${s.age} ago, normal is every ${s.normal}`
+          + (s.detail ? `\n${s.detail}` : '');
       box.append(chip);
     });
     return box;
@@ -188,12 +208,14 @@ class MeetingContext {
   /** Called once per page. Resolves the meeting from the URL, then the latest.
    *  Pages get a fully populated context before their first render. */
   async init() {
-    const [meetings, status] = await Promise.all([
+    const [meetings, status, freshness] = await Promise.all([
       api.meetings(60).catch(() => []),
       api.status().catch(() => null),
+      api.freshness().catch(() => null),
     ]);
     this.meetings = meetings;
     this.status = status;
+    this.freshness = freshness;
 
     const url = MeetingContext._readUrl();
     const known = (d) => meetings.some((m) => m.race_date === d);

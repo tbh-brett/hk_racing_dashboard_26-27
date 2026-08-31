@@ -63,6 +63,9 @@ export const api = {
   placeBet: (body) => post('/bets', body),
   vetHistory: (name, limit = 20) => get(
     `/vet/${encodeURIComponent(name)}?limit=${limit}`),
+  freshness: () => get('/freshness'),
+  changes: (date, since) => get(
+    `/changes/${date}${since ? `?since=${encodeURIComponent(since)}` : ''}`),
   lookup: (q) => get(`/lookup?${q}`),
   lookupInsight: (q) => get(`/lookup/insight?${q}`),
   lookupFilters: () => get('/lookup/filters'),

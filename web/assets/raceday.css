@@ -288,3 +288,17 @@ table.card td { padding: 6px 8px; }
 .vr-detail { color: var(--text-dim); line-height: 1.5; margin-top: 2px; }
 .vr-cleared { font-size: 10px; color: var(--win); margin-top: 2px; }
 .vr-open { font-size: 10px; color: var(--incident); margin-top: 2px; }
+
+/* ── what changed since I last looked ─────────────────────────────────────
+ * Brief 01 calls a favourite swap the single most informative thing on the
+ * screen. Drift and firm are opposite meanings, so they take opposite ends of
+ * the palette; a swap takes the edge colour because it is the one that
+ * changes what the model disagreement means.                               */
+#strip-right .ch-k { letter-spacing: .1em; color: var(--text-faint); }
+#strip-right .ch-since { color: var(--text-muted); }
+#strip-right .ch-drift { color: var(--alert); }
+#strip-right .ch-firm { color: var(--win); }
+#strip-right .ch-swap { color: var(--edge); cursor: help; }
+#strip-right .ch-scr { color: var(--alert); cursor: help; }
+#strip-right .ch-none { color: var(--text-muted); }
+#strip-right > span + span { margin-left: 10px; }

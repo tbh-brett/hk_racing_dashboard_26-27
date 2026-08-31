@@ -29,6 +29,7 @@ from hkrd.ingest import (corunning, dividends as dividends_ingest,
                          racecard as racecard_ingest,
                          results as results_ingest, vet as vet_ingest)
 from hkrd.ingest._client import FetchError
+from hkrd.store import job_log
 from hkrd.store import upsert
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
@@ -143,7 +144,43 @@ def scrape_meeting(date: str, venue: str, *, post_race: bool = False,
         except (FetchError, vet_ingest.VetError) as e:
             report.warnings.append(f"vet: {e}")
 
+    _log_sources(db, report, post_race=post_race)
     return report
+
+
+def _log_sources(db, report: ScrapeReport, *, post_race: bool) -> None:
+    """Record each source separately, for the freshness strip.
+
+    One job fetches four sources that go stale at very different rates, and a
+    vet scrape that failed while the card succeeded is a fact the strip has to
+    be able to show. Recording only the job would average them into one mark
+    and hide exactly the case worth seeing.
+
+    A source with nothing to fetch yet is NOT a failure: results and vet
+    records do not exist before the race is run, and marking them failed would
+    train the eye to ignore the strip on every race morning.
+    """
+    failed = {w.split(":", 1)[0] for w in report.warnings}
+    failed |= {e.split(":", 1)[0] for e in report.errors}
+    entries = [
+        ("card", "racecard" not in failed and report.declared >= 0,
+         f"{report.declared} declared"),
+        ("results", report.races > 0, f"{report.races} races · {report.runners} runners"),
+    ]
+    if post_race:
+        entries += [
+            ("dividends", "dividends" not in failed, f"{report.dividends} dividends"),
+            ("vet", "vet" not in failed, f"{report.vet_records} records"),
+        ]
+    conn = get_conn(db if db is not None else db_path())
+    try:
+        init_db(conn)
+        with transaction(conn):
+            for source, ok, detail in entries:
+                job_log.record_source(conn, f"scrape_meeting:{source}",
+                                      ok=ok, detail=detail)
+    finally:
+        conn.close()
 
 
 def _open(db: Path | None):

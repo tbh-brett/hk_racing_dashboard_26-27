@@ -30,7 +30,7 @@ from pathlib import Path
 
 from hkrd.ingest import trials as trials_ingest
 from hkrd.ingest._client import FetchError, NotFound
-from hkrd.store import upsert
+from hkrd.store import job_log, upsert
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
 __all__ = ["scrape", "catch_up", "TrialScrapeReport"]
@@ -115,6 +115,22 @@ def scrape(date: str, *, db: Path | None = None,
                 report.runners += upsert.upsert_trials(conn, rows)
                 if batch.get("distance"):
                     report.with_distance += len(rows)
+
+        # Recorded so the freshness strip can say when trials last LANDED.
+        # Trials are published weekly, so three days old is current for this
+        # source and stale for every other one — which is why the strip judges
+        # each source against its own normal rather than one shared threshold.
+        #
+        # A morning with no trial day writes NOTHING. Recording a success would
+        # advance the clock and make the strip read fresh when nothing arrived;
+        # recording a failure would cry wolf on most mornings, which is how a
+        # warning strip becomes wallpaper. The previous success stands, and it
+        # is the honest answer to "when did trials last land".
+        if report.runners or report.errors:
+            with transaction(conn):
+                job_log.record_source(
+                    conn, "scrape_trials", ok=bool(report.runners),
+                    detail=f"{report.batches} batches · {report.runners} trials")
     finally:
         conn.close()
     return report

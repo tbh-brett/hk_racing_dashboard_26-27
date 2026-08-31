@@ -24,7 +24,8 @@ from hkrd.store.connect import Connection, get_conn
 __all__ = ["concentration", "band", "price_movement", "odds_coverage",
            "latest_prices", "snapshot_age_hours", "STALE_AFTER_HOURS",
            "MIN_WINDOW_MINUTES", "warm", "place_probabilities",
-           "ranked_pairs", "PLACE_PAYING_FIELD"]
+           "ranked_pairs", "PLACE_PAYING_FIELD", "changes_since",
+           "MOVE_THRESHOLD"]
 
 # A price captured well before the off is not the price the rule was measured
 # on. Concentration moves from a mean of 0.539 in the morning to 0.637 at post
@@ -323,3 +324,96 @@ def ranked_pairs(date: str, race_no: int, *, top: int = 5, at: str = "latest",
              "horse_nos": [live[a]["horse_no"], live[b]["horse_no"]],
              "prob": round(100 * prob, 1)}
             for i, ((a, b), prob) in enumerate(ordered)]
+
+
+# A price is not "on the move" because it twitched. Two percent is the same
+# threshold `price_movement` uses to call a direction, and using a second one
+# here would let a runner be drifting in the strip and flat in its own row.
+MOVE_THRESHOLD = 0.02
+
+
+def changes_since(date: str, since: str | None, *,
+                  conn: Connection | None = None) -> dict[str, Any]:
+    """What moved across the whole meeting since a given moment.
+
+    Design brief 01 asks the Race Day page to answer "has the market moved
+    since I last looked, and on which horse" — and calls the favourite changing
+    "the single most informative thing on the screen", which the old dashboard
+    did not show at all. It happens in 44% of races.
+
+    `since` is the viewer's own last visit, so this is per-person state and the
+    page supplies it. With no `since` there is nothing to diff and the strip
+    says so rather than inventing a baseline — a "changes since" computed from
+    an arbitrary starting point is a number that looks informative and is not.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        if not since:
+            return {"race_date": date, "since": None, "drifts": 0,
+                    "firmers": 0, "fav_swaps": [], "scratched": [],
+                    "observed": False,
+                    "note": "no earlier visit to compare against"}
+
+        # `now` is the runner's price in the race's LATEST capture, not in the
+        # runner's own last row. Those differ for exactly the case that matters:
+        # a scratched runner still HAS rows, from before it came out, and
+        # reading its own last row reports it as priced and moving normally.
+        rows = conn.execute("""
+            SELECT a.race_no, a.horse_no,
+                   (SELECT win_odds FROM odds_snapshots b
+                     WHERE b.race_date = a.race_date AND b.race_no = a.race_no
+                       AND b.horse_no = a.horse_no AND b.captured_at <= ?
+                     ORDER BY b.captured_at DESC LIMIT 1) AS before,
+                   (SELECT win_odds FROM odds_snapshots c
+                     WHERE c.race_date = a.race_date AND c.race_no = a.race_no
+                       AND c.horse_no = a.horse_no
+                       AND c.captured_at = latest.at) AS now
+              FROM (SELECT DISTINCT race_date, race_no, horse_no
+                      FROM odds_snapshots WHERE race_date = ?) a
+              JOIN (SELECT race_no, max(captured_at) AS at
+                      FROM odds_snapshots WHERE race_date = ?
+                     GROUP BY race_no) latest ON latest.race_no = a.race_no
+        """, (since, date, date)).fetchall()
+
+        drifts = firmers = 0
+        scratched: list[dict[str, Any]] = []
+        by_race: dict[int, list[tuple[int, float | None, float | None]]] = {}
+        for r in rows:
+            before, now = r["before"], r["now"]
+            by_race.setdefault(r["race_no"], []).append(
+                (r["horse_no"], before, now))
+            if before is None:
+                continue
+            if now is None:
+                # Priced earlier and unpriced now: the runner came out.
+                scratched.append({"race_no": r["race_no"],
+                                  "horse_no": r["horse_no"]})
+                continue
+            change = (now - before) / before
+            if change > MOVE_THRESHOLD:
+                drifts += 1
+            elif change < -MOVE_THRESHOLD:
+                firmers += 1
+
+        # The favourite changing is the headline, so it names the race rather
+        # than being folded into a count.
+        fav_swaps = []
+        for race_no, entries in sorted(by_race.items()):
+            was = [(h, b) for h, b, _ in entries if b]
+            now = [(h, n) for h, _, n in entries if n]
+            if not was or not now:
+                continue
+            before_fav = min(was, key=lambda x: x[1])[0]
+            now_fav = min(now, key=lambda x: x[1])[0]
+            if before_fav != now_fav:
+                fav_swaps.append({"race_no": race_no, "from": before_fav,
+                                  "to": now_fav})
+
+        return {"race_date": date, "since": since, "drifts": drifts,
+                "firmers": firmers, "fav_swaps": fav_swaps,
+                "scratched": scratched, "observed": True,
+                "runners_compared": sum(1 for r in rows if r["before"])}
+    finally:
+        if own:
+            conn.close()

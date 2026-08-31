@@ -21,7 +21,7 @@ from pathlib import Path
 
 from hkrd.store.connect import get_conn, init_db
 
-__all__ = ["record", "running", "last_run", "recent"]
+__all__ = ["record", "record_source", "running", "last_run", "recent"]
 
 
 def _now() -> str:
@@ -95,3 +95,19 @@ def _shape(row) -> dict | None:
             # which needs a different response from "ran and failed".
             "ok": None if row["ok"] is None else bool(row["ok"]),
             "detail": row["detail"] or ""}
+
+
+def record_source(conn: sqlite3.Connection, job: str, *, ok: bool,
+                  detail: str, at: str | None = None) -> None:
+    """Record one SOURCE's outcome inside a job that fetches several.
+
+    `scrape_meeting` fetches the card, the results, the dividends and the vet
+    records in one pass, and the freshness strip reports them separately —
+    because they go stale at very different rates and because a vet scrape that
+    failed while the card succeeded is a fact the strip has to be able to show.
+
+    A closed row, written at the end, rather than the open-then-close pair
+    `running` uses: these are steps inside a run that is already being tracked,
+    not runs of their own.
+    """
+    record(conn, job, started_at=at or _now(), ok=ok, detail=detail)
