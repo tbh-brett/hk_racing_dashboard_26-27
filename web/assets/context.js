@@ -141,7 +141,13 @@ class MeetingContext {
     box.append(el('span', 'date', formatMeetingDate(this.date)));
     box.append(el('span', 'sep', '·'));
     box.append(el('span', 'races', `${this.races.length || meeting?.races || 0} races`));
+    // The caret is what makes this read as a control. Design brief 08 §1 keeps
+    // the meeting in Layer 1 and PROMPTS.md Phase 4 forbids per-page date
+    // pickers, so this is the ONLY meeting selector in the app — which makes
+    // it the one control that cannot afford to be invisible.
+    box.append(el('span', 'caret', '▾'));
     box.title = 'change meeting — or press ⌘K';
+    box.setAttribute('aria-haspopup', 'dialog');
     box.addEventListener('click', () => {
       window.dispatchEvent(new CustomEvent('palette:open', { detail: { seed: '' } }));
     });

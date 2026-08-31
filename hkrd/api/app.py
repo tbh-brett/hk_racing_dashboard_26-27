@@ -14,7 +14,8 @@ from fastapi.staticfiles import StaticFiles
 from hkrd.api import auth, routes
 from hkrd.query import (blackbook as bb_q, formguide as fg_q,
                         health as health_q, market as market_q, model,
-                        race as race_q, raceday as raceday_q)
+                        race as race_q, raceday as raceday_q,
+                        vet as vet_q)
 
 WEB = Path(__file__).resolve().parent.parent.parent / "web"
 
@@ -213,6 +214,18 @@ def condition_fit(name: str, distance: int | None = None, course: str | None = N
     cells = fg_q.condition_fit(name, distance=distance, course=course, going=going,
                                surface=surface, before=before)
     return {"horse_name": name.upper(), "cells": [c.to_dict() for c in cells]}
+
+
+@app.get("/api/vet/{name}")
+def vet_history(name: str, before: str | None = None, limit: int = 20) -> dict:
+    """One horse's veterinary record, newest first, unfiltered.
+
+    Design brief 07 §2 wants recent records only ON THE CARD. Here the question
+    is the horse's history, so nothing is dropped for age — the grade travels
+    with each record and the page decides how loudly to draw it.
+    """
+    return {"horse_name": name.upper(),
+            "records": vet_q.for_horse(name, before=before, limit=limit)}
 
 
 @app.get("/api/head-to-head/{horse_a}/{horse_b}")

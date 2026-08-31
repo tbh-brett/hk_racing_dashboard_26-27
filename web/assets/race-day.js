@@ -12,6 +12,7 @@ import { api, num } from './api.js';
 import { el, $, DASH, renderNav, styleBadge, styleOrdinal, compactDate,
          ordinal } from './vocab.js';
 import { context } from './context.js';
+import { anchoredPanel } from './overlay.js';
 import { install as installPalette } from './palette.js';
 
 const svg = (tag, attrs) => {
@@ -218,6 +219,39 @@ function renderH2HBand() {
   host.append(grid);
 }
 
+/** The vet record in full, in the shared anchored panel.
+ *
+ * Brief 09 §1: every hover/click panel in the app goes through overlay.js, so
+ * the collision handling and the fixed positioning are solved once. A panel
+ * positioned in the row's own flow is what made the page vibrate on scroll.
+ */
+function openVet(trigger, runner, records) {
+  // render() takes no arguments and RETURNS the element; anchoredPanel then
+  // adds its own class to it. Passing a space-separated className would throw
+  // in classList.add, so the panel's own class goes on the element here.
+  anchoredPanel(trigger, () => {
+    const host = el('div', 'vet-panel');
+    host.append(el('h6', null, `${runner.horse_no} ${runner.horse_name} · VET RECORD`));
+    records.forEach((v) => {
+      const row = el('div', `vet-rec vet-${v.grade}`);
+      const head = el('div', 'vr-head');
+      head.append(el('span', 'd', compactDate(v.record_date)));
+      head.append(el('span', 'c', v.category ?? 'UNKNOWN'));
+      if (v.age_days != null) {
+        head.append(el('span', 'age', `${v.age_days}d ago`));
+      }
+      row.append(head);
+      row.append(el('div', 'vr-detail', v.detail));
+      // Cleared to race is the difference between "was lame" and "is lame".
+      row.append(el('div', v.cleared ? 'vr-cleared' : 'vr-open',
+        v.cleared ? `cleared to race ${compactDate(v.passed_date)}`
+                  : 'no clearance recorded'));
+      host.append(row);
+    });
+    return host;
+  });
+}
+
 /* ── race context bar ────────────────────────────────────────────────────── */
 
 function renderRaceBar() {
@@ -406,6 +440,25 @@ function cardRow(r, index) {
   box.append(nm);
   const trip = (r.last_run?.tags ?? [])[0];
   if (trip) box.append(el('span', 'trip', trip.replace(/_/g, ' ')));
+  // Vet records have been scraped into the database since the first build and
+  // were never read back — brief 07 §2 puts a compact badge here, expanding on
+  // click. Significant and routine read differently on purpose: a passed
+  // examination is on nearly every runner, and a badge that fires on everyone
+  // stops being read.
+  const vet = r.vet ?? [];
+  if (vet.length) {
+    const worst = vet.find((v) => v.grade === 'significant') ?? vet[0];
+    const chip = el('span',
+      `vet vet-${worst.grade}${worst.cleared ? ' cleared' : ''}`,
+      worst.grade === 'significant' ? 'VET !' : 'VET');
+    chip.title = vet.map((v) => `${v.record_date} · ${v.category} · ${v.detail}`
+      + (v.passed_date ? ` (cleared ${v.passed_date})` : '')).join('\n');
+    // Bound once, at construction. anchoredPanel attaches mouseenter/mouseleave
+    // to the trigger, so calling it from a click handler would stack a fresh
+    // pair of listeners on every click.
+    openVet(chip, r, vet);
+    box.append(chip);
+  }
   name.append(box);
   tr.append(name);
 

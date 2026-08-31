@@ -61,6 +61,8 @@ export const api = {
   betCard: (date, no) => get(`/bets/card/${date}/${no}`),
   prebet: (body) => post('/bets/prebet', body),
   placeBet: (body) => post('/bets', body),
+  vetHistory: (name, limit = 20) => get(
+    `/vet/${encodeURIComponent(name)}?limit=${limit}`),
   lookup: (q) => get(`/lookup?${q}`),
   lookupInsight: (q) => get(`/lookup/insight?${q}`),
   lookupFilters: () => get('/lookup/filters'),

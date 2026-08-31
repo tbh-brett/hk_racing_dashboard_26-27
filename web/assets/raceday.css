@@ -254,3 +254,37 @@ table.card td { padding: 6px 8px; }
 .dis-row .r { margin-left: auto; color: var(--text-muted); }
 .detail .empty { color: var(--text-faint); font-size: var(--fs-sm);
                  font-family: var(--font-mono); }
+
+/* ── veterinary records ───────────────────────────────────────────────────
+ * Brief 07 §2. Significant and routine are deliberately different weights: a
+ * passed post-race examination sits on nearly every runner's record, and a
+ * badge that fires on everyone is a badge nobody reads. Copper rather than the
+ * alert red — a vet note is information, not a warning about the bet.        */
+.rd-row .vet {
+  font-size: 9px; letter-spacing: .04em; padding: 1px 4px;
+  border: 1px solid var(--line-2); color: var(--text-muted); cursor: help;
+  white-space: nowrap;
+}
+.rd-row .vet-significant {
+  color: var(--incident); border-color: var(--incident);
+}
+.rd-row .vet-routine { color: var(--text-muted); }
+/* Cleared to race is the difference between "was lame" and "is lame". */
+.rd-row .vet-significant.cleared { border-style: dashed; }
+
+.vet-panel { min-width: 300px; max-width: 420px; }
+.vet-panel h6 {
+  margin: 0 0 6px; font-size: var(--fs-xs); letter-spacing: .06em;
+  color: var(--text-muted); font-weight: 600;
+}
+.vet-rec {
+  padding: 6px 0; border-top: 1px solid var(--line-2); font-size: 11px;
+}
+.vet-rec:first-of-type { border-top: none; }
+.vr-head { display: flex; gap: 8px; align-items: baseline; }
+.vr-head .d { font-family: var(--font-mono); color: var(--text-2); }
+.vr-head .c { font-size: 9px; letter-spacing: .06em; color: var(--incident); }
+.vr-head .age { margin-left: auto; font-size: 10px; color: var(--text-faint); }
+.vr-detail { color: var(--text-dim); line-height: 1.5; margin-top: 2px; }
+.vr-cleared { font-size: 10px; color: var(--win); margin-top: 2px; }
+.vr-open { font-size: 10px; color: var(--incident); margin-top: 2px; }

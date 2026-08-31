@@ -20,7 +20,8 @@ from __future__ import annotations
 from typing import Any
 
 from hkrd.derive.probability import devig
-from hkrd.query import blackbook as bb_q, formguide as fg_q, market as market_q
+from hkrd.query import (blackbook as bb_q, formguide as fg_q,
+                        market as market_q, vet as vet_q)
 from hkrd.query.race import get_horse_form, get_race
 from hkrd.store.connect import Connection, get_conn
 
@@ -81,6 +82,8 @@ def build_card(date: str, race_no: int, *,
                   for b in bb_q.for_race(date, race_no, conn=conn)}
         moves = {m["horse_no"]: m
                  for m in market_q.price_movement(date, race_no, conn=conn)}
+        # Scraped since the first build and never read back until now.
+        vet = vet_q.for_race(date, race_no, conn=conn)
 
         # Market rank by price, so model-versus-market disagreement is explicit
         # rather than something the reader has to work out.
@@ -136,6 +139,7 @@ def build_card(date: str, race_no: int, *,
                 "trainer_prev": last.trainer if trainer_changed else None,
                 "market_rank": m_rank,
                 "movement": moves.get(r.horse_no),
+                "vet": vet.get(r.horse_name, []),
                 # Negative means the model likes it more than the market does.
                 "rank_delta": (r.sarr_rank - m_rank
                                if r.sarr_rank and m_rank else None),
