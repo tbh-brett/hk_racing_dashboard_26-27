@@ -532,3 +532,9 @@
   border-bottom: 1px solid var(--page-rule, var(--line));
   background: var(--page-band, var(--surface));
 }
+
+/* The empty ledger explains WHICH kind of empty it is. */
+.no-match .sub {
+  margin-top: 4px; font-size: var(--fs-xs); color: var(--text-faint);
+  letter-spacing: 0; text-transform: none;
+}

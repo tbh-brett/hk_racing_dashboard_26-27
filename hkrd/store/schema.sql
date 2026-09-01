@@ -259,6 +259,24 @@ CREATE TABLE IF NOT EXISTS run_notes (
   PRIMARY KEY (horse_name, race_date, race_no)
 );
 
+-- An observation about ONE TRIAL. Its own table, not a row in `run_notes`.
+--
+-- A trial is not a run: it has a batch number where a race has a race number,
+-- and the two share a date. Filed together, a note on the second trial of a
+-- morning and a note on race 2 that afternoon would collide on the primary
+-- key, and whichever was written second would silently replace the other.
+-- They are also different KINDS of observation — "cruised, never asked" is a
+-- statement about intent, which is what a trial is for, and it must not read
+-- as a comment on a race the horse ran.
+CREATE TABLE IF NOT EXISTS trial_notes (
+  horse_name TEXT    NOT NULL,
+  trial_date TEXT    NOT NULL,
+  trial_no   INTEGER NOT NULL,
+  note       TEXT    NOT NULL,
+  written_at TEXT    NOT NULL,
+  PRIMARY KEY (horse_name, trial_date, trial_no)
+);
+
 CREATE TABLE IF NOT EXISTS blackbook_tag_definitions (
   tag        TEXT PRIMARY KEY,
   definition TEXT

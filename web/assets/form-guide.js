@@ -353,6 +353,15 @@ function trialBand(runner) {
       ? ` — ${t.quality_reasons.join('; ')}` : ''}`;
     row.append(txt);
 
+    // What YOU wrote about this trial, on the Trials page. HKJC's comment says
+    // what happened; the note says why you cared, and the second is the reason
+    // the horse is worth a look now that it is in a race.
+    if (t.note) {
+      const mine = el('span', 'own-note', `✎ ${t.note.note}`);
+      mine.title = `your note — ${t.trial_date} T${t.trial_no}`;
+      row.append(mine);
+    }
+
     // The footage the mark is a summary of. A ++ nobody can watch is a score
     // taken on trust, which is the opposite of how every other figure here is
     // treated.

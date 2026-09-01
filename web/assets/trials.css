@@ -111,6 +111,7 @@
 /* A zero margin is arithmetic; WON is the fact. */
 .tr-row .won { color: var(--win); font-weight: 600; }
 .batch-head .going { color: var(--text-muted); }
+.batch-head .dist { color: var(--text-2); }
 .batch-head .batch-replay {
   margin-left: 10px; color: var(--tr-accent); text-decoration: none;
   font-size: var(--fs-xs); letter-spacing: .06em; white-space: nowrap;
@@ -228,3 +229,77 @@
    the archive rather than the button having gone somewhere. */
 .day-pick button:disabled { opacity: .3; cursor: default; }
 .day-pick button.on { color: var(--tr-accent); border-color: var(--tr-accent); }
+
+
+/* ── one trial, opened ───────────────────────────────────────────────────────
+ * A trial mark is a claim about what a horse can do; its form is the record of
+ * what it has done. Putting one under the other is the whole reason to open a
+ * row, so the columns are the Form Guide's — the same fact should not read
+ * differently on two pages.
+ */
+.tr-row { cursor: pointer; }
+.tr-row.open { background: var(--page-hover); }
+.tr-row .horse .bb {
+  margin-left: 6px; font-size: 9px; letter-spacing: .06em;
+  color: var(--book); border: 1px solid var(--book-ground); padding: 0 3px;
+}
+.tr-row .horse .noted { margin-left: 5px; color: var(--book); }
+
+.tr-detail {
+  padding: 8px 14px 10px 82px;
+  border-bottom: 1px solid var(--page-rule);
+  background: var(--page-band);
+}
+.tr-detail .d-head {
+  display: flex; align-items: center; gap: var(--sp-3);
+  font-family: var(--font-mono); font-size: var(--fs-xs);
+  letter-spacing: .1em; color: var(--text-dim); margin-bottom: 6px;
+}
+.tr-detail .d-head .right { margin-left: auto; }
+.tr-detail .d-head .booked {
+  letter-spacing: .06em; color: var(--book);
+  border: 1px solid var(--book-ground); padding: 0 5px;
+}
+.tr-detail .icon {
+  background: none; border: 1px solid var(--line-2); border-radius: 0;
+  color: var(--text-muted); cursor: pointer; padding: 0 6px;
+  font-size: var(--fs-sm); line-height: 17px;
+}
+.tr-detail .icon:hover { color: var(--text); border-color: var(--tr-accent); }
+.tr-detail .icon.has { color: var(--book); border-color: var(--book-ground); }
+/* The note you wrote, in prose — it is the one thing on this panel that is
+   yours rather than scraped, so it reads as writing and not as a field. */
+.tr-detail .d-note {
+  font-family: var(--font-sans); font-size: var(--fs-sm);
+  color: var(--text-2); line-height: 1.45; margin-bottom: 7px;
+  padding-left: 8px; border-left: 2px solid var(--book-ground);
+}
+.tr-detail .d-empty {
+  font-family: var(--font-mono); font-size: var(--fs-xs);
+  color: var(--text-faint); letter-spacing: .08em;
+}
+.tr-detail .d-run {
+  display: grid; align-items: center;
+  grid-template-columns: 78px minmax(150px, 1fr) 34px 52px 52px
+    minmax(140px, 1.1fr) 22px;
+  gap: 10px; min-height: 21px;
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.tr-detail .d-run-head {
+  font-size: var(--fs-xs); letter-spacing: .08em; color: var(--text-dim);
+  border-bottom: 1px solid var(--line); margin-bottom: 2px;
+}
+.tr-detail .d-run .r { text-align: right; }
+.tr-detail .d-run .cond { color: var(--text-dim); }
+.tr-detail .d-run .fin { color: var(--text-2); font-weight: 600; }
+.tr-detail .d-run .fin.won { color: var(--win); }
+.tr-detail .d-run .fig.above { color: var(--win); }
+.tr-detail .d-run .fig.below { color: var(--loss); }
+.tr-detail .d-run .trip {
+  display: flex; align-items: center; gap: var(--sp-2);
+  min-width: 0; overflow: hidden;
+}
+.tr-detail .d-run .trip .dim { color: var(--text-faint); }
+.tr-detail .d-play { color: var(--tr-accent); text-decoration: none; }
+.tr-detail .d-play:hover { color: var(--text); }

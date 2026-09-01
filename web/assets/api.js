@@ -64,6 +64,8 @@ export const api = {
   betsAnalysis: (qs = '') => get(`/bets/analysis${qs ? `?${qs}` : ''}`),
   betsReconciliation: (qs = '') => get(`/bets/reconciliation${qs ? `?${qs}` : ''}`),
   periods: () => get('/periods'),
+  seasons: () => get('/seasons'),
+  saveTrialNote: (body) => post('/trial-notes', body),
   // Entry. `prebet` prices a ticket without writing it; `placeBet` writes.
   betAccounts: () => get('/bets/accounts'),
   betRaceday: (date, account) => get(

@@ -632,6 +632,26 @@ select:hover, .btn:hover { background: var(--line-2); color: var(--text); }
 .period-pick .p-chip.on {
   color: var(--page-accent, var(--edge)); border-color: var(--page-accent, var(--edge));
 }
+/* Which season, once SEASON is the window. */
+.period-pick .seasons {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding-left: var(--sp-2); border-left: 1px solid var(--line-2);
+}
+.period-pick .s-chip {
+  background: none; border: 1px solid var(--line-2); border-radius: 0;
+  color: var(--text-muted); font-family: var(--font-mono);
+  font-size: var(--fs-xs); padding: 1px 6px; cursor: pointer;
+}
+.period-pick .s-chip:hover { color: var(--text); border-color: var(--text-dim); }
+.period-pick .s-chip.on {
+  color: var(--page-accent, var(--edge)); border-color: var(--page-accent, var(--edge));
+}
+/* A season with nothing in it is a fresh slate, not a fault — dimmed rather
+   than hidden, because hiding the season you are about to bet into is how you
+   end up filing September's bets into last season. */
+.period-pick .s-chip.empty { color: var(--text-faint); border-style: dashed; }
+.period-pick .s-chip.current.empty { border-color: var(--text-dim); }
+
 /* The bounds the word resolves to. Never omitted — "SEASON" is a word and
    "SEASON 2025/26" is a claim you can check. */
 .period-pick .bounds { color: var(--text-faint); letter-spacing: .04em; }

@@ -23,7 +23,7 @@ def blackbook_list(status: str | None = None, tag: str | None = None) -> dict:
 
 
 def _window(period_name: str | None, since: str | None, until: str | None,
-            anchor: str | None):
+            anchor: str | None, season: int | None = None):
     """The same five windows the Bets page offers, resolved the same way.
 
     Two resolvers would be two calendars, and the season one is the trap: HK
@@ -32,14 +32,15 @@ def _window(period_name: str | None, since: str | None, until: str | None,
     """
     try:
         return period.resolve(period_name, anchor=anchor,
-                              since=since, until=until)
+                              since=since, until=until, season=season)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
 
 
 @router.get("/api/blackbook/tags")
 def blackbook_tags(period: str | None = None, since: str | None = None,
-                   until: str | None = None, anchor: str | None = None) -> dict:
+                   until: str | None = None, anchor: str | None = None,
+        season: int | None = None) -> dict:
     """Per booking reason: strike, place, ROI and A/E with a 95% interval.
 
     A/E is the figure that says whether a tag beats the PRICE rather than
@@ -47,7 +48,7 @@ def blackbook_tags(period: str | None = None, since: str | None = None,
     1.00 and `expected_by_chance` says how many would at 5%. Publishing both is
     what stops a tag that looks like it is working from reading as one.
     """
-    win = _window(period, since, until, anchor)
+    win = _window(period, since, until, anchor, season)
     tags = bb_q.tag_performance(window=win)
     scored = [t for t in tags if t["ae"] is not None]
     cleared = [t["tag"] for t in scored
@@ -84,7 +85,8 @@ def blackbook_backed_vs_missed(entry_id: str | None = None,
                                period: str | None = None,
                                since: str | None = None,
                                until: str | None = None,
-                               anchor: str | None = None) -> dict:
+                               anchor: str | None = None,
+        season: int | None = None) -> dict:
     """What was backed, what was not, and how each did.
 
     Design brief 06 calls this "the single most important feature on the page":
@@ -93,14 +95,15 @@ def blackbook_backed_vs_missed(entry_id: str | None = None,
     """
     return bets_q.backed_and_missed(
         entry_id=entry_id, account=account,
-        window=_window(period, since, until, anchor))
+        window=_window(period, since, until, anchor, season))
 
 
 @router.get("/api/blackbook/by-account")
 def blackbook_by_account(entry_id: str | None = None,
                          period: str | None = None,
                          since: str | None = None, until: str | None = None,
-                         anchor: str | None = None) -> dict:
+                         anchor: str | None = None,
+        season: int | None = None) -> dict:
     """The same comparison per account, and combined.
 
     One book, two ledgers. The blackbook is shared — a horse is followed for
@@ -109,14 +112,15 @@ def blackbook_by_account(entry_id: str | None = None,
     about each book's own discipline rather than about the horses.
     """
     return bets_q.backed_by_account(
-        entry_id=entry_id, window=_window(period, since, until, anchor))
+        entry_id=entry_id, window=_window(period, since, until, anchor, season))
 
 
 @router.get("/api/blackbook/tags/backed-vs-missed")
 def blackbook_tags_backed_vs_missed(
         account: str | None = None, period: str | None = None,
         since: str | None = None, until: str | None = None,
-        anchor: str | None = None) -> dict:
+        anchor: str | None = None,
+        season: int | None = None) -> dict:
     """BACKED vs MISSED for each booking reason.
 
     The artboard puts it beside every tag, and that is where the comparison is
@@ -124,7 +128,7 @@ def blackbook_tags_backed_vs_missed(
     reason the entry was made, which the whole-book number cannot.
     """
     return {"tags": bets_q.backed_and_missed_by_tag(
-        account=account, window=_window(period, since, until, anchor))}
+        account=account, window=_window(period, since, until, anchor, season))}
 
 
 @router.get("/api/blackbook/declared/{date}")

@@ -28,6 +28,7 @@ import { el, $, DASH, renderNav, tripTagChips,
          replayUrl, trialReplayUrl, externalLink, compactDate,
          ordinal } from './vocab.js';
 import { context } from './context.js';
+import { renderReview, trialSubject, loadTags } from './review.js';
 import { install as installPalette } from './palette.js';
 
 
@@ -51,6 +52,10 @@ const state = {
   // choose — and remains the default, because the newest trials are what the
   // page is usually for.
   days: [], day: null,
+  // Which trial rows are expanded, and each horse's recent form once fetched.
+  // Keyed by horse + batch, because the same horse can appear in two mornings
+  // and they are different rows with different notes.
+  open: new Set(), form: {},
 };
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
@@ -200,8 +205,138 @@ function matches(r) {
 
 /* ── batches ─────────────────────────────────────────────────────────────── */
 
+function rowKey(r) {
+  return `${r.trial_date}:${r.trial_no}:${r.horse_name}`;
+}
+
+/** The horse's recent RACES, under the trial row that prompted the question.
+ *
+ *  A trial mark is a claim about what a horse can do; its form is the record
+ *  of what it has done, and putting them one above the other is the whole
+ *  reason to expand a row. The columns are the Form Guide's, because it is the
+ *  same fact and it should not read differently here.
+ */
+function runnerDetail(r) {
+  const box = el('div', 'tr-detail');
+
+  const head = el('div', 'd-head');
+  head.append(el('span', 'k', 'LAST SIX'));
+  if (r.blackbook) {
+    const chip = el('span', 'booked', `IN THE BOOK · ${r.blackbook.status}`);
+    chip.title = r.blackbook.reasoning || 'no reason recorded';
+    head.append(chip);
+  }
+  head.append(el('span', 'right'));
+  const pen = el('button', `icon${r.note ? ' has' : ''}`, '✎');
+  pen.title = r.note ? r.note.note : 'note on this trial';
+  pen.addEventListener('click', (e) => { e.stopPropagation(); showNote(e, r); });
+  head.append(pen);
+  box.append(head);
+
+  if (r.note) box.append(el('div', 'd-note', r.note.note));
+
+  const runs = state.form[rowKey(r)];
+  if (!runs) {
+    box.append(el('div', 'd-empty', 'loading…'));
+    loadForm(r, box);
+    return box;
+  }
+  box.append(formTable(runs));
+  return box;
+}
+
+function formTable(runs) {
+  if (!runs.length) return el('div', 'd-empty', 'NO RACES ON RECORD');
+  const tbl = el('div', 'd-runs');
+  const head = el('div', 'd-run d-run-head');
+  ['DATE', 'TRK DIST GOING CL', 'FIN', 'FIGURE', 'SP', 'TRIP']
+    .forEach((h, i) => head.append(el('span', i >= 2 ? 'r' : null, h)));
+  tbl.append(head);
+  runs.forEach((f) => {
+    const line = el('div', 'd-run');
+    line.append(el('span', null, compactDate(f.race_date)));
+    line.append(el('span', 'cond', [
+      f.venue, f.distance ? `${f.distance}m` : null, f.going,
+      f.race_class ? `C${f.race_class}` : null,
+    ].filter(Boolean).join(' ')));
+    const fin = el('span', 'r fin', String(f.place ?? f.place_code ?? DASH));
+    if (f.place === 1) fin.classList.add('won');
+    line.append(fin);
+    const fig = el('span', 'r fig', f.et_figure == null ? DASH
+      : num(f.et_figure, 0));
+    if (f.et_figure != null) {
+      fig.classList.add(f.et_figure >= 100 ? 'above' : 'below');
+      if (f.figure_display) fig.title = f.figure_display;
+    }
+    line.append(fig);
+    line.append(el('span', 'r', f.win_odds ? num(f.win_odds, 1) : DASH));
+    const trip = el('span', 'trip');
+    const chips = tripTagChips(f.tags,
+      { comment: f.incident_comment || f.running_comment, limit: 3 });
+    trip.append(chips ?? el('span', 'dim', DASH));
+    line.append(trip);
+    // Watch it, from the row that made you ask.
+    const url = replayUrl(f.race_date, f.race_no);
+    if (url) {
+      const play = externalLink(url, '▶', 'd-play');
+      play.title = `replay — ${f.race_date} race ${f.race_no}`;
+      play.addEventListener('click', (e) => e.stopPropagation());
+      line.append(play);
+    }
+    tbl.append(line);
+  });
+  return tbl;
+}
+
+async function loadForm(r, box) {
+  try {
+    const data = await api.horse(r.horse_name, 6);
+    state.form[rowKey(r)] = data.runs;
+    // The row may have been collapsed, or another opened, while this was in
+    // flight — writing into a detached node would leave the row on screen
+    // saying "loading…" for ever.
+    if (!box.isConnected) return;
+    box.querySelector('.d-empty')?.remove();
+    box.append(formTable(data.runs));
+  } catch (e) {
+    if (!box.isConnected) return;
+    box.querySelector('.d-empty')?.replaceChildren(
+      document.createTextNode(`unavailable — ${e.message}`));
+  }
+}
+
+/** The note form — the same one the Form Guide and Results use. */
+function showNote(event, r) {
+  renderReview($('popover'), {
+    horseName: r.horse_name,
+    subject: trialSubject(r),
+    existingNote: r.note,
+    booked: r.blackbook,
+    onSaved: (saved) => { r.note = saved; hidePopover(); render(); },
+    onPromoted: (entry) => { r.blackbook = entry; hidePopover(); render(); },
+    onClose: hidePopover,
+  });
+  const pop = $('popover');
+  pop.hidden = false;
+  const rect = event.currentTarget.getBoundingClientRect();
+  const w = 344;
+  pop.style.left = `${Math.min(rect.left, window.innerWidth - w - 12)}px`;
+  pop.style.top = `${Math.min(rect.bottom + 4, window.innerHeight - 220)}px`;
+}
+
+function hidePopover() {
+  $('popover').hidden = true;
+}
+
 function runnerRow(r) {
   const row = el('div', 'tr-row');
+  const key = rowKey(r);
+  if (state.open.has(key)) row.classList.add('open');
+  row.addEventListener('click', () => {
+    if (state.open.has(key)) state.open.delete(key);
+    else state.open.add(key);
+    render();
+  });
   // Draw first, as the design has it: a trial is barrier practice as much as
   // it is a time, and the gate the horse came out of is the context for the
   // positions three columns along.
@@ -211,6 +346,16 @@ function runnerRow(r) {
   row.append(el('div', 'r', r.place === null ? DASH : String(r.place)));
   const horse = el('div', 'horse');
   horse.append(document.createTextNode(r.horse_name));
+  if (r.blackbook) {
+    const chip = el('span', 'bb', 'BB');
+    chip.title = `in the blackbook since ${r.blackbook.added_date}`;
+    horse.append(chip);
+  }
+  if (r.note) {
+    const pen = el('span', 'noted', '✎');
+    pen.title = r.note.note;
+    horse.append(pen);
+  }
   horse.title = `${r.quality_band}${r.quality_reasons.length
     ? ` — ${r.quality_reasons.join('; ')}` : ''}`;
   row.append(horse);
@@ -274,9 +419,16 @@ function renderBatches() {
       head.append(el('span', 'splits',
         b.section_times.map((t) => num(t, 1)).join(' · ')));
     }
-    // HKJC publishes no trial distance, and inferring one from the clock would
-    // be a guess dressed as a fact.
-    head.append(el('span', 'right', 'no distance is published for a trial'));
+    // The distance IS published, in the batch header — the legacy import
+    // dropped it, which is why this line used to say there wasn't one. A
+    // missing distance now means this batch's header was not captured, not
+    // that HKJC withheld it, so it says which.
+    if (b.distance) {
+      head.append(el('span', 'dist', `${b.distance}m`));
+      head.append(el('span', 'right'));
+    } else {
+      head.append(el('span', 'right', 'no distance captured for this batch'));
+    }
     // The footage of the batch itself. A trial video is addressed differently
     // from a race replay — different type, and it needs the racecourse, since
     // trials run at three of them and the date does not say which.
@@ -292,7 +444,10 @@ function renderBatches() {
     const cols = el('div', 'tr-head');
     COLS.forEach(([label, cls]) => cols.append(el('div', cls || null, label)));
     box.append(cols);
-    runners.forEach((r) => box.append(runnerRow(r)));
+    runners.forEach((r) => {
+      box.append(runnerRow(r));
+      if (state.open.has(rowKey(r))) box.append(runnerDetail(r));
+    });
     host.append(box);
   });
   if (!shown) {
@@ -528,6 +683,8 @@ async function boot() {
   renderNav($('nav'), 'trials.html');
   wireSearch();
   wireDayPicker();
+  // The tag vocabulary the promote form offers, loaded once.
+  loadTags();
   // A trial morning is addressable, like the meeting is: ?day=2026-08-21
   // restores the view, so a note can link back to the trial it came from.
   state.day = new URLSearchParams(window.location.search).get('day');

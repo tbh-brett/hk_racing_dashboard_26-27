@@ -21,7 +21,8 @@ from pathlib import Path
 
 from hkrd.store.connect import db_path, get_conn, transaction
 
-__all__ = ["save_note", "delete_note", "promote_to_blackbook",
+__all__ = ["save_note", "delete_note", "save_trial_note",
+           "delete_trial_note", "promote_to_blackbook",
            "next_entry_id", "set_status"]
 
 
@@ -65,6 +66,50 @@ def delete_note(horse_name: str, race_date: str, race_no: int, *,
         conn.close()
 
 
+def save_trial_note(horse_name: str, trial_date: str, trial_no: int,
+                    note: str, *, db: Path | None = None) -> dict:
+    """Write or replace the note on one trial run.
+
+    Its own table, not a row in `run_notes`. A trial and a race share a date
+    and both carry a small number — batch 2 and race 2 — so filed together the
+    second note written would silently replace the first. They are also
+    different kinds of observation: "cruised, never asked" is about intent,
+    which is what a trial is for, and it must not read as a comment on a race.
+    """
+    text = (note or "").strip()
+    if not text:
+        raise ValueError("a note needs text; use delete_trial_note to remove one")
+    horse = horse_name.strip().upper()
+    conn = get_conn(db if db is not None else db_path())
+    try:
+        written = _now()
+        with transaction(conn):
+            conn.execute(
+                "INSERT INTO trial_notes (horse_name, trial_date, trial_no, "
+                "note, written_at) VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT (horse_name, trial_date, trial_no) DO UPDATE SET "
+                "note = excluded.note, written_at = excluded.written_at",
+                (horse, trial_date, trial_no, text, written))
+        return {"horse_name": horse, "trial_date": trial_date,
+                "trial_no": trial_no, "note": text, "written_at": written}
+    finally:
+        conn.close()
+
+
+def delete_trial_note(horse_name: str, trial_date: str, trial_no: int, *,
+                      db: Path | None = None) -> bool:
+    conn = get_conn(db if db is not None else db_path())
+    try:
+        with transaction(conn):
+            cur = conn.execute(
+                "DELETE FROM trial_notes WHERE horse_name = ? "
+                "AND trial_date = ? AND trial_no = ?",
+                (horse_name.strip().upper(), trial_date, trial_no))
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
 def next_entry_id(conn) -> str:
     """bb_0197 after bb_0196. Continues the legacy sequence rather than
     starting a second one beside it."""
@@ -81,6 +126,7 @@ def next_entry_id(conn) -> str:
 def promote_to_blackbook(horse_name: str, *, reasoning: str,
                          source_date: str | None = None,
                          source_race_no: int | None = None,
+                         source_trial_no: int | None = None,
                          tags: list[str] | None = None,
                          confidence: str = "medium",
                          expiry_days: int = 90,
@@ -101,8 +147,16 @@ def promote_to_blackbook(horse_name: str, *, reasoning: str,
     try:
         added = date.today().isoformat()
         expiry = (date.today() + timedelta(days=expiry_days)).isoformat()
-        source = (f"{source_date} R{source_race_no}" if source_date and source_race_no
-                  else source_date or (f"R{source_race_no}" if source_race_no else None))
+        # A trial is a T, not an R. Writing "2026-08-21 R1" for a trial would
+        # point the entry at a race that was never run, and every later reader
+        # of `source_race` would believe it.
+        if source_trial_no is not None:
+            source = (f"{source_date} T{source_trial_no}" if source_date
+                      else f"T{source_trial_no}")
+        elif source_date and source_race_no:
+            source = f"{source_date} R{source_race_no}"
+        else:
+            source = source_date or (f"R{source_race_no}" if source_race_no else None)
         with transaction(conn):
             entry_id = next_entry_id(conn)
             conn.execute(
@@ -111,7 +165,12 @@ def promote_to_blackbook(horse_name: str, *, reasoning: str,
                 "source_race_no, source_date_from) "
                 "VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)",
                 (entry_id, horse, added, expiry, reason, confidence, source,
-                 source_date, source_race_no, "memo" if source_date else None))
+                 source_date,
+                 # Only a real race number goes in the race column. A trial's
+                 # batch number left here would make the Blackbook link back
+                 # to race 1 of a meeting that may not exist.
+                 None if source_trial_no is not None else source_race_no,
+                 "memo" if source_date else None))
             conn.executemany(
                 "INSERT INTO blackbook_tags (id, tag) VALUES (?, ?) "
                 "ON CONFLICT (id, tag) DO NOTHING",

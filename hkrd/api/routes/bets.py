@@ -17,7 +17,7 @@ router = APIRouter()
 
 
 def _window(period_name: str | None, since: str | None, until: str | None,
-            anchor: str | None):
+            anchor: str | None, season: int | None = None):
     """The window every figure on the page is measured over.
 
     Read in ONE place so five endpoints cannot each interpret "week"
@@ -26,7 +26,7 @@ def _window(period_name: str | None, since: str | None, until: str | None,
     """
     try:
         return period.resolve(period_name, anchor=anchor,
-                              since=since, until=until)
+                              since=since, until=until, season=season)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
 
@@ -35,8 +35,9 @@ def _window(period_name: str | None, since: str | None, until: str | None,
 def bets_ledger(date: str | None = None, account: str | None = None,
                 limit: int = 500, period: str | None = None,
                 since: str | None = None, until: str | None = None,
-                anchor: str | None = None) -> dict:
-    win = _window(period, since, until, anchor)
+                anchor: str | None = None,
+        season: int | None = None) -> dict:
+    win = _window(period, since, until, anchor, season)
     rows = bets_q.ledger(date=date, account=account, window=win, limit=limit)
     return {"bets": rows, "count": len(rows), "window": win.as_dict()}
 
@@ -44,8 +45,9 @@ def bets_ledger(date: str | None = None, account: str | None = None,
 @router.get("/api/bets/summary")
 def bets_summary(account: str | None = None, period: str | None = None,
                  since: str | None = None, until: str | None = None,
-                 anchor: str | None = None) -> dict:
-    win = _window(period, since, until, anchor)
+                 anchor: str | None = None,
+        season: int | None = None) -> dict:
+    win = _window(period, since, until, anchor, season)
     return {**bets_q.summary(account=account, window=win),
             "window": win.as_dict()}
 
@@ -53,7 +55,8 @@ def bets_summary(account: str | None = None, period: str | None = None,
 @router.get("/api/bets/analysis")
 def bets_analysis(account: str | None = None, period: str | None = None,
                   since: str | None = None, until: str | None = None,
-                  anchor: str | None = None) -> dict:
+                  anchor: str | None = None,
+        season: int | None = None) -> dict:
     """Everything the analysis section renders, in one read.
 
     Every slice carries n and a 95% interval, because the design brief prints
@@ -62,17 +65,30 @@ def bets_analysis(account: str | None = None, period: str | None = None,
     chosen period and seven over all time is worse than offering no period.
     """
     return ba_q.analysis(account=account,
-                         window=_window(period, since, until, anchor))
+                         window=_window(period, since, until, anchor, season))
 
 
 @router.get("/api/bets/reconciliation")
 def bets_reconciliation(account: str | None = None, period: str | None = None,
                         since: str | None = None, until: str | None = None,
-                        anchor: str | None = None) -> dict:
+                        anchor: str | None = None,
+        season: int | None = None) -> dict:
     """Imported statement rows against logged bets. Nothing is silently
     merged, so a block the two disagree on is named."""
     return ba_q.reconciliation(account=account,
-                               window=_window(period, since, until, anchor))
+                               window=_window(period, since, until, anchor, season))
+
+
+@router.get("/api/seasons")
+def seasons() -> dict:
+    """Every season the archive holds, plus the one currently open.
+
+    A season with no data in it yet is still in this list, and that is the
+    point: on the first day of a new one, the page has to be able to show an
+    empty 2026/27 rather than silently keeping you in 2025/26 because that is
+    where the last meeting was.
+    """
+    return {"seasons": period.seasons()}
 
 
 @router.get("/api/periods")

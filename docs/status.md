@@ -96,10 +96,15 @@ unverified" below.
 
 Two things the parsers recovered that the archive does not have:
 
-- **Trial distance and going.** HKJC publishes both in the batch header; the
-  legacy import dropped them, so none of the 7,750 archived trials carries
-  one. `query/trials` had said HKJC published no distance, which was wrong
-  about the source rather than about the data.
+- ~~**Trial distance and going.**~~ **Recovered.** HKJC publishes both in the
+  batch header, and the draw, rider and stable on every row; the legacy import
+  read none of them, so all 7,750 archived trials came through without them
+  and the columns showing them read as empty data rather than as a lossy
+  import. `import_legacy_reports` now reads all six — distance, going, course,
+  draw, jockey, trainer — plus lengths-beaten through a fraction parser rather
+  than a numeric coercion that would have dropped 79% of it. Re-run the
+  reports step to backfill: 7,750 of 7,750 for everything except jockey, where
+  107 rows are genuinely blank at source.
 - **Veterinary records at all.** There is no vet table in the archive. The old
   scraper computed a "concern score" and then filtered its own output by it,
   so a record that existed on the page and scored below a threshold was simply

@@ -18,7 +18,9 @@ derive/trial_quality).
 Distance IS published, in the batch header, and this module said otherwise
 until `ingest/trials` was written against the page. The claim was wrong about
 the SOURCE, not about the data: no trial in the 7,750-row archive carries a
-distance because the legacy import dropped the field. New scrapes carry it, so
+distance because the legacy import dropped the field. That has been RECOVERED —
+`import_legacy_reports` now reads it, along with the draw, rider and stable it
+was also dropping — so the archive carries all four. New scrapes carry them, so
 a batch reads its distance where it has one and returns None where the archive
 never stored one -- which is a gap in the archive, not in HKJC.
 """
@@ -193,6 +195,17 @@ def days(*, limit: int = 60, venue: str | None = None,
             conn.close()
 
 
+def _booked(conn: Connection, names: list[str]) -> dict[str, dict[str, Any]]:
+    """Which of these horses the blackbook already follows."""
+    if not names:
+        return {}
+    marks = ",".join("?" * len(names))
+    return {r["horse_name"]: dict(r) for r in conn.execute(
+        f"SELECT horse_name, id, status, added_date, reasoning, confidence "
+        f"FROM blackbook WHERE horse_name IN ({marks}) "
+        f"ORDER BY added_date", [n.strip().upper() for n in names])}
+
+
 def recent_batches(*, limit: int = 12, venue: str | None = None,
                    date: str | None = None,
                    conn: Connection | None = None) -> list[dict[str, Any]]:
@@ -217,6 +230,42 @@ def recent_batches(*, limit: int = 12, venue: str | None = None,
             f"ORDER BY trial_date DESC, trial_no LIMIT ?",
             [*params, limit]).fetchall()
         return [batch(k["trial_date"], k["trial_no"], conn=conn) for k in keys]
+    finally:
+        if own:
+            conn.close()
+
+
+def _notes(conn: Connection, date: str, trial_no: int) -> dict[str, dict]:
+    """Notes written on one batch, by horse."""
+    return {r["horse_name"]: {"note": r["note"], "written_at": r["written_at"]}
+            for r in conn.execute(
+                "SELECT horse_name, note, written_at FROM trial_notes "
+                "WHERE trial_date = ? AND trial_no = ?", (date, trial_no))}
+
+
+def notes_for_horses(names: list[str], *, conn: Connection | None = None
+                     ) -> dict[str, list[dict[str, Any]]]:
+    """Every trial note per horse, newest first — for the Form Guide's band.
+
+    The note was written on the Trials page and belongs to the trial, but the
+    place it earns its keep is beside that horse's trial line in the form: the
+    reason you followed a trial is exactly what you want in front of you when
+    the horse turns up in a race.
+    """
+    if not names:
+        return {}
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        marks = ",".join("?" * len(names))
+        out: dict[str, list[dict[str, Any]]] = {}
+        for r in conn.execute(
+                f"SELECT horse_name, trial_date, trial_no, note, written_at "
+                f"FROM trial_notes WHERE horse_name IN ({marks}) "
+                f"ORDER BY trial_date DESC, trial_no DESC",
+                [n.strip().upper() for n in names]):
+            out.setdefault(r["horse_name"], []).append(dict(r))
+        return out
     finally:
         if own:
             conn.close()
@@ -253,8 +302,14 @@ def batch(date: str, trial_no: int, *,
         runners = [_runner(r, field_size, best) for r in rows]
 
         nxt = _next_starts(conn, [(r["horse_name"], date) for r in runners])
+        notes = _notes(conn, date, trial_no)
+        booked = _booked(conn, [r["horse_name"] for r in runners])
         for r in runners:
             r["next_start"] = nxt[(r["horse_name"], date)]
+            r["note"] = notes.get(r["horse_name"])
+            # Already followed, so the page can say so rather than offering to
+            # add a horse that is in the book twice over.
+            r["blackbook"] = booked.get(r["horse_name"])
 
         # Splits are the batch's, not the runner's: HKJC publishes one set of
         # sectionals per trial and repeats it on every row.
@@ -267,9 +322,10 @@ def batch(date: str, trial_no: int, *,
             "section_times": splits,
             "runners": runners,
             # Published in the batch header, so it is read where a scrape
-            # stored one. None means the archive has no distance for this
-            # batch -- the legacy import dropped the field -- and NOT that
-            # HKJC published none.
+            # stored one. HKJC DOES publish it, in the batch header; the
+            # legacy import used to drop it, which is now fixed. None here
+            # means this batch's header was not captured, not that there is
+            # no distance to capture.
             "distance": _column(rows[0], "distance"),
             "going": _column(rows[0], "going"),
             "course": _column(rows[0], "course"),
@@ -304,10 +360,20 @@ def for_horses(names: list[str], *, before: str | None = None, limit: int = 2,
         out: dict[str, list[dict[str, Any]]] = {}
         latest = conn.execute("SELECT max(trial_date) v FROM trials").fetchone()
         latest = latest["v"] if latest else None
+        # The note was written on the Trials page and belongs to the trial, but
+        # the place it earns its keep is here: the reason you followed a trial
+        # is what you want in front of you when the horse turns up in a race.
+        notes = {(n["horse_name"], n["trial_date"], n["trial_no"]): dict(n)
+                 for n in conn.execute(
+                     f"SELECT horse_name, trial_date, trial_no, note, written_at "
+                     f"FROM trial_notes WHERE horse_name IN ({marks})",
+                     [n.strip().upper() for n in names])}
         for row in rows:
             bucket = out.setdefault(row["horse_name"], [])
             if len(bucket) < limit:
                 r = _runner(row, row["field_size"], row["best_time"])
+                r["note"] = notes.get(
+                    (r["horse_name"], r["trial_date"], r["trial_no"]))
                 # So the Form Guide's play control can address the video the
                 # same way the Trials page does. It has no view of the trials
                 # calendar otherwise.

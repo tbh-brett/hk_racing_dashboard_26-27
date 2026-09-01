@@ -49,7 +49,13 @@ const state = {
   // ledger, the analysis and the reconciliation — because a page that filters
   // one panel and not the others invites reading two numbers as comparable
   // when they are measured over different things.
-  account: null, period: 'lifetime', window: null,
+  //
+  // THE DEFAULT IS THE SEASON NOW OPEN. A new season is a fresh slate for the
+  // ledger and for every figure derived from it, and defaulting to LIFETIME
+  // buries this season's first month under two years of history. Last season
+  // is one chip away and nothing is deleted — the record is worth keeping,
+  // it just is not the question in September.
+  account: null, period: 'season', season: null, seasons: [], window: null,
 };
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
@@ -65,7 +71,12 @@ function renderScope() {
   host.append(periodPicker(state.period, (key) => {
     state.period = key;
     loadLedger();
-  }, { window: state.window }));
+  }, {
+    window: state.window,
+    seasons: state.seasons,
+    season: state.season,
+    onSeason: (yr) => { state.season = yr; loadLedger(); },
+  }));
   // The entry view is about a bet not yet placed, so a window over past
   // results has nothing to say about it.
   host.hidden = state.view === 'entry';
@@ -288,8 +299,27 @@ function renderLedger() {
   const rows = state.bets.filter(matches);
   const host = $('led-rows');
   if (!rows.length) {
-    host.replaceChildren(el('div', 'no-match',
-      'NO BET MATCHES THESE FILTERS'));
+    // An empty ledger has two quite different causes and one used to be
+    // reported as the other. A new season with nothing bet in it yet is a
+    // fresh slate; "no bet matches these filters" sends you hunting for a
+    // filter that is not set.
+    const filtered = state.search || state.type
+      || state.result !== 'all' || state.source !== 'all';
+    const box = el('div', 'no-match');
+    if (filtered) {
+      box.append(el('div', null, 'NO BET MATCHES THESE FILTERS'));
+    } else if (!state.bets.length) {
+      const win = state.window?.label ?? 'this window';
+      box.append(el('div', null, `NOTHING BET IN ${win} YET`));
+      box.append(el('div', 'sub',
+        state.account
+          ? `no bets on ${state.account} — import a statement, or place one `
+            + 'from the entry view'
+          : 'import a statement, or place a bet from the entry view'));
+    } else {
+      box.append(el('div', null, 'NO BET MATCHES THESE FILTERS'));
+    }
+    host.replaceChildren(box);
   } else {
     host.replaceChildren(...rows.map(ledgerRow));
   }
@@ -630,6 +660,18 @@ async function boot() {
   await context.init();
   if (context.date) await loadEntry(context.date, context.summary);
   render();
+  // The seasons the archive holds, and which one is open. Read before the
+  // first ledger call so the page opens on the current season rather than
+  // opening on last season's and jumping.
+  try {
+    const { seasons } = await api.seasons();
+    state.seasons = seasons;
+    state.season = seasons.find((x) => x.current)?.season ?? null;
+  } catch {
+    // Without the list the picker simply offers no season chips, and "season"
+    // falls back to the one containing the meeting on screen.
+    state.seasons = [];
+  }
   await loadLedger();
 }
 
@@ -641,6 +683,7 @@ async function boot() {
 async function loadLedger() {
   const q = new URLSearchParams({ period: state.period });
   if (state.account) q.set('account', state.account);
+  if (state.season !== null) q.set('season', String(state.season));
   // Anchored on the meeting in the header, not on today: "this week" while
   // looking at an April meeting means that April week.
   if (context.date) q.set('anchor', context.date);

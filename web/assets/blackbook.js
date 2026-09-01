@@ -48,8 +48,10 @@ const state = {
   search: '', tag: null, status: 'all', range: 'all', today: null,
   todayOnly: false, declared: new Set(), open: new Set(), details: {},
   backedMissed: null, account: null, tagBvm: null,
-  // How far back every figure on the analysis view is measured.
-  period: 'lifetime', window: null,
+  // How far back every figure on the analysis view is measured. Defaults to
+  // the season now open, like the Bets page — the book carries forward but
+  // how it is PERFORMING is a question about the season being bet.
+  period: 'season', season: null, seasons: [], window: null,
   sort: 'added', sortDir: -1, busy: new Set(),
 };
 
@@ -707,7 +709,12 @@ function renderScope() {
   host.append(periodPicker(state.period, (key) => {
     state.period = key;
     reloadScoped();
-  }, { window: state.window }));
+  }, {
+    window: state.window,
+    seasons: state.seasons,
+    season: state.season,
+    onSeason: (yr) => { state.season = yr; reloadScoped(); },
+  }));
   // The list is the book itself — every horse being followed, whenever it was
   // added. Narrowing it by a results window would hide entries that simply
   // have not run yet, which is the opposite of what a watchlist is for.
@@ -719,6 +726,7 @@ function renderScope() {
 function _scopeQuery() {
   const q = new URLSearchParams({ period: state.period });
   if (state.account) q.set('account', state.account);
+  if (state.season !== null) q.set('season', String(state.season));
   // Anchored on the meeting in the header, like the Bets page. Measuring back
   // from TODAY on an archive that ends in July returns an empty month and no
   // indication that the emptiness is about the calendar rather than the book.
@@ -1024,6 +1032,15 @@ async function init() {
   // whichever meeting Layer 1 is on.
   const latest = context.date;
   state.today = latest;
+
+  // Which season is open, before anything else is read.
+  try {
+    const { seasons } = await api.seasons();
+    state.seasons = seasons;
+    state.season = seasons.find((x) => x.current)?.season ?? null;
+  } catch {
+    state.seasons = [];
+  }
 
   try {
     const [list, tags, summary, declared, backedMissed, tagBvm]

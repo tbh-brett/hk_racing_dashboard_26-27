@@ -205,6 +205,36 @@ def save_run_note(body: dict = Body(...)) -> dict:
         raise HTTPException(422, str(exc)) from exc
 
 
+@app.post("/api/trial-notes")
+def save_trial_note(body: dict = Body(...)) -> dict:
+    """Write a note on one trial run. Never creates a blackbook entry.
+
+    Same rule as `/api/notes`: a note is a record, an entry is a judgement, and
+    auto-promotion would fill the book with noise. Promotion is /api/blackbook,
+    which now takes `source_trial_no` so an entry can name the trial that
+    prompted it without pretending it was a race.
+    """
+    from hkrd.jobs import write_notes
+
+    try:
+        return write_notes.save_trial_note(
+            body["horse_name"], body["trial_date"], int(body["trial_no"]),
+            body.get("note", ""))
+    except KeyError as exc:
+        raise HTTPException(422, f"missing field: {exc.args[0]}") from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.delete("/api/trial-notes")
+def remove_trial_note(horse_name: str, trial_date: str,
+                      trial_no: int) -> dict:
+    from hkrd.jobs import write_notes
+
+    return {"deleted": write_notes.delete_trial_note(
+        horse_name, trial_date, trial_no)}
+
+
 @app.post("/api/blackbook")
 def create_blackbook_entry(body: dict = Body(...)) -> dict:
     """Promote a run to a blackbook entry — the deliberate step."""
@@ -217,6 +247,8 @@ def create_blackbook_entry(body: dict = Body(...)) -> dict:
             source_date=body.get("source_date"),
             source_race_no=(int(body["source_race_no"])
                             if body.get("source_race_no") is not None else None),
+            source_trial_no=(int(body["source_trial_no"])
+                             if body.get("source_trial_no") is not None else None),
             tags=body.get("tags") or [],
             confidence=body.get("confidence", "medium"))
     except KeyError as exc:

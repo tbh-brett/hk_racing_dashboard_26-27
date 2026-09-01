@@ -77,6 +77,38 @@ def _dividend_rows(doc: dict) -> list[dict]:
             if d.get("pool") and d.get("combination") is not None]
 
 
+def _int_or_none(v) -> int | None:
+    try:
+        return int(str(v).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _lbw(v) -> float | None:
+    """Lengths beaten, as published.
+
+    NEVER `pd.to_numeric`: the field carries "1-1/2", "SH", "NK" and "-", and
+    coercing it drops 79.1% of the values — the rule at the top of AGENTS.md.
+    Fractions are read; a margin word that is not a number stays None rather
+    than becoming a zero that reads as a dead heat.
+    """
+    text = str(v or "").strip()
+    if not text or text == "-":
+        return None
+    whole, _, frac = text.partition("-")
+    try:
+        total = float(whole) if whole else 0.0
+    except ValueError:
+        return None
+    if frac and "/" in frac:
+        a, _, b = frac.partition("/")
+        try:
+            total += float(a) / float(b)
+        except (ValueError, ZeroDivisionError):
+            return None
+    return round(total, 2)
+
+
 def _trial_rows(doc: dict) -> list[dict]:
     date = to_date(doc.get("date"))
     out = []
@@ -100,6 +132,18 @@ def _trial_rows(doc: dict) -> list[dict]:
                 "venue": "ST" if "SHA TIN" in course.upper() else "HV",
                 "surface": surface, "gear": (h.get("gear") or "").strip() or None,
                 "comment_text": (h.get("comment") or "").strip() or None,
+                # Draw, rider and stable are on EVERY row of the export and
+                # were dropped here, so all 7,750 archived trials came through
+                # without them and the columns that show them read as empty
+                # data rather than as a lossy import. The scraper has always
+                # captured them; only this step lost them.
+                "draw": _int_or_none(h.get("draw")),
+                "jockey": (h.get("jockey") or "").strip().upper() or None,
+                "trainer": (h.get("trainer") or "").strip().upper() or None,
+                "going": (batch.get("going") or "").strip() or None,
+                "distance": _int_or_none(batch.get("distance_m")),
+                "course": course.strip() or None,
+                "lengths_behind": _lbw(h.get("lbw")),
             })
     return out
 

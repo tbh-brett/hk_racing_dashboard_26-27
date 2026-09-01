@@ -385,3 +385,10 @@
 .fg-foot .violet { color: var(--violet); }
 .fg-foot .swing { color: var(--loss-dim); }
 
+
+/* The note you wrote on the Trials page, beside the trial it belongs to. It
+   takes the book's colour because it is yours, not scraped. */
+.trial-line .own-note {
+  color: var(--book); font-size: var(--fs-xs);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}

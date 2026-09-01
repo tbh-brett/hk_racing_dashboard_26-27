@@ -20,7 +20,8 @@ import datetime as dt
 from dataclasses import dataclass
 from typing import Any
 
-__all__ = ["PERIODS", "Window", "resolve", "season_of", "season_label"]
+__all__ = ["PERIODS", "Window", "resolve", "seasons", "season_of",
+           "season_label"]
 
 # The five the interface offers, in the order it offers them.
 PERIODS: tuple[str, ...] = ("day", "week", "month", "season", "lifetime")
@@ -76,7 +77,8 @@ def _anchor(anchor: str | dt.date | None) -> dt.date:
 def resolve(period: str | None = "lifetime", *,
             anchor: str | dt.date | None = None,
             since: str | None = None,
-            until: str | None = None) -> Window:
+            until: str | None = None,
+            season: int | None = None) -> Window:
     """Turn a period name into dates.
 
     An explicit `since`/`until` overrides the name — the interface offers a
@@ -117,10 +119,54 @@ def resolve(period: str | None = "lifetime", *,
         return Window(name, start.isoformat(), end.isoformat(),
                       f"{start.isoformat()} → {end.isoformat()}")
 
-    start_year = season_of(end)
+    start_year = season if season is not None else season_of(end)
     start = dt.date(start_year, SEASON_START_MONTH, 1)
-    return Window(name, start.isoformat(), end.isoformat(),
+    # A NAMED season runs to its own close, not to the anchor: asking for
+    # 2024/25 while looking at a 2026 meeting must not hand back two years of
+    # it. The unnamed one still runs to the anchor, which is what "so far this
+    # season" means.
+    close = dt.date(start_year + 1, SEASON_START_MONTH, 1) - dt.timedelta(days=1)
+    stop = close if season is not None else min(end, close)
+    return Window(name, start.isoformat(), stop.isoformat(),
                   f"SEASON {season_label(start_year)}")
+
+
+def seasons(*, conn: Any = None, today: str | dt.date | None = None
+            ) -> list[dict[str, Any]]:
+    """Every season the archive holds, newest first, with the current one marked.
+
+    The only function here that reads the database. A season the data has never
+    seen still belongs in the list the moment it opens — that is the whole
+    point at the start of a new one: the page has to be able to show an empty
+    2026/27 rather than silently keeping you in 2025/26 because that is where
+    the last meeting was.
+    """
+    from hkrd.store.connect import get_conn
+
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        found: dict[int, dict[str, Any]] = {}
+        for table, key in (("bets", "bets"), ("races", "meetings")):
+            for row in conn.execute(
+                    f"SELECT race_date d, count(*) n FROM {table} "
+                    f"WHERE race_date IS NOT NULL GROUP BY race_date"):
+                slot = found.setdefault(season_of(row["d"]),
+                                        {"bets": 0, "meetings": 0})
+                slot[key] += row["n"]
+
+        current = season_of(_anchor(today))
+        found.setdefault(current, {"bets": 0, "meetings": 0})
+        out = []
+        for yr in sorted(found, reverse=True):
+            w = resolve("season", season=yr)
+            out.append({"season": yr, "label": season_label(yr),
+                        "since": w.since, "until": w.until,
+                        "current": yr == current, **found[yr]})
+        return out
+    finally:
+        if own:
+            conn.close()
 
 
 def clause(window: Window | None, column: str = "b.race_date"

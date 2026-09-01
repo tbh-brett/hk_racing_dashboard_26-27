@@ -323,7 +323,9 @@ export const PERIODS = [
 ];
 
 export function periodPicker(current, onPick, { label = 'OVER', window: win = null,
-                                                cls = '' } = {}) {
+                                                cls = '', seasons = null,
+                                                season = null,
+                                                onSeason = null } = {}) {
   const bar = el('div', `period-pick ${cls}`.trim());
   bar.append(el('span', 'lab', label));
   PERIODS.forEach(([key, text]) => {
@@ -334,6 +336,32 @@ export function periodPicker(current, onPick, { label = 'OVER', window: win = nu
     b.addEventListener('click', () => onPick(key));
     bar.append(b);
   });
+
+  // WHICH season, once SEASON is the window. Without this, "season" can only
+  // ever mean the one containing the meeting on screen — which is right while
+  // reviewing a past meeting and exactly wrong in September, when the last
+  // meeting on record is still last season's and the question is about the one
+  // that just opened.
+  if (current === 'season' && seasons?.length && onSeason) {
+    const pick = el('span', 'seasons');
+    seasons.forEach((s) => {
+      const on = season === s.season;
+      const b = el('button', `s-chip${on ? ' on' : ''}`, s.label);
+      b.type = 'button';
+      // Say what is in it. An empty season is a fresh slate, not a fault, and
+      // the count is what tells the two apart before you click.
+      b.title = s.bets
+        ? `${s.bets} bets · ${s.meetings} meetings`
+        : s.current ? 'the season now open — nothing bet in it yet'
+          : 'no bets recorded in this season';
+      if (!s.bets) b.classList.add('empty');
+      if (s.current) b.classList.add('current');
+      b.addEventListener('click', () => onSeason(s.season));
+      pick.append(b);
+    });
+    bar.append(pick);
+  }
+
   // The bounds, always. "SEASON" is a word; "SEASON 2025/26" is checkable, and
   // a figure copied off the page can be checked again later against the same
   // dates rather than against whatever the word means that month.

@@ -36,6 +36,49 @@ export async function loadTags() {
   return TAG_OPTIONS;
 }
 
+/* WHAT IS BEING ANNOTATED.
+ *
+ * The form is the same for a race and a trial — a note, then one deliberate
+ * click to promote it — but the two are addressed differently: a race has a
+ * race number and a trial has a batch number, they share a date, and they are
+ * stored in separate tables for exactly that reason. So the difference is one
+ * small object rather than a second copy of the form, which is what would
+ * eventually give trials their own tag vocabulary and their own quiet rules
+ * about what a promotion means.
+ */
+export function runSubject(run) {
+  return {
+    kind: 'run',
+    title: 'RUN NOTE',
+    label: `${run.race_date} R${run.race_no}`,
+    detail: `${run.race_date} R${run.race_no} · ${conditionLabel(run)}`,
+    save: (horseName, note) => api.saveNote({
+      horse_name: horseName, race_date: run.race_date,
+      race_no: run.race_no, note,
+    }),
+    source: { source_date: run.race_date, source_race_no: run.race_no },
+  };
+}
+
+export function trialSubject(trial) {
+  const cond = [trial.venue, trial.surface,
+                trial.going ? `${trial.going}` : null]
+    .filter(Boolean).join(' ');
+  return {
+    kind: 'trial',
+    title: 'TRIAL NOTE',
+    label: `${trial.trial_date} T${trial.trial_no}`,
+    detail: `${trial.trial_date} T${trial.trial_no}${cond ? ` · ${cond}` : ''}`,
+    save: (horseName, note) => api.saveTrialNote({
+      horse_name: horseName, trial_date: trial.trial_date,
+      trial_no: trial.trial_no, note,
+    }),
+    // `source_trial_no`, never `source_race_no` — a trial written into the
+    // race column makes the book link back to a race that was never run.
+    source: { source_date: trial.trial_date, source_trial_no: trial.trial_no },
+  };
+}
+
 export function conditionLabel(run) {
   return [run.venue, run.course, run.distance ? `${run.distance}m` : null,
           run.going, run.race_class ? `C${run.race_class}` : null]
@@ -51,15 +94,17 @@ export function conditionLabel(run) {
  * calling page updates its own state — this module holds none.
  */
 export function renderReview(host, {
-  horseName, run, existingNote = null, booked = null,
+  horseName, run = null, subject = null, existingNote = null, booked = null,
   onSaved = () => {}, onPromoted = () => {}, onClose = () => {},
 }) {
+  // A caller that passes a bare `run` gets the run subject, which is what the
+  // Form Guide and Results already do.
+  const subj = subject ?? runSubject(run);
   host.replaceChildren();
 
   const hd = el('div', 'hd');
-  hd.append(document.createTextNode('RUN NOTE'));
-  hd.append(el('span', 'meta',
-    `${horseName} · ${run.race_date} R${run.race_no}`));
+  hd.append(document.createTextNode(subj.title));
+  hd.append(el('span', 'meta', `${horseName} · ${subj.label}`));
   const close = el('button', 'close', '✕');
   close.addEventListener('click', onClose);
   hd.append(close);
@@ -70,7 +115,8 @@ export function renderReview(host, {
   const row = el('div', 'row');
   const input = el('input');
   input.value = existingNote?.note ?? '';
-  input.placeholder = 'note on this run';
+  input.placeholder = subj.kind === 'trial'
+    ? 'note on this trial' : 'note on this run';
   row.append(input);
   const save = el('button', 'act', 'SAVE');
   const err = el('div', 'err');
@@ -78,11 +124,7 @@ export function renderReview(host, {
     save.disabled = true;
     err.textContent = '';
     try {
-      const saved = await api.saveNote({
-        horse_name: horseName, race_date: run.race_date,
-        race_no: run.race_no, note: input.value,
-      });
-      onSaved(saved);
+      onSaved(await subj.save(horseName, input.value));
     } catch (e) {
       err.textContent = e.message;
       save.disabled = false;
@@ -103,7 +145,7 @@ export function renderReview(host, {
     const open = el('button', 'act', '+ ADD TO BLACKBOOK');
     open.addEventListener('click', () => {
       open.remove();
-      sep.append(promoteForm({ horseName, run, noteInput: input,
+      sep.append(promoteForm({ horseName, subject: subj, noteInput: input,
                                onPromoted, onClose }));
     });
     sep.append(open);
@@ -114,13 +156,13 @@ export function renderReview(host, {
   return input;
 }
 
-function promoteForm({ horseName, run, noteInput, onPromoted, onClose }) {
+function promoteForm({ horseName, subject, noteInput, onPromoted, onClose }) {
   const form = el('div');
   form.append(el('div', 'cap', 'HORSE'));
   form.append(el('div', 'val strong', horseName));
-  form.append(el('div', 'cap', 'SOURCE RUN'));
-  form.append(el('div', 'val',
-    `${run.race_date} R${run.race_no} · ${conditionLabel(run)}`));
+  form.append(el('div', 'cap',
+    subject.kind === 'trial' ? 'SOURCE TRIAL' : 'SOURCE RUN'));
+  form.append(el('div', 'val', subject.detail));
   form.append(el('div', 'cap', 'REASON'));
   const reason = el('textarea');
   reason.rows = 3;
@@ -152,7 +194,7 @@ function promoteForm({ horseName, run, noteInput, onPromoted, onClose }) {
     try {
       const entry = await api.createBlackbookEntry({
         horse_name: horseName, reasoning: reason.value,
-        source_date: run.race_date, source_race_no: run.race_no,
+        ...subject.source,
         tags: [...chosen],
       });
       onPromoted(entry);

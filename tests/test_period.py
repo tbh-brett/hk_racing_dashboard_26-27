@@ -101,3 +101,50 @@ def test_the_column_is_the_caller_s_to_name() -> None:
     w = period.resolve("day", anchor="2026-07-15")
     assert period.clause(w, "b.race_date")[0].startswith("b.race_date")
     assert period.clause(w, "r.race_date")[0].startswith("r.race_date")
+
+
+# ── a new season ─────────────────────────────────────────────────────────────
+
+def test_a_named_season_runs_to_its_own_close_not_to_the_anchor() -> None:
+    """Asking for 2024/25 while looking at a 2026 meeting must not hand back
+    two years of it."""
+    w = period.resolve("season", season=2024, anchor="2026-07-15")
+    assert (w.since, w.until) == ("2024-09-01", "2025-08-31")
+
+
+def test_the_unnamed_season_still_stops_at_the_anchor() -> None:
+    """"So far this season" is the useful reading while reviewing a meeting."""
+    w = period.resolve("season", anchor="2026-01-20")
+    assert (w.since, w.until) == ("2025-09-01", "2026-01-20")
+
+
+def test_the_season_now_opening_can_be_named_before_it_has_data() -> None:
+    """The whole point on the first day of a new season: the page has to be
+    able to show an empty 2026/27 rather than silently keeping you in
+    2025/26, which is where the last meeting was."""
+    w = period.resolve("season", season=2026, anchor="2026-07-15")
+    assert w.label == "SEASON 2026/27"
+    assert w.since == "2026-09-01"
+    assert w.since > "2026-07-15"      # the anchor is BEFORE the window
+
+
+def test_the_season_list_includes_the_open_one_even_when_empty(tmp_path) -> None:
+    from hkrd.store.connect import get_conn, init_db, transaction
+
+    conn = get_conn(tmp_path / "s.db")
+    init_db(conn)
+    with transaction(conn):
+        conn.execute(
+            "INSERT INTO races (race_date, race_no, venue) "
+            "VALUES ('2026-03-04', 1, 'HV')")
+    try:
+        found = period.seasons(conn=conn, today="2026-09-01")
+    finally:
+        conn.close()
+
+    by_year = {s["season"]: s for s in found}
+    assert by_year[2025]["meetings"] == 1
+    assert by_year[2026]["meetings"] == 0
+    assert by_year[2026]["current"] is True
+    # Newest first, so the season being bet is the first thing offered.
+    assert [s["season"] for s in found] == sorted(by_year, reverse=True)
