@@ -606,3 +606,38 @@ select:hover, .btn:hover { background: var(--line-2); color: var(--text); }
 .popover .tag[aria-pressed="true"] { color: var(--book); border-color: var(--book-ground); background: var(--pop-act); }
 .popover .hint { font-family: var(--font-mono); font-size: 9px; color: var(--book-dim); line-height: 1.4; }
 .popover .err { color: var(--alert); font-size: var(--fs-sm); margin-top: 6px; }
+
+
+/* ── the window, and which book ──────────────────────────────────────────────
+ * Both are shared controls: the same five periods and the same two accounts
+ * wherever a performance figure is shown, so a number on one page and a number
+ * on another are over the same thing.
+ */
+.period-pick, .acct-pick {
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-family: var(--font-mono); font-size: var(--fs-xs);
+}
+.period-pick .lab, .acct-pick .lab {
+  color: var(--text-dim); letter-spacing: .1em;
+}
+.period-pick .p-chip, .acct-pick .a-chip {
+  background: none; border: 1px solid var(--line-2); border-radius: 0;
+  color: var(--text-muted); font-family: var(--font-mono);
+  font-size: var(--fs-xs); letter-spacing: .06em; padding: 1px 7px;
+  cursor: pointer;
+}
+.period-pick .p-chip:hover, .acct-pick .a-chip:hover {
+  color: var(--text); border-color: var(--text-dim);
+}
+.period-pick .p-chip.on {
+  color: var(--page-accent, var(--edge)); border-color: var(--page-accent, var(--edge));
+}
+/* The bounds the word resolves to. Never omitted — "SEASON" is a word and
+   "SEASON 2025/26" is a claim you can check. */
+.period-pick .bounds { color: var(--text-faint); letter-spacing: .04em; }
+
+/* Each account keeps its colour from the Bets page, because logging a bet to
+   the wrong account is a real and costly error and the band has to be loud. */
+.acct-pick .a-chip.on { color: var(--text); border-color: var(--text-dim); }
+.acct-pick.acct-brett .a-chip.on { color: var(--acct-1); border-color: var(--acct-1); }
+.acct-pick.acct-kelvin .a-chip.on { color: var(--acct-2); border-color: var(--acct-2); }

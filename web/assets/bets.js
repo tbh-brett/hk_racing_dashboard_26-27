@@ -17,7 +17,8 @@
  * been shown.
  */
 import { api, num } from './api.js';
-import { el, $, DASH, MINUS, renderNav } from './vocab.js';
+import { el, $, DASH, MINUS, renderNav, periodPicker,
+         accountPicker } from './vocab.js';
 import { context } from './context.js';
 import { initEntry, loadEntry, renderEntry } from './bets-entry.js';
 import { install as installPalette } from './palette.js';
@@ -44,9 +45,31 @@ const SOURCES = [['all', 'ALL'], ['confirmed', 'STATEMENT'],
 const state = {
   view: 'entry', bets: [], analysis: null, recon: null,
   search: '', type: null, result: 'all', source: 'all',
+  // Which book, and how far back. Both drive EVERY view on this page — the
+  // ledger, the analysis and the reconciliation — because a page that filters
+  // one panel and not the others invites reading two numbers as comparable
+  // when they are measured over different things.
+  account: null, period: 'lifetime', window: null,
 };
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
+
+/** Which book and how far back — one bar, governing every view on the page. */
+function renderScope() {
+  const host = $('scope-bar');
+  host.replaceChildren();
+  host.append(accountPicker(state.account, (key) => {
+    state.account = key;
+    loadLedger();
+  }));
+  host.append(periodPicker(state.period, (key) => {
+    state.period = key;
+    loadLedger();
+  }, { window: state.window }));
+  // The entry view is about a bet not yet placed, so a window over past
+  // results has nothing to say about it.
+  host.hidden = state.view === 'entry';
+}
 
 function renderViewToggle() {
   // Entry first: the page's own subject is the decision, and the ledger is
@@ -146,18 +169,74 @@ function renderHead() {
     el('div', c.cls ?? null, c.label)));
 }
 
+/** One selection, styled by what it is.
+ *
+ *  A BANKER carries the ticket: if it loses, nothing else on the line matters,
+ *  so it reads brightest and is placed first. A BOOKED horse is one the
+ *  blackbook already had a view on, and that keeps the book's colour — the
+ *  point of the book is recognising its horses in someone else's list.
+ */
+function selectionChip(s, booked) {
+  const name = s.horse_name ?? `#${s.horse_no}`;
+  const cls = [
+    s.is_banker ? 'banker' : null,
+    booked.has(s.horse_name) ? 'booked' : null,
+  ].filter(Boolean).join(' ');
+  const chip = el('span', cls || null, s.is_banker ? `${name}◆` : name);
+  if (s.place) chip.title = `finished ${s.place}`;
+  return chip;
+}
+
+/** Bankers first, then the rest in their own order.
+ *
+ *  A banker is not one selection among several — it is the leg the whole
+ *  ticket depends on, and reading it third in a list of five is reading the
+ *  ticket backwards. Stable within each group, so two bankers stay in the
+ *  order they were struck. */
+function bankersFirst(selections) {
+  return [...selections].sort(
+    (a, b) => (b.is_banker ? 1 : 0) - (a.is_banker ? 1 : 0));
+}
+
 function selectionText(b) {
   const booked = new Set(b.blackbook.map((x) => x.horse_name));
   const host = el('div', 'sel');
-  b.selections.forEach((s, i) => {
-    if (i) host.append(document.createTextNode(' · '));
-    const name = s.horse_name ?? `#${s.horse_no}`;
-    host.append(el('span', booked.has(s.horse_name) ? 'booked' : null,
-      s.is_banker ? `${name}◆` : name));
+
+  // AN ALL-UP SPANS RACES, and a flat list of eight horses hides which leg is
+  // which. One line per race, the race number first — so a four-leg ticket
+  // reads as four decisions rather than a run-on of names that spills out of
+  // the column.
+  const legs = new Map();
+  b.selections.forEach((s) => {
+    const key = s.race_no ?? b.race_no;
+    if (!legs.has(key)) legs.set(key, []);
+    legs.get(key).push(s);
   });
+  const multiRace = legs.size > 1;
+
+  if (multiRace) {
+    host.classList.add('multi');
+    [...legs.entries()].sort((x, y) => (x[0] ?? 0) - (y[0] ?? 0))
+      .forEach(([raceNo, picks]) => {
+        const line = el('div', 'leg');
+        line.append(el('span', 'rno', raceNo === null ? '⋯' : `R${raceNo}`));
+        bankersFirst(picks).forEach((s, i) => {
+          if (i) line.append(document.createTextNode(' · '));
+          line.append(selectionChip(s, booked));
+        });
+        host.append(line);
+      });
+  } else {
+    bankersFirst(b.selections).forEach((s, i) => {
+      if (i) host.append(document.createTextNode(' · '));
+      host.append(selectionChip(s, booked));
+    });
+  }
+
   if (!b.selections.length) host.textContent = DASH;
   host.title = b.selections.map((s) =>
-    `${s.horse_no} ${s.horse_name ?? ''}${s.is_banker ? ' (banker)' : ''}`
+    `${s.race_no ? `R${s.race_no} ` : ''}${s.horse_no} ${s.horse_name ?? ''}`
+    + `${s.is_banker ? ' (banker)' : ''}`
     + `${s.place ? ` — finished ${s.place}` : ''}`).join('\n');
   return host;
 }
@@ -509,6 +588,7 @@ function renderRecon() {
 
 function render() {
   renderViewToggle();
+  renderScope();
   renderSummary();
   $('view-entry').hidden = state.view !== 'entry';
   $('view-ledger').hidden = state.view !== 'ledger';
@@ -550,10 +630,28 @@ async function boot() {
   await context.init();
   if (context.date) await loadEntry(context.date, context.summary);
   render();
+  await loadLedger();
+}
+
+/** Everything the ledger, analysis and reconciliation views read.
+ *
+ *  One call for all three, with the same account and the same window, so they
+ *  cannot disagree about what they are counting.
+ */
+async function loadLedger() {
+  const q = new URLSearchParams({ period: state.period });
+  if (state.account) q.set('account', state.account);
+  // Anchored on the meeting in the header, not on today: "this week" while
+  // looking at an April meeting means that April week.
+  if (context.date) q.set('anchor', context.date);
+  const qs = q.toString();
   const [ledger, analysis, recon] = await Promise.all([
-    api.bets('?limit=2000'), api.betsAnalysis(), api.betsReconciliation(),
+    api.bets(`?limit=2000&${qs}`),
+    api.betsAnalysis(qs),
+    api.betsReconciliation(qs),
   ]);
   state.bets = ledger.bets;
+  state.window = ledger.window;
   state.analysis = analysis;
   state.recon = recon;
   render();

@@ -11,38 +11,79 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Body, HTTPException
 
-from hkrd.query import bet_analysis as ba_q, bets as bets_q, prebet
+from hkrd.query import bet_analysis as ba_q, bets as bets_q, period, prebet
 
 router = APIRouter()
 
 
+def _window(period_name: str | None, since: str | None, until: str | None,
+            anchor: str | None):
+    """The window every figure on the page is measured over.
+
+    Read in ONE place so five endpoints cannot each interpret "week"
+    differently — which is how the old dashboard ended up with two strike
+    rates that were both right over windows nobody had written down.
+    """
+    try:
+        return period.resolve(period_name, anchor=anchor,
+                              since=since, until=until)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
 @router.get("/api/bets")
 def bets_ledger(date: str | None = None, account: str | None = None,
-                limit: int = 500) -> dict:
-    rows = bets_q.ledger(date=date, account=account, limit=limit)
-    return {"bets": rows, "count": len(rows)}
+                limit: int = 500, period: str | None = None,
+                since: str | None = None, until: str | None = None,
+                anchor: str | None = None) -> dict:
+    win = _window(period, since, until, anchor)
+    rows = bets_q.ledger(date=date, account=account, window=win, limit=limit)
+    return {"bets": rows, "count": len(rows), "window": win.as_dict()}
 
 
 @router.get("/api/bets/summary")
-def bets_summary(account: str | None = None) -> dict:
-    return bets_q.summary(account=account)
+def bets_summary(account: str | None = None, period: str | None = None,
+                 since: str | None = None, until: str | None = None,
+                 anchor: str | None = None) -> dict:
+    win = _window(period, since, until, anchor)
+    return {**bets_q.summary(account=account, window=win),
+            "window": win.as_dict()}
 
 
 @router.get("/api/bets/analysis")
-def bets_analysis(account: str | None = None) -> dict:
+def bets_analysis(account: str | None = None, period: str | None = None,
+                  since: str | None = None, until: str | None = None,
+                  anchor: str | None = None) -> dict:
     """Everything the analysis section renders, in one read.
 
     Every slice carries n and a 95% interval, because the design brief prints
-    the rule across the whole section: a 12-bet slice is not a finding.
+    the rule across the whole section: a 12-bet slice is not a finding. The
+    window narrows all of them together — a page showing one figure over the
+    chosen period and seven over all time is worse than offering no period.
     """
-    return ba_q.analysis(account=account)
+    return ba_q.analysis(account=account,
+                         window=_window(period, since, until, anchor))
 
 
 @router.get("/api/bets/reconciliation")
-def bets_reconciliation(account: str | None = None) -> dict:
+def bets_reconciliation(account: str | None = None, period: str | None = None,
+                        since: str | None = None, until: str | None = None,
+                        anchor: str | None = None) -> dict:
     """Imported statement rows against logged bets. Nothing is silently
     merged, so a block the two disagree on is named."""
-    return ba_q.reconciliation(account=account)
+    return ba_q.reconciliation(account=account,
+                               window=_window(period, since, until, anchor))
+
+
+@router.get("/api/periods")
+def periods() -> dict:
+    """The windows every page offers, and what each resolves to today.
+
+    Served rather than hard-coded in the browser so the five names, the season
+    boundary and the bounds are one definition — the season runs September to
+    July, which a page inventing its own calendar year would get wrong.
+    """
+    return {"periods": [period.resolve(p).as_dict() for p in period.PERIODS]}
 
 
 @router.get("/api/bets/accounts")

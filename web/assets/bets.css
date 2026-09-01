@@ -58,10 +58,17 @@
 
 .led-head, .led-row {
   display: grid; align-items: center;
+  /* The selection column takes the slack: an all-up puts one line per race in
+     it, so it is the one cell whose height varies. */
   grid-template-columns:
-    88px 46px 40px 96px minmax(150px, 1fr) 66px 72px 68px 74px 62px;
+    88px 46px 40px 96px minmax(210px, 1fr) 66px 72px 68px 74px 62px;
   gap: 10px; padding: 0 14px;
 }
+/* Rows are top-aligned rather than centred, or a four-leg all-up floats its
+   date and stake in the middle of a tall cell away from the leg they belong
+   to. The header stays centred; it is one line. */
+.led-row { align-items: start; }
+.led-row > * { padding-top: 6px; }
 .led-head {
   height: 28px; border-bottom: 1px solid var(--line-2);
   background: var(--surface); font-family: var(--font-mono);
@@ -79,10 +86,27 @@
 .led-row .type { color: var(--text); letter-spacing: .04em; }
 .led-row .sel {
   color: var(--text-muted); overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: nowrap; padding: 3px 0;
 }
-/* A horse on this ticket that was in the blackbook when it was struck. */
+/* AN ALL-UP IS ONE LINE PER RACE. Eight names run together hide which leg is
+   which and spill out of the column; four lines read as the four decisions the
+   ticket actually is. */
+.led-row .sel.multi { white-space: normal; text-overflow: clip; }
+.led-row .sel .leg {
+  display: flex; align-items: baseline; gap: 5px;
+  min-height: 16px; white-space: nowrap;
+}
+.led-row .sel .leg .rno {
+  flex: none; width: 26px; color: var(--text-faint); font-size: var(--fs-xs);
+}
+/* THE BANKER CARRIES THE TICKET — if it loses, nothing else on the line
+   matters — so it reads brightest, and `bankersFirst` puts it at the front. */
+.led-row .sel .banker { color: var(--text); font-weight: 600; }
+/* A horse the blackbook already had a view on keeps the book's colour, banker
+   or not: recognising its horses in someone else's list is what the book is
+   for. Bold either way — this one is both. */
 .led-row .sel .booked { color: var(--book); }
+.led-row .sel .banker.booked { color: var(--book); font-weight: 600; }
 .led-row .num { text-align: right; }
 .led-row .pnl { text-align: right; font-weight: 600; }
 .led-row .pos { color: var(--win); }
@@ -498,3 +522,13 @@
 .pre-placed .ok { color: var(--win); font-family: var(--font-mono); }
 .pre-placed .ov { color: var(--alert); }
 .pre-error { font-size: 11px; color: var(--loss); padding: 6px 0; }
+
+
+/* The bar that says which book and how far back. Sits under the page header
+   and above every view it governs, so its scope is obvious from where it is. */
+.scope-bar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-5);
+  padding: 5px var(--sp-4);
+  border-bottom: 1px solid var(--page-rule, var(--line));
+  background: var(--page-band, var(--surface));
+}

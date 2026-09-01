@@ -25,6 +25,8 @@ from typing import Any
 import numpy as np
 
 from hkrd.query.market import band as concentration_band
+from hkrd.query import period
+from hkrd.query.period import Window
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["roi_interval", "slice_stats", "cumulative_pnl", "clv", "by_type",
@@ -96,15 +98,30 @@ def slice_stats(rows: list[dict[str, Any]], label: str = "") -> dict[str, Any]:
     }
 
 
-def _ledger_rows(conn: Connection, account: str | None) -> list[dict[str, Any]]:
-    where, params = ("WHERE account = ?", [account]) if account else ("", [])
+def _ledger_rows(conn: Connection, account: str | None,
+                 window: Window | None = None) -> list[dict[str, Any]]:
+    """Every bet the analysis is computed over.
+
+    ONE loader, so a window applied here reaches every figure on the page at
+    once. Two loaders is how a strike rate on one panel disagrees with the
+    strike rate on another, both right, over windows nobody wrote down.
+    """
+    where, params = ["1 = 1"], []
+    if account:
+        where.append("account = ?")
+        params.append(account)
+    frag, wp = period.clause(window, "race_date")
+    where.append(frag)
+    params.extend(wp)
     return [dict(r) for r in conn.execute(
         f"SELECT bet_id, race_date, race_no, bet_type, stake, returned, pnl, "
         f"hit, status, account, source, all_up_formula, placed_at "
-        f"FROM bets {where} ORDER BY race_date, placed_at", params)]
+        f"FROM bets WHERE {' AND '.join(where)} ORDER BY race_date, placed_at",
+        params)]
 
 
 def cumulative_pnl(*, account: str | None = None,
+                 window: Window | None = None,
                    conn: Connection | None = None) -> dict[str, Any]:
     """P/L carried forward by meeting, not by bet.
 
@@ -115,12 +132,21 @@ def cumulative_pnl(*, account: str | None = None,
     own = conn is None
     conn = conn or get_conn()
     try:
+        # It aggregates in SQL rather than through `_ledger_rows`, so the
+        # window has to be applied here too — this is the panel that quietly
+        # kept showing the whole archive while the headline above it narrowed.
+        where, params = ["1 = 1"], []
+        if account:
+            where.append("account = ?")
+            params.append(account)
+        frag, wp = period.clause(window, "race_date")
+        where.append(frag)
+        params.extend(wp)
         rows = conn.execute(f"""
             SELECT race_date, count(*) bets, sum(stake) staked,
                    sum(returned) returned
-            FROM bets {"WHERE account = ?" if account else ""}
-            GROUP BY race_date ORDER BY race_date""",
-            [account] if account else []).fetchall()
+            FROM bets WHERE {' AND '.join(where)}
+            GROUP BY race_date ORDER BY race_date""", params).fetchall()
         series, running = [], 0.0
         for r in rows:
             pnl = (r["returned"] or 0) - (r["staked"] or 0)
@@ -166,6 +192,7 @@ _CLV_SQL = """
 
 
 def clv(*, account: str | None = None,
+                 window: Window | None = None,
         conn: Connection | None = None) -> dict[str, Any]:
     """Closing line value, per priced SELECTION rather than per bet.
 
@@ -180,16 +207,32 @@ def clv(*, account: str | None = None,
     own = conn is None
     conn = conn or get_conn()
     try:
-        sql = _CLV_SQL + (" AND b.account = ?" if account else "")
-        rows = [dict(r) for r in conn.execute(sql, [account] if account else [])]
+        # Both reads take the window, or the "of N selections" denominator
+        # counts the whole archive while the numerator counts the window — and
+        # the share printed beside it would be nonsense.
+        _frag, _wp = period.clause(window, "b.race_date")
+        params = []
+        sql = _CLV_SQL
+        if account:
+            sql += " AND b.account = ?"
+            params.append(account)
+        sql += f" AND {_frag}"
+        params.extend(_wp)
+        rows = [dict(r) for r in conn.execute(sql, params)]
         priced = [r for r in rows if r["taken_odds"] and r["close_odds"]]
         for r in priced:
             r["clv"] = round(r["taken_odds"] / r["close_odds"] - 1, 4)
 
+        tot_clauses, tot_params = ["1 = 1"], []
+        if account:
+            tot_clauses.append("b.account = ?")
+            tot_params.append(account)
+        tot_clauses.append(_frag)
+        tot_params.extend(_wp)
         total_selections = conn.execute(
             "SELECT count(*) FROM bet_selections s JOIN bets b "
-            "ON b.bet_id = s.bet_id" + (" WHERE b.account = ?" if account else ""),
-            [account] if account else []).fetchone()[0]
+            f"ON b.bet_id = s.bet_id WHERE {' AND '.join(tot_clauses)}",
+            tot_params).fetchone()[0]
 
         n = len(priced)
         if not n:
@@ -217,12 +260,13 @@ def clv(*, account: str | None = None,
 
 
 def by_type(*, account: str | None = None,
+                 window: Window | None = None,
             conn: Connection | None = None) -> list[dict[str, Any]]:
     """Every bet type as its own slice, turnover first."""
     own = conn is None
     conn = conn or get_conn()
     try:
-        rows = _ledger_rows(conn, account)
+        rows = _ledger_rows(conn, account, window)
         groups: dict[str, list[dict]] = {}
         for r in rows:
             groups.setdefault(r["bet_type"], []).append(r)
@@ -235,6 +279,7 @@ def by_type(*, account: str | None = None,
 
 
 def allup_vs_straight(*, account: str | None = None,
+                 window: Window | None = None,
                       conn: Connection | None = None) -> dict[str, Any]:
     """The chain against the straight bets placed on the same days.
 
@@ -245,7 +290,7 @@ def allup_vs_straight(*, account: str | None = None,
     own = conn is None
     conn = conn or get_conn()
     try:
-        rows = _ledger_rows(conn, account)
+        rows = _ledger_rows(conn, account, window)
         allup_days = {r["race_date"] for r in rows
                       if r["bet_type"].startswith("ALLUP")}
         chain = [r for r in rows if r["bet_type"].startswith("ALLUP")]
@@ -287,6 +332,7 @@ def _closing_concentration(conn: Connection) -> dict[tuple[str, int], float]:
 
 
 def by_concentration(*, account: str | None = None,
+                 window: Window | None = None,
                      conn: Connection | None = None) -> dict[str, Any]:
     """Does the coverage rule hold — strong, moderate, weak markets.
 
@@ -297,7 +343,7 @@ def by_concentration(*, account: str | None = None,
     conn = conn or get_conn()
     try:
         conc = _closing_concentration(conn)
-        rows = _ledger_rows(conn, account)
+        rows = _ledger_rows(conn, account, window)
         bands: dict[str, list[dict]] = {}
         spanning = []
         for r in rows:
@@ -320,6 +366,7 @@ def by_concentration(*, account: str | None = None,
 
 
 def favourite_split(*, account: str | None = None,
+                 window: Window | None = None,
                     conn: Connection | None = None) -> dict[str, Any]:
     """Tickets that included the market favourite against those that did not.
 
@@ -340,15 +387,21 @@ def favourite_split(*, account: str | None = None,
                 favourites.setdefault((r["race_date"], r["race_no"]),
                                       set()).add(r["horse_no"])
 
+        # Which bets backed a favourite. The slice itself comes from
+        # `_ledger_rows`, so this is a lookup rather than a second row set —
+        # but it is narrowed to the same window so the scan stays proportional
+        # to what is being asked about rather than to the whole archive.
+        _fav_where, _fav_params = period.clause(window, "b.race_date")
         with_fav: set[str] = set()
-        for r in conn.execute("""
+        for r in conn.execute(f"""
             SELECT b.bet_id, b.race_date, s.race_no, s.horse_no
-            FROM bets b JOIN bet_selections s ON s.bet_id = b.bet_id"""):
+            FROM bets b JOIN bet_selections s ON s.bet_id = b.bet_id
+            WHERE {_fav_where}""", _fav_params):
             if r["horse_no"] in favourites.get(
                     (r["race_date"], r["race_no"]), ()):
                 with_fav.add(r["bet_id"])
 
-        rows = _ledger_rows(conn, account)
+        rows = _ledger_rows(conn, account, window)
         inc = [r for r in rows if r["bet_id"] in with_fav]
         exc = [r for r in rows if r["bet_id"] not in with_fav]
         total = len(rows)
@@ -363,6 +416,7 @@ def favourite_split(*, account: str | None = None,
 
 
 def reconciliation(*, account: str | None = None,
+                 window: Window | None = None,
                    conn: Connection | None = None) -> dict[str, Any]:
     """Imported statement rows set against logged bets, so nothing is silently
     merged.
@@ -380,8 +434,15 @@ def reconciliation(*, account: str | None = None,
     own = conn is None
     conn = conn or get_conn()
     try:
-        where = " WHERE b.account = ?" if account else ""
-        params = [account] if account else []
+        clauses, wparams = ["1 = 1"], []
+        if account:
+            clauses.append("b.account = ?")
+            wparams.append(account)
+        _frag, _wp = period.clause(window, "b.race_date")
+        clauses.append(_frag)
+        wparams.extend(_wp)
+        where = f" WHERE {' AND '.join(clauses)}"
+        params = wparams
         rows = [dict(r) for r in conn.execute(f"""
             SELECT b.bet_id, b.source, b.settle_method, b.bookie_ref,
                    b.stake, b.returned,
@@ -452,23 +513,27 @@ def reconciliation(*, account: str | None = None,
 
 
 def analysis(*, account: str | None = None,
+             window: Window | None = None,
              conn: Connection | None = None) -> dict[str, Any]:
     """Everything the analysis section of the Bets page renders, in one read."""
     own = conn is None
     conn = conn or get_conn()
     try:
-        rows = _ledger_rows(conn, account)
+        rows = _ledger_rows(conn, account, window)
         return {
             "overall": slice_stats(rows, "ALL BETS"),
-            "cumulative": cumulative_pnl(account=account, conn=conn),
-            "clv": clv(account=account, conn=conn),
-            "by_type": by_type(account=account, conn=conn),
-            "all_up": allup_vs_straight(account=account, conn=conn),
-            "concentration": by_concentration(account=account, conn=conn),
-            "favourite": favourite_split(account=account, conn=conn),
-            "reconciliation": reconciliation(account=account, conn=conn),
+            "cumulative": cumulative_pnl(account=account, window=window, conn=conn),
+            "clv": clv(account=account, window=window, conn=conn),
+            "by_type": by_type(account=account, window=window, conn=conn),
+            "all_up": allup_vs_straight(account=account, window=window, conn=conn),
+            "concentration": by_concentration(account=account, window=window, conn=conn),
+            "favourite": favourite_split(account=account, window=window, conn=conn),
+            "reconciliation": reconciliation(account=account, window=window, conn=conn),
             "thin_bets": THIN_BETS,
             "account": account,
+            # What the figures above were measured over, named and bounded, so
+            # a number copied off this page can be checked later.
+            "window": (window or period.resolve("lifetime")).as_dict(),
         }
     finally:
         if own:

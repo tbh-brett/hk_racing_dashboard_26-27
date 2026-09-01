@@ -43,26 +43,27 @@ export const api = {
   meetingBlackbook: (date) => get(`/raceday/${date}/blackbook`),
   blackbook: (q = '') => get(`/blackbook${q}`),
   blackbookEntry: (id) => get(`/blackbook/${encodeURIComponent(id)}`),
-  blackbookTags: () => get('/blackbook/tags'),
+  blackbookTags: (qs = '') => get(`/blackbook/tags${qs ? `?${qs}` : ''}`),
   blackbookDeclared: (date) => get(`/blackbook/declared/${date}`),
-  backedVsMissed: (entryId, account) => get(
+  backedVsMissed: (entryId, account, qs = '') => get(
     '/blackbook/backed-vs-missed'
-    + (entryId || account
-      ? `?${[entryId ? `entry_id=${entryId}` : '',
-             account ? `account=${account}` : ''].filter(Boolean).join('&')}`
-      : '')),
+    + `?${[entryId ? `entry_id=${entryId}` : '',
+           account ? `account=${account}` : '', qs]
+      .filter(Boolean).join('&')}`),
   blackbookByAccount: (entryId) => get(
     `/blackbook/by-account${entryId ? `?entry_id=${entryId}` : ''}`),
-  tagsBackedVsMissed: (account) => get(
+  tagsBackedVsMissed: (account, qs = '') => get(
     '/blackbook/tags/backed-vs-missed'
-    + (account ? `?account=${encodeURIComponent(account)}` : '')),
+    + `?${[account ? `account=${encodeURIComponent(account)}` : '', qs]
+      .filter(Boolean).join('&')}`),
   bets: (q = '') => get(`/bets${q}`),
   betsSummary: () => get('/bets/summary'),
   betsForRace: (date, no) => get(`/bets/race/${date}/${no}`),
-  betsAnalysis: (account) => get(
-    `/bets/analysis${account ? `?account=${encodeURIComponent(account)}` : ''}`),
-  betsReconciliation: (account) => get(
-    `/bets/reconciliation${account ? `?account=${encodeURIComponent(account)}` : ''}`),
+  // A query string, not just an account: these take the window too, and the
+  // page builds it once so all three calls agree.
+  betsAnalysis: (qs = '') => get(`/bets/analysis${qs ? `?${qs}` : ''}`),
+  betsReconciliation: (qs = '') => get(`/bets/reconciliation${qs ? `?${qs}` : ''}`),
+  periods: () => get('/periods'),
   // Entry. `prebet` prices a ticket without writing it; `placeBet` writes.
   betAccounts: () => get('/bets/accounts'),
   betRaceday: (date, account) => get(

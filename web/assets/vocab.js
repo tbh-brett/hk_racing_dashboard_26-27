@@ -304,3 +304,60 @@ export function paceCell(pace, { cls = 'pace' } = {}) {
   }
   return box;
 }
+
+
+/* ── the window a figure is measured over ─────────────────────────────────
+ *
+ * Daily, weekly, monthly, seasonal, lifetime — the same five on every page
+ * that shows a performance figure, resolved SERVER SIDE by query/period.py.
+ * The browser never computes a boundary: the Hong Kong season runs September
+ * to July, and a page doing its own date arithmetic would cut one season in
+ * half and mix two together while looking entirely reasonable.
+ *
+ * `onPick` is handed the period name. The caller re-fetches; nothing here
+ * touches data.
+ */
+export const PERIODS = [
+  ['day', 'DAY'], ['week', 'WEEK'], ['month', 'MONTH'],
+  ['season', 'SEASON'], ['lifetime', 'LIFETIME'],
+];
+
+export function periodPicker(current, onPick, { label = 'OVER', window: win = null,
+                                                cls = '' } = {}) {
+  const bar = el('div', `period-pick ${cls}`.trim());
+  bar.append(el('span', 'lab', label));
+  PERIODS.forEach(([key, text]) => {
+    const on = (current ?? 'lifetime') === key;
+    const b = el('button', `p-chip${on ? ' on' : ''}`, text);
+    b.type = 'button';
+    b.setAttribute('aria-pressed', String(on));
+    b.addEventListener('click', () => onPick(key));
+    bar.append(b);
+  });
+  // The bounds, always. "SEASON" is a word; "SEASON 2025/26" is checkable, and
+  // a figure copied off the page can be checked again later against the same
+  // dates rather than against whatever the word means that month.
+  if (win?.label) bar.append(el('span', 'bounds', win.label));
+  return bar;
+}
+
+/* ── which book ───────────────────────────────────────────────────────────
+ * One book, two ledgers. The blackbook is shared; the money is not.
+ */
+export const ACCOUNTS = [
+  ['', 'BOTH'], ['brett', 'BRETT'], ['kelvin', 'KELVIN'],
+];
+
+export function accountPicker(current, onPick, { label = 'LEDGER' } = {}) {
+  const bar = el('div', `acct-pick${current ? ` acct-${current}` : ''}`);
+  bar.append(el('span', 'lab', label));
+  ACCOUNTS.forEach(([key, text]) => {
+    const on = (current ?? '') === key;
+    const b = el('button', `a-chip${on ? ' on' : ''}`, text);
+    b.type = 'button';
+    b.setAttribute('aria-pressed', String(on));
+    b.addEventListener('click', () => onPick(key || null));
+    bar.append(b);
+  });
+  return bar;
+}

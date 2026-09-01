@@ -22,6 +22,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from hkrd.query import period
+from hkrd.query.period import Window
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["ledger", "bets_for_race", "bets_for_horse", "backed_and_missed",
@@ -38,6 +40,7 @@ def _rows(conn: Connection, sql: str, params: Any = ()) -> list[dict]:
 
 
 def ledger(*, date: str | None = None, account: str | None = None,
+           window: Window | None = None,
            limit: int = 500, conn: Connection | None = None) -> list[dict[str, Any]]:
     """Bets, newest first, with the horses each one backed."""
     own = conn is None
@@ -50,6 +53,9 @@ def ledger(*, date: str | None = None, account: str | None = None,
         if account:
             where.append("b.account = ?")
             params.append(account)
+        frag, wp = period.clause(window, "b.race_date")
+        where.append(frag)
+        params.extend(wp)
         params.append(limit)
         bets = _rows(conn, f"""
             SELECT b.* FROM bets b
@@ -222,6 +228,7 @@ _RUNS_SINCE = """
 
 
 def backed_and_missed_by_tag(*, account: str | None = None,
+                             window: Window | None = None,
                              conn: Connection | None = None
                              ) -> dict[str, dict[str, Any]]:
     """The same comparison, one reading per booking reason.
@@ -243,7 +250,8 @@ def backed_and_missed_by_tag(*, account: str | None = None,
             "SELECT DISTINCT tag FROM blackbook_tags ORDER BY tag")]
         out: dict[str, dict[str, Any]] = {}
         for tag in tags:
-            d = backed_and_missed(account=account, tag=tag, conn=conn)
+            d = backed_and_missed(account=account, tag=tag, window=window,
+                                  conn=conn)
             b, m = d["backed"], d["missed"]
             out[tag] = {
                 "runs": d["runs"],
@@ -265,6 +273,7 @@ def backed_and_missed_by_tag(*, account: str | None = None,
 def backed_and_missed(*, entry_id: str | None = None,
                       account: str | None = None,
                       tag: str | None = None,
+                      window: Window | None = None,
                       conn: Connection | None = None) -> dict[str, Any]:
     """The falsifiability requirement: what was backed, what was not, and how
     each did.
@@ -307,6 +316,13 @@ def backed_and_missed(*, entry_id: str | None = None,
             where += (" AND b.id IN (SELECT id FROM blackbook_tags "
                       "WHERE tag = :tag)")
             params["tag"] = tag
+        # On the RUN, like the tag analysis: "how did the book do last month"
+        # is about last month's runs, not last month's bookings. Through the
+        # shared builder, in its named form — this query binds by name
+        # throughout and sqlite3 will not mix the two styles.
+        frag, wparams = period.named_clause(window, "r.race_date")
+        where += f" AND {frag}"
+        params.update(wparams)
 
         runs = _rows(conn, f"""
             SELECT b.id, b.horse_name, r.race_date, r.race_no, r.horse_no,
@@ -402,12 +418,20 @@ def backed_and_missed(*, entry_id: str | None = None,
 
 
 def summary(*, account: str | None = None,
+            window: Window | None = None,
             conn: Connection | None = None) -> dict[str, Any]:
     """The ledger's headline: turnover, return, strike rate, by bet type."""
     own = conn is None
     conn = conn or get_conn()
     try:
-        where, params = ("WHERE account = ?", [account]) if account else ("", [])
+        clauses, params = ["1 = 1"], []
+        if account:
+            clauses.append("account = ?")
+            params.append(account)
+        frag, wp = period.clause(window, "race_date")
+        clauses.append(frag)
+        params.extend(wp)
+        where = f"WHERE {' AND '.join(clauses)}"
         total = conn.execute(f"""
             SELECT count(*) bets, sum(stake) staked, sum(returned) returned,
                    sum(CASE WHEN hit = 1 THEN 1 ELSE 0 END) hits,
@@ -469,6 +493,7 @@ def _backed_by_account(conn: Connection, runs: list[dict]) -> dict[str, int]:
 
 
 def backed_by_account(*, entry_id: str | None = None,
+                      window: Window | None = None,
                       conn: Connection | None = None) -> dict[str, Any]:
     """The same comparison run once per account, plus the combined view.
 
@@ -481,10 +506,11 @@ def backed_by_account(*, entry_id: str | None = None,
     try:
         from hkrd.query.prebet import ACCOUNTS
 
-        out = {"combined": backed_and_missed(entry_id=entry_id, conn=conn)}
+        out = {"combined": backed_and_missed(entry_id=entry_id,
+                                             window=window, conn=conn)}
         for a in ACCOUNTS:
             out[a["key"]] = backed_and_missed(
-                entry_id=entry_id, account=a["key"], conn=conn)
+                entry_id=entry_id, account=a["key"], window=window, conn=conn)
         return out
     finally:
         if own:

@@ -27,6 +27,8 @@ from __future__ import annotations
 from typing import Any
 
 from hkrd.derive.probability import actual_over_expected
+from hkrd.query import period
+from hkrd.query.period import Window
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["list_entries", "entry_detail", "for_race", "declared_on",
@@ -262,7 +264,8 @@ def declared_on(date: str, *, conn: Connection | None = None
             conn.close()
 
 
-def tag_performance(*, conn: Connection | None = None) -> list[dict[str, Any]]:
+def tag_performance(*, window: Window | None = None,
+                    conn: Connection | None = None) -> list[dict[str, Any]]:
     """Strike and place rate per booking reason, with the sample size beside it.
 
     "Weak evidence must look weak." Across 153 condition cells in the prior
@@ -273,6 +276,10 @@ def tag_performance(*, conn: Connection | None = None) -> list[dict[str, Any]]:
     own = conn is None
     conn = conn or get_conn()
     try:
+        # The window is on the RUN, not on when the entry was booked: "how did
+        # this tag do last month" is a question about the runs that happened
+        # last month, whatever month the horse was booked in.
+        _win, _wp = period.clause(window, "r.race_date")
         rows = conn.execute(f"""
             SELECT t.tag,
                    count(DISTINCT b.id) entries,
@@ -286,10 +293,10 @@ def tag_performance(*, conn: Connection | None = None) -> list[dict[str, Any]]:
                    sum(CASE WHEN {_IMPLIED_SQL} IS NOT NULL THEN 1 ELSE 0 END) ae_runs
             {_RUNS_SINCE_FROM}
             JOIN blackbook_tags t ON t.id = b.id
-            WHERE r.place IS NOT NULL
+            WHERE r.place IS NOT NULL AND {_win}
             GROUP BY t.tag
             ORDER BY count(*) DESC
-        """).fetchall()
+        """, _wp).fetchall()
 
         # Entries carrying a tag but no subsequent run yet — they belong in the
         # count, otherwise a tag looks better tested than it is.

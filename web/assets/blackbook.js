@@ -11,7 +11,7 @@
  * is the page.
  */
 import { api, num, signed } from './api.js';
-import { el, $, DASH, MINUS, renderNav, styleClass } from './vocab.js';
+import { el, $, DASH, MINUS, renderNav, periodPicker, accountPicker, styleClass } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 
@@ -48,6 +48,8 @@ const state = {
   search: '', tag: null, status: 'all', range: 'all', today: null,
   todayOnly: false, declared: new Set(), open: new Set(), details: {},
   backedMissed: null, account: null, tagBvm: null,
+  // How far back every figure on the analysis view is measured.
+  period: 'lifetime', window: null,
   sort: 'added', sortDir: -1, busy: new Set(),
 };
 
@@ -694,6 +696,54 @@ function tagBackedVsMissed(d) {
   return box;
 }
 
+/** Which book and how far back — the same bar the Bets page carries. */
+function renderScope() {
+  const host = $('scope-bar');
+  host.replaceChildren();
+  host.append(accountPicker(state.account, (key) => {
+    state.account = key;
+    reloadScoped();
+  }));
+  host.append(periodPicker(state.period, (key) => {
+    state.period = key;
+    reloadScoped();
+  }, { window: state.window }));
+  // The list is the book itself — every horse being followed, whenever it was
+  // added. Narrowing it by a results window would hide entries that simply
+  // have not run yet, which is the opposite of what a watchlist is for.
+  host.hidden = state.view !== 'analysis';
+}
+
+/** The window and account, as a query string. One builder, so the first paint
+ *  and every reload ask for exactly the same thing. */
+function _scopeQuery() {
+  const q = new URLSearchParams({ period: state.period });
+  if (state.account) q.set('account', state.account);
+  // Anchored on the meeting in the header, like the Bets page. Measuring back
+  // from TODAY on an archive that ends in July returns an empty month and no
+  // indication that the emptiness is about the calendar rather than the book.
+  if (state.today) q.set('anchor', state.today);
+  return q.toString();
+}
+
+/** Re-read everything the window and the account govern. */
+async function reloadScoped() {
+  const qs = _scopeQuery();
+  const [tags, bm, tagBvm] = await Promise.all([
+    api.blackbookTags(qs),
+    api.backedVsMissed(null, state.account, qs).catch(() => null),
+    api.tagsBackedVsMissed(state.account, qs).catch(() => ({ tags: {} })),
+  ]);
+  state.tags = tags.tags;
+  state.cleared = tags.cleared;
+  state.scored = tags.scored;
+  state.expectedByChance = tags.expected_by_chance;
+  state.window = tags.window ?? null;
+  state.backedMissed = bm;
+  state.tagBvm = tagBvm?.tags ?? {};
+  render();
+}
+
 function renderAnalysis() {
   const meta = state.tagMeta ?? {};
   const rows = [...state.tags].sort((a, b) => b.runs - a.runs);
@@ -831,11 +881,14 @@ function renderWholeBook() {
     return;
   }
 
-  // ONE BOOK, TWO LEDGERS. The book is shared — a horse is followed for what
-  // it did, not for whose money is on it — but "was this run backed" has a
-  // different answer per account, and the gap between them is a finding about
-  // each book's discipline rather than about the horses.
-  host.append(accountSwitch());
+  // The account switch lives in the page's scope bar now — it governs the tag
+  // table and this panel alike, and two controls for one question is how they
+  // end up disagreeing. The per-account split still travels with the numbers.
+  const split = bm.by_account ?? {};
+  if (Object.keys(split).length) {
+    host.append(el('div', 'bm-split', Object.entries(split)
+      .map(([a, n]) => `${a} ${n}`).join(' · ')));
+  }
 
   // Both sides priced at the SAME notional flat win stake. The real ledger is
   // quinellas and multi-leg tickets; comparing those against a notional win
@@ -923,6 +976,7 @@ function renderStatusPanel() {
 /* ── loading ─────────────────────────────────────────────────────────────── */
 
 function render() {
+  renderScope();
   renderViewToggle();
   renderSummary();
   $('view-list').hidden = state.view !== 'list';
@@ -975,17 +1029,19 @@ async function init() {
     const [list, tags, summary, declared, backedMissed, tagBvm]
       = await Promise.all([
       api.blackbook(),
-      api.blackbookTags(),
+      // The window is on the URL from the first paint, so the bounds beside
+      // the picker are true before anything is clicked.
+      api.blackbookTags(_scopeQuery()),
       api.blackbookSummary(latest),
       // A meeting with nothing booked is normal, and a missing meeting must
               // not take the whole page down with it.
               latest ? api.blackbookDeclared(latest).catch(() => ({ entries: [] }))
         : Promise.resolve({ entries: [] }),
-      api.backedVsMissed().catch(() => null),
+      api.backedVsMissed(null, null, _scopeQuery()).catch(() => null),
       // A per-tag pass over the ledger. Failing it must not take the page
       // down: the column reads "no runs since booking" and everything else
       // on the analysis view still renders.
-      api.tagsBackedVsMissed().catch(() => ({ tags: {} })),
+      api.tagsBackedVsMissed(null, _scopeQuery()).catch(() => ({ tags: {} })),
     ]);
     state.entries = list.entries;
     state.tags = tags.tags;
@@ -997,6 +1053,7 @@ async function init() {
     state.summary = summary;
     state.backedMissed = backedMissed;
     state.tagBvm = tagBvm?.tags ?? {};
+    state.window = tags.window ?? null;
     state.declared = new Set(declared.entries.map((d) => d.horse_name));
   } catch (e) {
     $('entries').replaceChildren(el('div', 'no-match', `failed to load: ${e.message}`));
