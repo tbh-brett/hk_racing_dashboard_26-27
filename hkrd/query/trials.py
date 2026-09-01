@@ -157,13 +157,61 @@ def _next_starts(conn: Connection, pairs: list[tuple[str, str]]
     return out
 
 
-def recent_batches(*, limit: int = 12, venue: str | None = None,
-                   conn: Connection | None = None) -> list[dict[str, Any]]:
-    """The most recent trial batches, newest first, each with its runners."""
+def days(*, limit: int = 60, venue: str | None = None,
+         conn: Connection | None = None) -> list[dict[str, Any]]:
+    """The trial calendar, newest first.
+
+    TRIALS ARE NOT MEETINGS. They are held on mornings that are mostly not race
+    days, so the meeting in the header cannot address them — asking Layer 1 for
+    "21 Aug" gets nothing, because no race was run that day. That is why this
+    page needs a day list of its own, and it is not the per-page date picker
+    brief 08 §1 forbids: that rule is about four pages disagreeing over which
+    MEETING is on screen.
+    """
     own = conn is None
     conn = conn or get_conn()
     try:
         where, params = ("WHERE venue = ?", [venue]) if venue else ("", [])
+        rows = conn.execute(f"""
+            SELECT trial_date,
+                   count(DISTINCT trial_no) batches,
+                   count(*) runners,
+                   group_concat(DISTINCT venue) venues
+              FROM trials {where}
+             GROUP BY trial_date
+             ORDER BY trial_date DESC LIMIT ?""", [*params, limit]).fetchall()
+        return [{"trial_date": r["trial_date"], "batches": r["batches"],
+                 "runners": r["runners"],
+                 # group_concat has no ordering guarantee, so it is sorted here
+                 # rather than rendered in whatever order SQLite happened to
+                 # accumulate it — ST,HV one day and HV,ST the next reads as a
+                 # difference between the days.
+                 "venues": ",".join(sorted((r["venues"] or "").split(",")))}
+                for r in rows]
+    finally:
+        if own:
+            conn.close()
+
+
+def recent_batches(*, limit: int = 12, venue: str | None = None,
+                   date: str | None = None,
+                   conn: Connection | None = None) -> list[dict[str, Any]]:
+    """The most recent trial batches, newest first, each with its runners.
+
+    `date` pins it to one trial day; without it the feed is simply the newest
+    `limit` batches, which may span several mornings.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        clauses, params = [], []
+        if venue:
+            clauses.append("venue = ?")
+            params.append(venue)
+        if date:
+            clauses.append("trial_date = ?")
+            params.append(date)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         keys = conn.execute(
             f"SELECT DISTINCT trial_date, trial_no FROM trials {where} "
             f"ORDER BY trial_date DESC, trial_no LIMIT ?",
@@ -172,6 +220,20 @@ def recent_batches(*, limit: int = 12, venue: str | None = None,
     finally:
         if own:
             conn.close()
+
+
+def _is_archived(conn: Connection, trial_date: str) -> bool:
+    """Has HKJC moved this trial day behind its archive page?
+
+    The live barrier-trial page shows ONE day — the most recent one held — and
+    everything before it is reachable only through the archive, whose URL
+    carries the date. The video player takes that page as its return link, so
+    which of the two it should be is a fact about the data, answered here
+    rather than guessed in the browser from whatever the page happens to have
+    loaded.
+    """
+    row = conn.execute("SELECT max(trial_date) v FROM trials").fetchone()
+    return bool(row and row["v"] and str(trial_date) < str(row["v"]))
 
 
 def batch(date: str, trial_no: int, *,
@@ -211,6 +273,7 @@ def batch(date: str, trial_no: int, *,
             "distance": _column(rows[0], "distance"),
             "going": _column(rows[0], "going"),
             "course": _column(rows[0], "course"),
+            "archived": _is_archived(conn, date),
         }
     finally:
         if own:
@@ -239,10 +302,17 @@ def for_horses(names: list[str], *, before: str | None = None, limit: int = 2,
             f"{_BATCH_SQL} WHERE t.horse_name IN ({marks}){clause} "
             f"ORDER BY t.horse_name, t.trial_date DESC", params).fetchall()
         out: dict[str, list[dict[str, Any]]] = {}
+        latest = conn.execute("SELECT max(trial_date) v FROM trials").fetchone()
+        latest = latest["v"] if latest else None
         for row in rows:
             bucket = out.setdefault(row["horse_name"], [])
             if len(bucket) < limit:
-                bucket.append(_runner(row, row["field_size"], row["best_time"]))
+                r = _runner(row, row["field_size"], row["best_time"])
+                # So the Form Guide's play control can address the video the
+                # same way the Trials page does. It has no view of the trials
+                # calendar otherwise.
+                r["archived"] = bool(latest and str(r["trial_date"]) < str(latest))
+                bucket.append(r)
         return out
     finally:
         if own:

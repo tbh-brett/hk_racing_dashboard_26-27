@@ -24,6 +24,7 @@ from typing import Any
 from hkrd.store.connect import Connection, transaction
 
 __all__ = ["new_bet_id", "insert_bet", "settings", "set_setting",
+           "normalise_accounts",
            "overrides_for", "DEFAULT_SETTINGS"]
 
 # What the guardrails compare against until the user sets their own. These are
@@ -130,3 +131,26 @@ def overrides_for(conn: Connection, bet_ids: Sequence[str]) -> dict[str, list[di
             {"flag": r["flag"], "detail": r["detail"],
              "overridden_at": r["overridden_at"]})
     return out
+
+
+# The two books the interface knows. A bet filed under anything else is a bet
+# no page can show — see `query/prebet.ACCOUNTS`, which is the same pair.
+KNOWN_ACCOUNTS = ("brett", "kelvin")
+
+
+def normalise_accounts(conn: Connection, *, default: str = "brett") -> int:
+    """Move bets filed under an unknown account into a known one.
+
+    The legacy ledger predates the two-account split and filed all 1,078 bets
+    under "personal". Left alone they are invisible: every account view asks
+    for brett or kelvin, so the whole of the history reads as "no bets" and the
+    Blackbook then calls every one of those runs a missed chance — a wrong
+    answer that looks like a confident one.
+
+    Returns how many moved, so a run that changed nothing says so.
+    """
+    marks = ",".join("?" * len(KNOWN_ACCOUNTS))
+    return conn.execute(
+        f"UPDATE bets SET account = ? "
+        f"WHERE account IS NULL OR lower(account) NOT IN ({marks})",
+        (default, *KNOWN_ACCOUNTS)).rowcount

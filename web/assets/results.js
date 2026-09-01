@@ -18,17 +18,29 @@
  * second.
  */
 import { api, num } from './api.js';
-import { el, $, DASH, MINUS, renderNav, paceCell,
+import { el, $, DASH, MINUS, renderNav, paceCell, styleBadge,
          tripTagChips } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 import { loadTags, renderReview } from './review.js';
 
 
+/* The owner's order, September 2026. Two changes worth naming.
+ *
+ * WEIGHT MOVED UP, beside the draw: they are the two things fixed before the
+ * race is run, and reading them together is how a result gets weighed.
+ *
+ * TRIP IS ITS OWN COLUMN. It shared a cell with POSITIONS, which meant the
+ * tags had to fit whatever room the positions left and were capped at two,
+ * with the rest behind a `+2`. On a results page the trouble a horse met is
+ * the reason the finishing position is not the whole story, so it gets the
+ * width to say all of it.
+ */
 const COLS = [
-  ['FIN', 'r'], ['NO', 'r'], ['HORSE', ''], ['JOCKEY', ''], ['DR', 'r'],
-  ['TRAINER', ''], ['STYLE', ''], ['WT', 'r'], ['MARGIN', 'r'],
-  ['WIN SP', 'r'], ['PLC SP', 'r'], ['ET FIGURE', 'r'], ['POSITIONS · TRIP', ''],
+  ['FIN', 'r'], ['NO', 'r'], ['HORSE', ''], ['WT', 'r'], ['DR', 'r'],
+  ['JOCKEY', ''], ['TRAINER', ''], ['POSITIONS', ''], ['STYLE', ''],
+  ['MARGIN', 'r'], ['WIN SP', 'r'], ['PLC SP', 'r'], ['ET FIGURE', 'r'],
+  ['TRIP', ''],
 ];
 
 const state = {
@@ -296,12 +308,25 @@ function resultRow(runner, booked, backed) {
   horse.title = runner.horse_name;
   row.append(horse);
 
-  row.append(el('div', 'jockey', runner.jockey ?? DASH));
-  row.append(el('div', 'r', runner.draw ? String(runner.draw) : DASH));
-  row.append(el('div', 'trainer', runner.trainer ?? DASH));
-  row.append(el('div', null, runner.pace_style ?? DASH));
   row.append(el('div', 'r',
     runner.actual_weight ? String(runner.actual_weight) : DASH));
+  row.append(el('div', 'r', runner.draw ? String(runner.draw) : DASH));
+  row.append(el('div', 'jockey', runner.jockey ?? DASH));
+  row.append(el('div', 'trainer', runner.trainer ?? DASH));
+
+  const pos = el('div', 'pos');
+  pos.append(el('span', 'seq',
+    (runner.running_positions ?? []).join(' ') || DASH));
+  if (runner.section_times && runner.section_times.length) {
+    pos.title = `sectionals ${runner.section_times.map((t) => num(t, 2)).join(' · ')}`;
+  }
+  row.append(pos);
+
+  // A badge, through the shared renderer, like every other page.
+  const style = el('div');
+  style.append(styleBadge(runner.pace_style));
+  row.append(style);
+
   row.append(el('div', 'r',
     runner.lengths_behind === null || runner.lengths_behind === undefined
       ? DASH : num(runner.lengths_behind, 2)));
@@ -315,20 +340,16 @@ function resultRow(runner, booked, backed) {
   if (runner.figure_display) fig.title = runner.figure_display;
   row.append(fig);
 
-  const pos = el('div', 'pos');
-  pos.append(el('span', 'seq',
-    (runner.running_positions ?? []).join(' ') || DASH));
-  if (runner.section_times && runner.section_times.length) {
-    pos.title = `sectionals ${runner.section_times.map((t) => num(t, 2)).join(' · ')}`;
-  }
-  // The design's header for this column is POSITIONS · TRIP, and the tags were
-  // on the RunnerLine the whole time. Where a horse ran in the field and what
-  // happened to it there are one fact — a horse that sat last and was checked
-  // at the 800m did not run a bad race, and the positions alone say it did.
-  const trip = tripTagChips(runner.tags,
-    { comment: runner.incident_comment || runner.running_comment });
-  if (trip) pos.append(trip);
-  row.append(pos);
+  // EVERY tag, not the first two. This is a results page: the trouble a horse
+  // met is the reason its finishing position is not the whole story, and a
+  // fourth tag hidden behind a `+2` is the one that explains the run.
+  const trip = el('div', 'trip');
+  const chips = tripTagChips(runner.tags, {
+    comment: runner.incident_comment || runner.running_comment,
+    limit: Infinity,
+  });
+  trip.append(chips ?? el('span', 'dim', DASH));
+  row.append(trip);
   row.addEventListener('click', () => {
     if (state.open.has(runner.horse_no)) state.open.delete(runner.horse_no);
     else state.open.add(runner.horse_no);

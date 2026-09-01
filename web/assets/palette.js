@@ -43,6 +43,8 @@ function fuzzy(query, text) {
 
 const state = {
   open: false, query: '', items: [], shown: [], cursor: 0, horses: null,
+  // Narrow to one kind. Null is everything, which is what ⌘K opens.
+  only: null,
 };
 
 let root = null;
@@ -132,6 +134,20 @@ function collect() {
   return items;
 }
 
+/* Order for an EMPTY query — what the palette shows the moment it opens.
+ *
+ * The tiebreak used to be `a.kind.localeCompare(b.kind)`, which is alphabetical
+ * and therefore put HORSE before MEETING, PAGE and RACE. With four hundred
+ * horses loaded, the forty-row list was four hundred horses deep in horses and
+ * a meeting never appeared in it — so clicking the date in the header, which
+ * opens this palette, offered no way to change the date. The whole of "there is
+ * no date picker" was this line.
+ *
+ * Cold, you want where you are (the races in this meeting), then where else you
+ * could be (other meetings), then the pages, then the long tail.
+ */
+const KIND_RANK = { RACE: 0, MEETING: 1, PAGE: 2, HORSE: 3 };
+
 function refresh() {
   const q = state.query.trim();
 
@@ -146,8 +162,9 @@ function refresh() {
       }
       return { ...it, score };
     })
-    .filter((it) => it.score >= 0)
-    .sort((a, b) => b.score - a.score || a.kind.localeCompare(b.kind))
+    .filter((it) => it.score >= 0 && (!state.only || it.kind === state.only))
+    .sort((a, b) => b.score - a.score
+      || (KIND_RANK[a.kind] ?? 9) - (KIND_RANK[b.kind] ?? 9))
     .slice(0, 40);
 
   state.cursor = 0;
@@ -189,9 +206,12 @@ function onKey(e) {
   }
 }
 
-export function open(seed = '') {
+/** `only` narrows to one kind — the header's meeting button opens on MEETING,
+ *  so the control that shows the date offers the dates. */
+export function open(seed = '', { only = null } = {}) {
   if (!root) build();
   state.open = true;
+  state.only = only;
   state.items = collect();
   state.query = seed;
   input.value = seed;
@@ -213,12 +233,14 @@ export function open(seed = '') {
 
 export function close() {
   state.open = false;
+  state.only = null;
   if (root) root.hidden = true;
 }
 
 /** Wire ⌘K / Ctrl-K once per page. */
 export function install() {
-  window.addEventListener('palette:open', (e) => open(e.detail?.seed ?? ''));
+  window.addEventListener('palette:open',
+    (e) => open(e.detail?.seed ?? '', { only: e.detail?.only ?? null }));
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();

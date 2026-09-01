@@ -11,7 +11,8 @@
  */
 import { api, num, signed } from './api.js';
 import { el, $, DASH, MINUS, renderNav, styleClass, styleOrdinal,
-         replayUrl, externalLink, compactDate, tripTags } from './vocab.js';
+         replayUrl, trialReplayUrl, externalLink, compactDate,
+         tripTags } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 import { conditionLabel, loadTags, renderReview } from './review.js';
@@ -355,7 +356,8 @@ function trialBand(runner) {
     // The footage the mark is a summary of. A ++ nobody can watch is a score
     // taken on trust, which is the opposite of how every other figure here is
     // treated.
-    const turl = replayUrl(t.trial_date, t.trial_no);
+    const turl = trialReplayUrl(t.trial_date, t.trial_no, t.venue,
+                                { archived: t.archived });
     if (turl) {
       const play = externalLink(turl, '▶', 'icon play');
       play.title = `trial replay — ${t.trial_date} batch ${t.trial_no}`;

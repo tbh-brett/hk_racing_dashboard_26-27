@@ -216,6 +216,51 @@ export function replayUrl(raceDate, raceNo) {
     + '&noPTbar=false&noLeading=false&videoParam=P';
 }
 
+/* A BARRIER TRIAL IS NOT A RACE, and its video is not a race replay.
+ *
+ * Every trial link in this dashboard was built by calling `replayUrl` with a
+ * trial date and a batch number, which produces a perfectly well-formed URL for
+ * a RACE that does not exist. Nothing failed loudly — the player just had
+ * nothing to play.
+ *
+ *   race    ?type=replay-full&date=…&no=…&lang=eng&noPTbar=…&videoParam=P
+ *   trial   ?type=brts&date=…&rc=…&no=…&lang=eng&rf=…&pageid=racing/local
+ *
+ * Two differences beyond the type. A trial needs `rc`, the racecourse, because
+ * trials run at three (Sha Tin, Happy Valley, Conghua) and the date alone does
+ * not say which — a race replay does not need it because a race meeting is at
+ * one track. And `rf` is the page the player returns to, which HKJC moves into
+ * an archive once a newer trial day is published.
+ *
+ * `jumpTime` is a seek offset to where the batch actually jumps, published on
+ * the trials page per batch. It is a convenience, not part of addressing the
+ * video: without it the clip starts from the beginning of the batch, which is
+ * a slightly early start rather than a broken link. We do not store it yet.
+ */
+const TRIAL_COURSE = { ST: 'st', HV: 'hv', CH: 'ch' };
+
+export function trialReplayUrl(trialDate, trialNo, venue,
+                               { archived = true, jumpTime = null } = {}) {
+  const rc = TRIAL_COURSE[String(venue ?? '').toUpperCase()];
+  // No guessing a default course. A link to the wrong track's trial is worse
+  // than no link: it plays, and it is a different set of horses.
+  if (!trialDate || !trialNo || !rc) return null;
+  const ymd = String(trialDate).replace(/-/g, '');
+  const no = String(trialNo).padStart(2, '0');
+  // The return link. Once a newer trial day is published HKJC moves the old
+  // one behind the archive page, which carries the date; the live page does
+  // not, because it only ever shows the newest day.
+  const rf = archived
+    ? 'http://racing.hkjc.com/en-us/local/information/archive/btresult'
+      + `?Date=${String(trialDate).replace(/-/g, '/')}`
+    : 'http://racing.hkjc.com/en-us/local/information/btresult';
+  return 'https://racing.hkjc.com/contentAsset/videoplayer_v4/'
+    + 'video-player-iframe_v4.html'
+    + `?type=brts&date=${ymd}&rc=${rc}&no=${no}&lang=eng`
+    + `&rf=${rf}&pageid=racing/local`
+    + (jumpTime == null ? '' : `&jumpTime=${jumpTime}`);
+}
+
 /** The official result page for a race, for checking a figure against source. */
 export function hkjcResultUrl(raceDate, raceNo, venue) {
   if (!raceDate || !raceNo) return null;

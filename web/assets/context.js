@@ -150,7 +150,12 @@ class MeetingContext {
     box.title = 'change meeting — or press ⌘K';
     box.setAttribute('aria-haspopup', 'dialog');
     box.addEventListener('click', () => {
-      window.dispatchEvent(new CustomEvent('palette:open', { detail: { seed: '' } }));
+      // Opens on MEETINGS. Clicking a control that shows a date and getting a
+      // list of horses is why this read as "there is no way to change the
+      // date" — the list was there and the dates were four hundred rows down
+      // it. ⌘K still opens everything.
+      window.dispatchEvent(new CustomEvent('palette:open',
+        { detail: { seed: '', only: 'MEETING' } }));
     });
     host.append(box);
 
@@ -200,9 +205,70 @@ class MeetingContext {
         ? `${s.name}: no successful run on record (normal: every ${s.normal})`
         : `${s.name}: last landed ${s.age} ago, normal is every ${s.normal}`
           + (s.detail ? `\n${s.detail}` : '');
+      chip.title += '\n\nclick to fetch this source now';
+      // The comment above this method has said "clicking a stale source is how
+      // you refresh just that source" since it was written. It was never wired.
+      chip.setAttribute('role', 'button');
+      chip.tabIndex = 0;
+      const go = () => this._scrape(s, chip);
+      chip.addEventListener('click', go);
+      chip.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
+      });
       box.append(chip);
     });
     return box;
+  }
+
+  /** Fetch one source now, and say what it wrote.
+   *
+   *  Never a spinner that ends in silence: the counts land on the chip itself,
+   *  because a scrape that ran and stored nothing looks exactly like one that
+   *  worked until somebody checks a price.
+   */
+  async _scrape(source, chip) {
+    if (chip.dataset.running) return;
+    chip.dataset.running = '1';
+    const was = chip.lastChild.textContent;
+    chip.lastChild.textContent = '…';
+    try {
+      const body = { source: source.key };
+      // The meeting scrape needs to be told which meeting. The header knows.
+      if (source.key !== 'trials') {
+        if (this.date) body.date = this.date;
+        if (this.meeting?.venue) body.venue = this.meeting.venue;
+      }
+      const r = await api.scrape(body);
+      const wrote = Object.entries(r.wrote ?? {})
+        .filter(([, n]) => n).map(([k, n]) => `${n} ${k}`).join(' · ');
+      chip.lastChild.textContent = r.ok ? '✓ now' : '⚠';
+      chip.title = `${source.name}: ${wrote || 'wrote nothing'}`
+        + (r.warnings?.length ? `\n${r.warnings.join('\n')}` : '')
+        + (r.errors?.length ? `\n${r.errors.join('\n')}` : '');
+      // Re-read the strip so every source's age is the truth again, not just
+      // the one that was clicked.
+      await this.refreshFreshness();
+    } catch (e) {
+      chip.lastChild.textContent = '⚠';
+      chip.title = `${source.name}: ${e.message}`;
+      chip.classList.add('is-stale');
+      // Restore the age after a moment; the failure is on the hover.
+      setTimeout(() => { chip.lastChild.textContent = was; }, 4000);
+    } finally {
+      delete chip.dataset.running;
+    }
+  }
+
+  /** Re-read per-source freshness and redraw Layer 1. */
+  async refreshFreshness() {
+    try {
+      this.freshness = await api.freshness();
+      this.render();
+    } catch {
+      // A strip that cannot refresh keeps the last honest reading rather than
+      // blanking, which would read as "nothing has ever run".
+      throw new Error('could not re-read freshness');
+    }
   }
 
   /** Called once per page. Resolves the meeting from the URL, then the latest.

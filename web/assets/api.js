@@ -73,6 +73,9 @@ export const api = {
   vetHistory: (name, limit = 20) => get(
     `/vet/${encodeURIComponent(name)}?limit=${limit}`),
   freshness: () => get('/freshness'),
+  // Fetch one source now. The only write the header can make, and it goes
+  // through jobs/ like every other write — see AGENTS.md on api → jobs.
+  scrape: (body) => post('/jobs/scrape', body),
   changes: (date, since) => get(
     `/changes/${date}${since ? `?since=${encodeURIComponent(since)}` : ''}`),
   lookup: (q) => get(`/lookup?${q}`),
@@ -88,8 +91,11 @@ export const api = {
   lookupCorpus: () => get('/lookup/corpus'),
   meetingResults: (date) => get(`/results/${date}`),
   raceResult: (date, no) => get(`/results/${date}/${no}`),
-  trials: (limit = 12, venue) => get(
-    `/trials?limit=${limit}` + (venue ? `&venue=${venue}` : '')),
+  trialDays: (venue) => get(
+    `/trials/days${venue ? `?venue=${encodeURIComponent(venue)}` : ''}`),
+  trials: (limit = 12, venue, date) => get(
+    `/trials?limit=${limit}` + (venue ? `&venue=${venue}` : '')
+    + (date ? `&date=${date}` : '')),
   trialStandouts: (days = 21) => get(`/trials/standouts?days=${days}`),
   trialCalibration: () => get('/trials/calibration'),
   trialsForHorses: (horses, before) => get(

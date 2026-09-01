@@ -388,7 +388,8 @@ def import_statement_job(body: dict = Body(...)) -> JSONResponse:
     src = Path(body.get("path", "")).expanduser()
     if not src.exists():
         raise HTTPException(404, f"not found: {src}")
-    report = import_statement.run(src, account=body.get("account", "personal"))
+    report = import_statement.run(
+        src, account=body.get("account", import_statement.DEFAULT_ACCOUNT))
     payload = {
         "files": report.files, "bets": report.bets,
         "new_bets": report.new_bets, "selections": report.selections,
@@ -396,6 +397,100 @@ def import_statement_job(body: dict = Body(...)) -> JSONResponse:
         "unparsed": report.unparsed, "errors": report.errors,
     }
     return JSONResponse(payload, status_code=200 if not report.errors else 500)
+
+
+# Which job answers for which source on the freshness strip. `scrape_meeting`
+# fetches the card, the results, the dividends and the vet records in one pass,
+# so three of the five names map onto it — the strip reports them separately
+# because they can fail separately, not because they are separate fetches.
+_SCRAPE_JOBS = {
+    "card": "meeting", "results": "meeting", "vet": "meeting",
+    "odds": "odds", "trials": "trials",
+}
+
+
+@app.post("/api/jobs/scrape")
+def scrape_job(body: dict = Body(...)) -> JSONResponse:
+    """Run one source's scrape now.
+
+    Design brief 07 §6 argues the interface for scraping should not be a page
+    of buttons, because that makes the mechanism the interface and leaves the
+    user remembering what to run and when. The freshness strip is the
+    inversion: it already says which source is stale, and this is what makes
+    that diagnosis actionable in the same place — you refresh the thing the
+    strip is complaining about, not "a scraper" in the abstract.
+
+    Every response carries what the run WROTE. A job that succeeded and stored
+    nothing is the failure this whole design exists to make visible, so there
+    is no bare "ok" anywhere in here.
+    """
+    source = str(body.get("source", "")).lower()
+    job = _SCRAPE_JOBS.get(source)
+    if job is None:
+        raise HTTPException(
+            400, f"unknown source {source!r}; expected one of "
+                 f"{', '.join(sorted(_SCRAPE_JOBS))}")
+
+    date = body.get("date") or None
+    venue = body.get("venue") or None
+    try:
+        if job == "meeting":
+            from hkrd.jobs import scrape_meeting as mj
+            if not date or not venue:
+                raise HTTPException(
+                    400, "a meeting scrape needs a date and a venue; the "
+                         "header knows both for the meeting on screen")
+            r = mj.scrape_meeting(date, venue, post_race=True)
+            wrote = {"races": r.races, "runners": r.runners,
+                     "comments": r.comments, "dividends": r.dividends,
+                     "vet_records": r.vet_records}
+            errors, warnings, ok = r.errors, r.warnings, r.ok
+        elif job == "odds":
+            from hkrd.jobs import scrape_odds as oj
+            r = oj.run(date, venue)
+            wrote = {"races": r.races, "win_place": r.win_place,
+                     "pairs": r.pairs}
+            errors, warnings = [], [*r.notes, *r.skipped]
+            # Nothing to price is not a failure. Most days have no meeting.
+            ok = bool(r.races) or not r.attempted
+        else:
+            from hkrd.jobs import scrape_trials as tj
+            r = tj.scrape(date) if date else tj.catch_up(limit=4)
+            reports = r if isinstance(r, list) else [r]
+            wrote = {"batches": sum(x.batches for x in reports),
+                     "runners": sum(x.runners for x in reports),
+                     "days": len(reports)}
+            errors = [e for x in reports for e in x.errors]
+            warnings = [f"{x.date}: none published"
+                        for x in reports if x.no_such_day]
+            ok = not errors
+    except HTTPException:
+        raise
+    except Exception as exc:
+        # A scrape reaches the network and a browser, so it fails for reasons
+        # that are about the HOST rather than about the code, and the person
+        # clicking the strip is the one who can fix them. A bare 500 tells them
+        # nothing; these say which thing is missing and what to do about it.
+        text = f"{type(exc).__name__}: {exc}"
+        missing_browser = ("Executable doesn't exist" in text
+                           or "playwright install" in text.lower()
+                           or isinstance(exc, ImportError))
+        if missing_browser:
+            raise HTTPException(503, (
+                "live odds need a real browser and this host has none. "
+                "Install one with `python -m playwright install chromium`, or "
+                "add it to the image — see docs/deploy.md. Every other source "
+                "scrapes without a browser and still works."))
+        if "getaddrinfo" in text or "Max retries" in text or "Timeout" in text:
+            raise HTTPException(503, (
+                f"could not reach HKJC to fetch {source}. The site is up or "
+                f"this host cannot get out to it — {text[:160]}"))
+        raise HTTPException(500, f"{source} scrape failed — {text[:400]}")
+
+    payload = {"source": source, "job": job, "date": date, "venue": venue,
+               "wrote": wrote, "total": sum(wrote.values()),
+               "ok": ok, "errors": errors, "warnings": warnings}
+    return JSONResponse(payload, status_code=200 if ok else 500)
 
 
 @app.post("/api/jobs/rebuild-et")

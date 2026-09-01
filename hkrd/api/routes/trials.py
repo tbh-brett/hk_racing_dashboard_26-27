@@ -13,11 +13,20 @@ router = APIRouter()
 
 
 @router.get("/api/trials")
-def trials_feed(limit: int = 12, venue: str | None = None) -> dict:
+def trials_feed(limit: int = 12, venue: str | None = None,
+                date: str | None = None) -> dict:
     """Recent trial batches, each runner rated by the same engine the Form
-    Guide's inline band uses."""
-    batches = trials_q.recent_batches(limit=limit, venue=venue)
+    Guide's inline band uses. `date` pins the feed to one trial morning."""
+    batches = trials_q.recent_batches(limit=limit, venue=venue, date=date)
     return {"batches": batches, "count": len(batches)}
+
+
+@router.get("/api/trials/days")
+def trials_days(limit: int = 60, venue: str | None = None) -> dict:
+    """The trial calendar. Trials are held on mornings that are mostly not race
+    days, so the meeting in the header cannot address them."""
+    rows = trials_q.days(limit=limit, venue=venue)
+    return {"days": rows, "count": len(rows)}
 
 
 @router.get("/api/trials/standouts")

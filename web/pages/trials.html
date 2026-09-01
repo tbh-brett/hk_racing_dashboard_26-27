@@ -40,7 +40,18 @@
 </div>
 
 <div class="chip-bar">
-  <div class="chip-label">QUALITY</div>
+  <!-- Trials are held on mornings that are mostly not race days, so the
+       meeting in the header cannot address them. This is the trial calendar,
+       which is a different axis from the meeting rather than a second opinion
+       about it. -->
+  <div class="chip-label">MORNING</div>
+  <div class="day-pick">
+    <button id="day-prev" title="an earlier trial morning">‹</button>
+    <select id="day-select" aria-label="Trial morning"></select>
+    <button id="day-next" title="a later trial morning">›</button>
+    <button id="day-all" class="chip">ALL RECENT</button>
+  </div>
+  <div class="chip-label bordered">QUALITY</div>
   <div class="chips" id="band-chips"></div>
   <div class="chip-label bordered">VENUE</div>
   <div class="chips fixed" id="venue-chips"></div>

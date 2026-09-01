@@ -182,3 +182,65 @@ def test_the_tag_filter_actually_narrows(db):
     finally:
         conn.close()
     assert 0 < tagged < whole
+
+
+# ── an account no page can show ──────────────────────────────────────────────
+
+def test_a_bet_under_an_unknown_account_is_moved_not_left(db):
+    """The legacy ledger filed 1,078 bets under "personal", which is neither
+    of the two books the interface knows. Left there they are invisible: every
+    account view asks for brett or kelvin, so the whole history reads as "no
+    bets" and the Blackbook then calls every one of those runs a missed chance
+    — a wrong answer that looks like a confident one.
+    """
+    from hkrd.store import bets as bets_store
+    conn = get_conn(db)
+    try:
+        with transaction(conn):
+            conn.execute("UPDATE bets SET account = 'personal'")
+            moved = bets_store.normalise_accounts(conn)
+        rows = dict(conn.execute(
+            "SELECT account, count(*) FROM bets GROUP BY account").fetchall())
+    finally:
+        conn.close()
+    assert moved == 2
+    assert rows == {"brett": 2}
+
+
+def test_normalising_twice_moves_nothing_the_second_time(db):
+    """It runs on every bootstrap, and a bootstrap is meant to converge."""
+    from hkrd.store import bets as bets_store
+    conn = get_conn(db)
+    try:
+        with transaction(conn):
+            conn.execute("UPDATE bets SET account = 'personal'")
+            bets_store.normalise_accounts(conn)
+        with transaction(conn):
+            assert bets_store.normalise_accounts(conn) == 0
+    finally:
+        conn.close()
+
+
+def test_a_known_account_is_never_reassigned(db):
+    """Kelvin's bets must not be swept into Brett's book by a tidy-up."""
+    from hkrd.store import bets as bets_store
+    conn = get_conn(db)
+    try:
+        with transaction(conn):
+            conn.execute("UPDATE bets SET account = 'kelvin' WHERE bet_id = 'b2'")
+            bets_store.normalise_accounts(conn)
+        rows = dict(conn.execute(
+            "SELECT account, count(*) FROM bets GROUP BY account").fetchall())
+    finally:
+        conn.close()
+    assert rows == {"brett": 1, "kelvin": 1}
+
+
+def test_the_default_account_is_one_the_interface_knows():
+    """The bug in one line: an import default that is not in ACCOUNTS files
+    every bet where no page will look for it."""
+    from hkrd.jobs import import_bets, import_statement
+    from hkrd.query.prebet import ACCOUNTS
+    known = {a["key"] for a in ACCOUNTS}
+    assert import_bets.DEFAULT_ACCOUNT in known
+    assert import_statement.DEFAULT_ACCOUNT in known

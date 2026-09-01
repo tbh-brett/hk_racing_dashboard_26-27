@@ -25,7 +25,8 @@
  */
 import { api, num } from './api.js';
 import { el, $, DASH, renderNav, tripTagChips,
-         replayUrl, externalLink, compactDate, ordinal } from './vocab.js';
+         replayUrl, trialReplayUrl, externalLink, compactDate,
+         ordinal } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 
@@ -45,6 +46,11 @@ const COLS = [
 const state = {
   view: 'batches', batches: [], standouts: null, calibration: null,
   search: '', band: null, venue: 'all',
+  // The trial morning on screen. Null is the rolling feed of the most recent
+  // batches, which is what the page opened on before there was any way to
+  // choose — and remains the default, because the newest trials are what the
+  // page is usually for.
+  days: [], day: null,
 };
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
@@ -121,6 +127,53 @@ function chip(label, on, onClick, count) {
   return b;
 }
 
+/* ── the trial morning ────────────────────────────────────────────────────
+ * A trial day is not a meeting: 159 of them in the archive, and most fall on
+ * mornings with no race card, so Layer 1 cannot reach them. Brief 08 §1's ban
+ * on per-page date pickers is about four pages disagreeing over which MEETING
+ * is on screen; this is a different calendar, and having no control for it is
+ * what made the whole archive unreachable from this page.
+ */
+function renderDayPicker() {
+  const sel = $('day-select');
+  sel.replaceChildren();
+  const rolling = el('option', null, `MOST RECENT · ${state.batches.length} batches`);
+  rolling.value = '';
+  sel.append(rolling);
+  state.days.forEach((d) => {
+    const o = el('option', null,
+      `${compactDate(d.trial_date)} · ${d.venues} · ${d.batches} batch`
+      + `${d.batches === 1 ? '' : 'es'} · ${d.runners} runs`);
+    o.value = d.trial_date;
+    sel.append(o);
+  });
+  sel.value = state.day ?? '';
+
+  const at = state.days.findIndex((d) => d.trial_date === state.day);
+  // The list is newest first, so "earlier" is forward through it.
+  $('day-prev').disabled = at >= state.days.length - 1;
+  $('day-next').disabled = state.day === null || at <= 0;
+  $('day-all').classList.toggle('on', state.day === null);
+}
+
+function wireDayPicker() {
+  $('day-select').addEventListener('change', (e) => {
+    state.day = e.target.value || null;
+    load();
+  });
+  const step = (by) => {
+    const at = state.days.findIndex((d) => d.trial_date === state.day);
+    // From the rolling feed, stepping back lands on the newest morning.
+    const next = state.day === null ? (by > 0 ? 0 : -1) : at + by;
+    if (next < 0 || next >= state.days.length) return;
+    state.day = state.days[next].trial_date;
+    load();
+  };
+  $('day-prev').addEventListener('click', () => step(1));
+  $('day-next').addEventListener('click', () => step(-1));
+  $('day-all').addEventListener('click', () => { state.day = null; load(); });
+}
+
 function renderChips() {
   const counts = new Map();
   state.batches.forEach((b) => b.runners.forEach((r) => {
@@ -188,6 +241,7 @@ function runnerRow(r) {
 
 function renderBatches() {
   renderChips();
+  renderDayPicker();
   const host = $('batches');
   host.replaceChildren();
   let shown = 0;
@@ -223,10 +277,11 @@ function renderBatches() {
     // HKJC publishes no trial distance, and inferring one from the clock would
     // be a guess dressed as a fact.
     head.append(el('span', 'right', 'no distance is published for a trial'));
-    // The footage of the batch itself. The Form Guide has linked trial replays
-    // since it was built, from this same helper — the Trials page, which is
-    // where someone goes to watch trials, did not.
-    const turl = replayUrl(b.trial_date, b.trial_no);
+    // The footage of the batch itself. A trial video is addressed differently
+    // from a race replay — different type, and it needs the racecourse, since
+    // trials run at three of them and the date does not say which.
+    const turl = trialReplayUrl(b.trial_date, b.trial_no, b.venue,
+                                { archived: b.archived });
     if (turl) {
       const play = externalLink(turl, '▶ REPLAY', 'batch-replay');
       play.title = `trial replay — ${b.trial_date} batch ${b.trial_no}`;
@@ -453,12 +508,17 @@ function wireSearch() {
 
 async function load() {
   const venue = state.venue === 'all' ? undefined : state.venue;
-  const [batches, standouts, calibration] = await Promise.all([
-    api.trials(12, venue),
+  // A named morning asks for ALL of that morning's batches; the rolling feed
+  // asks for the newest twelve. Twelve on a nine-batch morning would silently
+  // pull in the previous one and show two dates under one heading.
+  const [batches, days, standouts, calibration] = await Promise.all([
+    api.trials(state.day ? 60 : 12, venue, state.day),
+    api.trialDays(venue),
     api.trialStandouts(),
     api.trialCalibration(),
   ]);
   state.batches = batches.batches;
+  state.days = days.days;
   state.standouts = standouts;
   state.calibration = calibration;
   render();
@@ -467,6 +527,10 @@ async function load() {
 async function boot() {
   renderNav($('nav'), 'trials.html');
   wireSearch();
+  wireDayPicker();
+  // A trial morning is addressable, like the meeting is: ?day=2026-08-21
+  // restores the view, so a note can link back to the trial it came from.
+  state.day = new URLSearchParams(window.location.search).get('day');
   installPalette();
   await context.init();
   render();

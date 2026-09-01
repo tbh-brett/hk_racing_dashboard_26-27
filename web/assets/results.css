@@ -76,8 +76,10 @@
 
 .res-head, .res-row {
   display: grid; align-items: center;
-  grid-template-columns: 34px 30px minmax(140px, 1fr) 100px 30px 100px 62px
-    38px 60px 56px 56px 62px minmax(160px, 1.15fr);
+  /* FIN NO HORSE WT DR JOCKEY TRAINER POSITIONS STYLE MARGIN
+     WIN-SP PLC-SP ET-FIGURE TRIP */
+  grid-template-columns: 34px 30px minmax(132px, 1fr) 38px 28px 96px 96px
+    76px 64px 58px 54px 54px 62px minmax(180px, 1.3fr);
   gap: 9px; padding: 0 14px;
 }
 .res-head {
@@ -102,14 +104,21 @@
 }
 .res-row .r { text-align: right; }
 .res-row .fig { text-align: right; color: var(--text-2); }
-/* POSITIONS · TRIP is one cell: where the horse ran and what happened to it
-   there. The sequence holds its width; the tags are what gives way. */
 .res-row .pos {
-  display: flex; align-items: center; gap: var(--sp-2);
-  min-width: 0; overflow: hidden;
   color: var(--text-dim); letter-spacing: .04em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.res-row .pos .seq { flex: 0 0 auto; white-space: nowrap; }
+/* TRIP has its own column so it can show EVERY tag. Sharing a cell with the
+   positions capped it at two and hid the rest behind a `+2` — on a results
+   page the trouble a horse met is the reason the finish is not the whole
+   story, so it wraps onto a second line rather than being truncated. */
+.res-row .trip {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2);
+  min-width: 0; padding: 3px 0;
+}
+.res-row .trip .trip-tags { flex-wrap: wrap; overflow: visible; }
+.res-row .trip .trip-tag { overflow: visible; }
+.res-row .trip .dim { color: var(--text-faint); }
 .res-row .bb {
   color: var(--book); border: 1px solid var(--book-ground); padding: 0 3px;
   font-size: var(--fs-xs); margin-left: 5px;

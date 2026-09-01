@@ -13,6 +13,12 @@ entry, and that join is the entire point of importing this.
 """
 from __future__ import annotations
 
+# Whose book an import belongs to when nobody says. the legacy ledger predates the two-account split —
+# `query/prebet.ACCOUNTS` is the pair the interface knows, and
+# "personal" is not one of them, so an unlabelled import used to
+# land in a third account no page could show.
+DEFAULT_ACCOUNT = "brett"
+
 import argparse
 import json
 import re
@@ -72,7 +78,7 @@ def _bookie_ref(row: dict) -> str | None:
     return found.group(1) if found else None
 
 
-def run(src: Path, *, db: Path | None = None, account: str = "personal",
+def run(src: Path, *, db: Path | None = None, account: str = DEFAULT_ACCOUNT,
         source: str = "legacy_log") -> BetsReport:
     report = BetsReport()
     conn = get_conn(db if db is not None else db_path())
@@ -190,7 +196,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--src", type=Path, required=True)
     ap.add_argument("--db", type=Path, default=None)
-    ap.add_argument("--account", default="personal")
+    ap.add_argument("--account", default=DEFAULT_ACCOUNT,
+                    help="which book these bets belong to")
     a = ap.parse_args(argv)
     if not a.src.is_file():
         print(f"not found: {a.src}")

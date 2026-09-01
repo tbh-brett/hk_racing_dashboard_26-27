@@ -96,8 +96,20 @@ def run(legacy: Path, *, db: Path | None = None,
 
     def _bets():
         from hkrd.jobs import import_bets
+        from hkrd.store import bets as bets_store
+        from hkrd.store.connect import get_conn, transaction
         out = import_bets.run(legacy / "reports" / "user_bets_log.jsonl", db=target)
-        return f"{out.bets:,} bets · {out.selections:,} selections"
+        # Anything still filed under an account the interface does not know is
+        # invisible to every account view. Moved, and the count said out loud —
+        # silently relabelling someone's ledger would be worse than leaving it.
+        conn = get_conn(target) if target else get_conn()
+        try:
+            with transaction(conn):
+                moved = bets_store.normalise_accounts(conn)
+        finally:
+            conn.close()
+        detail = f"{out.bets:,} bets · {out.selections:,} selections"
+        return detail + (f" · {moved:,} moved to brett" if moved else "")
 
     def _blackbook():
         from hkrd.jobs import import_blackbook

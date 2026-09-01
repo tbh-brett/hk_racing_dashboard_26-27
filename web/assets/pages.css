@@ -70,8 +70,15 @@
   margin-left: auto; padding: 0 var(--sp-4);
   border-left: 1px solid var(--line); font-size: var(--fs-sm);
 }
+/* Each source is a control: clicking it fetches that source now. Brief 07 §6
+   argues against a page of scrape buttons because that makes the mechanism the
+   interface — this is the inversion, where the thing already telling you what
+   is stale is the thing that fixes it. */
 .freshness .src { display: flex; align-items: baseline; gap: var(--sp-1);
-  padding: 1px 5px; border: 1px solid var(--line-2); }
+  padding: 1px 5px; border: 1px solid var(--line-2); cursor: pointer; }
+.freshness .src:hover { border-color: var(--text-dim); background: var(--surface); }
+.freshness .src:focus-visible { outline: 1px solid var(--edge); outline-offset: 1px; }
+.freshness .src[data-running] { cursor: progress; opacity: .6; }
 .freshness .name { color: var(--text-dim); }
 .freshness .ok { color: var(--win); }
 .freshness .stale { color: var(--edge); }

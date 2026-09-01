@@ -16,6 +16,12 @@ backed-versus-missed depends on.
 """
 from __future__ import annotations
 
+# Whose book an import belongs to when nobody says. a statement is one account's, and Brett's is the older of the two —
+# `query/prebet.ACCOUNTS` is the pair the interface knows, and
+# "personal" is not one of them, so an unlabelled import used to
+# land in a third account no page could show.
+DEFAULT_ACCOUNT = "brett"
+
 import argparse
 import hashlib
 from dataclasses import dataclass, field
@@ -98,7 +104,7 @@ def _race_date(compact: str) -> str | None:
 
 
 def run(src: Path, *, db: Path | None = None,
-        account: str = "personal") -> StatementImportReport:
+        account: str = DEFAULT_ACCOUNT) -> StatementImportReport:
     report = StatementImportReport()
     paths = (sorted(p for p in src.iterdir() if p.suffix.lower() == ".txt")
              if src.is_dir() else [src])
@@ -251,7 +257,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--src", type=Path, required=True,
                     help="a statement .txt, or a directory of them")
     ap.add_argument("--db", type=Path, default=None)
-    ap.add_argument("--account", default="personal")
+    ap.add_argument("--account", default=DEFAULT_ACCOUNT,
+                    help="which book these bets belong to")
     a = ap.parse_args(argv)
     if not a.src.exists():
         print(f"not found: {a.src}")

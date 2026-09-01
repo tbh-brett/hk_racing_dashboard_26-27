@@ -200,3 +200,31 @@
   font-size: var(--fs-xs);
 }
 .next .ns-play:hover { color: var(--text); }
+
+
+/* ── the trial morning ───────────────────────────────────────────────────────
+ * A different calendar from the meeting in the header: 159 trial days, most of
+ * them not race days. A select rather than chips because the list is long and
+ * a year of mornings is not a chip row.
+ */
+.day-pick { display: flex; align-items: center; gap: var(--sp-2); }
+.day-pick select {
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--line-2); border-radius: 0;
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+  padding: 2px 6px; min-width: 250px; cursor: pointer;
+}
+.day-pick select:hover { border-color: var(--tr-accent); }
+.day-pick button {
+  background: none; color: var(--text-muted);
+  border: 1px solid var(--line-2); border-radius: 0;
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+  padding: 1px 7px; cursor: pointer; line-height: 1.5;
+}
+.day-pick button:hover:not(:disabled) {
+  color: var(--text); border-color: var(--tr-accent);
+}
+/* Disabled, not hidden: the control staying put says you are at the end of
+   the archive rather than the button having gone somewhere. */
+.day-pick button:disabled { opacity: .3; cursor: default; }
+.day-pick button.on { color: var(--tr-accent); border-color: var(--tr-accent); }
