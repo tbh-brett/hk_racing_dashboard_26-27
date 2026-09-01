@@ -302,3 +302,32 @@ table.card td { padding: 6px 8px; }
 #strip-right .ch-scr { color: var(--alert); cursor: help; }
 #strip-right .ch-none { color: var(--text-muted); }
 #strip-right > span + span { margin-left: 10px; }
+
+
+/* ── the panel's own sections ────────────────────────────────────────────────
+ * The note the owner wrote, and who this horse has already beaten in today's
+ * field. Both were in the payload and neither was drawn.
+ */
+#detail .bb-note h6 { color: var(--book); }
+#detail .bb-note p {
+  margin: 0; color: var(--text-2); font-size: var(--fs-sm);
+  line-height: 1.45; font-family: var(--font-sans);
+}
+#detail .bb-meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+  margin-top: 5px; font-size: var(--fs-xs); color: var(--text-faint);
+}
+#detail .bb-meta .k { color: var(--book-dim); letter-spacing: .06em; }
+#detail .bb-meta .tag {
+  color: var(--book); border: 1px solid var(--book-ground); padding: 0 4px;
+}
+#detail .met-row {
+  display: flex; align-items: baseline; gap: var(--sp-2);
+  min-height: 17px; font-size: var(--fs-xs); color: var(--text-muted);
+}
+#detail .met-row .v2 {
+  color: var(--text-2); overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#detail .met-row .rec { margin-left: auto; color: var(--text); font-weight: 600; }
+#detail .met-row .k { color: var(--text-faint); }

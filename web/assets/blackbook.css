@@ -20,7 +20,7 @@
 :root {
   /* BOOKED holds a full ISO date, so it needs the room for one — at 62px
      every row read "2026-…" and the column said nothing. */
-  --bb-grid: 26px 150px 190px 92px 150px 52px 74px 108px 88px 1fr;
+  --bb-grid: 26px 150px 210px 92px 140px 52px 74px 100px 84px 1fr;
   --run-grid: 152px 68px 82px 36px 46px 158px 1fr;
 }
 
@@ -90,7 +90,12 @@
 .bb-row.open .caret { color: var(--book); }
 .bb-row .who { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; overflow: hidden; }
 .bb-row .who .id { font-size: var(--fs); font-weight: 600; color: var(--text-muted); }
-.bb-row .who .nm { font-size: var(--fs); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+/* The name is never truncated. A horse identified as "HAPPYDEARHAPPY…" is a
+   horse you have to hover to recognise, in a book whose whole purpose is
+   recognising it — so the id beside it gives way first and the name keeps its
+   width. Every name in the book fits: the longest is 18 characters. */
+.bb-row .who .nm { font-size: var(--fs); font-weight: 600; flex: 0 0 auto; }
+.bb-row .who .id { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
 .bb-row.today .who .nm { color: var(--edge); }
 .bb-row .tags { display: flex; gap: 4px; overflow: hidden; }
 .tag-pill {

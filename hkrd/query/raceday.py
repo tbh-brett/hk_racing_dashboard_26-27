@@ -305,7 +305,12 @@ def _pairs_meeting_again(conn: Connection, date: str, runners,
                 "meetings": len(h2h["meetings"]),
                 "last_date": last["race_date"],
                 "last_cond": f"{last['distance']}m {last['going']}",
-                "last_line": f"{last['pa']} v {last['pb']}",
+                # How each FINISHED and what each CARRIED, which is the pair
+                # the weight swing is about: "2nd (126) · 6th (126)" says the
+                # one that beat the other was on the same weight, and today's
+                # gap is the change to that.
+                "a_place": last["pa"], "b_place": last["pb"],
+                "a_weight_then": last["wa"], "b_weight_then": last["wb"],
                 "gap_then": h2h["last_weight_gap"], "gap_now": today_gap,
                 "swing": swing,
                 # Escalating tiers at 4, 6 and 8 lb. Most pairs clear none of
@@ -313,7 +318,13 @@ def _pairs_meeting_again(conn: Connection, date: str, runners,
                 "swing_tier": (3 if swing is not None and swing >= 8
                                else 2 if swing is not None and swing >= 6
                                else 1 if swing is not None and swing >= 4 else 0),
-                "a_gate": last["da"], "b_gate": last["db"],
+                # BOTH gates, so the card can show the move. Only the gate at
+                # the last meeting was carried, and today's draw was sitting
+                # unused on the runner two lines up — so the card showed two
+                # bare numbers that read as a pair of draws and were in fact
+                # one horse's history each.
+                "a_gate_then": last["da"], "a_gate_now": a.draw,
+                "b_gate_then": last["db"], "b_gate_now": b.draw,
             })
     out.sort(key=lambda p: (-(p["swing"] or 0), -p["meetings"]))
     return out[:limit]

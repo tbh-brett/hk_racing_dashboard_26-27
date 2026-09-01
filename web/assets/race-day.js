@@ -9,8 +9,8 @@
  * (AUC .785 against .727), which the footer states outright.
  */
 import { api, num } from './api.js';
-import { el, $, DASH, renderNav, styleBadge, styleOrdinal, compactDate,
-         ordinal } from './vocab.js';
+import { el, $, DASH, MINUS, renderNav, styleBadge, styleOrdinal,
+         compactDate, ordinal, tagLabel } from './vocab.js';
 import { context } from './context.js';
 import { anchoredPanel } from './overlay.js';
 import { install as installPalette } from './palette.js';
@@ -240,7 +240,27 @@ function renderBlackbookBand() {
 
 function swingLabel(p) {
   if (p.swing === null || p.swing === undefined) return 'NO WT DATA';
-  return `${p.swing}LB`;
+  // The dots are the tier, at 4, 6 and 8lb. A number alone makes the reader do
+  // the threshold arithmetic on every card; the dots say "this one" at a
+  // glance, which is the whole job of a band you scan rather than read.
+  const dots = p.swing_tier ? ` ${'●'.repeat(p.swing_tier)}` : '';
+  return `SWING ${p.swing}lb${dots}`;
+}
+
+/** Where a horse jumps from today against where it jumped from last time.
+ *
+ *  Two bare numbers used to sit here and they were not a pair of draws — they
+ *  were each horse's draw at the LAST meeting, with today's never shown. So
+ *  the line answered a question nobody asked and looked like it answered the
+ *  one they did. */
+function gateNote(then, now) {
+  if (then === null || then === undefined
+      || now === null || now === undefined) return String(now ?? then ?? DASH);
+  const d = now - then;
+  if (d === 0) return `${then}→${now} =`;
+  // Wider or inside, named — a signed number alone leaves the reader working
+  // out which direction is which on a track they may not have in mind.
+  return `${then}→${now} ${d > 0 ? `+${d} W` : `${MINUS}${-d} IN`}`;
 }
 
 function renderH2HBand() {
@@ -272,14 +292,20 @@ function renderH2HBand() {
     l1.append(el('span', 'who', `${p.a_no} ${p.a_name}`));
     l1.append(el('span', 'v', 'v'));
     l1.append(el('span', 'who', `${p.b_no} ${p.b_name}`));
-    l1.append(el('span', 'rec', p.record));
+    l1.append(el('span', 'rec',
+      `${p.record}${p.meetings ? ` · ${p.meetings} MEET${p.meetings === 1 ? '' : 'S'}` : ''}`));
     c.append(l1);
 
     const l2 = el('div', 'h2h-meta');
     l2.append(el('span', 'k', 'LAST'));
     l2.append(el('span', 'v2', compactDate(p.last_date)));
     l2.append(el('span', null, p.last_cond));
-    l2.append(el('span', 'v2', p.last_line));
+    // How each finished and what each carried — the pair the weight swing is
+    // about. "6 v 8" was two finishing positions with the weights dropped, so
+    // the line above it had nothing to be a change FROM.
+    l2.append(el('span', 'v2',
+      `${ordinal(p.a_place)}${p.a_weight_then ? ` (${p.a_weight_then})` : ''}`
+      + ` · ${ordinal(p.b_place)}${p.b_weight_then ? ` (${p.b_weight_then})` : ''}`));
     c.append(l2);
 
     const l3 = el('div', 'h2h-meta');
@@ -292,8 +318,9 @@ function renderH2HBand() {
     c.append(l3);
 
     const l4 = el('div', 'h2h-meta');
-    l4.append(el('span', 'k', `GATE ${p.a_gate ?? DASH}`));
-    l4.append(el('span', 'k', String(p.b_gate ?? DASH)));
+    l4.append(el('span', 'k',
+      `GATE ${gateNote(p.a_gate_then, p.a_gate_now)}`));
+    l4.append(el('span', 'k', gateNote(p.b_gate_then, p.b_gate_now)));
     c.append(l4);
     grid.append(c);
   });
@@ -639,16 +666,63 @@ function renderDetail() {
   tr.append(th);
   host.append(tr);
 
+  // The note that put this horse in the book. It was on the runner the whole
+  // time and the panel never showed it — which is the one thing on this panel
+  // the owner wrote themselves, and the reason the horse is worth a second
+  // look at all.
+  if (r.blackbook?.reasoning) {
+    const bb = el('section', 'bb-note');
+    bb.append(el('h6', null, 'BLACKBOOK NOTE'));
+    bb.append(el('p', null, r.blackbook.reasoning));
+    const meta = el('div', 'bb-meta');
+    meta.append(el('span', 'k', r.blackbook.status?.toUpperCase() ?? ''));
+    if (r.blackbook.added_date) {
+      meta.append(el('span', null, `since ${compactDate(r.blackbook.added_date)}`));
+    }
+    (r.blackbook.tags ?? []).forEach(
+      (t) => meta.append(el('span', 'tag', tagLabel(t))));
+    bb.append(meta);
+    host.append(bb);
+  }
+
+  // Who else in today's field this horse has already run against. The band
+  // across the top has every pair; this is the same fact narrowed to the
+  // runner being looked at, which is the question you have while looking at it.
+  const met = (state.card?.head_to_head ?? []).filter(
+    (p) => p.a_no === r.horse_no || p.b_no === r.horse_no);
+  if (met.length) {
+    const sec = el('section');
+    sec.append(el('h6', null, "MET TODAY'S FIELD BEFORE"));
+    met.forEach((p) => {
+      const mine = p.a_no === r.horse_no;
+      const row = el('div', 'met-row');
+      row.append(el('span', 'v2',
+        `v ${mine ? p.b_no : p.a_no} ${mine ? p.b_name : p.a_name}`));
+      // The record read from THIS horse's side. Printed as stored it would
+      // say 2-1 to a horse that has lost twice.
+      const rec = String(p.record ?? '').split('-');
+      row.append(el('span', 'rec',
+        mine ? p.record : `${rec[1] ?? ''}-${rec[0] ?? ''}`));
+      if (p.swing != null) row.append(el('span', 'k', `${p.swing}lb`));
+      sec.append(row);
+    });
+    host.append(sec);
+  }
+
   const form = el('section');
   form.append(el('h6', null, 'LAST SIX'));
   const tbl = el('table');
-  const runs = r.form ?? [];
-  if (!runs.length) {
+  form.append(tbl);
+  host.append(form);
+  if (r.form) {
+    // Straight from cache. The table used to be filled ONLY by the fetch
+    // callback, so the second time you hovered a horse it stayed empty
+    // forever — the data was there and nothing drew it.
+    tbl.replaceChildren(...r.form.map(formRow));
+  } else {
     form.append(el('div', 'empty', 'loading…'));
     loadForm(r, form);
   }
-  form.append(tbl);
-  host.append(form);
 
   const shape = el('section');
   shape.append(el('h6', null, 'MARKET SHAPE · WIN %'));
@@ -686,27 +760,36 @@ function renderDetail() {
   host.append(dis);
 }
 
+/** One past run, as the panel shows it. Split out because the panel draws it
+ *  from cache and the fetch draws it on arrival, and two copies would drift. */
+function formRow(f) {
+  const tr = el('tr');
+  tr.append(el('td', null, f.race_date?.slice(5) ?? DASH));
+  tr.append(el('td', null, `${f.distance ?? DASH} ${f.going ?? ''}`));
+  const pos = el('td', 'c-right', String(f.place ?? f.place_code ?? DASH));
+  if (f.place === 1) pos.style.color = 'var(--win)';
+  tr.append(pos);
+  const fig = el('td', 'c-right', f.et_figure ? num(f.et_figure, 0) : DASH);
+  if (f.et_figure) fig.style.color = f.et_figure >= 100 ? 'var(--win)' : 'var(--loss)';
+  tr.append(fig);
+  tr.append(el('td', 'c-right', f.win_odds ? num(f.win_odds, 1) : DASH));
+  return tr;
+}
+
 async function loadForm(runner, section) {
   try {
     const data = await api.horse(runner.horse_name, 6);
     runner.form = data.runs;
-    const tbl = section.querySelector('table');
+    // Moving the cursor down a card re-renders the panel and throws this
+    // section away mid-flight. Writing into it then puts the rows in a node
+    // nobody can see, and the horse now on screen keeps saying "loading…".
+    if (!section.isConnected) return;
     section.querySelector('.empty')?.remove();
-    tbl.replaceChildren(...data.runs.map((f) => {
-      const tr = el('tr');
-      tr.append(el('td', null, f.race_date?.slice(5) ?? DASH));
-      tr.append(el('td', null, `${f.distance ?? DASH} ${f.going ?? ''}`));
-      const pos = el('td', 'c-right', String(f.place ?? f.place_code ?? DASH));
-      if (f.place === 1) pos.style.color = 'var(--win)';
-      tr.append(pos);
-      const fig = el('td', 'c-right', f.et_figure ? num(f.et_figure, 0) : DASH);
-      if (f.et_figure) fig.style.color = f.et_figure >= 100 ? 'var(--win)' : 'var(--loss)';
-      tr.append(fig);
-      tr.append(el('td', 'c-right', f.win_odds ? num(f.win_odds, 1) : DASH));
-      return tr;
-    }));
+    section.querySelector('table').replaceChildren(...data.runs.map(formRow));
   } catch {
-    section.querySelector('.empty')?.replaceChildren(document.createTextNode('unavailable'));
+    if (!section.isConnected) return;
+    section.querySelector('.empty')
+      ?.replaceChildren(document.createTextNode('unavailable'));
   }
 }
 
