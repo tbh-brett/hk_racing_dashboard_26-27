@@ -284,6 +284,18 @@ for it.
 
 ### Run it by hand
 
+**From the dashboard.** Every source in the freshness strip is a button: click
+`Card`, `Odds`, `Results`, `Trials` or `Vet` and that source is fetched now.
+The chip then shows what the run wrote — never a bare tick, because a scrape
+that succeeded and stored nothing is the failure the strip exists to catch.
+This is the fastest path and needs no SSH.
+
+Two failures it will tell you about in words rather than a 500: a host with no
+browser (only the live odds need one — see **Live odds** below), and HKJC not
+being reachable from the machine.
+
+**Over SSH**, when you want the dry run or the whole nightly sweep:
+
 ```bash
 fly ssh console -a hkrd
 python -m hkrd.jobs.nightly --db /data/hkrd.db --dry-run   # what would it do?
