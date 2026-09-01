@@ -149,6 +149,10 @@ def build_card(date: str, race_no: int, *,
                     "pace_style": last.pace_style,
                     "days_ago": _days_between(last.race_date, date),
                     "tags": [t for t in last.tags if t not in _ROUTINE],
+                    # The sentence the tags were derived from. A chip reading
+                    # "bled" is the signal; the stewards' own words are what
+                    # the reader wants the moment they hover it.
+                    "comment": last.incident_comment or last.running_comment,
                     "lane_notes": list(last.lane_notes),
                 } if last else None,
             })
@@ -280,8 +284,27 @@ def _place_ratio_range(runners) -> str | None:
     return f"{min(ratios):.2f}–{max(ratios):.2f}"
 
 
+def _swing_favours(a, b, gap_then: int | None, gap_now: int | None
+                   ) -> dict[str, Any]:
+    """Which horse the weight change favours, and by how much.
+
+    `gap` is A's weight minus B's. A FALL means A carries less relative to B
+    than it did, so A is better off by that much; a rise favours B. Equal
+    weights either side is not "no swing" — it is a real change if the gap
+    moved, and the horse that came down is the one that benefits.
+    """
+    if gap_then is None or gap_now is None:
+        return {"favours_no": None, "favours_name": None, "favours_lb": None}
+    move = gap_now - gap_then
+    if move == 0:
+        return {"favours_no": None, "favours_name": None, "favours_lb": 0}
+    better = b if move > 0 else a
+    return {"favours_no": better.horse_no, "favours_name": better.horse_name,
+            "favours_lb": abs(move)}
+
+
 def _pairs_meeting_again(conn: Connection, date: str, runners,
-                         limit: int = 8) -> list[dict[str, Any]]:
+                         limit: int = 40) -> list[dict[str, Any]]:
     """Runners in today's field who have met before.
 
     Sorted by weight swing, because the swing is the gap BETWEEN them and a
@@ -313,6 +336,14 @@ def _pairs_meeting_again(conn: Connection, date: str, runners,
                 "a_weight_then": last["wa"], "b_weight_then": last["wb"],
                 "gap_then": h2h["last_weight_gap"], "gap_now": today_gap,
                 "swing": swing,
+                # WHO THE SWING FAVOURS, said outright. The card used to print
+                # "-9 → 0" and leave the reader to work out which horse got
+                # the better of it — which is arithmetic done wrong under
+                # time pressure, on the one figure the pair is sorted by.
+                #
+                # The gap is A minus B. It FALLING means A is carrying less
+                # relative to B than it was, so A is better off.
+                **_swing_favours(a, b, h2h["last_weight_gap"], today_gap),
                 # Escalating tiers at 4, 6 and 8 lb. Most pairs clear none of
                 # them, which is correct rather than a bug.
                 "swing_tier": (3 if swing is not None and swing >= 8

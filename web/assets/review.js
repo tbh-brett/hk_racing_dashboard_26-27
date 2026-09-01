@@ -14,7 +14,7 @@
  * grows is unusable within a season.
  */
 import { api } from './api.js';
-import { el } from './vocab.js';
+import { el, conditionLabel } from './vocab.js';
 
 
 /* The tag vocabulary is the one the imported book actually uses, loaded once
@@ -79,11 +79,7 @@ export function trialSubject(trial) {
   };
 }
 
-export function conditionLabel(run) {
-  return [run.venue, run.course, run.distance ? `${run.distance}m` : null,
-          run.going, run.race_class ? `C${run.race_class}` : null]
-    .filter(Boolean).join(' ');
-}
+
 
 /**
  * Fill `host` with the run-note form, and the promote form behind one click.

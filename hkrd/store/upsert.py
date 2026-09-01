@@ -105,7 +105,7 @@ def upsert_runners(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
             "trainer": r.get("trainer"),
             "actual_weight": coerce.to_int(r.get("actual_weight"), field="actual_weight"),
             "declared_weight": coerce.to_int(r.get("declared_weight"), field="declared_weight"),
-            "gear": r.get("gear"),
+            "gear": coerce.parse_gear(r.get("gear")),
             "rating": coerce.to_int(r.get("rating"), field="rating"),
             "win_odds": coerce.to_odds(r.get("win_odds")),
             "section_times": r.get("section_times"),
@@ -181,7 +181,7 @@ def upsert_trials(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
             "trainer": r.get("trainer"),
             "draw": coerce.to_int(r.get("draw"), field="draw"),
             "lengths_behind": r.get("lengths_behind"),
-            "gear": r.get("gear"),
+            "gear": coerce.parse_gear(r.get("gear")),
             "comment_text": r.get("comment_text"),
         })
     cols = ["trial_date", "trial_no", "horse_name", "place", "finish_time",

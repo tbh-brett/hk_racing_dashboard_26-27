@@ -105,8 +105,27 @@ export function movementClass(direction) {
 export const ROUTINE_TAGS = new Set(['sampling', 'vet_routine', 'no_report',
                                      'jumped_fairly']);
 
+/* VETERINARY FINDINGS, which are not trip trouble and must not read as it.
+ *
+ * There is no vet scrape in the archive — `vet_records` holds zero rows — so
+ * every piece of veterinary information the dashboard has comes from the
+ * stewards' text. It used to arrive as one undifferentiated `vet_finding`;
+ * `derive/tags.NAMED_VET` now names them, and a test holds these two lists
+ * identical, because a horse that bled and a horse that was checked at the
+ * 800m are different facts and a shared badge says they are the same one.
+ */
+export const VET_TAGS = new Set(['bled', 'roarer', 'lame_fore', 'lame_hind',
+                                 'arrhythmia', 'mucus', 'barred',
+                                 'vet_finding']);
+
 export function tripTags(tags) {
   return (tags ?? []).filter((t) => !ROUTINE_TAGS.has(t));
+}
+
+/** A finding reads before trouble: it is about the horse rather than the run,
+ *  and it is the one that changes whether you back it next time. */
+export function isVetTag(tag) {
+  return VET_TAGS.has(tag);
 }
 
 /** Tag text as it reads on screen: underscores are a storage detail. */
@@ -127,12 +146,17 @@ export function tagLabel(tag) {
  */
 export function tripTagChips(tags, { comment = null, limit = 2,
                                      cls = 'trip-tag' } = {}) {
-  const trouble = tripTags(tags);
+  // Findings first — a horse that bled is a different kind of fact from one
+  // that met traffic, and it is the one that changes whether you back it next
+  // time. Sorting them forward means the tag that survives a `limit` is the
+  // one worth keeping.
+  const trouble = tripTags(tags)
+    .sort((a, b) => (isVetTag(b) ? 1 : 0) - (isVetTag(a) ? 1 : 0));
   if (!trouble.length) return null;
   const box = el('span', `${cls}s`);
   const title = comment || trouble.map(tagLabel).join(' · ');
   trouble.slice(0, limit).forEach((t) => {
-    const chip = el('span', cls, tagLabel(t));
+    const chip = el('span', isVetTag(t) ? `${cls} vet` : cls, tagLabel(t));
     chip.title = title;
     box.append(chip);
   });
@@ -277,6 +301,88 @@ export function externalLink(href, text, cls) {
   a.target = '_blank';
   a.rel = 'noopener noreferrer';
   return a;
+}
+
+/* ── race class ───────────────────────────────────────────────────────────
+ *
+ * Hong Kong grades its races on a ladder — Class 1 at the top down to Class 5
+ * — and stores two values on it that are not rungs. Group races arrive as the
+ * class string "0"; Griffin races arrive as the literal words "Griffin Race".
+ * A page that prints `C${race_class}` therefore renders them "C0" and
+ * "CGriffin Race": the first says nothing, the second is broken text. Both are
+ * named here, once, so every page calls the same race the same thing.
+ *
+ * Colour follows the ladder rather than merely labelling it. Five steps of one
+ * warm-to-cool ramp read as an ORDERING; five separate hues would read as five
+ * unrelated categories, which is not what a class is. The two off-ladder
+ * values carry the only strong marks, because they are the two a reader most
+ * needs to catch: a Group race is the grade above the ladder, and a Griffin
+ * race sits beside it — a series for horses that have no rating yet, so its
+ * form cannot be read against a class at all.
+ */
+export const CLASS_NAME = {
+  '0': 'GRP',
+  'Griffin Race': 'GRIF',
+};
+
+const CLASS_TITLE = {
+  GRP: 'Group race — above the class ladder',
+  GRIF: 'Griffin race — for horses not yet rated, so not on the class ladder',
+};
+
+export function classLabel(raceClass) {
+  if (raceClass === null || raceClass === undefined || raceClass === '') return null;
+  const key = String(raceClass);
+  return CLASS_NAME[key] ?? `C${key}`;
+}
+
+/** The class as a tinted chip, or null when the race has no class on record.
+ *  Callers append it; a missing class prints nothing rather than a dash,
+ *  because the surrounding cell already carries the track and the distance. */
+export function classCell(raceClass, { cls = 'cl' } = {}) {
+  const label = classLabel(raceClass);
+  if (label === null) return null;
+  const key = String(raceClass);
+  // The tone name never comes from raw data — an unexpected class string would
+  // otherwise become a CSS class name of its own and silently match nothing.
+  const tone = key === '0' ? 'group'
+    : CLASS_NAME[key] ? 'griffin'
+      : /^[1-5]$/.test(key) ? `c${key}` : 'other';
+  const chip = el('span', `${cls} ${cls}-${tone}`, label);
+  chip.title = CLASS_TITLE[label] ?? `Class ${key}`;
+  return chip;
+}
+
+/** A run's conditions as text, for tooltips, popover titles and any row too
+ *  narrow for chips. Three files each had their own copy of this and each
+ *  wrote `C${race_class}`, so a Group race read "C0" and a Griffin race read
+ *  "CGriffin Race" in all three. One copy, calling `classLabel`. */
+export function conditionLabel(run) {
+  return [run.venue, run.course, run.distance ? `${run.distance}m` : null,
+          run.going, classLabel(run.race_class)]
+    .filter(Boolean).join(' ');
+}
+
+/* ── how fast away ────────────────────────────────────────────────────────
+ *
+ * ESZ: the runner's early sectional standardised inside its OWN race.
+ * Positive is faster away — `early_pace` is a time, and query/pace.py flips
+ * the sign there so no reader ever has to hold "smaller is quicker" in mind.
+ *
+ * Standardised within the race and not across the archive, because a field's
+ * early sectional is dominated by distance and grade: compared across races
+ * every sprinter reads as fast away and every stayer as slow, which says
+ * nothing about how either began relative to what it was beaten away by.
+ */
+export function eszCell(z, { cls = 'esz' } = {}) {
+  if (z === null || z === undefined) return el('span', `${cls} dim`, DASH);
+  const sign = z > 0 ? '+' : z < 0 ? MINUS : '';
+  const cell = el('span', `${cls} ${z >= 0 ? 'esz-fast' : 'esz-slow'}`,
+    `${sign}${Math.abs(z).toFixed(2)}`);
+  cell.title = z >= 0
+    ? `jumped ${Math.abs(z).toFixed(2)} sd FASTER than this race\u2019s field`
+    : `jumped ${Math.abs(z).toFixed(2)} sd SLOWER than this race\u2019s field`;
+  return cell;
 }
 
 /** Running positions as the sequence they are: `10 9 6 3 2`. */

@@ -26,7 +26,7 @@
 import { api, num } from './api.js';
 import { el, $, DASH, MINUS, renderNav, tripTagChips,
          replayUrl, trialReplayUrl, externalLink, compactDate,
-         ordinal } from './vocab.js';
+         ordinal, classLabel } from './vocab.js';
 import { context } from './context.js';
 import { renderReview, trialSubject, loadTags } from './review.js';
 import { install as installPalette } from './palette.js';
@@ -369,7 +369,7 @@ function formTable(runs) {
     line.append(el('span', null, compactDate(f.race_date)));
     line.append(el('span', 'cond', [
       f.venue, f.distance ? `${f.distance}m` : null, f.going,
-      f.race_class ? `C${f.race_class}` : null,
+      classLabel(f.race_class),
     ].filter(Boolean).join(' ')));
     const fin = el('span', 'r fin', String(f.place ?? f.place_code ?? DASH));
     if (f.place === 1) fin.classList.add('won');

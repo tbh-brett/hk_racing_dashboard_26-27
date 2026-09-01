@@ -10,7 +10,7 @@
  */
 import { api, num } from './api.js';
 import { el, $, DASH, MINUS, renderNav, styleBadge, styleOrdinal,
-         compactDate, ordinal, tagLabel } from './vocab.js';
+         compactDate, ordinal, tagLabel, tripTagChips } from './vocab.js';
 import { context } from './context.js';
 import { anchoredPanel } from './overlay.js';
 import { install as installPalette } from './palette.js';
@@ -282,8 +282,12 @@ function renderH2HBand() {
   host.replaceChildren(row);
 
   if (!state.h2hOpen || !pairs.length) return;
+  // EVERY pair, scrolled. Four of twenty-two were shown and the rest were
+  // simply gone, with nothing on screen to say so — the band is sorted by
+  // weight swing, so the ones dropped were the smallest swings, which is the
+  // least bad truncation and still a silent one.
   const grid = el('div', 'h2h-grid');
-  pairs.slice(0, 4).forEach((p) => {
+  pairs.forEach((p) => {
     const c = el('div', 'h2h-cell');
     const l1 = el('div', 'h2h-line');
     // Full names. Taking the first word turned TO INFINITY into "TO" and
@@ -292,8 +296,15 @@ function renderH2HBand() {
     l1.append(el('span', 'who', `${p.a_no} ${p.a_name}`));
     l1.append(el('span', 'v', 'v'));
     l1.append(el('span', 'who', `${p.b_no} ${p.b_name}`));
-    l1.append(el('span', 'rec',
-      `${p.record}${p.meetings ? ` · ${p.meetings} MEET${p.meetings === 1 ? '' : 'S'}` : ''}`));
+    // The record alone. "1-0 · 1 MEET" spent sixty pixels restating what
+    // "1-0" already sums to, and those sixty pixels were coming out of the
+    // horses' names.
+    const rec = el('span', 'rec', p.record);
+    if (p.meetings) {
+      rec.title = `met ${p.meetings} time${p.meetings === 1 ? '' : 's'}`
+        + ` — ${p.a_name} ${p.record.split('-')[0]}, ${p.b_name} ${p.record.split('-')[1]}`;
+    }
+    l1.append(rec);
     c.append(l1);
 
     const l2 = el('div', 'h2h-meta');
@@ -308,20 +319,40 @@ function renderH2HBand() {
       + ` · ${ordinal(p.b_place)}${p.b_weight_then ? ` (${p.b_weight_then})` : ''}`));
     c.append(l2);
 
-    const l3 = el('div', 'h2h-meta');
-    l3.append(el('span', 'k', 'WT GAP'));
-    l3.append(el('span', 'v2',
-      `${p.gap_then ?? DASH} → ${p.gap_now ?? DASH}`));
-    // Escalating tiers at 4, 6 and 8lb. Most pairs clear none of them, and
-    // that is correct rather than a bug.
+    // WHO THE SWING FAVOURS, in words, above the arithmetic that produced it.
+    // "-9 → 0" is the evidence; it is not the answer, and working the answer
+    // out from it is the step that was going wrong.
+    const l3 = el('div', 'h2h-verdict');
+    if (p.favours_no) {
+      const mine = p.favours_no === p.a_no;
+      l3.append(el('span', `won-wt ${mine ? 'a' : 'b'}`,
+        `${p.favours_no} ${p.favours_name}`));
+      l3.append(el('span', 'by', `${p.favours_lb}lb better off`));
+    } else if (p.favours_lb === 0) {
+      l3.append(el('span', 'level', 'SAME WEIGHTS AS LAST TIME'));
+    } else {
+      l3.append(el('span', 'level', 'NO WEIGHT ON RECORD'));
+    }
     l3.append(el('span', `swing swing-${p.swing_tier}`, swingLabel(p)));
     c.append(l3);
 
     const l4 = el('div', 'h2h-meta');
-    l4.append(el('span', 'k',
-      `GATE ${gateNote(p.a_gate_then, p.a_gate_now)}`));
-    l4.append(el('span', 'k', gateNote(p.b_gate_then, p.b_gate_now)));
+    l4.append(el('span', 'k', 'WT GAP'));
+    l4.append(el('span', 'v2', `${p.gap_then ?? DASH} → ${p.gap_now ?? DASH}`));
     c.append(l4);
+
+    // The gate move, one horse per line and labelled with the horse. Two
+    // unlabelled notes side by side gave no way to tell whose gate was whose.
+    [[p.a_no, p.a_gate_then, p.a_gate_now],
+     [p.b_no, p.b_gate_then, p.b_gate_now]].forEach(([no, then, now]) => {
+      const line = el('div', 'h2h-gate');
+      line.append(el('span', 'no', String(no)));
+      line.append(el('span', 'k', 'GATE'));
+      const move = (then != null && now != null) ? now - then : null;
+      line.append(el('span', `mv ${move === null ? '' : move > 0 ? 'wide'
+        : move < 0 ? 'in' : 'same'}`.trim(), gateNote(then, now)));
+      c.append(line);
+    });
     grid.append(c);
   });
   host.append(grid);
@@ -546,8 +577,16 @@ function cardRow(r, index) {
   const nm = el('span', 'nm', r.horse_name);
   if (r.blackbook) nm.classList.add('booked');
   box.append(nm);
-  const trip = (r.last_run?.tags ?? [])[0];
-  if (trip) box.append(el('span', 'trip', trip.replace(/_/g, ' ')));
+  // The FIRST tag in the array was an arbitrary pick — the order the deriver
+  // happened to write them in — so a horse that bled last start showed
+  // "contact" and the finding never reached the page at all. `tripTagChips`
+  // is the shared rule: routine tags dropped, veterinary findings sorted to
+  // the front and given the alert colour, the whole list on the tooltip.
+  const trip = tripTagChips(r.last_run?.tags, {
+    comment: r.last_run?.comment ?? null,
+    limit: 1, cls: 'trip',
+  });
+  if (trip) box.append(trip);
   // Vet records have been scraped into the database since the first build and
   // were never read back — brief 07 §2 puts a compact badge here, expanding on
   // click. Significant and routine read differently on purpose: a passed

@@ -12,10 +12,11 @@
 import { api, num, signed } from './api.js';
 import { el, $, DASH, MINUS, renderNav, styleClass, styleOrdinal,
          replayUrl, trialReplayUrl, externalLink, compactDate,
-         tripTags } from './vocab.js';
+         tripTags, tripTagChips, ordinal, classCell, classLabel, eszCell,
+         paceCell, positionsText, conditionLabel } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
-import { conditionLabel, loadTags, renderReview } from './review.js';
+import { loadTags, renderReview } from './review.js';
 
 
 /* The trend tint's threshold, measured rather than chosen. Over 12,540 six-run
@@ -35,7 +36,7 @@ const COLS = [
   { key: 'trainer', label: 'TRAINER' },
   { key: 'wt', label: 'WT', cls: 'r' },
   { key: 'odds', label: 'ODDS', cls: 'r' },
-  { key: 'seq', label: 'LAST 6 FIGURES · NEWEST LEFT' },
+  { key: 'seq', label: 'LAST 6 FIGURES · NEWEST LEFT · BAR = TREND' },
   { key: 'flags', label: 'FLAGS' },
 ];
 
@@ -99,7 +100,10 @@ function renderRaceHeader() {
     return d;
   };
   facts.append(fact('DIST', race.distance ? `${race.distance}m` : null));
-  facts.append(fact('CLASS', race.race_class));
+  // The same words the run rows use. Printed raw this said "CLASS 0" for a
+  // Group race and "CLASS Griffin Race" for a Griffin, so the header and the
+  // rows beneath it named the same race two different ways.
+  facts.append(fact('CLASS', classLabel(race.race_class)));
   facts.append(fact('GOING', race.going));
   facts.append(fact('COURSE', race.course));
   facts.append(fact('FIELD', String(race.field_size)));
@@ -267,8 +271,13 @@ function sequenceCell(runner) {
     slope.title = `recent three ${recent.toFixed(1)} vs earlier three `
       + `${older.toFixed(1)} (${move >= 0 ? '+' : ''}${move.toFixed(1)}); `
       + `tinted beyond ${TREND_THRESHOLD}, one sd of the population`;
+    if (!slope.classList.contains('up') && !slope.classList.contains('down')) {
+      slope.title += ' — flat, so no tint';
+    }
   } else if (known.length) {
     slope.title = `${known.length} figures — a trend needs six`;
+  } else {
+    slope.title = 'no figures on record';
   }
   cell.append(slope);
   return cell;
@@ -387,26 +396,85 @@ function h2hBand(runner) {
   const pairs = state.h2h[runner.horse_name];
   if (!pairs || !pairs.length) return null;
   const band = el('div', 'h2h-band');
-  band.append(el('span', 'lab', 'HEAD TO HEAD'));
+  const lab = el('span', 'lab');
+  lab.append(document.createTextNode('HEAD TO HEAD'));
+  lab.append(el('b', null, ` ${pairs.length}`));
+  band.append(lab);
+  // A scrolling rail, like Race Day's. A horse that has met six of today's
+  // field has six cards, and squeezing them into the width made every one
+  // unreadable rather than showing fewer honestly.
+  const rail = el('span', 'pair-rail');
   pairs.forEach((p) => {
     const box = el('span', 'pair');
-    box.append(el('span', null, `v ${p.other}`));
-    box.append(el('span', 'rec', p.record));
-    box.append(el('span', 'last', `LAST ${p.last_date} ${p.last_cond} · ${p.last_line}`));
-    box.append(el('span', 'rec', `GAP ${p.gap_then ?? DASH} → ${p.gap_now ?? DASH}`));
-    const sw = el('span', `swing ${swingTier(p.swing)}`,
-      p.swing === null || p.swing === undefined ? 'NO WT DATA' : `${p.swing}LB`);
-    box.append(sw);
-    band.append(box);
+
+    const top = el('span', 'pl');
+    top.append(el('span', 'who', `v ${p.other}`));
+    top.append(el('span', 'rec',
+      `${p.record}${p.meetings ? ` · ${p.meetings}` : ''}`));
+    box.append(top);
+
+    const mid = el('span', 'pl');
+    mid.append(el('span', 'last',
+      `${compactDate(p.last_date)} ${p.last_cond} · ${p.last_line}`));
+    box.append(mid);
+
+    // The verdict before the arithmetic.
+    const ver = el('span', 'pl');
+    if (p.favours) {
+      ver.append(el('span', `won-wt ${p.favours}`,
+        p.favours === 'mine' ? 'THIS HORSE' : p.favours_name));
+      ver.append(el('span', 'by', `${p.favours_lb}lb better off`));
+    } else {
+      ver.append(el('span', 'level',
+        p.swing === null ? 'NO WT DATA' : 'SAME WEIGHTS'));
+    }
+    ver.append(el('span', `swing ${swingTier(p.swing)}`,
+      p.swing === null || p.swing === undefined ? '' : `${p.swing}LB`));
+    box.append(ver);
+
+    const gates = el('span', 'pl gates');
+    gates.append(el('span', 'k', 'GATE'));
+    gates.append(el('span', 'g', gateMove(p.gate_then, p.gate_now)));
+    gates.append(el('span', 'k', `v ${p.other_no}`));
+    gates.append(el('span', 'g', gateMove(p.other_gate_then, p.other_gate_now)));
+    box.append(gates);
+
+    rail.append(box);
   });
+  band.append(rail);
   return band;
 }
 
+/** Where a horse jumps from today against where it jumped from last time.
+ *  Wider or inside NAMED, because a signed number leaves the reader working
+ *  out which direction is which on a track they may not have in mind. */
+function gateMove(then, now) {
+  if (then == null || now == null) return String(now ?? then ?? DASH);
+  const d = now - then;
+  if (d === 0) return `${then}→${now} =`;
+  return `${then}→${now} ${d > 0 ? `+${d} W` : `${MINUS}${-d} IN`}`;
+}
+
+/* The run row's own columns.
+ *
+ * It no longer borrows `--fg-grid` from the runner rows above it. That grid
+ * was ten columns wide and this is twelve, and the two were never describing
+ * the same things anyway: the runner row's fourth column is today's draw,
+ * the run row's is the draw of a race two months ago. Sharing the template
+ * bought a vertical alignment between quantities that do not correspond, and
+ * cost every column that had nowhere to go — POSITIONS, ESZ and the pace of
+ * the race — being crushed into one trailing cell.
+ *
+ * Order set by the owner, and it reads as a sentence: when and where, how it
+ * was ridden, who rode it, what it carried, where it jumped from and how fast
+ * it got away, where it sat, where it finished, and what the clock said.
+ */
 const RUN_HEAD = [
-  ['RUN', 'c'], ['DATE · TRK CRS DIST GOING CL', ''], ['STYLE', ''], ['DR', 'c'],
-  ['JOCKEY', ''], ['TRAINER', ''], ['WT', 'r'], ['FIN', 'r'],
+  ['RUN', 'c'], ['DATE · TRK CRS DIST GOING CL', ''], ['STYLE', ''],
+  ['JOCKEY', ''], ['TRAINER', ''], ['WT', 'r'], ['DR', 'c'], ['ESZ', 'r'],
+  ['POSITIONS', ''], ['FIN', 'r'],
   ['FIGURE · MARGIN · TIME · PLACE DIV', ''],
-  ['PACE · GEAR · POSITIONS · TRIP · BB · NOTE · VID', ''],
+  ['PACE · GEAR · TRIP · BB · NOTE · VID', ''],
 ];
 
 function runKey(horseNo, run) {
@@ -430,29 +498,67 @@ function runRow(runner, run, index) {
 
   row.append(el('div', 'n', String(index + 1)));
 
+  // ── when and where ──────────────────────────────────────────────────────
   const when = el('div', 'when');
   when.append(el('span', 'caret', open ? '▼' : '▶'));
   // One date format, defined once — brief 08 §1. An ISO date on screen is
   // a storage format that escaped.
   when.append(el('span', null, compactDate(run.race_date)));
-  when.append(el('span', 'cond', conditionLabel(run)));
+  // Track, course, distance and going as text; the class as its own chip, so
+  // it can be read at a glance and so "0" and "Griffin Race" stop rendering
+  // as "C0" and "CGriffin Race". `conditionLabel` still builds the whole
+  // string for tooltips and popover titles, where a chip cannot go.
+  const where = [run.venue, run.course, run.distance ? `${run.distance}m` : null,
+                 run.going].filter(Boolean).join(' ');
+  if (where) when.append(el('span', 'cond', where));
+  const cl = classCell(run.race_class);
+  if (cl) when.append(cl);
+  // The whole condition in words, for the reader whose window is narrow
+  // enough that the cell has clipped it.
+  when.title = conditionLabel(run);
   row.append(when);
 
-  const st = el('div');
+  // ── how it was ridden ───────────────────────────────────────────────────
+  // Once. It used to appear here as a badge and again in the trailing cell as
+  // a bare initial, which read as two facts and was one.
+  const st = el('div', 'st');
   st.append(el('span', styleClass(run.pace_style), run.pace_style ?? 'UNKNOWN'));
   row.append(st);
 
-  row.append(el('div', 'dr', String(run.draw ?? DASH)));
-  row.append(el('div', 'jockey', run.jockey ?? DASH));
+  // Clips at the tail rather than widening the row — with the whole name on
+  // the tooltip, because "R Kingsc…" and "R Kingston" are different people.
+  const jk = el('div', 'jockey', run.jockey ?? DASH);
+  if (run.jockey) jk.title = run.jockey;
+  row.append(jk);
 
   const runs = history(runner);
   const prev = runs[index + 1];
   const changed = prev?.trainer && run.trainer && prev.trainer !== run.trainer;
   const tr = el('div', `trainer${changed ? ' changed' : ''}`, run.trainer ?? DASH);
   if (changed) tr.title = `was ${prev.trainer} the run before`;
+  else if (run.trainer) tr.title = run.trainer;
   row.append(tr);
 
   row.append(el('div', 'wt', String(run.actual_weight ?? DASH)));
+  row.append(el('div', 'dr', String(run.draw ?? DASH)));
+
+  // ── how fast away, and where it sat ─────────────────────────────────────
+  // The draw says where it started; ESZ says what it did with it. A wide gate
+  // and a fast beginning is a different run from a wide gate and a slow one,
+  // and the positions that follow are unreadable without it.
+  const esz = state.guide?.esz?.[`${run.race_date}:${run.race_no}:${run.horse_no}`];
+  const eszCol = el('div', 'esz-col');
+  eszCol.append(eszCell(esz));
+  row.append(eszCol);
+
+  // Four calls fit; the five-call route line ellipsises, so the sequence is
+  // repeated whole on the tooltip.
+  const pos = el('div', 'pos', positionsText(run.running_positions));
+  if ((run.running_positions ?? []).length) {
+    pos.title = `at each call: ${run.running_positions.join(' → ')}`;
+  }
+  row.append(pos);
+
   // A non-finisher shows its code, not a blank: WV and PU mean different things.
   row.append(el('div', `fin ${finClass(run)}`,
     run.place !== null && run.place !== undefined
@@ -478,21 +584,44 @@ function runRow(runner, run, index) {
   }
   row.append(fg);
 
+  // ── the trailing cell ───────────────────────────────────────────────────
   const trail = el('div', 'trail');
-  const tempo = el('span', 'tempo');
-  tempo.append(el('i'));
-  tempo.append(el('span', null, run.pace_style ? run.pace_style[0] : DASH));
-  tempo.title = run.pace_style ? `ran as ${run.pace_style}` : 'no running style on record';
-  trail.append(tempo);
+
+  // How fast the RACE was run, which the running style alone cannot tell you:
+  // led in a crawl and led in a sprint are opposite facts. Measured pace only
+  // — the server sends nothing where it could not measure it, and a dash is
+  // the honest reading of that.
+  const pace = state.guide?.pace?.[`${run.race_date}:${run.race_no}`];
+  const paced = paceCell(pace);
+  paced.title = pace
+    ? `the race was run ${pace.band.toLowerCase()} for the distance`
+      + ` — ${pace.z > 0 ? '+' : ''}${pace.z} sd over ${pace.peers} races`
+    : 'no sectionals for this race, so its pace was never measured';
+  trail.append(paced);
 
   trail.append(gearCell(run, prev));
-  trail.append(el('span', 'pos', (run.running_positions ?? []).join(' ') || DASH));
 
-  const trip = el('span', 'trip',
-    run.incident_comment || run.running_comment
-    || (run.lane_notes ?? []).join(' · ') || '');
-  trip.title = trip.textContent;
-  trail.append(trip);
+  // The stewards' prose as the tags derived from it. The full sentence stays
+  // on the tooltip and in the expanded run — but a row that has to be READ is
+  // a row that gets skipped, and the tag is the part that is comparable
+  // between runs. A veterinary finding sorts to the front.
+  const comment = run.incident_comment || run.running_comment || null;
+  // Two, as on every other page. Three fit only by ellipsis, and "bum…",
+  // "raced k…", "shifte…" is less readable than two whole tags and a count —
+  // the tooltip carries the full list either way.
+  const chips = tripTagChips(run.tags, { comment, limit: 2 });
+  if (chips) {
+    trail.append(chips);
+  } else if (!(run.tags ?? []).length
+             && (comment || (run.lane_notes ?? []).length)) {
+    // Prose only when the vocabulary saw NOTHING. Tags that exist but are all
+    // routine mean the stewards reported a clean run, and printing the
+    // sentence they wrote — "No report." — puts a note in the trip column of
+    // a horse that had no trip to report.
+    const trip = el('span', 'trip', comment || run.lane_notes.join(' · '));
+    trip.title = trip.textContent;
+    trail.append(trip);
+  }
 
   const marks = el('div', 'marks');
   const bb = state.guide?.blackbook?.[runner.horse_name];
@@ -522,6 +651,7 @@ function runRow(runner, run, index) {
   row.append(trail);
   return row;
 }
+
 
 /** Gear, and what changed about it since the run before.
  *
@@ -692,7 +822,14 @@ function detailBlock(runner) {
   if (h2h) box.append(h2h);
 
   const head = el('div', 'run-head');
-  RUN_HEAD.forEach(([label, cls]) => head.append(el('div', cls || null, label)));
+  // Two of these labels are longer than the column beneath them can be
+  // without taking width from something that must not lose it. They clip, and
+  // carry themselves whole on the tooltip.
+  RUN_HEAD.forEach(([label, cls]) => {
+    const cell = el('div', cls || null, label);
+    cell.title = label;
+    head.append(cell);
+  });
   box.append(head);
 
   const runs = history(runner);
@@ -730,7 +867,7 @@ function renderAside() {
   sub.append(el('div', 'cap', 'HOW THIS HORSE FITS TODAY'));
   sub.append(el('div', 'cond',
     [race.venue, race.distance ? `${race.distance}m` : null,
-     race.race_class ? `C${race.race_class}` : null, race.going,
+     classLabel(race.race_class), race.going,
      race.course ? `COURSE ${race.course}` : null,
      runner.draw ? `DRAW ${runner.draw}` : null].filter(Boolean).join(' · ')));
 
@@ -966,16 +1103,32 @@ async function loadH2H(runner) {
       const gapNow = (runner.actual_weight !== null && other.actual_weight !== null)
         ? runner.actual_weight - other.actual_weight : null;
       const gapThen = body.last_weight_gap;
+      // WHO the change favours. The gap is THIS horse minus the other, so a
+      // fall means this horse carries less relative to it than last time and
+      // is the one better off. Working that out from two signed numbers is
+      // the step that was going wrong.
+      const move = (gapThen === null || gapNow === null)
+        ? null : gapNow - gapThen;
       found.push({
+        other_no: other.horse_no,
         other: `${other.horse_no} ${other.horse_name}`,
         record: `${body.record.a}-${body.record.b}`,
+        meetings: body.meetings.length,
         last_date: last.race_date,
         last_cond: `${last.distance ?? DASH}m ${last.going ?? ''}`.trim(),
-        last_line: `${last.pa ?? DASH} v ${last.pb ?? DASH}`,
+        last_line: `${ordinal(last.pa)}${last.wa ? ` (${last.wa})` : ''}`
+          + ` · ${ordinal(last.pb)}${last.wb ? ` (${last.wb})` : ''}`,
         gap_then: gapThen === null ? null : signed(gapThen, 0),
         gap_now: gapNow === null ? null : signed(gapNow, 0),
-        swing: (gapThen === null || gapNow === null)
-          ? null : Math.abs(gapNow - gapThen),
+        swing: move === null ? null : Math.abs(move),
+        // `mine` when this horse came down relative to the other.
+        favours: move === null || move === 0 ? null
+          : (move < 0 ? 'mine' : 'theirs'),
+        favours_name: move === null || move === 0 ? null
+          : (move < 0 ? runner.horse_name : other.horse_name),
+        favours_lb: move === null ? null : Math.abs(move),
+        gate_then: last.da, gate_now: runner.draw,
+        other_gate_then: last.db, other_gate_now: other.draw,
       });
     } catch { /* a pair with no shared history is the norm, not an error */ }
   }));

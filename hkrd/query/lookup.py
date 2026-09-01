@@ -18,10 +18,11 @@ insight, and n beside every figure.
 """
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 from hkrd.derive.probability import actual_over_expected
-from hkrd.query.race import _LINE_SQL, _to_line
+from hkrd.query.race import _LINE_SQL, _to_line, tags_bulk
 from hkrd.query.types import RunnerLine
 from hkrd.store.connect import Connection, get_conn
 
@@ -194,6 +195,16 @@ def search_runs(*, source: str = "race", limit: int = 500,
             f"{_LINE_SQL} WHERE {where} ORDER BY {sort} LIMIT ?",
             [*params, limit]).fetchall()
         lines = [_to_line(r) for r in rows]
+        # The trip tags the grid can filter on but, until now, could not show.
+        # One query for the whole page rather than one per row — see
+        # `tags_bulk` for why the difference decides whether the column exists.
+        found = tags_bulk(conn, [(x.race_date, x.race_no, x.horse_no)
+                                 for x in lines])
+        lines = [replace(x, tags=found.get((x.race_date, x.race_no, x.horse_no),
+                                           ((), ()))[0],
+                         lane_notes=found.get((x.race_date, x.race_no, x.horse_no),
+                                              ((), ()))[1])
+                 for x in lines]
 
         if source == "both":
             lines += _search_trials(conn, filters, limit)

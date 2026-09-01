@@ -106,21 +106,47 @@
 .bb-stale { opacity: .55; }
 .bb-stale .name { font-weight: 400; }
 
+/* EVERY pair, scrolled sideways. Four of twenty-two used to render and the
+   rest were simply gone. Cards keep a fixed width so a wide field reads as a
+   row you scroll rather than twenty-two columns squeezed to nothing. */
 .h2h-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  display: flex; overflow-x: auto; scroll-snap-type: x proximity;
   border-top: 1px solid var(--h2h-rule);
 }
+/* 372px, because that is what two Hong Kong horse names and a record need.
+   At 300px every long pairing ellipsised both names and the card stopped
+   answering the question it exists to answer — which of these two is better
+   off. The band scrolls, so the cost of a wider card is cards further along
+   the rail, not information lost. */
+.h2h-grid > .h2h-cell { flex: 0 0 372px; scroll-snap-align: start; }
+.h2h-grid::-webkit-scrollbar { height: 7px; }
+.h2h-grid::-webkit-scrollbar-thumb { background: var(--h2h-rule); }
 .h2h-cell {
   padding: 7px 12px 8px; border-right: 1px solid var(--h2h-rule);
-  font-family: var(--font-mono); min-width: 0;
+  font-family: var(--font-mono); min-width: 0; overflow: hidden;
 }
-.h2h-line { display: flex; align-items: baseline; gap: 7px; white-space: nowrap; }
-.h2h-line .who { font-size: var(--fs); font-weight: 600; }
-.h2h-line .v { font-size: 10px; color: var(--text-dim); }
-.h2h-line .rec { margin-left: auto; font-size: var(--fs-sm); color: var(--text-2); }
+/* nowrap without a clip is how a card two names too wide prints straight over
+   the card beside it — which is what a 300px cell holding "4 TAKE ACTION v 11
+   PRESTIGE SUPERIOR" did on every long-named pairing. The names give way; the
+   numbers that make the card readable — the pairing record, the swing — do
+   not. */
+.h2h-line {
+  display: flex; align-items: baseline; gap: 7px; white-space: nowrap;
+  overflow: hidden;
+}
+.h2h-line .who {
+  font-size: var(--fs); font-weight: 600;
+  min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis;
+}
+.h2h-line .v { font-size: 10px; color: var(--text-dim); flex: none; }
+.h2h-line .rec {
+  margin-left: auto; padding-left: 7px; flex: none;
+  font-size: var(--fs-sm); color: var(--text-2);
+}
 .h2h-meta {
   display: flex; align-items: baseline; gap: 8px; margin-top: 4px;
   font-size: 10px; color: var(--text-muted); white-space: nowrap;
+  overflow: hidden;
 }
 .h2h-meta .k { color: var(--text-dim); }
 .h2h-meta .v2 { color: var(--text-2); }
@@ -331,3 +357,34 @@ table.card td { padding: 6px 8px; }
 }
 #detail .met-row .rec { margin-left: auto; color: var(--text); font-weight: 600; }
 #detail .met-row .k { color: var(--text-faint); }
+
+
+/* WHO the weight change favours, said in words. The gap either side of the
+   arrow is the evidence; this is the answer, and working the answer out from
+   the evidence is the step that was going wrong under time pressure. */
+.h2h-verdict {
+  display: flex; align-items: baseline; gap: var(--sp-2);
+  margin-top: 5px; font-size: var(--fs-xs); white-space: nowrap;
+}
+.h2h-verdict .won-wt {
+  color: var(--text); font-weight: 600; overflow: hidden;
+  text-overflow: ellipsis;
+}
+.h2h-verdict .by { color: var(--win); }
+.h2h-verdict .level { color: var(--text-faint); letter-spacing: .06em; }
+.h2h-verdict .swing { margin-left: auto; }
+
+/* One gate per line, labelled with the horse it belongs to. Two unlabelled
+   notes side by side gave no way to tell whose gate was whose. */
+.h2h-gate {
+  display: flex; align-items: baseline; gap: var(--sp-2);
+  margin-top: 2px; font-size: var(--fs-xs); color: var(--text-dim);
+}
+.h2h-gate .no { width: 16px; text-align: right; color: var(--text-muted); }
+.h2h-gate .k { color: var(--text-faint); letter-spacing: .08em; }
+.h2h-gate .mv { color: var(--text-2); }
+/* Wider is not worse and inside is not better — they are just directions, so
+   they read as a pair rather than as good and bad. */
+.h2h-gate .mv.wide { color: var(--style-closer); }
+.h2h-gate .mv.in { color: var(--style-leader); }
+.h2h-gate .mv.same { color: var(--text-faint); }

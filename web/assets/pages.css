@@ -257,6 +257,58 @@ select:hover, .btn:hover { background: var(--line-2); color: var(--text); }
   color: var(--incident); border: 1px solid var(--incident); cursor: help;
 }
 .trip-tag.more { border-style: dashed; }
+/* A VETERINARY FINDING is about the horse, not the run. It takes the alert
+   colour rather than the stewards' copper so that "bled" cannot be skimmed as
+   another traffic note — it is the tag that changes whether you back the horse
+   next time. */
+.trip-tag.vet {
+  color: var(--alert); border-color: var(--alert);
+}
+
+
+/* ── race class ──────────────────────────────────────────────────────────────
+ *
+ * `classCell` in vocab.js decides the words; this decides the tone. Five steps
+ * of one ramp for the ladder, and a ground for each of the two values that are
+ * not on it — see the token block for why the ladder is a ramp and not a
+ * palette.
+ */
+.cl { padding: 0 3px; font-size: var(--fs-xs); letter-spacing: .04em; cursor: help; }
+.cl-c1 { color: var(--cls-1); }
+.cl-c2 { color: var(--cls-2); }
+.cl-c3 { color: var(--cls-3); }
+.cl-c4 { color: var(--cls-4); }
+.cl-c5 { color: var(--cls-5); }
+.cl-other { color: var(--text-muted); }
+.cl-group {
+  color: var(--cls-group); background: var(--cls-group-g); font-weight: 600;
+}
+.cl-griffin {
+  color: var(--cls-griffin); background: var(--cls-griffin-g); font-weight: 600;
+}
+
+/* ── how fast away ───────────────────────────────────────────────────────────
+ *
+ * Green faster, red slower, on the result hues rather than a sixth pair —
+ * getting away quickly is a good outcome for the runner in the same sense a
+ * placing is, and inventing a private palette for it would say otherwise.
+ */
+.esz { cursor: help; font-variant-numeric: tabular-nums; }
+.esz.dim { color: var(--text-faint); cursor: default; }
+.esz-fast { color: var(--win); }
+.esz-slow { color: var(--loss); }
+
+/* ── race pace ───────────────────────────────────────────────────────────────
+ *
+ * Moved here from lookup.css: `paceCell` is shared vocabulary, and colours
+ * that live in one page's stylesheet leave the same renderer grey on every
+ * other page that imports it.
+ */
+.p-veryslow  { color: var(--pace-1); }
+.p-slow      { color: var(--pace-2); }
+.p-neutral   { color: var(--pace-3); }
+.p-fast      { color: var(--pace-4); }
+.p-veryfast  { color: var(--pace-5); }
 
 
 /* ── command palette ─────────────────────────────────────────────────────────

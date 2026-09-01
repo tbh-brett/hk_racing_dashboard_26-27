@@ -18,7 +18,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-__all__ = ["DERIVE_VERSION", "Tag", "TAG_RULES", "tag_comment", "tag_rows"]
+__all__ = ["DERIVE_VERSION", "Tag", "TAG_RULES", "NAMED_VET",
+           "tag_comment", "tag_rows"]
 
 DERIVE_VERSION = "tags-1.0"
 
@@ -26,7 +27,7 @@ DERIVE_VERSION = "tags-1.0"
 @dataclass(frozen=True)
 class Tag:
     name: str
-    kind: str        # trouble | routine | style | lane
+    kind: str        # trouble | vet | routine | style | lane
     polarity: int    # +1 excuse (ran better than it looks), -1 negative, 0 neutral
     confidence: float
 
@@ -69,13 +70,42 @@ TAG_RULES: tuple[tuple[str, str, int, str], ...] = (
                                        r"(?=.*\b(did not show|no significant|"
                                        r"no abnormalit\w+|passed)\b)"),
     ("no_report",       "routine",  0, r"^\s*no report\.?\s*$"),
-    # Significant vet findings must never render like a passed examination.
-    ("vet_finding",     "trouble", +1, r"\bveterinar\w+\b(?!.*no abnormalit)"
+    # ── veterinary findings, named ───────────────────────────────────────────
+    #
+    # THERE IS NO VET SCRAPE IN THE ARCHIVE — `vet_records` holds zero rows —
+    # so every piece of veterinary information the dashboard has comes from
+    # the stewards' text, and until now it arrived as one undifferentiated
+    # `vet_finding`. "Bled from both nostrils" and "lame in its left fore" are
+    # not the same fact about a horse and must not render as the same badge.
+    #
+    # Frequencies below are over the 10,775 incident texts in the archive.
+    # Each is checked against the routine rule above: a passed examination
+    # never matches any of these.
+    ("bled",            "vet",     -1, r"\bbled\b|\bepistaxis\b|"
+                                       r"blood in (the |its |the horse.s )?trachea"),  # 1.7%
+    ("roarer",          "vet",     -1, r'"?\broarer\b|\brespiratory noise\b|'
+                                       r"\bmaking a noise\b"),                 # 1.0%
+    ("lame_fore",       "vet",     -1, r"lame[^.;]{0,30}\b(fore|front)\b"),    # 0.9%
+    ("lame_hind",       "vet",     -1, r"lame[^.;]{0,30}\bhind\b"),            # 0.2%
+    ("arrhythmia",      "vet",     -1, r"irregular heart|\barrhythmi\w+|"
+                                       r"\bheart (rhythm|rate)\b"),            # 0.3%
+    ("mucus",           "vet",     -1, r"\bmucus\b"),                          # 0.1%
+    ("barred",          "vet",     -1, r"\bbarred\b|not be permitted to race|"
+                                       r"\bstood down\b"),                     # 0.1%
+    # The catch-all stays, for a finding none of the above names. It is what
+    # tells you the vocabulary has a gap rather than the horse being fine.
+    ("vet_finding",     "vet",     -1, r"\bveterinar\w+\b(?!.*no abnormalit)"
                                        r".*\b(bled|bleeding|lame|injur\w+|"
                                        r"cardiac|fractur\w+|barred)\b"),
 )
 
 _COMPILED = tuple((n, k, p, re.compile(pat, re.I)) for n, k, p, pat in TAG_RULES)
+
+# The findings the vocabulary can name. `vet_finding` is the fallback for one
+# it cannot, which is what tells you the vocabulary has a gap rather than the
+# horse being fine.
+NAMED_VET = frozenset({"bled", "roarer", "lame_fore", "lame_hind",
+                       "arrhythmia", "mucus", "barred"})
 
 
 def tag_comment(text: str | None) -> tuple[Tag, ...]:
@@ -91,10 +121,16 @@ def tag_comment(text: str | None) -> tuple[Tag, ...]:
     for name, kind, polarity, pattern in _COMPILED:
         if pattern.search(text):
             found.append(Tag(name=name, kind=kind, polarity=polarity, confidence=0.9))
-    # A significant vet finding supersedes the routine tag on the same text.
     names = {t.name for t in found}
-    if "vet_finding" in names:
+    # A significant vet finding supersedes the routine tag on the same text: a
+    # horse that bled did not merely pass an examination.
+    if any(t.kind == "vet" for t in found):
         found = [t for t in found if t.name != "vet_routine"]
+    # And the catch-all only speaks when nothing more precise did. Emitting
+    # `vet_finding` beside `lame_fore` says the same thing twice and makes the
+    # row look like two findings.
+    if names & NAMED_VET:
+        found = [t for t in found if t.name != "vet_finding"]
     return tuple(found)
 
 

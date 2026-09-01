@@ -249,6 +249,72 @@ def test_every_page_the_nav_points_at_exists() -> None:
     assert not missing, f"nav points at missing pages: {missing}"
 
 
+def _without_comments(text: str) -> str:
+    """Source with its comments removed.
+
+    A rule that fires on the comment explaining the rule is a rule nobody can
+    document.
+    """
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    return re.sub(r"^\s*//.*$", "", text, flags=re.M)
+
+
+def test_the_run_row_columns_are_the_order_the_owner_set() -> None:
+    """The Form Guide's expanded run row, column for column.
+
+    Not a design-artboard question — the owner set this order by hand, and it
+    is the order the eye is trained on. It is also the fix for two things that
+    were wrong before it: the running style appeared twice (a badge here and a
+    bare initial in the trailing cell), and the race's own pace, the runner's
+    ESZ and its running positions had no column at all.
+    """
+    text = (ASSETS / "form-guide.js").read_text(encoding="utf-8")
+    head = re.search(r"const RUN_HEAD = \[(.*?)\n\];", text, re.S)
+    assert head, "RUN_HEAD is no longer a literal array; this test cannot read it"
+    labels = re.findall(r"\['([^']+)',", head.group(1))
+    assert labels == [
+        "RUN", "DATE · TRK CRS DIST GOING CL", "STYLE", "JOCKEY", "TRAINER",
+        "WT", "DR", "ESZ", "POSITIONS", "FIN",
+        "FIGURE · MARGIN · TIME · PLACE DIV",
+        "PACE · GEAR · TRIP · BB · NOTE · VID",
+    ], "the run row's columns have moved; the owner set this order"
+
+
+def test_the_run_row_has_a_grid_of_its_own() -> None:
+    """It shared `--fg-grid` with the runner rows, which is ten columns wide.
+
+    Twelve columns on a ten-column template silently collapses the last two
+    into one cell, which is how POSITIONS and the pace ended up crushed into
+    the trailing cell in the first place.
+    """
+    css = (ASSETS / "formguide.css").read_text(encoding="utf-8")
+    grid = re.search(r"--run-grid:\s*([^;]+);", css)
+    assert grid, "formguide.css no longer defines --run-grid"
+    columns = grid.group(1).split()
+    assert len(columns) == 12, (
+        f"--run-grid has {len(columns)} columns, RUN_HEAD has 12")
+    assert re.search(r"\.run-head,\s*\.run-row\s*\{[^}]*--run-grid", css), (
+        "the run rows are not using --run-grid")
+
+
+def test_the_class_ladder_is_named_in_one_place() -> None:
+    """"0" is a Group race and "Griffin Race" is not a class number at all.
+
+    A page that writes `C${race_class}` renders those as "C0" and
+    "CGriffin Race". `classLabel` exists so no page has to know that.
+    """
+    offenders = []
+    for f in sorted(ASSETS.glob("*.js")):
+        if f.name == VOCAB.name:
+            continue
+        text = _without_comments(f.read_text(encoding="utf-8"))
+        if re.search(r"`C\$\{[^}]*(race_)?class", text):
+            offenders.append(f.name)
+    assert not offenders, (
+        "these build a class label inline instead of calling classLabel: "
+        + ", ".join(offenders))
+
+
 def test_running_style_is_rendered_through_one_function() -> None:
     """Lookup showed style as plain text while every other page showed a badge.
 
@@ -264,3 +330,22 @@ def test_running_style_is_rendered_through_one_function() -> None:
     assert not offenders, (
         "these build a style class inline instead of calling styleBadge/"
         f"styleClass from vocab.js: {offenders}")
+
+
+def test_the_vet_vocabulary_is_the_same_list_on_both_sides() -> None:
+    """`derive/tags.NAMED_VET` decides what a veterinary finding is; vocab.js
+    decides how one is drawn. Two lists means a finding the deriver names and
+    the page renders as ordinary trip trouble — which is the failure that made
+    "bled" indistinguishable from "checked" in the first place.
+    """
+    from hkrd.derive.tags import NAMED_VET
+
+    text = VOCAB.read_text(encoding="utf-8")
+    block = re.search(r"export const VET_TAGS = new Set\((.*?)\);", text, re.S)
+    assert block, "vocab.js must export VET_TAGS"
+    drawn = set(re.findall(r"'([a-z_]+)'", block.group(1)))
+    # The page also draws the catch-all, which is not in NAMED_VET by design:
+    # it is the fallback for a finding the vocabulary cannot name.
+    assert drawn == set(NAMED_VET) | {"vet_finding"}, (
+        f"only in the deriver: {set(NAMED_VET) - drawn}\n"
+        f"only in the page:    {drawn - set(NAMED_VET) - {'vet_finding'}}")

@@ -10,7 +10,23 @@
   /* Widened with the type. The columns were measured against 9px text and
      truncated their own headers at 10px — the density was winning over the
      legibility it exists to serve. */
-  --fg-grid: 36px 194px 82px 30px 94px 92px 36px 58px 196px 1fr;
+  --fg-grid: 36px 194px 82px 30px 94px 92px 36px 58px 250px 1fr;
+
+  /* The run rows inside an expanded horse. Twelve columns where the runner
+     rows have ten, because they carry different things — see RUN_HEAD in
+     form-guide.js for why the two grids stopped being one.
+     Measured, not guessed: every width below was read off the widest real
+     content in nine cards spanning a year — 371 run rows — and then traded
+     against the pane, which at 1720px is 1424px wide and cannot hold all
+     twelve columns at their widest at once.
+     So the widths that clip are chosen rather than discovered. JOCKEY,
+     TRAINER, POSITIONS and the date all carry a tooltip with the full value
+     and clip at the tail, where the lost characters cost least; the columns
+     that must never clip — the figure, the finish, the weight, the draw and
+     ESZ — are whole numbers and are sized past their widest. POSITIONS holds
+     four calls, which is every sprint and most routes; the five-call 2000m
+     line is the one that ellipsises. */
+  --run-grid: 30px 250px 78px 104px 96px 36px 26px 50px 94px 40px 186px 1fr;
 }
 
 /* ── strip additions ─────────────────────────────────────────────────────── */
@@ -86,9 +102,10 @@
 .fg-main { flex: 1; min-width: 0; overflow: auto; }
 
 .fg-head, .fg-row, .run-head, .run-row {
-  display: grid; grid-template-columns: var(--fg-grid); align-items: center;
-  font-family: var(--font-mono);
+  display: grid; align-items: center; font-family: var(--font-mono);
 }
+.fg-head, .fg-row { grid-template-columns: var(--fg-grid); }
+.run-head, .run-row { grid-template-columns: var(--run-grid); }
 .fg-head {
   height: 26px; position: sticky; top: 0; z-index: 3;
   background: var(--surface); border-bottom: 1px solid var(--line-3);
@@ -133,13 +150,32 @@
 
 /* The six-figure sequence, newest left, with the trend as a tint under it.
    A trend drawn as a line would claim more precision than six figures carry. */
-.seq { display: flex; gap: 3px; align-items: baseline; }
-.seq span { width: 22px; text-align: right; font-size: var(--fs); }
+/* SIX FIGURES, NEWEST LEFT. The column the eye goes to first on this page and
+   the tightest thing on it — 99 97 87 99109109 ran together as one number.
+   Each figure now has its own width and gap, so the sequence reads as six
+   readings rather than a string of digits. */
+.seq {
+  display: flex; gap: var(--sp-3); align-items: baseline;
+  font-variant-numeric: tabular-nums;
+}
+.seq span {
+  width: 30px; text-align: right; font-size: var(--fs-md);
+  letter-spacing: .02em;
+}
 .seq .best { font-weight: 600; color: var(--text); }
 .seq .mid { color: var(--text-2); }
 .seq .weak { color: var(--text-muted); }
 .seq .none { color: var(--text-faint); }
-.slope { height: 2px; margin-top: 2px; background: transparent; }
+/* THE TREND, as a tint under the sequence: the mean of the newest three
+   against the mean of the oldest three. Green means the horse is running to
+   bigger figures than it was, red smaller. It is drawn only past one standard
+   deviation of the population (5.9 points) — a smaller cut would tint three
+   quarters of the field, which is how a decoration comes to look like a
+   signal. Hover it for the two means and the move. */
+.slope {
+  height: 3px; margin-top: 3px; background: var(--line);
+  border-radius: 1px;
+}
 .slope.up { background: var(--win); }
 .slope.down { background: var(--loss); }
 
@@ -189,27 +225,61 @@
    drawn as neither credit nor debit. */
 .trial-band .q-untested { color: var(--text-faint); }
 
+/* A horse that has met six of today's field gets six cards. They used to be
+   crushed onto one line, which made every one unreadable instead of showing
+   fewer honestly — so the rail scrolls and each card keeps its width. */
 .h2h-band {
-  display: flex; align-items: center; gap: 14px; padding: 5px 12px;
+  display: flex; align-items: stretch; gap: 12px; padding: 5px 12px;
   border-bottom: 1px solid var(--line-2); background: var(--h2h-band);
-  font-family: var(--font-mono); font-size: var(--fs-xs); overflow-x: auto;
+  font-family: var(--font-mono); font-size: var(--fs-xs); min-width: 0;
 }
-.h2h-band .lab { color: var(--loss-dim); letter-spacing: .1em; flex: none; }
-.h2h-band .pair { display: flex; align-items: baseline; gap: 7px; flex: none; white-space: nowrap; }
-.h2h-band .pair .rec { color: var(--text-muted); }
-.h2h-band .pair .last { color: var(--text-faint); }
-.h2h-band .swing { padding: 0 5px; border: 1px solid var(--line-3); color: var(--text-muted); }
+.h2h-band .lab {
+  color: var(--loss-dim); letter-spacing: .1em; flex: none;
+  align-self: center;
+}
+.h2h-band .lab b { color: var(--text); }
+.h2h-band .pair-rail {
+  display: flex; gap: 10px; overflow-x: auto; min-width: 0; padding-bottom: 2px;
+}
+.h2h-band .pair-rail::-webkit-scrollbar { height: 6px; }
+.h2h-band .pair-rail::-webkit-scrollbar-thumb { background: var(--h2h-rule); }
+.h2h-band .pair {
+  display: flex; flex-direction: column; gap: 1px; flex: 0 0 264px;
+  white-space: nowrap; padding: 2px 8px 3px;
+  border-left: 1px solid var(--h2h-rule);
+}
+.h2h-band .pl { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.h2h-band .pair .who {
+  color: var(--text-2); overflow: hidden; text-overflow: ellipsis;
+}
+.h2h-band .pair .rec { color: var(--text-muted); margin-left: auto; }
+.h2h-band .pair .last {
+  color: var(--text-faint); overflow: hidden; text-overflow: ellipsis;
+}
+/* The verdict, before the arithmetic that produced it. */
+.h2h-band .won-wt {
+  color: var(--text); font-weight: 600; overflow: hidden;
+  text-overflow: ellipsis;
+}
+.h2h-band .by { color: var(--win); }
+.h2h-band .level { color: var(--text-faint); }
+.h2h-band .gates .k { color: var(--text-faint); letter-spacing: .06em; }
+.h2h-band .gates .g { color: var(--text-dim); }
+.h2h-band .swing { margin-left: auto; padding: 0 5px; border: 1px solid var(--line-3); color: var(--text-muted); }
 .h2h-band .swing.t1 { color: var(--loss-dim); border-color: var(--h2h-rule); }
 .h2h-band .swing.t2 { color: var(--loss); border-color: var(--h2h-rule); }
 .h2h-band .swing.t3 { color: var(--alert); border-color: var(--alert); }
 
+/* Tracked tighter than the card header above it. At .09em the two longest
+   labels lost four more characters each to the clip, and a sub-header's job
+   is to name its column, not to set a rhythm. */
 .run-head {
   height: 22px; background: var(--surface); border-bottom: 1px solid var(--line-2);
-  font-size: var(--fs-xs); letter-spacing: .09em; color: var(--text-faint);
+  font-size: var(--fs-xs); letter-spacing: .04em; color: var(--text-faint);
 }
 /* A label that wraps grows past the 22px row and hangs over the run beneath
    it, swallowing that run's clicks. Clip instead. */
-.run-head > * { padding: 0 8px; white-space: nowrap; overflow: hidden; }
+.run-head > * { padding: 0 5px; white-space: nowrap; overflow: hidden; }
 .run-head .c { text-align: center; }
 .run-head .r { text-align: right; }
 
@@ -219,12 +289,27 @@
 }
 .run-row:hover { background: var(--run-hover); }
 .run-row.open { background: var(--run-open); }
-.run-row > * { padding: 0 8px; min-width: 0; }
+.run-row > * { padding: 0 5px; min-width: 0; }
 .run-row .n { padding: 0 6px; text-align: center; color: var(--text-faint); }
-.run-row .when { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+/* Clipped, and with a gutter it cannot spend. Without the gutter the class
+   chip finishes flush against the style badge in the next column and the two
+   read as one run-on token; without the clip, a long condition simply prints
+   over the badge instead. */
+.run-row .when {
+  display: flex; align-items: baseline; gap: 6px; white-space: nowrap;
+  overflow: hidden; padding-right: 12px;
+}
 .run-row .when .caret { font-size: var(--fs-xs); width: 7px; color: var(--text-faint); }
 .run-row .when .cond { color: var(--text-muted); }
 .run-row .dr { padding: 0 4px; text-align: center; color: var(--text-2); }
+/* The badge is a word, and a word that overflows its column lands on the
+   class chip next to it. Clip rather than let it travel. */
+.run-row .st { overflow: hidden; }
+.run-row .esz-col { padding: 0 4px; text-align: right; }
+.run-row .pos {
+  font-size: var(--fs-xs); color: var(--text-2); letter-spacing: .04em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .run-row .jockey, .run-row .trainer {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-2);
 }
@@ -247,10 +332,27 @@
 .run-row .above { color: var(--win); }
 .run-row .below { color: var(--loss); }
 .run-row .trail { display: flex; gap: 6px; align-items: center; min-width: 0; }
-.run-row .tempo { width: 26px; display: flex; align-items: center; gap: 4px; }
-.run-row .tempo i { width: 7px; height: 7px; flex: none; background: var(--text-faint); }
-.run-row .gear { width: 140px; white-space: nowrap; overflow: hidden; color: var(--gear); }
-.run-row .pos { width: 66px; font-size: var(--fs-xs); color: var(--text-2); letter-spacing: .04em; }
+/* Wide enough for "V.Slow (+1.30)" whole — the number is what makes the band
+   checkable, and a band whose number is cut off is just an adjective. */
+.run-row .pace {
+  width: 106px; flex: none; font-size: var(--fs-xs); cursor: help;
+  white-space: nowrap; overflow: hidden;
+}
+.run-row .pace .z { color: var(--text-faint); }
+.run-row .pace .dim { color: var(--text-faint); }
+/* Gear yields before the trip tags do. A tag is a finding; gear is context
+   for one, and on a row too narrow for both the finding is the one to keep. */
+.run-row .gear {
+  flex: 0 3 130px; min-width: 0; white-space: nowrap; overflow: hidden;
+  color: var(--gear);
+}
+/* The tags do not shrink; the gear does. Two whole tags and a "+2" is a
+   reading; "bum…", "raced kee…" is not, and the gear string beside them is
+   context for a finding rather than a finding itself. 210px is the widest
+   two-tag run measured across the sample, so in practice nothing here clips
+   — the cap is there so a vocabulary that grows cannot silently push the
+   replay button off the row. */
+.run-row .trip-tags { flex: 0 0 auto; max-width: 210px; }
 .run-row .trip {
   flex: 1; min-width: 0; font-size: var(--fs-xs); color: var(--incident);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

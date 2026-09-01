@@ -164,6 +164,15 @@ def form_guide(date: str, race_no: int, history: int = 6) -> dict:
         keys |= {(r.race_date, r.race_no) for r in runs}
     out["esz"] = {f"{d}:{n}:{h}": v
                   for (d, n, h), v in pace_q.early_speed_z(sorted(keys)).items()}
+
+    # How fast the RACE was run, for every race on screen. A distinct fact from
+    # the runner's own style: "led" in a crawl and "led" in a sprint are
+    # opposite readings of the same word, and a form line carrying only the
+    # style leaves no way to tell them apart. Measured only — the style-based
+    # projection `race_pace` falls back to is an estimate, and an estimate
+    # printed beside an actual finishing time reads as a measurement.
+    out["pace"] = {f"{d}:{n}": v
+                   for (d, n), v in pace_q.race_pace_bulk(sorted(keys)).items()}
     return out
 
 

@@ -22,7 +22,7 @@
 import { api, num } from './api.js';
 import { el, $, DASH, MINUS, renderNav, styleBadge, compactDate,
          positionsText, paceCell, replayUrl, hkjcResultUrl,
-         externalLink, PACE_SHORT } from './vocab.js';
+         externalLink, PACE_SHORT, tripTagChips } from './vocab.js';
 import { flyout } from './overlay.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
@@ -53,6 +53,10 @@ const COLS = [
   { k: 'lbw', label: 'LBW', cls: 'r' },
   { k: 'sp', label: 'ODDS', cls: 'r' }, { k: 'gear', label: 'GEAR' },
   { k: 'fig', label: 'FIGURE', cls: 'r' },
+  // The grid could already FILTER on a tag and had nowhere to show one, so a
+  // search for every run where a horse bled returned rows that looked like
+  // every other row. Veterinary findings sort to the front here as everywhere.
+  { k: 'trip', label: 'TRIP' },
   { k: 'replay', label: '\u25b6', cls: 'c' },
   { k: 'hkjc', label: 'HKJC', cls: 'c' },
 ];
@@ -515,6 +519,16 @@ function runRow(r) {
     ? DASH : num(r.et_figure, 1));
   if (r.figure_display) fig.title = r.figure_display;
   row.append(fig);
+
+  // What the stewards recorded about the run, as the shared chips rather than
+  // as prose: the whole point of a grid is that a row is comparable with the
+  // one above it, and a sentence is not.
+  const trip = el('div', 'trip-cell');
+  const chips = tripTagChips(r.tags, {
+    comment: r.incident_comment || r.running_comment || null, limit: 2,
+  });
+  trip.append(chips ?? document.createTextNode(DASH));
+  row.append(trip);
 
   // Two links out. A figure that cannot be checked against the source is a
   // number the reader has to take on trust, and the replay is what the trip

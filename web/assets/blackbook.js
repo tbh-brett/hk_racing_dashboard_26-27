@@ -11,7 +11,8 @@
  * is the page.
  */
 import { api, num, signed } from './api.js';
-import { el, $, DASH, MINUS, renderNav, periodPicker, accountPicker, styleClass } from './vocab.js';
+import { el, $, DASH, MINUS, renderNav, periodPicker, accountPicker,
+         styleClass, conditionLabel } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 
@@ -378,11 +379,6 @@ function statusButton(e, status, label, extra) {
   return b;
 }
 
-function condLabel(r) {
-  return [r.venue, r.course, r.distance ? `${r.distance}m` : null, r.going,
-          r.race_class ? `C${r.race_class}` : null].filter(Boolean).join(' ');
-}
-
 function finClass(r) {
   if (r.place === 1) return 'win';
   if (r.place !== null && r.place <= 3) return 'placed';
@@ -393,7 +389,7 @@ function runLine(r, cls) {
   const line = el('div', `run-line${cls ? ` ${cls}` : ''}`);
   const when = el('div', 'when');
   when.append(document.createTextNode(`${r.race_date} `));
-  when.append(el('span', 'cond', condLabel(r)));
+  when.append(el('span', 'cond', conditionLabel(r)));
   line.append(when);
 
   const st = el('div');

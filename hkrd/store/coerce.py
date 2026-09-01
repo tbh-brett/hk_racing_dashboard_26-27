@@ -15,7 +15,7 @@ from datetime import date, datetime
 __all__ = [
     "CoerceError", "parse_lbw", "parse_finish_time", "to_place",
     "to_odds", "to_date", "to_int", "parse_section_times",
-    "parse_running_positions",
+    "parse_running_positions", "parse_gear",
 ]
 
 
@@ -259,3 +259,36 @@ def parse_running_positions(token: object) -> tuple[int, ...]:
                 f"running_positions: bad position {part!r} in {token!r}"
             ) from None
     return tuple(out)
+
+
+# ── gear ──────────────────────────────────────────────────────────────────────
+#
+# The card writes "--" where a horse carries no gear: 2,552 of 19,868 runs in
+# the archive. Stored verbatim it becomes a piece of gear NAMED "--", and
+# everything downstream that compares one run's gear against the run before it
+# then reports gear applied on the run that has none, and gear removed on the
+# run after. Design note 03 §3 calls first-time gear "one of the more reliable
+# public signals bettors watch for", and a false one is worse than none.
+#
+# Only a WHOLE token is a placeholder. A trailing hyphen inside a real code is
+# meaningful — "CP-", "B-" and "E-" are the cheekpiece, blinker and ear-muff
+# codes with the piece removed — so nothing is ever stripped from a token that
+# has other characters in it.
+# Enumerated from the archive, not imagined: of 815 distinct gear strings on
+# 19,868 runs, "--" is the only placeholder that occurs. The other three are
+# its family, carried over from `_NO_MARGIN` above, and cost nothing.
+_NO_GEAR = {"-", "--", "---", ""}
+
+
+def parse_gear(token: object) -> str | None:
+    """A gear string with the card's placeholders removed, or None for no gear.
+
+    Returns None rather than "" so the column reads the same as a genuinely
+    absent value, and every page's `gear || DASH` prints a dash without having
+    to know what the card writes.
+    """
+    if token is None:
+        return None
+    pieces = [p.strip() for p in str(token).split("/")]
+    kept = [p for p in pieces if p.upper() not in _NO_GEAR]
+    return "/".join(kept) or None

@@ -106,6 +106,51 @@ def test_parse_running_positions_accepts_both_legacy_shapes():
     assert coerce.parse_running_positions("4; 4; 4; 1") == (4, 4, 4, 1)
 
 
+# ── gear ─────────────────────────────────────────────────────────────────────
+#
+# "--" is the card's way of writing NO GEAR, and it is on 2,552 of 19,868 runs.
+# Left as a token it becomes a piece of gear by that name, and the first-time
+# and removed-since-last-start flags — the whole reason the column is on the
+# page — start firing on horses that carried nothing.
+
+
+@pytest.mark.parametrize("token", ["--", "-", "---", "", "  --  ", None])
+def test_the_cards_no_gear_placeholders_become_no_gear(token):
+    assert coerce.parse_gear(token) is None
+
+
+@pytest.mark.parametrize("token,expected", [
+    ("B/TT1", "B/TT1"), ("TT1", "TT1"), ("B/TT1/SR", "B/TT1/SR"),
+    ("  B / TT1 ", "B/TT1"),
+])
+def test_real_gear_survives_unchanged(token, expected):
+    assert coerce.parse_gear(token) == expected
+
+
+@pytest.mark.parametrize("token", ["CP-", "B-", "E-", "P-/PC1/TT", "B-/SR1/TT"])
+def test_a_trailing_hyphen_inside_a_code_is_not_a_placeholder(token):
+    """"B-" is the blinker code with the piece REMOVED. Stripping the hyphen
+    because a hyphen appears in the placeholder would turn "gear taken off"
+    into "gear still on" — the opposite fact."""
+    assert coerce.parse_gear(token) == token
+
+
+def test_a_placeholder_beside_real_gear_drops_only_itself():
+    assert coerce.parse_gear("B/--/TT1") == "B/TT1"
+
+
+def test_gear_placeholders_never_reach_the_database(conn):
+    """The fix belongs on the way in, so that no reader has to know about it."""
+    with transaction(conn):
+        upsert.upsert_races(conn, RACE)
+        upsert.upsert_runners(conn, [dict(RUNNERS[0], horse_no=41, gear="--"),
+                                     dict(RUNNERS[0], horse_no=42, gear="B/TT1")])
+    rows = dict(conn.execute(
+        "SELECT horse_no, gear FROM runners WHERE horse_no IN (41, 42)").fetchall())
+    assert rows[41] is None
+    assert rows[42] == "B/TT1"
+
+
 # ── idempotency: the property every scrape depends on ────────────────────────
 
 RACE = [{"race_date": "2026-07-15", "race_no": 3, "venue": "HV", "course": "C",

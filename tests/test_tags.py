@@ -48,12 +48,36 @@ def test_a_passed_veterinary_examination_is_routine():
     assert all(t.kind == "routine" for t in tagged)
 
 
-def test_a_real_veterinary_finding_is_trouble_not_routine():
+def test_a_real_veterinary_finding_is_never_routine():
     text = "A veterinary examination found the horse to have bled from both nostrils."
     tagged = {t.name: t for t in tags.tag_comment(text)}
-    assert "vet_finding" in tagged
-    assert tagged["vet_finding"].kind == "trouble"
+    assert "bled" in tagged, "the finding is named, not left as a catch-all"
+    assert tagged["bled"].kind == "vet"
     assert "vet_routine" not in tagged, "a finding must supersede the routine tag"
+
+
+def test_a_named_finding_replaces_the_catch_all():
+    """`vet_finding` beside `lame_fore` says the same thing twice and makes one
+    finding look like two."""
+    tagged = {t.name for t in tags.tag_comment(
+        "Veterinary examination revealed that horse to be lame in its left front leg.")}
+    assert tagged == {"lame_fore"}
+
+
+def test_the_catch_all_still_speaks_when_nothing_names_it():
+    """It is what tells you the vocabulary has a gap, rather than the horse
+    being fine."""
+    tagged = {t.name for t in tags.tag_comment(
+        "Veterinary examination revealed a fractured cannon bone.")}
+    assert tagged == {"vet_finding"}
+
+
+def test_every_named_finding_has_a_rule():
+    """`NAMED_VET` is what the page draws as a finding and what the catch-all
+    defers to. A name in it with no rule behind it would silently never fire."""
+    ruled = {n for n, kind, _, _ in tags.TAG_RULES if kind == "vet"}
+    assert tags.NAMED_VET <= ruled
+    assert ruled - tags.NAMED_VET == {"vet_finding"}
 
 
 def test_sampling_is_routine():
@@ -105,4 +129,5 @@ def test_every_rule_has_a_distinct_name():
 
 
 def test_rules_declare_only_known_kinds():
-    assert {k for _, k, _, _ in tags.TAG_RULES} <= {"trouble", "routine", "style", "lane"}
+    assert {k for _, k, _, _ in tags.TAG_RULES} <= {"trouble", "vet", "routine",
+                                                    "style", "lane"}

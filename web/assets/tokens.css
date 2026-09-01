@@ -103,6 +103,29 @@
   --pace-4:         #d98b5c;   /* Fast                                      */
   --pace-5:         #d95c5c;   /* Very Fast                                 */
 
+  /* ── race class ─────────────────────────────────────────────────────────
+   * A LADDER, so one ramp at five steps rather than five hues: the eye reads
+   * a ramp as an ordering and a palette as a set of unrelated labels, and a
+   * class is an ordering. Held low in saturation on purpose — a form row
+   * already spends its strong colour on the result, the figure and the trip,
+   * and class is context for those, not a competitor to them.
+   *
+   * Two values are not rungs and carry the only strong marks. Group is the
+   * grade above the ladder; Griffin is beside it, a series for horses with no
+   * rating, whose form cannot be read against a class at all. Both are given
+   * a ground so they read as categorically different rather than as a sixth
+   * and seventh step.
+   */
+  --cls-1:          #dba07a;   /* Class 1 — warm end of the ramp            */
+  --cls-2:          #c2a68d;
+  --cls-3:          #a4aaa8;
+  --cls-4:          #8998a8;
+  --cls-5:          #6f8296;   /* Class 5 — cool end                        */
+  --cls-group:      #e6c260;   /* Group — above the ladder                  */
+  --cls-group-g:    #2b2313;
+  --cls-griffin:    #c9a888;   /* Griffin — beside the ladder               */
+  --cls-griffin-g:  #2a2018;
+
   /* Band grounds, read off the Race Day artboard. */
   --book-band:    #12181a;   /* blackbook band                             */
   --book-rule:    #1e2a2a;

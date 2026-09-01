@@ -136,7 +136,7 @@
 
 .lk-head, .lk-row {
   display: grid; align-items: center;
-  /* 26 columns, in the old dashboard's order. The table scrolls sideways
+  /* 27 columns, in the old dashboard's order. The table scrolls sideways
      rather than dropping information: this page's whole job is having every
      fact about a run on one line. */
   grid-template-columns:
@@ -146,8 +146,8 @@
     minmax(124px, 1fr) 34px 34px 74px 74px
     /* style  run pos.  pace      time  finΔ lbw  odds gear */
     64px    82px      96px      62px  50px 46px 44px 58px
-    /* figure  ▶    hkjc */
-    50px     22px 40px;
+    /* figure  trip  ▶    hkjc */
+    50px     206px 22px 40px;
   gap: 7px; padding: 0 14px;
 }
 .lk-head {
@@ -325,14 +325,13 @@
 .lk-link { color: var(--lk-accent); text-decoration: none; font-size: 11px; }
 .lk-link:hover { color: var(--text); text-decoration: underline; }
 
-/* Race pace: the label carries its own number, so the label is checkable. */
+/* Race pace: the label carries its own number, so the label is checkable.
+   The five band colours moved to pages.css when the Form Guide started
+   showing pace per historic run — `paceCell` is shared vocabulary, and a
+   shared renderer whose colours live in one page's stylesheet renders grey
+   everywhere else. */
 .lk-row .pace-band { font-size: 10px; }
 .lk-row .pace .z { color: var(--text-faint); font-size: 10px; }
-.p-veryslow  { color: var(--pace-1); }
-.p-slow      { color: var(--pace-2); }
-.p-neutral   { color: var(--pace-3); }
-.p-fast      { color: var(--pace-4); }
-.p-veryfast  { color: var(--pace-5); }
 
 /* ── the filter grid ──────────────────────────────────────────────────────
  * The design lays these out as a grid of chip groups rather than a column of
@@ -395,3 +394,11 @@
 }
 .filter-panel .fp-chips .fp-field { flex-direction: row; align-items: center; gap: 4px; }
 .filter-panel .fp-chips .fp-field input { width: 62px; }
+
+/* Trip tags in the grid. Two chips is what fits beside every other fact on the
+   line; the rest are counted, and the whole list — with the stewards' own
+   sentence where there is one — is on the tooltip. */
+.lk-row .trip-cell {
+  display: flex; align-items: center; min-width: 0; overflow: hidden;
+  color: var(--text-faint);
+}

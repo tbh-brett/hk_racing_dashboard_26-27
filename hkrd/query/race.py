@@ -13,7 +13,7 @@ from hkrd.store.connect import Connection, get_conn
 from hkrd.query.types import RaceLine, RunnerLine
 
 __all__ = ["get_race", "get_meeting", "get_horse_form", "list_meetings",
-           "list_horses"]
+           "list_horses", "tags_bulk"]
 
 # Derived tables are LEFT JOINed: a runner with no ET row still returns, with a
 # null figure. A missing derived value must never make a runner disappear.
@@ -64,6 +64,31 @@ def _tags(conn: Connection, date: str, race_no: int,
         (lanes if tag.startswith("lane:") else tags).append(
             tag[5:] if tag.startswith("lane:") else tag)
     return tuple(tags), tuple(lanes)
+
+
+def tags_bulk(conn: Connection, keys: Sequence[tuple[str, int, int]]
+              ) -> dict[tuple[str, int, int], tuple[tuple[str, ...], tuple[str, ...]]]:
+    """`_tags` for many runs at once, as {(date, race_no, horse_no): (tags, lanes)}.
+
+    Lookup returns up to 500 rows spanning as many races. Calling `_tags` per
+    row is 500 round trips for a grid that has 500ms to render, which is why
+    the page shipped with no trip column at all rather than a slow one. One
+    query answers the whole grid.
+    """
+    wanted = {(str(d), int(n), int(h)) for d, n, h in keys}
+    if not wanted:
+        return {}
+    out: dict[tuple[str, int, int], tuple[list[str], list[str]]] = {}
+    for r in conn.execute(
+            "SELECT race_date, race_no, horse_no, tag FROM runner_tags ORDER BY tag"):
+        key = (r["race_date"], r["race_no"], r["horse_no"])
+        if key not in wanted:
+            continue
+        tags, lanes = out.setdefault(key, ([], []))
+        tag = r["tag"]
+        (lanes if tag.startswith("lane:") else tags).append(
+            tag[5:] if tag.startswith("lane:") else tag)
+    return {k: (tuple(t), tuple(l)) for k, (t, l) in out.items()}
 
 
 def _comments(conn: Connection, date: str, race_no: int,
