@@ -1,7 +1,7 @@
 /* Trials — ported from web/design-source/Trials.dc.html.
  *
- * Three views: the recent batches, the standouts feed, and what the rating
- * actually predicts.
+ * Three views: the batches as screened, everything they flagged, and whether
+ * the flagging holds up at the races.
  *
  * The artboard states the design twice, and the second time as the reason the
  * page is worth having:
@@ -24,7 +24,7 @@
  * nothing about it either way.
  */
 import { api, num } from './api.js';
-import { el, $, DASH, renderNav, tripTagChips,
+import { el, $, DASH, MINUS, renderNav, tripTagChips,
          replayUrl, trialReplayUrl, externalLink, compactDate,
          ordinal } from './vocab.js';
 import { context } from './context.js';
@@ -32,26 +32,32 @@ import { renderReview, trialSubject, loadTags } from './review.js';
 import { install as installPalette } from './palette.js';
 
 
-const VIEWS = [['batches', 'BATCHES'], ['standouts', 'STANDOUTS'],
+const VIEWS = [['batches', 'BATCHES'], ['flagged', 'FLAGGED'],
                ['calibration', 'DOES IT HOLD']];
 
 const BANDS = ['STANDOUT', 'POSITIVE', 'NEUTRAL', 'NEGATIVE', 'UNTESTED'];
 const VENUES = [['all', 'ALL'], ['ST', 'ST'], ['HV', 'HV']];
 
+/* The screening artboard's columns. The unlabelled third is the finishing
+   position, which reads as part of the horse rather than as a column of its
+   own; SCREEN is the last, and is where a run leaves this page for the book. */
 const COLS = [
-  ['DR', 'r'], ['', ''], ['P', 'r'], ['HORSE', ''], ['GEAR', ''],
-  ['JOCKEY', ''], ['POSITIONS', ''], ['MGN', 'r'], ['TIME', 'r'],
-  ['COMMENT', ''], ['NEXT ACTUAL START', ''],
+  ['DR', 'r'], ['Q', 'c'], ['', 'r'], ['HORSE', ''], ['GEAR', ''],
+  ['JOCKEY', ''], ['SECTIONS', ''], ['MGN', 'r'], ['TIME', 'r'],
+  ['TRIAL COMMENT', ''], ['NEXT START', ''], ['SCREEN', ''],
 ];
 
 const state = {
-  view: 'batches', batches: [], standouts: null, calibration: null,
+  view: 'batches', batches: [], calibration: null,
   search: '', band: null, venue: 'all',
   // The trial morning on screen. Null is the rolling feed of the most recent
   // batches, which is what the page opened on before there was any way to
   // choose — and remains the default, because the newest trials are what the
   // page is usually for.
   days: [], day: null,
+  // Which panel a SCREEN control asked for, so + BB lands on the blackbook
+  // form rather than on an expansion the reader has to search.
+  focus: null,
   // Which trial rows are expanded, and each horse's recent form once fetched.
   // Keyed by horse + batch, because the same horse can appear in two mornings
   // and they are different rows with different notes.
@@ -61,8 +67,11 @@ const state = {
 /* ── chrome ──────────────────────────────────────────────────────────────── */
 
 function renderViewToggle() {
+  const n = countShown();
+  const counts = { batches: state.batches.length, flagged: n.flagged };
   $('view-toggle').replaceChildren(...VIEWS.map(([key, label]) => {
     const b = el('button', null, label);
+    if (counts[key] !== undefined) b.append(el('span', 'n', ` ${counts[key]}`));
     b.setAttribute('aria-pressed', String(state.view === key));
     b.addEventListener('click', () => { state.view = key; render(); });
     return b;
@@ -216,32 +225,135 @@ function rowKey(r) {
  *  reason to expand a row. The columns are the Form Guide's, because it is the
  *  same fact and it should not read differently here.
  */
-function runnerDetail(r) {
-  const box = el('div', 'tr-detail');
-
+function panel(title, extra) {
+  const box = el('section', 'd-panel');
   const head = el('div', 'd-head');
-  head.append(el('span', 'k', 'LAST SIX'));
-  if (r.blackbook) {
-    const chip = el('span', 'booked', `IN THE BOOK · ${r.blackbook.status}`);
-    chip.title = r.blackbook.reasoning || 'no reason recorded';
-    head.append(chip);
-  }
-  head.append(el('span', 'right'));
-  const pen = el('button', `icon${r.note ? ' has' : ''}`, '✎');
-  pen.title = r.note ? r.note.note : 'note on this trial';
-  pen.addEventListener('click', (e) => { e.stopPropagation(); showNote(e, r); });
-  head.append(pen);
+  head.append(el('span', 'k', title));
+  if (extra) head.append(extra);
   box.append(head);
+  return box;
+}
 
-  if (r.note) box.append(el('div', 'd-note', r.note.note));
+/** WHY the mark, factor by factor.
+ *
+ *  The scoring is `derive/trial_quality`, server side, and this only renders
+ *  what it returned — the same engine the Form Guide's inline band reads
+ *  through, which is what the page's own footer promises. A second scoring
+ *  written here would drift from that one within a season and neither would
+ *  be obviously wrong.
+ */
+function screenRead(r) {
+  const box = panel('SCREEN READ · MEASURED AGAINST THE FIELD');
+  (r.quality_reads ?? []).forEach((rd) => {
+    const line = el('div', 'd-read');
+    line.append(el('span', 'k', rd.key));
+    const text = el('span', 't', rd.text);
+    // A factor shown at zero with no reason reads as one the engine forgot
+    // rather than one it weighed and discarded. MARGIN is the case that
+    // matters: it is on the row and deliberately not in the score.
+    if (rd.note) text.title = rd.note;
+    line.append(text);
+    const pts = el('span', `p ${rd.points > 0 ? 'up' : rd.points < 0 ? 'down' : 'nil'}`,
+      rd.points === 0 ? '0' : `${rd.points > 0 ? '+' : MINUS}${Math.abs(rd.points)}`);
+    if (rd.note) pts.title = rd.note;
+    line.append(pts);
+    box.append(line);
+  });
 
-  const runs = state.form[rowKey(r)];
-  if (!runs) {
-    box.append(el('div', 'd-empty', 'loading…'));
-    loadForm(r, box);
+  const band = el('div', 'd-read band');
+  band.append(el('span', 'k', 'BAND'));
+  const name = el('span', 't');
+  name.append(el('span', `q q-${(r.quality_band ?? '').toLowerCase()}`,
+    r.quality_mark ?? ''));
+  name.append(document.createTextNode(` ${r.quality_band ?? DASH}`));
+  band.append(name);
+  band.append(el('span', 'p total',
+    `${(r.quality_score ?? 0) > 0 ? '+' : ''}${num(r.quality_score ?? 0, 1)}`));
+  box.append(band);
+
+  // What this band actually went on to do — recomputed from the archive, not
+  // quoted. A calibration figure nobody recomputes is the kind of number this
+  // page exists to argue against.
+  const hold = state.calibration?.bands?.[r.quality_band]?.hold;
+  if (hold) box.append(el('div', 'd-hold', hold));
+  return box;
+}
+
+/** The rest of the batch, and what they did next.
+ *
+ *  The check on the mark: a standout out of a batch whose other five all won
+ *  next start says more about the batch than about the horse.
+ */
+function batchRetro(r) {
+  const box = panel('THE REST OF THE BATCH · AND WHAT THEY DID NEXT');
+  const rest = r.retro ?? [];
+  if (!rest.length) {
+    box.append(el('div', 'd-empty', 'NOTHING ELSE IN THIS BATCH'));
     return box;
   }
-  box.append(formTable(runs));
+  rest.forEach((o) => {
+    const line = el('div', 'd-retro');
+    line.append(el('span', 'p', o.place === null ? DASH : String(o.place)));
+    line.append(el('span', 'n', o.horse_name));
+    line.append(el('span', 'm', o.margin === null || o.margin === undefined
+      ? DASH : `${num(o.margin, 1)}L`));
+    line.append(el('span', 'arr', '\u2192'));
+    const nxt = o.next_start;
+    if (!nxt) {
+      line.append(el('span', 'nx none', 'no start since'));
+    } else {
+      const won = nxt.place === 1;
+      line.append(el('span', `nx${won ? ' won' : ''}`,
+        `${compactDate(nxt.race_date)} · ${ordinal(nxt.place)}/${nxt.field_size}`));
+    }
+    box.append(line);
+  });
+  return box;
+}
+
+/** The book and the note, written from here.
+ *
+ *  Both go through `review.js`, the one form the Form Guide and Results use —
+ *  a second copy would give trials their own tag vocabulary and eventually
+ *  their own quiet rules about what a promotion means.
+ */
+function screenForms(r) {
+  const box = el('section', 'd-panel forms');
+  const host = el('div', 'd-review');
+  renderReview(host, {
+    horseName: r.horse_name,
+    subject: trialSubject(r),
+    existingNote: r.note,
+    booked: r.blackbook,
+    onSaved: (saved) => { r.note = saved; render(); },
+    onPromoted: (entry) => { r.blackbook = entry; render(); },
+    onClose: () => { state.open.delete(rowKey(r)); render(); },
+  });
+  if (state.focus) host.classList.add('focus-here');
+  box.append(host);
+  return box;
+}
+
+function runnerDetail(r) {
+  const box = el('div', 'tr-detail');
+  const top = el('div', 'd-cols');
+  top.append(screenRead(r));
+  top.append(batchRetro(r));
+  top.append(screenForms(r));
+  box.append(top);
+
+  // And the horse's own races. A trial is a claim about what a horse can do;
+  // this is the record of what it has done, and the two belong one above the
+  // other — the artboard does not carry it, the owner asked for it.
+  const form = panel('LAST SIX · AT THE RACES');
+  box.append(form);
+  const runs = state.form[rowKey(r)];
+  if (!runs) {
+    form.append(el('div', 'd-empty', 'loading…'));
+    loadForm(r, form);
+  } else {
+    form.append(formTable(runs));
+  }
   return box;
 }
 
@@ -306,28 +418,6 @@ async function loadForm(r, box) {
 }
 
 /** The note form — the same one the Form Guide and Results use. */
-function showNote(event, r) {
-  renderReview($('popover'), {
-    horseName: r.horse_name,
-    subject: trialSubject(r),
-    existingNote: r.note,
-    booked: r.blackbook,
-    onSaved: (saved) => { r.note = saved; hidePopover(); render(); },
-    onPromoted: (entry) => { r.blackbook = entry; hidePopover(); render(); },
-    onClose: hidePopover,
-  });
-  const pop = $('popover');
-  pop.hidden = false;
-  const rect = event.currentTarget.getBoundingClientRect();
-  const w = 344;
-  pop.style.left = `${Math.min(rect.left, window.innerWidth - w - 12)}px`;
-  pop.style.top = `${Math.min(rect.bottom + 4, window.innerHeight - 220)}px`;
-}
-
-function hidePopover() {
-  $('popover').hidden = true;
-}
-
 function runnerRow(r) {
   const row = el('div', 'tr-row');
   const key = rowKey(r);
@@ -381,7 +471,38 @@ function runnerRow(r) {
   comment.title = r.comment ?? '';
   row.append(comment);
   row.append(nextStart(r.next_start));
+
+  // SCREEN — where a run leaves this page. Both controls say what IS rather
+  // than only what could be: a horse already followed reads BB ✓ instead of
+  // offering to add it a second time, and a note that exists carries its
+  // count. Clicks stop here; the row's own handler is the expander.
+  const screen = el('div', 'screen');
+  const book = el('button', r.blackbook ? 'sc-btn booked' : 'sc-btn',
+    r.blackbook ? 'BB ✓' : '+ BB');
+  book.title = r.blackbook
+    ? `in the blackbook since ${r.blackbook.added_date}`
+    : 'add this horse to the blackbook, from this trial';
+  book.addEventListener('click', (e) => { e.stopPropagation(); openRow(r, 'book'); });
+  screen.append(book);
+
+  const note = el('button', r.note ? 'sc-btn has' : 'sc-btn',
+    r.note ? 'NOTE 1' : 'NOTE');
+  note.title = r.note ? r.note.note : 'write a note on this trial';
+  note.addEventListener('click', (e) => { e.stopPropagation(); openRow(r, 'note'); });
+  screen.append(note);
+  row.append(screen);
   return row;
+}
+
+/** Open a row on the panel the control asked for, so a click on + BB lands on
+ *  the blackbook form rather than on an expansion the user has to read. */
+function openRow(r, focus) {
+  state.open.add(rowKey(r));
+  state.focus = focus;
+  render();
+  const box = document.querySelector('.tr-detail .focus-here');
+  box?.scrollIntoView({ block: 'nearest' });
+  box?.focus();
 }
 
 function renderBatches() {
@@ -465,81 +586,45 @@ function renderBatches() {
 
 /* ── standouts ───────────────────────────────────────────────────────────── */
 
-function renderStandouts() {
-  const s = state.standouts;
-  const host = $('standouts');
-  if (!s) { host.replaceChildren(el('div', 'empty-line', 'LOADING')); return; }
-  host.replaceChildren();
-
-  const note = el('div', 'so-note');
-  note.append(el('b', null, `${s.shown} TRIALS SHOWN. `));
-  note.append(document.createTextNode(
-    'One engine, two surfaces: the same finish and comment rating used inline '
-    + "on a horse's own trial line, aggregated here as a live feed — not a "
-    + `separately curated list. ${s.considered} trials since ${s.since} were `
-    + 'rated; these are the ones that came out '
-    + `${s.bands.join(' or ').toLowerCase()}.`));
-  host.append(note);
-
-  if (!s.runs.length) {
-    host.append(el('div', 'no-match',
-      'NO TRIAL CLEARS THIS QUALITY FILTER IN THE CURRENT SLICE.'));
-    return;
-  }
-
-  s.runs.filter(matches).forEach((r) => {
-    const box = el('div', 'standout');
-    const line = el('div', 'so-line');
-    line.append(qMark(r.quality_band, r.quality_mark));
-    line.append(el('span', 'name', r.horse_name));
-    line.append(el('span', 'where',
-      `${r.trial_date} T${r.trial_no} · ${r.venue} ${r.surface} · `
-      + `finished ${r.place ?? DASH} of ${r.field_size}`
-      + (r.margin ? ` · ${num(r.margin, 1)}L` : '')));
-    if (r.blackbook) {
-      const badge = el('span', 'so-badge',
-        `IN THE BLACKBOOK · ${r.blackbook.status}`);
-      badge.title = `added ${r.blackbook.added_date}`;
-      line.append(badge);
+/** Everything above neutral, across the batches on screen.
+ *
+ *  Not a separate feed and not a curated list — the same runs, filtered by the
+ *  same mark, which is what makes "18 FLAGGED" in the header checkable by
+ *  clicking it.
+ */
+function flaggedRuns() {
+  const out = [];
+  state.batches.forEach((b) => b.runners.forEach((r) => {
+    if (matches(r) && ['STANDOUT', 'POSITIVE'].includes(r.quality_band)) {
+      out.push(r);
     }
-    line.append(el('span', 'right'));
-    line.append(nextStart(r.next_start));
-    box.append(line);
-    // The reasons, because a mark nobody can check is a mark nobody should
-    // act on.
-    box.append(el('div', 'so-reasons', r.quality_reasons.join(' · ')));
-    if (r.comment) box.append(el('div', 'so-comment', r.comment));
-
-    // What the REST of the batch did next is the check on the rating: a
-    // standout out of a batch whose other five all won next start says more
-    // about the batch than about the horse.
-    if (r.batch_next && r.batch_next.length) {
-      const rest = el('div', 'so-batch');
-      rest.append(el('span', 'k', 'WHAT THE REST OF THE BATCH DID NEXT'));
-      r.batch_next.forEach((o) => {
-        const row = el('div', 'row');
-        row.append(el('span', null, o.place === null ? DASH : String(o.place)));
-        row.append(el('span', 'n', o.horse_name));
-        row.append(el('span', null, '→'));
-        if (!o.next_start) {
-          row.append(el('span', null, 'no start since'));
-        } else {
-          const placed = o.next_start.place
-            <= (o.next_start.field_size >= 7 ? 3 : 2);
-          row.append(el('span', o.next_start.place === 1 ? 'won' : null,
-            `${o.next_start.place}/${o.next_start.field_size}`
-            + `${placed && o.next_start.place !== 1 ? ' placed' : ''}`
-            + ` ${o.next_start.race_date}`));
-        }
-        rest.append(row);
-      });
-      box.append(rest);
-    }
-    host.append(box);
-  });
+  }));
+  return out;
 }
 
-/* ── calibration ─────────────────────────────────────────────────────────── */
+function renderFlagged() {
+  renderChips();
+  renderDayPicker();
+  const host = $('standouts');
+  host.replaceChildren();
+  const rows = flaggedRuns();
+  if (!rows.length) {
+    host.replaceChildren(el('div', 'no-match',
+      'NOTHING ABOVE NEUTRAL IN THIS SLICE.'));
+    $('match-count').textContent = `0 of ${countShown().total}`;
+    return;
+  }
+  const box = el('div', 'batch');
+  const cols = el('div', 'tr-head');
+  COLS.forEach(([label, cls]) => cols.append(el('div', cls || null, label)));
+  box.append(cols);
+  rows.forEach((r) => {
+    box.append(runnerRow(r));
+    if (state.open.has(rowKey(r))) box.append(runnerDetail(r));
+  });
+  host.append(box);
+  $('match-count').textContent = `${rows.length} flagged`;
+}
 
 function renderCalibration() {
   const c = state.calibration;
@@ -627,10 +712,37 @@ function renderSummary() {
     box.append(document.createTextNode(` ${label}`));
     return box;
   };
-  host.append(stat(c.overall.trials.toLocaleString(), 'TRIALS RATED'));
+  // WHAT IS ON SCREEN, not what is in the archive. The artboard's counts read
+  // as a summary of the slice being looked at — "44 runs screened, 18
+  // flagged" — and a lifetime figure under the same words would be a
+  // different claim wearing the same label.
+  const n = countShown();
+  host.append(stat(String(n.total), 'RUNS SCREENED'));
+  host.append(stat(String(n.flagged), 'FLAGGED'));
+  host.append(stat(String(n.booked), 'BOOKED'));
+  host.append(stat(String(n.notes), 'NOTES'));
+  // The calibration behind the marks stays, quieter, on the right.
   const so = c.bands.STANDOUT;
-  host.append(stat(pct(so.next_win_rate), 'STANDOUT NEXT-WIN'));
-  host.append(stat(pct(c.overall.next_win_rate), 'BASELINE'));
+  const hold = el('span', 'right');
+  hold.append(el('b', null, pct(so.next_win_rate)));
+  hold.append(document.createTextNode(
+    ` STANDOUT NEXT-WIN v ${pct(c.overall.next_win_rate)} BASELINE`));
+  hold.title = so.hold ?? '';
+  host.append(hold);
+}
+
+/** What the current filters are actually showing. One counter, so the header,
+ *  the FLAGGED tab and the match count cannot disagree about the same slice. */
+function countShown() {
+  let total = 0, flagged = 0, booked = 0, notes = 0;
+  state.batches.forEach((b) => b.runners.forEach((r) => {
+    if (!matches(r)) return;
+    total += 1;
+    if (['STANDOUT', 'POSITIVE'].includes(r.quality_band)) flagged += 1;
+    if (r.blackbook) booked += 1;
+    if (r.note) notes += 1;
+  }));
+  return { total, flagged, booked, notes };
 }
 
 function render() {
@@ -641,7 +753,7 @@ function render() {
   document.querySelector('.filter-bar').hidden = !filtersApply;
   document.querySelector('.chip-bar').hidden = !filtersApply;
   if (state.view === 'batches') renderBatches();
-  if (state.view === 'standouts') renderStandouts();
+  if (state.view === 'flagged') renderFlagged();
   if (state.view === 'calibration') renderCalibration();
 }
 
@@ -666,15 +778,15 @@ async function load() {
   // A named morning asks for ALL of that morning's batches; the rolling feed
   // asks for the newest twelve. Twelve on a nine-batch morning would silently
   // pull in the previous one and show two dates under one heading.
-  const [batches, days, standouts, calibration] = await Promise.all([
+  // FLAGGED is these same batches filtered, not a separate feed — which is
+  // what makes the count in the header checkable by clicking it.
+  const [batches, days, calibration] = await Promise.all([
     api.trials(state.day ? 60 : 12, venue, state.day),
     api.trialDays(venue),
-    api.trialStandouts(),
     api.trialCalibration(),
   ]);
   state.batches = batches.batches;
   state.days = days.days;
-  state.standouts = standouts;
   state.calibration = calibration;
   render();
 }

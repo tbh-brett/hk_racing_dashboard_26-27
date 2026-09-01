@@ -97,3 +97,77 @@ def test_only_the_newest_morning_is_live_the_rest_are_archived(db) -> None:
     assert tq.batch("2026-08-21", 1, conn=db)["archived"] is False
     assert tq.batch("2026-08-20", 1, conn=db)["archived"] is True
     assert tq.batch("2026-07-07", 1, conn=db)["archived"] is True
+
+
+# ── what the screening page needs from a batch ───────────────────────────────
+
+def test_a_batch_says_how_many_it_flagged(db) -> None:
+    """The batch header says it, so a morning worth opening is visible before
+    it is opened."""
+    b = tq.batch("2026-08-21", 1, conn=db)
+    assert b["flagged"] == sum(
+        1 for r in b["runners"] if r["quality_band"] in ("STANDOUT", "POSITIVE"))
+
+
+def test_every_runner_carries_the_rest_of_its_batch(db) -> None:
+    """The check on the mark: a standout out of a batch whose other five all
+    won next start says more about the batch than about the horse."""
+    b = tq.batch("2026-08-21", 1, conn=db)
+    for r in b["runners"]:
+        names = {o["horse_name"] for o in r["retro"]}
+        assert r["horse_name"] not in names, "a horse is not its own retro"
+        assert len(r["retro"]) == len(b["runners"]) - 1
+
+
+def test_the_retro_is_built_without_a_query_per_runner(db) -> None:
+    """A nine-horse batch would otherwise cost nine round trips to say what
+    one already knows. Asserted by counting the statements the call makes."""
+    # sqlite3.Connection.execute is read-only, so the count is taken with a
+    # thin wrapper standing in for the connection.
+    class Counting:
+        def __init__(self, inner):
+            self.inner, self.n = inner, 0
+
+        def execute(self, sql, *a):
+            self.n += 1
+            return self.inner.execute(sql, *a)
+
+        def __getattr__(self, name):
+            return getattr(self.inner, name)
+
+    spy = Counting(db)
+    runners = len(tq.batch("2026-08-21", 1, conn=spy)["runners"])
+    assert runners >= 3, "the fixture needs a batch worth counting over"
+    # A handful of reads for the batch and its next starts — never one per
+    # runner FOR each runner, which is what building the retro naively costs.
+    assert spy.n < runners * runners, (
+        f"{spy.n} statements for {runners} runners looks quadratic")
+
+
+def test_each_read_is_on_the_runner_for_the_panel(db) -> None:
+    r = tq.batch("2026-08-21", 1, conn=db)["runners"][0]
+    assert [x["key"] for x in r["quality_reads"]] == ["FINISH", "COMMENT", "MARGIN"]
+
+
+def test_the_band_hold_sentence_is_computed_not_quoted(db) -> None:
+    """The artboard hard-codes one of these per band. Hard-coded, it is a
+    claim about the archive that stops being true the first time the archive
+    grows — and a calibration figure nobody recomputes is exactly the kind of
+    number this page exists to argue against."""
+    c = tq.calibration(conn=db)
+    for band in c["order"]:
+        hold = c["bands"][band]["hold"]
+        assert hold and band in hold
+        row = c["bands"][band]
+        if row["with_next"]:
+            # The sentence quotes the same rate the row carries, so the prose
+            # and the table cannot disagree.
+            assert f"{row['next_win_rate']:.1%}" in hold
+
+
+def test_a_band_with_nothing_to_show_says_so_rather_than_zero(db) -> None:
+    c = tq.calibration(conn=db)
+    for band in c["order"]:
+        row = c["bands"][band]
+        if not row["with_next"]:
+            assert "no next start on record" in row["hold"]

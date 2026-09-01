@@ -101,6 +101,9 @@ export function renderReview(host, {
   // Form Guide and Results already do.
   const subj = subject ?? runSubject(run);
   host.replaceChildren();
+  // The form carries its own styling class, so it looks the same in the
+  // popover the Form Guide opens and inline in a Trials row.
+  host.classList.add('review');
 
   const hd = el('div', 'hd');
   hd.append(document.createTextNode(subj.title));

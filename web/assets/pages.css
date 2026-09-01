@@ -558,54 +558,61 @@ select:hover, .btn:hover { background: var(--line-2); color: var(--text); }
   background: var(--pop); border: 1px solid var(--book-ground); padding: 8px 10px;
   box-shadow: 0 8px 22px rgba(0, 0, 0, .65);
 }
-.popover .hd {
+
+/* The FORM's own styling, on the form rather than on the popover it usually
+   sits in. It was scoped to `.popover`, so the first page to render it inline
+   — Trials, where booking a horse happens in the row rather than over it —
+   got an unstyled form with its title running into its subtitle. A component
+   that only looks right in one host is a component with a hidden dependency
+   on that host. */
+.review .hd {
   display: flex; align-items: baseline; gap: 8px; font-family: var(--font-mono);
   font-size: 9px; letter-spacing: .09em; color: var(--book);
 }
-.popover .hd .meta { color: var(--book-dim); }
-.popover .hd .close {
+.review .hd .meta { color: var(--book-dim); }
+.review .hd .close {
   margin-left: auto; color: var(--text-faint); cursor: pointer;
   background: none; border: 0; font: inherit; padding: 0;
 }
-.popover .body { font-size: var(--fs); line-height: 1.45; color: var(--text-2); margin-top: 6px; }
-.popover .trace {
+.review .body { font-size: var(--fs); line-height: 1.45; color: var(--text-2); margin-top: 6px; }
+.review .trace {
   font-family: var(--font-mono); font-size: 9px; color: var(--book-dim);
   margin-top: 6px; letter-spacing: .06em;
 }
-.popover .row { display: flex; gap: 6px; margin-top: 8px; }
-.popover input, .popover textarea {
+.review .row { display: flex; gap: 6px; margin-top: 8px; }
+.review input, .review textarea {
   flex: 1; min-width: 0; background: var(--bg-deep); border: 1px solid var(--pop-field);
   color: var(--text); font-family: var(--font-mono); font-size: var(--fs-sm);
   padding: 3px 6px;
 }
-.popover textarea {
+.review textarea {
   width: 100%; font-family: var(--font); font-size: var(--fs);
   line-height: 1.45; resize: vertical; margin-top: 3px;
 }
-.popover .act {
+.review .act {
   font-family: var(--font-mono); font-size: var(--fs-xs); cursor: pointer;
   color: var(--book); border: 1px solid var(--book-ground); background: var(--pop-act);
   padding: 3px 9px; white-space: nowrap; letter-spacing: .06em;
 }
-.popover .act:hover { color: var(--text); }
-.popover .act:disabled { opacity: .5; cursor: progress; }
-.popover .act.ghost { color: var(--text-muted); border-color: var(--line-3); background: none; }
-.popover .sep { margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--pop-rule); }
-.popover .cap {
+.review .act:hover { color: var(--text); }
+.review .act:disabled { opacity: .5; cursor: progress; }
+.review .act.ghost { color: var(--text-muted); border-color: var(--line-3); background: none; }
+.review .sep { margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--pop-rule); }
+.review .cap {
   font-family: var(--font-mono); font-size: 9px; color: var(--text-faint);
   margin-top: 7px; letter-spacing: .06em;
 }
-.popover .val { font-family: var(--font-mono); font-size: var(--fs); color: var(--text-2); }
-.popover .val.strong { font-weight: 600; color: var(--text); }
-.popover .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-.popover .tag {
+.review .val { font-family: var(--font-mono); font-size: var(--fs); color: var(--text-2); }
+.review .val.strong { font-weight: 600; color: var(--text); }
+.review .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.review .tag {
   font-family: var(--font-mono); font-size: 9px; padding: 1px 5px; cursor: pointer;
   white-space: nowrap; color: var(--text-muted); border: 1px solid var(--line-3);
   background: none;
 }
-.popover .tag[aria-pressed="true"] { color: var(--book); border-color: var(--book-ground); background: var(--pop-act); }
-.popover .hint { font-family: var(--font-mono); font-size: 9px; color: var(--book-dim); line-height: 1.4; }
-.popover .err { color: var(--alert); font-size: var(--fs-sm); margin-top: 6px; }
+.review .tag[aria-pressed="true"] { color: var(--book); border-color: var(--book-ground); background: var(--pop-act); }
+.review .hint { font-family: var(--font-mono); font-size: 9px; color: var(--book-dim); line-height: 1.4; }
+.review .err { color: var(--alert); font-size: var(--fs-sm); margin-top: 6px; }
 
 
 /* ── the window, and which book ──────────────────────────────────────────────

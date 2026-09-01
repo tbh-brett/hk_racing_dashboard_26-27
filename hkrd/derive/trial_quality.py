@@ -124,6 +124,32 @@ def neutrals(comment: str | None) -> list[str]:
     return _hits(comment, _NEU_RE)
 
 
+def _read(key: str, text: str, points: float, note: str | None = None
+          ) -> dict[str, Any]:
+    """One factor of the verdict: what was looked at, what it said, what it
+    was worth. `note` explains a zero — a factor shown at 0 with no reason
+    reads as one the engine forgot rather than one it weighed and discarded."""
+    return {"key": key, "text": text, "points": points, "note": note}
+
+
+def _margin_read(margin: float | None) -> dict[str, Any]:
+    """Margin, always shown and never scored.
+
+    The artboard's own scoring gives it ±1. Measured, it does not carry:
+    holding the finishing position constant, mid-pack finishers go 7.2%
+    next-start wins within two lengths of the winner and 5.7% at fourteen or
+    more — a spread of one and a half points across a 7x range in margin, on
+    samples of a few hundred. A trial winner is often not extended, so the
+    field's margin measures how hard the WINNER was ridden more than how well
+    the rest went.
+    """
+    text = ("no margin recorded" if margin is None
+            else "on terms with the winner" if margin <= 0
+            else f"{margin:.1f}L off the winner")
+    return _read("MARGIN", text, 0.0,
+                 "shown as context; measured, it does not move the band")
+
+
 def rate(*, place: int | None, field_size: int, margin: float | None = None,
          comment: str | None = None) -> dict[str, Any]:
     """One trial's quality, with the reasons it got there.
@@ -142,19 +168,40 @@ def rate(*, place: int | None, field_size: int, margin: float | None = None,
     if neu and not pos and not neg and (place is None or place > 1):
         return {"band": "UNTESTED", "mark": MARKS["UNTESTED"], "score": 0.0,
                 "reasons": [f"comment: {neu[0]}"], "margin": margin,
+                "reads": [
+                    _read("FINISH", f"finished {place} of {field_size}"
+                          if place else "no finishing position recorded", 0.0),
+                    _read("COMMENT", neu[0], 0.0,
+                          "the horse was not asked to win, so the trial says "
+                          "nothing about it either way"),
+                    _margin_read(margin),
+                ],
                 "positives": pos, "negatives": neg, "neutrals": neu}
 
     score = 0.0
     reasons: list[str] = []
+    # `reads` is the same verdict broken into the factors that produced it, so
+    # the page can show WHY rather than only WHAT. Same numbers, same order —
+    # a second scoring in the browser would drift from this one within a
+    # season and neither would be obviously wrong.
+    reads: list[dict[str, Any]] = []
     if place == 1:
         score += 2.0
         reasons.append("won the trial")
+        reads.append(_read("FINISH", "won the trial", 2.0))
     elif place is not None and place <= 3:
         score += 1.0
         reasons.append(f"finished {place}")
+        reads.append(_read("FINISH", f"finished {place} of {field_size}", 1.0))
     elif place is not None and field_size and place >= field_size - 1:
         score -= 1.0
         reasons.append(f"finished {place} of {field_size}")
+        reads.append(_read("FINISH", f"finished {place} of {field_size}", -1.0))
+    else:
+        reads.append(_read(
+            "FINISH",
+            f"finished {place} of {field_size}" if place else "no finish recorded",
+            0.0))
 
     # The negative vocabulary is the stronger of the two. A "weakened in the
     # straight" trial predicts 1.3% next-start wins against 24.1% for one that
@@ -163,12 +210,20 @@ def rate(*, place: int | None, field_size: int, margin: float | None = None,
     if pos:
         score += 1.0
         reasons.append(f"comment: {pos[0]}")
+        reads.append(_read("COMMENT", pos[0], 1.0))
     if neg:
         score -= 1.5
         reasons.append(f"comment: {neg[0]}")
+        reads.append(_read("COMMENT", neg[0], -1.5))
+    if not pos and not neg:
+        reads.append(_read(
+            "COMMENT", neu[0] if neu else "nothing the vocabulary scores", 0.0,
+            "of 65 clauses tested against 7,622 comments, 51 have a 95% "
+            "interval containing the baseline and are ignored however they read"))
+    reads.append(_margin_read(margin))
 
     band = ("STANDOUT" if score >= 3.0 else "POSITIVE" if score >= 1.5
             else "NEGATIVE" if score <= -1.0 else "NEUTRAL")
     return {"band": band, "mark": MARKS[band], "score": round(score, 2),
-            "reasons": reasons, "margin": margin,
+            "reasons": reasons, "margin": margin, "reads": reads,
             "positives": pos, "negatives": neg, "neutrals": neu}

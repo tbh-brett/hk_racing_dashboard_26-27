@@ -311,6 +311,17 @@ def batch(date: str, trial_no: int, *,
             # add a horse that is in the book twice over.
             r["blackbook"] = booked.get(r["horse_name"])
 
+        # THE REST OF THE BATCH, AND WHAT THEY DID NEXT. Built in memory from
+        # rows already fetched rather than a query per runner: a nine-horse
+        # batch would otherwise cost nine round trips to say what one already
+        # knows. It is the check on the mark — a standout out of a batch whose
+        # other five all won next start says more about the batch.
+        for r in runners:
+            r["retro"] = [
+                {"horse_name": o["horse_name"], "place": o["place"],
+                 "margin": o["margin"], "next_start": o["next_start"]}
+                for o in runners if o["horse_name"] != r["horse_name"]]
+
         # Splits are the batch's, not the runner's: HKJC publishes one set of
         # sectionals per trial and repeats it on every row.
         splits = runners[0]["section_times"]
@@ -330,6 +341,10 @@ def batch(date: str, trial_no: int, *,
             "going": _column(rows[0], "going"),
             "course": _column(rows[0], "course"),
             "archived": _is_archived(conn, date),
+            # How many in this batch rated above neutral. The batch header
+            # says it, so a morning worth opening is visible before it is.
+            "flagged": sum(1 for r in runners
+                           if r["quality_band"] in ("STANDOUT", "POSITIVE")),
         }
     finally:
         if own:
@@ -452,6 +467,34 @@ def _booked(conn: Connection, names: list[str]) -> dict[str, dict[str, Any]]:
         f"WHERE horse_name IN ({marks})", [n.upper() for n in names])}
 
 
+def _hold_sentence(band: str, row: dict[str, Any],
+                   base: dict[str, Any]) -> str:
+    """What this band went on to do, in a sentence, from the live numbers.
+
+    The artboard hard-codes one of these per band. Hard-coded, it is a claim
+    about the archive that stops being true the first time the archive grows —
+    and a calibration figure nobody recomputes is exactly the kind of number
+    this page exists to argue against.
+    """
+    n, win = row["with_next"], row["next_win_rate"]
+    if not n or win is None:
+        return f"{band} has no next start on record yet."
+    pct, basis = f"{win:.1%}", f"{base['next_win_rate']:.1%}"
+    if band == "UNTESTED":
+        return (f"UNTESTED sits on the baseline at {pct} against {basis} over "
+                f"{n:,} next starts — the trial told you nothing either way, "
+                f"which is the intent rather than a shortcoming.")
+    if not row["clears_baseline"]:
+        return (f"{band} went {pct} next-start wins over {n:,}, against a "
+                f"baseline of {basis}. The interval contains the baseline, so "
+                f"this band is not separating.")
+    better = win > (base["next_win_rate"] or 0)
+    tail = ("Screening it out is the point." if not better
+            else f"{row['next_place_rate']:.1%} placed.")
+    return (f"{band} went {pct} next-start wins over {n:,} next starts, "
+            f"against a baseline of {basis}. {tail}")
+
+
 def calibration(*, conn: Connection | None = None) -> dict[str, Any]:
     """What each band actually went on to do at the races.
 
@@ -533,6 +576,7 @@ def calibration(*, conn: Connection | None = None) -> dict[str, Any]:
             row["clears_baseline"] = bool(
                 ci and base_rate is not None
                 and (ci[0] > base_rate or ci[1] < base_rate))
+            row["hold"] = _hold_sentence(name, row, base)
             out[name] = row
         return {"bands": out, "overall": base, "order": list(BANDS)}
     finally:

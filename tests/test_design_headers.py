@@ -23,7 +23,10 @@ DESIGN = Path(__file__).resolve().parent.parent / "web" / "design-source"
 # the whole set — that would restate the design — but enough that an extractor
 # returning something plausible and wrong still fails.
 WITNESS = {
-    "Trials": {"DR", "JOCKEY", "MGN", "NEXT ACTUAL START"},
+    # The screening artboard, September 2026. SCREEN is the column a run
+    # leaves the page through; Q is the band mark it leaves on.
+    "Trials": {"DR", "Q", "JOCKEY", "SECTIONS", "MGN", "TRIAL COMMENT",
+               "NEXT START", "SCREEN"},
     "Results": {"FIN", "WIN SP", "PLC SP", "ET FIGURE"},
     "Race Day": {"DR", "HORSE", "JOCKEY"},
     "Form Guide": {"DR", "JOCKEY", "TRAINER", "WT"},

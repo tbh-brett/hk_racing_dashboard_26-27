@@ -61,6 +61,16 @@ PAGE_HTML = {
     "model-analysis.js": "model-analysis.html",
 }
 
+# Labels a page renders VERBATIM from the server. The Trials page prints the
+# screen read's factor names — FINISH, COMMENT, MARGIN — exactly as
+# `derive/trial_quality` returns them, deliberately: writing them again in the
+# browser would be a second copy of the scoring vocabulary, which is the thing
+# that page's whole design is against. So the module that owns the words is
+# part of what the page renders.
+SERVER_LABELS = {
+    "trials.js": ["hkrd/derive/trial_quality.py"],
+}
+
 # A page's own module plus anything it imports for rendering. A header may be
 # ported into a helper rather than the page file itself.
 EXTRA_SOURCES = {
@@ -115,6 +125,10 @@ def _built_text(page: str) -> str:
     html = ROOT / "web" / "pages" / PAGE_HTML.get(page, "")
     if html.is_file():
         parts.append(html.read_text(encoding="utf-8"))
+    for module in SERVER_LABELS.get(page, []):
+        candidate = ROOT / module
+        if candidate.is_file():
+            parts.append(candidate.read_text(encoding="utf-8"))
     return "\n".join(parts)
 
 
