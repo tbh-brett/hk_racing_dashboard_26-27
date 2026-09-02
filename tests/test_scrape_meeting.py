@@ -231,3 +231,100 @@ def test_an_unreachable_host_is_not_retried_once_per_race(tmp_path):
     # 3 attempts for the card + 3 for the results, not 3 x 11 for each.
     assert dead.calls <= 8, f"{dead.calls} fetches for one unreachable meeting"
     assert time.monotonic() - started < 30
+
+
+# ── a meeting that has not been run yet ──────────────────────────────────────
+#
+# The only kind the Card button exists for. Its card is up; its results do not
+# exist. Every signal said the scrape had failed: `ok` required races > 0, the
+# results failure was filed as an error, the early return skipped the source
+# log entirely, and the API reported the `races`/`runners` counters — which a
+# card scrape never touches — so a card that had just stored a full field
+# reported "wrote nothing" and the strip kept saying "no successful run on
+# record".
+
+_CARD = {
+    "races": [{
+        "race": {"race_date": "2099-01-01", "race_no": 1, "venue": "ST",
+                 "course": "A", "surface": "Turf", "going": "G",
+                 "distance": 1200, "race_class": "4"},
+        "runners": [{"race_no": 1, "horse_no": i, "horse_name": f"H{i}",
+                     "draw": i, "gear": "B", "rating": 50} for i in range(1, 13)],
+    }],
+    "errors": [],
+}
+
+
+@pytest.fixture()
+def pre_race(monkeypatch, tmp_path):
+    """A card that is up, for a meeting nobody has run."""
+    from hkrd.ingest._client import FetchError
+    monkeypatch.setattr(scrape_meeting.racecard_ingest, "fetch_meeting",
+                        lambda *a, **k: _CARD)
+    monkeypatch.setattr(
+        scrape_meeting.results_ingest, "fetch_meeting",
+        lambda *a, **k: (_ for _ in ()).throw(FetchError("404 not published")))
+    return scrape_meeting.scrape_meeting("2099-01-01", "ST", db=tmp_path / "t.db")
+
+
+def test_a_card_scraped_before_the_race_is_a_success(pre_race):
+    """There is nothing else to fetch until the meeting is run."""
+    assert pre_race.declared == 12
+    assert pre_race.ok is True
+    assert pre_race.errors == []
+
+
+def test_results_that_do_not_exist_yet_are_not_an_error(pre_race):
+    assert any("not published yet" in w for w in pre_race.warnings)
+
+
+def test_the_card_is_recorded_even_though_results_ended_the_run(pre_race, tmp_path):
+    """The early return skipped the source log, so the strip said the card had
+    never succeeded no matter how many times it did."""
+    conn = get_conn(tmp_path / "t.db")
+    logged = dict(conn.execute("SELECT job, ok FROM job_runs").fetchall())
+    conn.close()
+    assert logged.get("scrape_meeting:card") == 1
+    # Results are not claimed either way before the meeting has been run.
+    assert "scrape_meeting:results" not in logged
+
+
+def test_the_declared_field_is_actually_stored(pre_race, tmp_path):
+    conn = get_conn(tmp_path / "t.db")
+    n = conn.execute("SELECT count(*) FROM runners WHERE race_date='2099-01-01'"
+                     ).fetchone()[0]
+    gear = conn.execute("SELECT gear FROM runners WHERE horse_no=1").fetchone()[0]
+    conn.close()
+    assert n == 12
+    assert gear == "B", "the card is the only source of gear"
+
+
+def test_missing_results_after_the_race_is_still_an_error(monkeypatch, tmp_path):
+    """The rule reads the calendar, not the mood: a meeting that HAS been run
+    and has no results is a real failure and must stay one."""
+    from hkrd.ingest._client import FetchError
+    past = dict(_CARD)
+    past = {"races": [{**_CARD["races"][0],
+                       "race": {**_CARD["races"][0]["race"],
+                                "race_date": "2020-01-01"}}],
+            "errors": []}
+    monkeypatch.setattr(scrape_meeting.racecard_ingest, "fetch_meeting",
+                        lambda *a, **k: past)
+    monkeypatch.setattr(
+        scrape_meeting.results_ingest, "fetch_meeting",
+        lambda *a, **k: (_ for _ in ()).throw(FetchError("404 not published")))
+    r = scrape_meeting.scrape_meeting("2020-01-01", "ST", db=tmp_path / "t.db")
+    assert r.errors and "results" in r.errors[0]
+    assert r.ok is False
+
+
+def test_sources_that_only_exist_after_a_race_are_not_claimed_before_it(
+        pre_race, tmp_path):
+    """Dividends and vet records do not exist until the meeting is run, so a
+    pre-race scrape has neither succeeded nor failed at them. Recording them
+    as successful with "0 records" is the same silent zero the freshness strip
+    exists to catch."""
+    conn = get_conn(tmp_path / "t.db")
+    logged = dict(conn.execute("SELECT job, ok FROM job_runs").fetchall())
+    conn.close()
+    assert logged == {"scrape_meeting:card": 1}

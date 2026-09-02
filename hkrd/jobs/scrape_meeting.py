@@ -22,6 +22,7 @@ the row. No code generation, ever.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -56,7 +57,14 @@ class ScrapeReport:
 
     @property
     def ok(self) -> bool:
-        return not self.errors and self.races > 0
+        """Did this run land anything it could land?
+
+        `races > 0` alone made every PRE-RACE scrape a failure — which is the
+        only kind the card button exists for. A meeting whose card is up and
+        whose results do not exist yet has been scraped completely: there is
+        nothing else to fetch until it is run. A declared field is a result.
+        """
+        return not self.errors and (self.races > 0 or self.declared > 0)
 
     def render(self) -> str:
         lines = [f"  meeting            {self.date} {self.venue}",
@@ -102,9 +110,18 @@ def scrape_meeting(date: str, venue: str, *, post_race: bool = False,
         races = results_ingest.fetch_meeting(date, venue, max_races=max_races,
                                              session=session)
     except (FetchError, results_ingest.ResultsError) as e:
-        report.errors.append(f"results: {e}")
-        # A card with no results yet is a meeting that has not been run, not a
-        # failed scrape. Report what was declared rather than nothing.
+        # A meeting that has not been run yet HAS no results, and saying so is
+        # a fact about the calendar rather than a failed scrape. After the day
+        # it is a real failure and stays an error.
+        if date >= _today():
+            report.warnings.append(
+                f"results: not published yet — {date} has not been run")
+        else:
+            report.errors.append(f"results: {e}")
+        # Nothing further to fetch, but the card that just landed must still be
+        # recorded: returning here without logging is why the strip said "no
+        # successful run on record" after a card scrape that worked.
+        _log_sources(db, report, post_race=post_race)
         return report
 
     conn = get_conn(db if db is not None else db_path())
@@ -148,6 +165,18 @@ def scrape_meeting(date: str, venue: str, *, post_race: bool = False,
     return report
 
 
+# The meetings, the dates on the cards and the person reading them are all in
+# Hong Kong. A host running in UTC is eight hours behind, which on a Saturday
+# evening would call a card that is up "in the future" and file a real results
+# failure as "not run yet".
+_HK = dt.timezone(dt.timedelta(hours=8))
+
+
+def _today() -> str:
+    """Today in Hong Kong, where the meetings are."""
+    return dt.datetime.now(_HK).date().isoformat()
+
+
 def _log_sources(db, report: ScrapeReport, *, post_race: bool) -> None:
     """Record each source separately, for the freshness strip.
 
@@ -165,13 +194,22 @@ def _log_sources(db, report: ScrapeReport, *, post_race: bool) -> None:
     entries = [
         ("card", "racecard" not in failed and report.declared >= 0,
          f"{report.declared} declared"),
-        ("results", report.races > 0, f"{report.races} races · {report.runners} runners"),
     ]
-    if post_race:
-        entries += [
-            ("dividends", "dividends" not in failed, f"{report.dividends} dividends"),
-            ("vet", "vet" not in failed, f"{report.vet_records} records"),
-        ]
+    # Nothing that only exists AFTER a race is claimed either way before the
+    # race. There is no success or failure to record when the meeting has not
+    # been run — and a strip that marks three sources failed every race
+    # morning is a strip nobody reads by the afternoon.
+    run_yet = not (report.date >= _today() and report.races == 0)
+    if run_yet:
+        entries.append(
+            ("results", report.races > 0,
+             f"{report.races} races · {report.runners} runners"))
+        if post_race:
+            entries += [
+                ("dividends", "dividends" not in failed,
+                 f"{report.dividends} dividends"),
+                ("vet", "vet" not in failed, f"{report.vet_records} records"),
+            ]
     conn = get_conn(db if db is not None else db_path())
     try:
         init_db(conn)

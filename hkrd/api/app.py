@@ -488,9 +488,14 @@ def scrape_job(body: dict = Body(...)) -> JSONResponse:
                     400, "a meeting scrape needs a date and a venue; the "
                          "header knows both for the meeting on screen")
             r = mj.scrape_meeting(date, venue, post_race=True)
-            wrote = {"races": r.races, "runners": r.runners,
-                     "comments": r.comments, "dividends": r.dividends,
-                     "vet_records": r.vet_records}
+            # `declared` FIRST, and it was missing entirely. A card scraped
+            # before its meeting is run stores a full field and increments
+            # nothing else, so the reply said "wrote nothing" about a card that
+            # had just landed twelve runners — which is what "I clicked Card
+            # and nothing happened" looked like from the outside.
+            wrote = {"declared": r.declared, "races": r.races,
+                     "runners": r.runners, "comments": r.comments,
+                     "dividends": r.dividends, "vet_records": r.vet_records}
             errors, warnings, ok = r.errors, r.warnings, r.ok
         elif job == "odds":
             from hkrd.jobs import scrape_odds as oj

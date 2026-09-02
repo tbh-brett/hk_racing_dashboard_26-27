@@ -338,6 +338,20 @@ class MeetingContext {
       fresh.lastChild.textContent = r.ok ? '✓ now' : '⚠';
       if (!r.ok) fresh.classList.add('is-stale');
       fresh.title = outcome;
+
+      // A card fetched for a meeting the page is not on is a meeting the page
+      // should go to. Without this the scrape worked, the strip said so, and
+      // every table on screen still showed the old card — which reads as
+      // nothing having happened at all.
+      if (r.ok && meeting?.date && meeting.date !== this.date) {
+        this.meetings = await api.meetings(60).catch(() => this.meetings);
+        if (this.meetings.some((m) => m.race_date === meeting.date)) {
+          await this.setDate(meeting.date);
+        } else {
+          fresh.title = `${outcome}\nStored, but ${meeting.date} is not on the `
+            + 'meeting list yet — reload the page.';
+        }
+      }
     } catch (e) {
       chip.lastChild.textContent = '⚠';
       chip.title = `${source.name}: ${e.message}`;
