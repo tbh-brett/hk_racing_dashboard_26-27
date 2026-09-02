@@ -13,7 +13,8 @@ import { api, num, signed } from './api.js';
 import { el, $, DASH, MINUS, renderNav, styleClass, styleOrdinal,
          replayUrl, trialReplayUrl, externalLink, compactDate,
          tripTags, tripTagChips, ordinal, classCell, classLabel, eszCell,
-         paceCell, positionsText, conditionLabel, drawText } from './vocab.js';
+         paceCell, positionsText, conditionLabel, drawText,
+         tagLabel } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 import { loadTags, renderReview } from './review.js';
@@ -198,6 +199,21 @@ function sortedRunners() {
  *  earned from data rather than decorative. */
 function flagsFor(runner) {
   const out = [];
+  // FIRST, and named. A veterinary finding is the one flag that changes
+  // whether you back the horse at all, and it was reachable only by expanding
+  // the horse and then hovering a run row — two clicks and a guess about which
+  // run. It says WHAT and WHEN, because "VET" alone sends you looking again.
+  const vet = state.guide?.vet_form?.[runner.horse_name] ?? [];
+  if (vet.length) {
+    const worst = vet[0];   // newest first, from the server
+    out.push({
+      kind: 'vet',
+      text: `${tagLabel(worst.tag).toUpperCase()} · ${runsAgo(worst.runs_ago)}`,
+      title: worst.comment
+        || `${tagLabel(worst.tag)} — ${compactDate(worst.race_date)}`,
+      more: vet.length > 1 ? vet.length - 1 : 0,
+    });
+  }
   const bb = state.guide?.blackbook?.[runner.horse_name];
   if (bb) out.push({ kind: 'bb', text: 'BLACKBOOK', bb });
 
@@ -230,6 +246,11 @@ function flagsFor(runner) {
     }
   }
   return out;
+}
+
+/** "LAST START" beats "1 RUN AGO", and after that the count is what reads. */
+function runsAgo(n) {
+  return n === 1 ? 'LAST START' : `${n} RUNS AGO`;
 }
 
 function daysBetween(a, b) {
@@ -322,6 +343,14 @@ function horseRow(runner) {
   flagsFor(runner).forEach((f) => {
     const chip = el('span', `flag ${f.kind}`, f.text);
     if (f.title) chip.title = f.title;
+    // A second finding is a different fact from one. Counted rather than
+    // listed, because the row has one line and the first is the newest.
+    if (f.more) {
+      const more = el('span', 'more', `+${f.more}`);
+      more.title = `${f.more} earlier veterinary finding`
+        + `${f.more === 1 ? '' : 's'} in the runs shown`;
+      chip.append(more);
+    }
     if (f.bb) {
       chip.addEventListener('mouseenter', (e) => showBlackbookNote(e, f.bb));
       chip.addEventListener('mouseleave', hidePopover);

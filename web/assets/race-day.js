@@ -10,7 +10,8 @@
  */
 import { api, num } from './api.js';
 import { el, $, DASH, MINUS, renderNav, styleBadge, styleOrdinal,
-         compactDate, ordinal, tagLabel, tripTagChips, drawText } from './vocab.js';
+         compactDate, ordinal, tagLabel, tripTagChips, drawText,
+         isVetTag } from './vocab.js';
 import { context } from './context.js';
 import { anchoredPanel } from './overlay.js';
 import { install as installPalette } from './palette.js';
@@ -582,7 +583,26 @@ function cardRow(r, index) {
   // "contact" and the finding never reached the page at all. `tripTagChips`
   // is the shared rule: routine tags dropped, veterinary findings sorted to
   // the front and given the alert colour, the whole list on the tooltip.
-  const trip = tripTagChips(r.last_run?.tags, {
+  // A veterinary finding over the last six starts comes FIRST and by name.
+  // The trip chip beside it reads the last run only, so a horse that bled
+  // three starts back showed nothing here at all — and that is the one fact
+  // on this row that decides whether you back it. Same server call as the
+  // Form Guide, so the two pages cannot call the same horse sound and unsound.
+  const found = r.vet_form ?? [];
+  if (found.length) {
+    const worst = found[0];   // newest first, from the server
+    const chip = el('span', 'trip vet',
+      `${tagLabel(worst.tag).toUpperCase()}${found.length > 1 ? ` +${found.length - 1}` : ''}`);
+    chip.title = `${tagLabel(worst.tag)} — `
+      + `${worst.runs_ago === 1 ? 'last start' : `${worst.runs_ago} runs ago`}`
+      + `, ${compactDate(worst.race_date)}`
+      + (worst.comment ? `\n\n${worst.comment}` : '');
+    box.append(chip);
+  }
+  // Trouble only. The findings are on the chip above; showing them twice made
+  // the row say "LAME HIND lame hind" and pushed the traffic note — a
+  // different fact about the same run — off the end.
+  const trip = tripTagChips((r.last_run?.tags ?? []).filter((t) => !isVetTag(t)), {
     comment: r.last_run?.comment ?? null,
     limit: 1, cls: 'trip',
   });

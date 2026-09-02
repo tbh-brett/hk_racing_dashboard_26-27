@@ -216,6 +216,13 @@ table.card td { padding: 6px 8px; }
 .horse .nm { font-size: var(--fs-md); font-weight: 600; white-space: nowrap; }
 .trip { font-size: 10px; color: var(--incident); border: 1px solid var(--edge-ground);
         padding: 1px 5px; white-space: nowrap; }
+/* The finding, not the traffic. Same alert colour the vet chips carry on every
+   other page, and heavier, because it is the one chip on this row that says
+   the horse may not be sound. */
+.trip.vet {
+  color: var(--alert); border-color: var(--alert); font-weight: 600;
+  cursor: help;
+}
 .odds-win { font-size: 16px; font-weight: 600; line-height: 1.05; }
 .odds-place { font-size: var(--fs-sm); color: var(--text-faint); line-height: 1.15; }
 .mv { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }

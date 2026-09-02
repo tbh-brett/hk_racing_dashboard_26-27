@@ -18,7 +18,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-__all__ = ["DERIVE_VERSION", "Tag", "TAG_RULES", "NAMED_VET",
+__all__ = ["DERIVE_VERSION", "Tag", "TAG_RULES", "NAMED_VET", "VET_TAGS",
            "tag_comment", "tag_rows"]
 
 DERIVE_VERSION = "tags-1.0"
@@ -104,6 +104,14 @@ _COMPILED = tuple((n, k, p, re.compile(pat, re.I)) for n, k, p, pat in TAG_RULES
 # The findings the vocabulary can name. `vet_finding` is the fallback for one
 # it cannot, which is what tells you the vocabulary has a gap rather than the
 # horse being fine.
+#: Every tag of kind "vet", named and catch-all. The one list a page or a
+#: query asks "is this a veterinary finding?" — `NAMED_VET` is the subset that
+#: says WHAT was found, and `vet_finding` is the one that only says a finding
+#: was made. `vet_routine` is deliberately absent: a passed examination is on
+#: nearly every runner and is not a finding.
+VET_TAGS = frozenset({"bled", "roarer", "lame_fore", "lame_hind",
+                      "arrhythmia", "mucus", "barred", "vet_finding"})
+
 NAMED_VET = frozenset({"bled", "roarer", "lame_fore", "lame_hind",
                        "arrhythmia", "mucus", "barred"})
 

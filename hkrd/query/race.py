@@ -10,10 +10,11 @@ from collections.abc import Sequence
 
 from hkrd.store.coerce import parse_running_positions, parse_section_times
 from hkrd.store.connect import Connection, get_conn
+from hkrd.derive.tags import VET_TAGS
 from hkrd.query.types import RaceLine, RunnerLine
 
 __all__ = ["get_race", "get_meeting", "get_horse_form", "list_meetings",
-           "list_horses", "tags_bulk"]
+           "list_horses", "tags_bulk", "vet_form"]
 
 # Derived tables are LEFT JOINed: a runner with no ET row still returns, with a
 # null figure. A missing derived value must never make a runner disappear.
@@ -96,6 +97,89 @@ def tags_bulk(conn: Connection, keys: Sequence[tuple[str, int, int]]
         (lanes if tag.startswith("lane:") else tags).append(
             tag[5:] if tag.startswith("lane:") else tag)
     return {k: (tuple(t), tuple(l)) for k, (t, l) in out.items()}
+
+
+def vet_form(horse_names: Sequence[str], *, before: str | None = None,
+             runs: int = 6, conn: Connection | None = None
+             ) -> dict[str, list[dict[str, Any]]]:
+    """Veterinary findings over each horse's last `runs` starts.
+
+    The one answer to "has this horse been found wrong lately", so that Race
+    Day and the Form Guide cannot give different ones. Both pages showed the
+    finding only where the reader had already gone looking: Race Day read the
+    single most recent run, and the Form Guide buried it in a tooltip on a run
+    row two clicks deep. A horse that bled three starts back is a fact you want
+    before you open anything.
+
+    Newest first, with how many starts ago it was and the stewards' own
+    sentence, so the chip on the row can say WHAT and WHEN and the tooltip can
+    show the evidence.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        return _vet_form(conn, horse_names, before, runs)
+    finally:
+        if own:
+            conn.close()
+
+
+def _vet_form(conn: Connection, horse_names: Sequence[str],
+              before: str | None, runs: int) -> dict[str, list[dict[str, Any]]]:
+    names = [n.strip().upper() for n in horse_names if n]
+    if not names:
+        return {}
+    marks = ",".join("?" * len(names))
+    # The stewards' account, which is where the finding was read from. Their
+    # 'incident' text is preferred over the objective corunning description:
+    # the finding is in the incident report, and showing the other one under a
+    # chip that says "bled" would be evidence for a different claim.
+    sql = (f"SELECT r.horse_name, r.race_date, r.race_no, t.tag, "
+           f"       (SELECT comment_text FROM runner_comments c "
+           f"         WHERE c.race_date = r.race_date AND c.race_no = r.race_no "
+           f"           AND c.horse_no = r.horse_no "
+           f"         ORDER BY (c.source = 'incident') DESC LIMIT 1) AS comment "
+           f"  FROM runners r "
+           f"  JOIN runner_tags t ON t.race_date = r.race_date "
+           f"                    AND t.race_no = r.race_no "
+           f"                    AND t.horse_no = r.horse_no "
+           f" WHERE r.horse_name IN ({marks})")
+    params: list[Any] = list(names)
+    if before:
+        sql += " AND r.race_date < ?"
+        params.append(before)
+    sql += " ORDER BY r.horse_name, r.race_date DESC, r.race_no DESC"
+
+    # Which starts count as "recent" is decided per horse from its own record,
+    # not by a date window: six starts is six starts whether they took a
+    # season or a year.
+    starts: dict[str, list[str]] = {}
+    for r in conn.execute(
+            f"SELECT horse_name, race_date, race_no FROM runners "
+            f"WHERE horse_name IN ({marks})"
+            + (" AND race_date < ?" if before else "")
+            + " ORDER BY horse_name, race_date DESC, race_no DESC", params):
+        seen = starts.setdefault(r["horse_name"], [])
+        key = f"{r['race_date']}:{r['race_no']}"
+        if key not in seen:
+            seen.append(key)
+
+    out: dict[str, list[dict[str, Any]]] = {}
+    for r in conn.execute(sql, params):
+        if r["tag"] not in VET_TAGS:
+            continue
+        recent = starts.get(r["horse_name"], [])[:runs]
+        key = f"{r['race_date']}:{r['race_no']}"
+        if key not in recent:
+            continue
+        out.setdefault(r["horse_name"], []).append({
+            "tag": r["tag"],
+            "race_date": r["race_date"],
+            "race_no": r["race_no"],
+            "runs_ago": recent.index(key) + 1,
+            "comment": r["comment"],
+        })
+    return out
 
 
 def _comments(conn: Connection, date: str, race_no: int,

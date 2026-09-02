@@ -22,7 +22,7 @@ from typing import Any
 from hkrd.derive.probability import devig
 from hkrd.query import (blackbook as bb_q, formguide as fg_q,
                         market as market_q, vet as vet_q)
-from hkrd.query.race import get_horse_form, get_race
+from hkrd.query.race import get_horse_form, get_race, vet_form
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["build_card", "meeting_blackbook", "meeting_summary",
@@ -107,6 +107,12 @@ def build_card(date: str, race_no: int, *,
             # capture -- which is worth seeing rather than hiding.
             overround = round(100 * (sum(1 / o for o in priced_odds) - 1), 1)
 
+        # Veterinary findings over each runner's last six starts — the same
+        # call the Form Guide makes, so the two pages cannot disagree about
+        # whether a horse has been found wrong. One query for the card.
+        vet_recent = vet_form(
+            [r.horse_name for r in race.runners], before=date, runs=6, conn=conn)
+
         runners: list[dict[str, Any]] = []
         for r in race.runners:
             prior = get_horse_form(r.horse_name, limit=1, before=date, conn=conn)
@@ -140,6 +146,7 @@ def build_card(date: str, race_no: int, *,
                 "market_rank": m_rank,
                 "movement": moves.get(r.horse_no),
                 "vet": vet.get(r.horse_name, []),
+                "vet_form": vet_recent.get(r.horse_name, []),
                 # Negative means the model likes it more than the market does.
                 "rank_delta": (r.sarr_rank - m_rank
                                if r.sarr_rank and m_rank else None),

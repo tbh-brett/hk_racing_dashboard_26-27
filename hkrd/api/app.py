@@ -173,6 +173,12 @@ def form_guide(date: str, race_no: int, history: int = 6) -> dict:
     # printed beside an actual finishing time reads as a measurement.
     out["pace"] = {f"{d}:{n}": v
                    for (d, n), v in pace_q.race_pace_bulk(sorted(keys)).items()}
+
+    # Veterinary findings over the six runs on screen, so the row can carry the
+    # flag before anything is expanded. Same call as Race Day makes, so the two
+    # pages cannot report a different horse as sound.
+    out["vet_form"] = race_q.vet_form(
+        [r.horse_name for r in guide.race.runners], before=date, runs=history)
     return out
 
 

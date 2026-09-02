@@ -184,6 +184,17 @@
   font-size: var(--fs-xs); padding: 0 5px; white-space: nowrap;
   line-height: 15px; border: 1px solid var(--line-3); color: var(--text-muted);
 }
+/* A veterinary finding, in the alert colour the vet chips use everywhere else,
+   and heavier than its neighbours. It is the only flag on this row that says
+   the horse may not be sound, and it used to be two clicks and a hover away. */
+.flag.vet {
+  color: var(--alert); border-color: var(--alert); font-weight: 600;
+  cursor: help;
+}
+.flag.vet .more {
+  margin-left: 5px; padding-left: 5px; font-weight: 400;
+  border-left: 1px solid var(--alert); opacity: .8;
+}
 .flag.bb { color: var(--book); border-color: var(--book-ground); cursor: help; }
 .flag.trip { color: var(--incident); border-color: var(--edge-ground); }
 .flag.cond { color: var(--cond); border-color: var(--cond-rule); }
