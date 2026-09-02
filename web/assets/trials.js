@@ -26,7 +26,7 @@
 import { api, num } from './api.js';
 import { el, $, DASH, MINUS, renderNav, tripTagChips,
          replayUrl, trialReplayUrl, externalLink, compactDate,
-         ordinal, classLabel } from './vocab.js';
+         ordinal, classLabel, drawText } from './vocab.js';
 import { context } from './context.js';
 import { renderReview, trialSubject, loadTags } from './review.js';
 import { install as installPalette } from './palette.js';
@@ -430,8 +430,7 @@ function runnerRow(r) {
   // Draw first, as the design has it: a trial is barrier practice as much as
   // it is a time, and the gate the horse came out of is the context for the
   // positions three columns along.
-  row.append(el('div', 'r', r.draw === null || r.draw === undefined
-    ? DASH : String(r.draw)));
+  row.append(el('div', 'r', drawText(r.draw)));
   row.append(qMark(r.quality_band, r.quality_mark));
   row.append(el('div', 'r', r.place === null ? DASH : String(r.place)));
   const horse = el('div', 'horse');

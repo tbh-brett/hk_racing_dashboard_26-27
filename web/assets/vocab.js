@@ -78,25 +78,6 @@ export function styleBadge(style, opts) {
   return el('span', styleClass(style, opts), style ?? DASH);
 }
 
-/* ── market movement ──────────────────────────────────────────────────────
- * Direction and magnitude together. Settlement is tote, so this is a sizing
- * input and an operational signal — never a timing edge, and nothing built on
- * it may read as a selection rule.
- */
-export function movementArrow(direction) {
-  if (direction === 'drifted') return '▲';
-  if (direction === 'shortened') return '▼';
-  return '·';
-}
-
-/** Class naming what the money did. Drift and firm are opposite meanings and
- *  must never share a colour with a result (win/loss) elsewhere. */
-export function movementClass(direction) {
-  if (direction === 'drifted') return 'mv-drifted';
-  if (direction === 'shortened') return 'mv-shortened';
-  return 'mv-flat';
-}
-
 /* ── trip trouble ─────────────────────────────────────────────────────────
  * Tags extracted from the stewards' commentary. Routine veterinary entries are
  * not trip trouble and must not render as though they were — a badge that
@@ -168,44 +149,12 @@ export function tripTagChips(tags, { comment = null, limit = 2,
   return box;
 }
 
-/* ── figures ──────────────────────────────────────────────────────────────
- * `figure_display` is built in query/types.py so the figure, its length
- * equivalent and its confidence are assembled once, server side. This renders
- * what arrives; it never recomputes it. If a figure needs to read differently,
- * the change belongs in the query layer or it will disagree with itself.
- */
-export function figureCell(run, { cls = 'fig' } = {}) {
-  const box = el('span', cls);
-  if (!run || run.et_figure == null) {
-    box.append(el('span', 'dim', DASH));
-    return box;
-  }
-  box.append(el('span', 'v', run.et_figure.toFixed(1)));
-  if (run.et_len_vs_par != null) {
-    const len = run.et_len_vs_par;
-    box.append(el('span', len >= 0 ? 'up' : 'down',
-      `${len >= 0 ? '+' : MINUS}${Math.abs(len).toFixed(1)}L`));
-  }
-  if (run.et_confidence) {
-    box.append(el('span', `conf c-${run.et_confidence.toLowerCase()}`,
-      run.et_confidence.toUpperCase()));
-  }
-  return box;
-}
-
 /* ── dates ────────────────────────────────────────────────────────────────
  * One format, defined once, used everywhere — design brief 08 §1. An ISO date
  * on screen is a storage format that escaped.
  */
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-/** `2026-07-15` → `15 Jul 2026`. */
-export function shortDate(iso) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? '');
-  if (!m) return iso ?? DASH;
-  return `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}`;
-}
 
 /** `2026-07-15` → `15 Jul 26`, for a cell too narrow for the year in full. */
 export function compactDate(iso) {
@@ -361,6 +310,20 @@ export function conditionLabel(run) {
   return [run.venue, run.course, run.distance ? `${run.distance}m` : null,
           run.going, classLabel(run.race_class)]
     .filter(Boolean).join(' ');
+}
+
+/** The barrier a horse jumped from, or a dash when none is on record.
+ *
+ * Four files spelled this five different ways and three of them tested the
+ * draw for TRUTH rather than for presence. No gate is numbered 0, so none of
+ * them was wrong today — but a page that renders a missing draw differently
+ * from the page beside it is a page that reports a data outage differently,
+ * and that is what made "the draw is gone" hard to place: each screen was
+ * failing in its own dialect. One spelling, so the next outage looks the same
+ * everywhere and is found in one edit.
+ */
+export function drawText(draw) {
+  return draw === null || draw === undefined ? DASH : String(draw);
 }
 
 /* ── how fast away ────────────────────────────────────────────────────────

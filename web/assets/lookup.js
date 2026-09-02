@@ -22,7 +22,7 @@
 import { api, num } from './api.js';
 import { el, $, DASH, MINUS, renderNav, styleBadge, compactDate,
          positionsText, paceCell, replayUrl, hkjcResultUrl,
-         externalLink, PACE_SHORT, tripTagChips } from './vocab.js';
+         externalLink, PACE_SHORT, tripTagChips, drawText } from './vocab.js';
 import { flyout } from './overlay.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
@@ -33,10 +33,15 @@ const TABS = [['runs', 'RUNS'], ['breakdown', 'BREAKDOWN'], ['pivot', 'PIVOT'],
 
 /* The old dashboard's Race Lookup carried these and the owner prefers them:
  * every fact about a run, on one line, with the two links that let a figure be
- * checked against the source. RT (rating) is deliberately NOT here — the
- * scraper stopped populating `rating` from April 2026 alongside horse_id, so
- * the column would be mostly blank, and the owner's instruction is to
- * categorise by CLASS instead.
+ * checked against the source. RT (rating) is deliberately NOT here, and the
+ * reason recorded when it was left out was wrong: the scraper never stopped
+ * populating `rating`. The RESULTS write was erasing it — the racecard carries
+ * a rating and a result does not, and the upsert overwrote every column with
+ * whatever the newer row held, blank included. Fixed in store/upsert.py, so
+ * new meetings carry it again; April to July 2026 stayed blank and cannot be
+ * recovered from anything held locally. The column can come back when the
+ * coverage does. Until then the owner's instruction stands: categorise by
+ * CLASS.
  */
 const COLS = [
   { k: 'date', label: 'DATE' }, { k: 'r', label: 'R', cls: 'r' },
@@ -365,8 +370,9 @@ function renderFilterPanel() {
   host.append(grid);
 
   // Gate, finish and the numeric ranges. Rating mode is deliberately absent:
-  // `rating` stopped populating in April 2026, so the filter would exclude
-  // every recent run rather than narrow anything. Class is the categorisation.
+  // April-July 2026 has no rating on record (the results write erased what the
+  // card supplied — see the header comment), so the filter would exclude every
+  // recent run rather than narrow anything. Class is the categorisation.
   const modes = el('div', 'fp-grid');
 
   const gate = el('div', 'fp-group');
@@ -481,7 +487,7 @@ function runRow(r) {
   const horse = el('div', 'horse', r.horse_name);
   horse.title = r.horse_name;
   row.append(horse);
-  cell('r', r.draw ? String(r.draw) : DASH);
+  cell('r', drawText(r.draw));
   cell('r', r.actual_weight ? String(r.actual_weight) : DASH);
   cell(null, r.jockey);
   cell(null, r.trainer);

@@ -10,7 +10,7 @@
  */
 import { api, num } from './api.js';
 import { el, $, DASH, MINUS, renderNav, styleBadge, styleOrdinal,
-         compactDate, ordinal, tagLabel, tripTagChips } from './vocab.js';
+         compactDate, ordinal, tagLabel, tripTagChips, drawText } from './vocab.js';
 import { context } from './context.js';
 import { anchoredPanel } from './overlay.js';
 import { install as installPalette } from './palette.js';
@@ -613,7 +613,7 @@ function cardRow(r, index) {
   st.append(styleBadge(r.last_run?.pace_style, { chip: false }));
   tr.append(st);
 
-  tr.append(el('td', 'c-num', String(r.draw ?? DASH)));
+  tr.append(el('td', 'c-num', drawText(r.draw)));
   tr.append(el('td', null, r.jockey ?? DASH));
 
   const trn = el('td', r.trainer_changed ? 'trainer-changed' : null);
@@ -805,11 +805,18 @@ function formRow(f) {
   const tr = el('tr');
   tr.append(el('td', null, f.race_date?.slice(5) ?? DASH));
   tr.append(el('td', null, `${f.distance ?? DASH} ${f.going ?? ''}`));
-  const pos = el('td', 'c-right', String(f.place ?? f.place_code ?? DASH));
-  if (f.place === 1) pos.style.color = 'var(--win)';
+  // Classes, not inline styles. A colour written into the element cannot be
+  // restyled from the stylesheet, does not follow the tokens when they move,
+  // and is the one place on this page a rule could not reach.
+  const pos = el('td', `c-right${f.place === 1 ? ' won' : ''}`,
+    String(f.place ?? f.place_code ?? DASH));
   tr.append(pos);
-  const fig = el('td', 'c-right', f.et_figure ? num(f.et_figure, 0) : DASH);
-  if (f.et_figure) fig.style.color = f.et_figure >= 100 ? 'var(--win)' : 'var(--loss)';
+  // Presence, not truth. `f.et_figure ?` reads a figure of 0 as no figure;
+  // par is 100 so it cannot happen today, and it is the same falsy test that
+  // hid the missing draw for a week.
+  const hasFig = f.et_figure !== null && f.et_figure !== undefined;
+  const fig = el('td', `c-right${hasFig ? (f.et_figure >= 100 ? ' above' : ' below') : ''}`,
+    hasFig ? num(f.et_figure, 0) : DASH);
   tr.append(fig);
   tr.append(el('td', 'c-right', f.win_odds ? num(f.win_odds, 1) : DASH));
   return tr;

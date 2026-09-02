@@ -27,7 +27,7 @@
  * blocks. Going past one is a checkbox that gets recorded, not a wall.
  */
 import { api } from './api.js';
-import { el, DASH } from './vocab.js';
+import { el, DASH, drawText } from './vocab.js';
 
 const money = (v) => (v == null ? DASH : `$${Number(v).toLocaleString('en-HK',
   { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`);
@@ -209,7 +209,7 @@ function cardRow(r) {
   row.append(name);
 
   row.append(styleCell(r));
-  row.append(el('span', 'dr', r.draw == null ? DASH : String(r.draw)));
+  row.append(el('span', 'dr', drawText(r.draw)));
   row.append(el('span', 'jockey', r.jockey ?? DASH));
   row.append(el('span', 'win', r.win_odds == null ? DASH : r.win_odds.toFixed(1)));
   row.append(el('span', 'place', r.place_odds == null ? DASH : r.place_odds.toFixed(1)));

@@ -27,7 +27,23 @@ def _upsert(
     conn: sqlite3.Connection, table: str, cols: Sequence[str],
     keys: Sequence[str], rows: Sequence[Row],
 ) -> int:
-    """Generic idempotent write. Non-key columns are refreshed on conflict."""
+    """Generic idempotent write. A non-key column is refreshed on conflict WHEN
+    THE INCOMING ROW HAS A VALUE FOR IT, and left alone when it does not.
+
+    The distinction is the whole point. One runner is written by two different
+    scrapes: the racecard the day before carries the draw, the gear and the
+    rating and knows no result; the result afterwards carries the placing, the
+    time and the sectionals and has no gear column at all. A plain
+    `SET c = excluded.c` therefore had the result ERASE the gear and the rating
+    that the card had supplied — 0% of July 2026 runners had gear on record,
+    47% in June, ~86% in every month whose card was never overwritten.
+
+    Nothing errored, because nothing was wrong with either scrape. A NULL
+    arriving from a narrower source means "this source does not carry that
+    field", never "the value is now unknown", so it must not overwrite one that
+    is already stored. Correcting a value to blank is not a thing any of these
+    scrapes do; adding a field a previous scrape lacked is.
+    """
     if not rows:
         return 0
     updates = [c for c in cols if c not in keys]
@@ -35,7 +51,7 @@ def _upsert(
         f"INSERT INTO {table} ({', '.join(cols)}) "
         f"VALUES ({', '.join('?' for _ in cols)}) "
         f"ON CONFLICT ({', '.join(keys)}) DO UPDATE SET "
-        + ", ".join(f"{c} = excluded.{c}" for c in updates)
+        + ", ".join(f"{c} = coalesce(excluded.{c}, {table}.{c})" for c in updates)
     ) if updates else (
         f"INSERT INTO {table} ({', '.join(cols)}) "
         f"VALUES ({', '.join('?' for _ in cols)}) "

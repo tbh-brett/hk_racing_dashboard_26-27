@@ -297,6 +297,28 @@ def test_the_run_row_has_a_grid_of_its_own() -> None:
         "the run rows are not using --run-grid")
 
 
+def test_the_draw_is_rendered_through_one_function() -> None:
+    """Four files, five spellings, three of them a truthiness test.
+
+    No gate is numbered 0 so none of them was wrong, but each page reported a
+    MISSING draw in its own dialect, which is what made an outage that hit
+    every page at once look like four separate faults.
+    """
+    offenders = []
+    for f in sorted(ASSETS.glob("*.js")):
+        if f.name == VOCAB.name:
+            continue
+        text = _without_comments(f.read_text(encoding="utf-8"))
+        # `r.draw ?? 99` is a SORT key, not a rendering: it maps a missing
+        # draw to a sort position, which is a different job.
+        render = re.sub(r"\.draw \?\? \d+", "", text)
+        if re.search(r"\.draw\s*\?[^?]|String\(\w+\.draw", render):
+            offenders.append(f.name)
+    assert not offenders, (
+        "these render the draw inline instead of calling drawText: "
+        + ", ".join(offenders))
+
+
 def test_the_class_ladder_is_named_in_one_place() -> None:
     """"0" is a Group race and "Griffin Race" is not a class number at all.
 

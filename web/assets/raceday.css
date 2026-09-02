@@ -388,3 +388,10 @@ table.card td { padding: 6px 8px; }
 .h2h-gate .mv.wide { color: var(--style-closer); }
 .h2h-gate .mv.in { color: var(--style-leader); }
 .h2h-gate .mv.same { color: var(--text-faint); }
+
+/* The last-six panel's result colours. Previously written straight onto the
+   elements from JavaScript, which put them beyond the reach of every rule in
+   this file and of the tokens when they move. */
+.c-right.won   { color: var(--win); }
+.c-right.above { color: var(--win); }
+.c-right.below { color: var(--loss); }

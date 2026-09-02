@@ -213,6 +213,55 @@ def test_values_are_coerced_on_the_way_in(conn):
     assert isinstance(row["place"], int)
 
 
+def test_a_later_scrape_never_erases_what_an_earlier_one_knew(conn):
+    """The racecard carries gear, the draw and the rating; the result does not.
+
+    Written in that order with a plain overwrite, the result blanked the gear
+    and the rating for every meeting whose card had been scraped — which is why
+    July 2026 had gear on 0% of runners and the months before it had ~86%.
+    """
+    with transaction(conn):
+        upsert.upsert_races(conn, RACE)
+        upsert.upsert_runners(conn, [{
+            "race_date": RACE[0]["race_date"], "race_no": RACE[0]["race_no"],
+            "horse_no": 77, "horse_name": "CARD FIRST",
+            "draw": 7, "gear": "B/TT", "rating": 60,
+            "jockey": "J Moreira", "actual_weight": 130,
+        }])
+    with transaction(conn):
+        # The result: a placing and a time, and no gear column at all.
+        upsert.upsert_runners(conn, [{
+            "race_date": RACE[0]["race_date"], "race_no": RACE[0]["race_no"],
+            "horse_no": 77, "horse_name": "CARD FIRST",
+            "place": "1", "finish_time": "1:09.50",
+            "draw": 7, "jockey": "J Moreira", "actual_weight": 130,
+        }])
+    row = conn.execute("SELECT * FROM runners WHERE horse_no = 77").fetchone()
+    assert row["place"] == 1                # the result landed
+    assert row["gear"] == "B/TT"            # and did not take the gear with it
+    assert row["rating"] == 60
+    assert row["draw"] == 7
+
+
+def test_a_real_correction_still_overwrites(conn):
+    """Absent must not erase; PRESENT must still win, or a corrected card can
+    never be applied."""
+    with transaction(conn):
+        upsert.upsert_races(conn, RACE)
+        upsert.upsert_runners(conn, [{
+            "race_date": RACE[0]["race_date"], "race_no": RACE[0]["race_no"],
+            "horse_no": 78, "horse_name": "REDRAWN", "draw": 7, "gear": "B",
+        }])
+    with transaction(conn):
+        upsert.upsert_runners(conn, [{
+            "race_date": RACE[0]["race_date"], "race_no": RACE[0]["race_no"],
+            "horse_no": 78, "horse_name": "REDRAWN", "draw": 9, "gear": "B/XB",
+        }])
+    row = conn.execute("SELECT * FROM runners WHERE horse_no = 78").fetchone()
+    assert row["draw"] == 9
+    assert row["gear"] == "B/XB"
+
+
 def test_odds_snapshots_accumulate_and_are_never_replaced(conn):
     """Movement is the point. A second capture is a new row, not an overwrite."""
     with transaction(conn):

@@ -19,7 +19,7 @@
  */
 import { api, num } from './api.js';
 import { el, $, DASH, MINUS, renderNav, paceCell, styleBadge,
-         tripTagChips } from './vocab.js';
+         tripTagChips, drawText } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 import { loadTags, renderReview } from './review.js';
@@ -212,7 +212,7 @@ function detailBlock(runner, stewardsFor, booked) {
 
   const facts = el('div', 'facts');
   facts.append(factRow('GEAR', runner.gear || null));
-  facts.append(factRow('DRAW', runner.draw ? String(runner.draw) : null));
+  facts.append(factRow('DRAW', drawText(runner.draw)));
   facts.append(factRow('WEIGHT',
     runner.actual_weight ? `${runner.actual_weight} lb` : null));
   // Lane comes from the Comments on Running page, and only about a quarter of
@@ -310,7 +310,7 @@ function resultRow(runner, booked, backed) {
 
   row.append(el('div', 'r',
     runner.actual_weight ? String(runner.actual_weight) : DASH));
-  row.append(el('div', 'r', runner.draw ? String(runner.draw) : DASH));
+  row.append(el('div', 'r', drawText(runner.draw)));
   row.append(el('div', 'jockey', runner.jockey ?? DASH));
   row.append(el('div', 'trainer', runner.trainer ?? DASH));
 

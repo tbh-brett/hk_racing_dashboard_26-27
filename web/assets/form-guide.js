@@ -13,7 +13,7 @@ import { api, num, signed } from './api.js';
 import { el, $, DASH, MINUS, renderNav, styleClass, styleOrdinal,
          replayUrl, trialReplayUrl, externalLink, compactDate,
          tripTags, tripTagChips, ordinal, classCell, classLabel, eszCell,
-         paceCell, positionsText, conditionLabel } from './vocab.js';
+         paceCell, positionsText, conditionLabel, drawText } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 import { loadTags, renderReview } from './review.js';
@@ -306,7 +306,7 @@ function horseRow(runner) {
   st.append(el('span', styleClass(last?.pace_style), last?.pace_style ?? 'UNKNOWN'));
   row.append(st);
 
-  row.append(el('div', 'dr', String(runner.draw ?? DASH)));
+  row.append(el('div', 'dr', drawText(runner.draw)));
   row.append(el('div', 'jockey', runner.jockey ?? DASH));
 
   const changed = last?.trainer && runner.trainer && last.trainer !== runner.trainer;
@@ -540,7 +540,7 @@ function runRow(runner, run, index) {
   row.append(tr);
 
   row.append(el('div', 'wt', String(run.actual_weight ?? DASH)));
-  row.append(el('div', 'dr', String(run.draw ?? DASH)));
+  row.append(el('div', 'dr', drawText(run.draw)));
 
   // ── how fast away, and where it sat ─────────────────────────────────────
   // The draw says where it started; ESZ says what it did with it. A wide gate
@@ -869,7 +869,8 @@ function renderAside() {
     [race.venue, race.distance ? `${race.distance}m` : null,
      classLabel(race.race_class), race.going,
      race.course ? `COURSE ${race.course}` : null,
-     runner.draw ? `DRAW ${runner.draw}` : null].filter(Boolean).join(' · ')));
+     runner.draw == null ? null : `DRAW ${runner.draw}`]
+      .filter(Boolean).join(' · ')));
 
   const parts = [hd, sub];
   const cells = state.fitFor === runner.horse_name ? state.fit : null;
