@@ -98,13 +98,45 @@ def scrape_meeting(date: str, venue: str, *, post_race: bool = False,
     # source for rating, gear and days-since-last. It is fetched first so a
     # meeting can be scraped ahead of time and again after — the second pass
     # upserts the results onto the same rows.
+    declared: dict[int, set[str]] = {}
     try:
         card = racecard_ingest.fetch_meeting(date, venue, max_races=max_races,
                                              session=session)
         report.declared = _store_card(db, card)
         report.warnings.extend(f"racecard: {e}" for e in card["errors"])
+        # Kept to check the results against. See `_is_same_meeting`.
+        for race in card["races"]:
+            declared[race["race"]["race_no"]] = {
+                (r.get("horse_name") or "").strip().upper()
+                for r in race["runners"] if r.get("horse_name")}
     except (FetchError, racecard_ingest.RacecardError) as e:
         report.warnings.append(f"racecard: {e}")
+
+    # NOTHING POST-RACE IS FETCHED BEFORE THE RACE. Asked for the results of a
+    # meeting that has not been run, HKJC does not answer 404 — it serves a
+    # page, and `_store_race` stamps the date we ASKED for onto whatever came
+    # back. That wrote another meeting's runners, odds and finishing positions
+    # under this date: a 6 Sep card showing 15 Jul's twelve horses at 15 Jul's
+    # prices, with the two genuinely new runners left underneath.
+    #
+    # There is nothing to fetch yet, so the fix is to not ask.
+    if date >= _today():
+        # The VET RECORD is the exception, and the reason it is fetched here
+        # rather than with the post-race sources: it is not an account of the
+        # race, it is each declared runner's veterinary history — examinations
+        # from previous months, attached to today's field. It is published with
+        # the card and it is the single most useful thing to know before
+        # backing anything.
+        try:
+            notes = vet_ingest.fetch_meeting(date, venue, max_races=max_races,
+                                             session=session)
+            report.vet_records = _store_vet(db, notes)
+        except (FetchError, vet_ingest.VetError) as e:
+            report.warnings.append(f"vet: {e}")
+        report.warnings.append(
+            f"results: not published yet — {date} has not been run")
+        _log_sources(db, report, post_race=post_race, pre_race=True)
+        return report
 
     try:
         races = results_ingest.fetch_meeting(date, venue, max_races=max_races,
@@ -123,6 +155,19 @@ def scrape_meeting(date: str, venue: str, *, post_race: bool = False,
         # successful run on record" after a card scrape that worked.
         _log_sources(db, report, post_race=post_race)
         return report
+
+    # A second line of defence for every other way a page can be substituted:
+    # the results must describe the field the card declared. Storing a race
+    # whose runners this meeting never had is worse than storing nothing,
+    # because nothing about the rows afterwards says they are from elsewhere.
+    wrong = [r for r in races if not _is_same_meeting(r, declared)]
+    if wrong:
+        report.errors.append(
+            f"results: the page returned for {date} {venue} lists runners this "
+            f"meeting did not declare (races "
+            f"{', '.join(str(r.get('race_no')) for r in wrong)}) — refusing to "
+            f"store another meeting's results under this date")
+        races = [r for r in races if r not in wrong]
 
     conn = get_conn(db if db is not None else db_path())
     try:
@@ -172,12 +217,33 @@ def scrape_meeting(date: str, venue: str, *, post_race: bool = False,
 _HK = dt.timezone(dt.timedelta(hours=8))
 
 
+def _is_same_meeting(race: dict, declared: dict[int, set[str]]) -> bool:
+    """Do these results belong to the card we declared?
+
+    Only checkable when the card was read — with no declared field there is
+    nothing to compare against and the results are taken at their word.
+    A field changes between declaration and running (scratchings, reserves),
+    so this asks for a MAJORITY overlap rather than an exact match: a wholly
+    different meeting shares almost no horses, and a real card shares nearly
+    all of them.
+    """
+    want = declared.get(race.get("race_no"))
+    if not want:
+        return True
+    got = {(r.get("horse_name") or "").strip().upper()
+           for r in race.get("runners", []) if r.get("horse_name")}
+    if not got:
+        return True
+    return len(got & want) * 2 > len(got)
+
+
 def _today() -> str:
     """Today in Hong Kong, where the meetings are."""
     return dt.datetime.now(_HK).date().isoformat()
 
 
-def _log_sources(db, report: ScrapeReport, *, post_race: bool) -> None:
+def _log_sources(db, report: ScrapeReport, *, post_race: bool,
+                 pre_race: bool = False) -> None:
     """Record each source separately, for the freshness strip.
 
     One job fetches four sources that go stale at very different rates, and a
@@ -199,17 +265,19 @@ def _log_sources(db, report: ScrapeReport, *, post_race: bool) -> None:
     # race. There is no success or failure to record when the meeting has not
     # been run — and a strip that marks three sources failed every race
     # morning is a strip nobody reads by the afternoon.
+    # The vet record is published with the card, so it is claimed either way
+    # whenever it was actually fetched — before the race as well as after.
+    if pre_race or post_race:
+        entries.append(("vet", "vet" not in failed,
+                        f"{report.vet_records} records"))
     run_yet = not (report.date >= _today() and report.races == 0)
     if run_yet:
         entries.append(
             ("results", report.races > 0,
              f"{report.races} races · {report.runners} runners"))
         if post_race:
-            entries += [
-                ("dividends", "dividends" not in failed,
-                 f"{report.dividends} dividends"),
-                ("vet", "vet" not in failed, f"{report.vet_records} records"),
-            ]
+            entries.append(("dividends", "dividends" not in failed,
+                            f"{report.dividends} dividends"))
     conn = get_conn(db if db is not None else db_path())
     try:
         init_db(conn)

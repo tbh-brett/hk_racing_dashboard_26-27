@@ -320,11 +320,113 @@ def test_missing_results_after_the_race_is_still_an_error(monkeypatch, tmp_path)
 
 def test_sources_that_only_exist_after_a_race_are_not_claimed_before_it(
         pre_race, tmp_path):
-    """Dividends and vet records do not exist until the meeting is run, so a
+    """Results and dividends do not exist until the meeting is run, so a
     pre-race scrape has neither succeeded nor failed at them. Recording them
-    as successful with "0 records" is the same silent zero the freshness strip
-    exists to catch."""
+    as successful with "0 rows" is the same silent zero the freshness strip
+    exists to catch.
+
+    The vet record is NOT one of those: it is each declared runner's
+    veterinary history, published with the card, so it is claimed either way.
+    """
     conn = get_conn(tmp_path / "t.db")
     logged = dict(conn.execute("SELECT job, ok FROM job_runs").fetchall())
     conn.close()
-    assert logged == {"scrape_meeting:card": 1}
+    assert set(logged) == {"scrape_meeting:card", "scrape_meeting:vet"}
+    assert logged["scrape_meeting:card"] == 1
+
+
+# ── another meeting's results must never land under this date ────────────────
+#
+# Asked for the results of a meeting that has not been run, HKJC does not
+# answer 404 — it serves a page. `_store_race` stamps the date we ASKED for
+# onto whatever came back, so the 6 Sep card showed 15 Jul's twelve horses at
+# 15 Jul's prices, with the two genuinely new runners left underneath. Nothing
+# about the stored rows said they were from elsewhere.
+
+_OTHER_MEETING = [{
+    "race_no": 1, "venue": "HV", "course": "C", "going": "G", "distance": 1650,
+    "race_class": "5",
+    "runners": [{"horse_no": i, "horse_name": f"OLD HORSE {i}",
+                 "place": str(i), "win_odds": 7.0 + i} for i in range(1, 13)],
+}]
+
+
+def test_post_race_sources_are_not_fetched_before_the_race(monkeypatch, tmp_path):
+    """The fix is to not ask. Nothing post-race exists yet."""
+    asked = []
+    monkeypatch.setattr(scrape_meeting.racecard_ingest, "fetch_meeting",
+                        lambda *a, **k: _CARD)
+    monkeypatch.setattr(scrape_meeting.results_ingest, "fetch_meeting",
+                        lambda *a, **k: asked.append("results") or _OTHER_MEETING)
+    r = scrape_meeting.scrape_meeting("2099-01-01", "ST", db=tmp_path / "t.db",
+                                      post_race=True)
+    assert asked == [], "results were fetched for a meeting nobody has run"
+    assert r.declared == 12 and r.ok is True
+
+
+def test_results_for_a_field_this_meeting_never_declared_are_refused(
+        monkeypatch, tmp_path):
+    """The second line of defence, for a date in the past where we do ask."""
+    past_card = {"races": [{**_CARD["races"][0],
+                            "race": {**_CARD["races"][0]["race"],
+                                     "race_date": "2020-01-01"}}],
+                 "errors": []}
+    monkeypatch.setattr(scrape_meeting.racecard_ingest, "fetch_meeting",
+                        lambda *a, **k: past_card)
+    monkeypatch.setattr(scrape_meeting.results_ingest, "fetch_meeting",
+                        lambda *a, **k: _OTHER_MEETING)
+    r = scrape_meeting.scrape_meeting("2020-01-01", "ST", db=tmp_path / "t.db")
+
+    assert any("did not declare" in e for e in r.errors)
+    conn = get_conn(tmp_path / "t.db")
+    names = [x[0] for x in conn.execute(
+        "SELECT horse_name FROM runners WHERE race_date='2020-01-01'").fetchall()]
+    conn.close()
+    assert not any(n.startswith("OLD HORSE") for n in names), \
+        "another meeting's runners were stored under this date"
+    assert r.ok is False
+
+
+def test_the_real_field_is_still_stored_when_it_matches(monkeypatch, tmp_path):
+    """The guard asks for a majority overlap, so scratchings and reserves do
+    not make a genuine card look like a substitution."""
+    past_card = {"races": [{**_CARD["races"][0],
+                            "race": {**_CARD["races"][0]["race"],
+                                     "race_date": "2020-01-01"}}],
+                 "errors": []}
+    real = [{"race_no": 1, "venue": "ST", "course": "A", "going": "G",
+             "distance": 1200, "race_class": "4",
+             # Ten of the twelve declared, plus one late reserve.
+             "runners": ([{"horse_no": i, "horse_name": f"H{i}", "place": str(i)}
+                          for i in range(1, 11)]
+                         + [{"horse_no": 13, "horse_name": "RESERVE",
+                             "place": "11"}])}]
+    monkeypatch.setattr(scrape_meeting.racecard_ingest, "fetch_meeting",
+                        lambda *a, **k: past_card)
+    monkeypatch.setattr(scrape_meeting.results_ingest, "fetch_meeting",
+                        lambda *a, **k: real)
+    r = scrape_meeting.scrape_meeting("2020-01-01", "ST", db=tmp_path / "t.db")
+    assert r.races == 1 and r.runners == 11
+    assert not any("did not declare" in e for e in r.errors)
+
+
+def test_the_vet_record_is_fetched_before_the_race(monkeypatch, tmp_path):
+    """It is a history attached to today's field, not an account of the race,
+    and it is the single most useful thing to know before backing anything."""
+    asked = []
+    monkeypatch.setattr(scrape_meeting.racecard_ingest, "fetch_meeting",
+                        lambda *a, **k: _CARD)
+    monkeypatch.setattr(scrape_meeting.results_ingest, "fetch_meeting",
+                        lambda *a, **k: asked.append("results") or [])
+    monkeypatch.setattr(
+        scrape_meeting.vet_ingest, "fetch_meeting",
+        lambda *a, **k: asked.append("vet") or {1: [
+            {"race_date": "2099-01-01", "race_no": 1, "horse_no": 1,
+             "horse_name": "H1", "record_date": "2026-06-12",
+             "detail": "lameness in the near fore", "passed_date": None,
+             "category": "PHYSICAL"}]})
+    r = scrape_meeting.scrape_meeting("2099-01-01", "ST", db=tmp_path / "t.db",
+                                      post_race=True)
+    assert "vet" in asked, "the vet record was not fetched for a live card"
+    assert "results" not in asked
+    assert r.vet_records == 1

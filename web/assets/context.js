@@ -326,7 +326,13 @@ class MeetingContext {
       const r = await api.scrape(body);
       const wrote = Object.entries(r.wrote ?? {})
         .filter(([, n]) => n).map(([k, n]) => `${n} ${k}`).join(' · ');
+      // The analysis is reported beside the rows, not added to them: a
+      // rebuild touches the whole archive and its counts would swamp the
+      // field that was just fetched.
+      const built = Object.entries(r.derived ?? {})
+        .filter(([, n]) => n).map(([k, n]) => `${n} ${k}`).join(' · ');
       const outcome = `${source.name}: ${wrote || 'wrote nothing'}`
+        + (built ? `\nanalysis: ${built}` : '')
         + (r.warnings?.length ? `\n${r.warnings.join('\n')}` : '')
         + (r.errors?.length ? `\n${r.errors.join('\n')}` : '');
       // Re-read the strip so every source's age is the truth again, not just

@@ -40,14 +40,14 @@ def test_a_meeting_scrape_will_not_guess_the_meeting() -> None:
 def test_the_three_meeting_sources_share_one_fetch(source: str) -> None:
     """The strip reports them separately because they FAIL separately, not
     because they are separate requests to HKJC."""
-    from hkrd.api.app import _SCRAPE_JOBS
+    from hkrd.api.routes.jobs import _SCRAPE_JOBS
     assert _SCRAPE_JOBS[source] == "meeting"
 
 
 def test_every_source_on_the_strip_can_be_run() -> None:
     """A strip that says a source is stale and offers no way to fetch it is
     the diagnosis without the fix — which is the state this replaced."""
-    from hkrd.api.app import _SCRAPE_JOBS
+    from hkrd.api.routes.jobs import _SCRAPE_JOBS
     from hkrd.query.freshness import SOURCES
     missing = [s["key"] for s in SOURCES if s["key"] not in _SCRAPE_JOBS]
     assert not missing, f"the strip shows {missing} with no way to fetch them"
