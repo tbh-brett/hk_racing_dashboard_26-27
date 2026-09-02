@@ -183,10 +183,23 @@ function draw() {
     row.append(el('span', 'label', it.label));
     if (it.hint) row.append(el('span', 'hint', it.hint));
     row.addEventListener('click', () => { it.run(); close(); });
-    row.addEventListener('mouseenter', () => { state.cursor = i; draw(); });
+    // MOVE the highlight; do not rebuild the list to draw it. `draw()` calls
+    // replaceChildren, so redrawing on mouseenter destroyed the row the
+    // pointer was on: the mousedown landed on a node that no longer existed
+    // by mouseup, no click event was ever produced, and the ONLY meeting
+    // picker in the app could not be clicked with a mouse. Arrow keys and
+    // Enter still worked, which is how it went unnoticed.
+    row.addEventListener('mouseenter', () => highlight(i));
     list.append(row);
   });
-  list.children[state.cursor]?.scrollIntoView({ block: 'nearest' });
+  highlight(state.cursor);
+}
+
+/** The cursor, as a class on the rows that are already there. */
+function highlight(i) {
+  state.cursor = i;
+  [...list.children].forEach((row, n) => row.classList.toggle('on', n === i));
+  list.children[i]?.scrollIntoView({ block: 'nearest' });
 }
 
 function onKey(e) {
@@ -195,8 +208,8 @@ function onKey(e) {
     e.preventDefault();
     const n = state.shown.length;
     if (!n) return;
-    state.cursor = (state.cursor + (e.key === 'ArrowDown' ? 1 : -1) + n) % n;
-    draw();
+    // Same reason as the mouse: move the highlight rather than rebuilding.
+    highlight((state.cursor + (e.key === 'ArrowDown' ? 1 : -1) + n) % n);
     return;
   }
   if (e.key === 'Enter') {

@@ -615,11 +615,17 @@ function cardRow(r, index) {
   const vet = r.vet ?? [];
   if (vet.length) {
     const worst = vet.find((v) => v.grade === 'significant') ?? vet[0];
+    // A tag, in the same shape and the same colour family as every other tag
+    // on this row. It used to read "VET !" in a style of its own, which made
+    // the one chip about the horse's soundness look like a different kind of
+    // object from the chip beside it saying what went wrong in the race.
     const chip = el('span',
-      `vet vet-${worst.grade}${worst.cleared ? ' cleared' : ''}`,
-      worst.grade === 'significant' ? 'VET !' : 'VET');
-    chip.title = vet.map((v) => `${v.record_date} · ${v.category} · ${v.detail}`
-      + (v.passed_date ? ` (cleared ${v.passed_date})` : '')).join('\n');
+      `trip vet vet-${worst.grade}${worst.cleared ? ' cleared' : ''}`,
+      `VET${vet.length > 1 ? ` +${vet.length - 1}` : ''}`);
+    // NO `title`. The panel below is the reading of these records — grouped,
+    // dated, coloured by category, with what cleared them. The browser's own
+    // tooltip drew the same text again in a white box on top of it, so every
+    // hover produced two answers to one question.
     // Bound once, at construction. anchoredPanel attaches mouseenter/mouseleave
     // to the trigger, so calling it from a click handler would stack a fresh
     // pair of listeners on every click.
@@ -806,11 +812,22 @@ function renderDetail() {
   const disagreements = rows
     .filter((x) => x.rank_delta !== null && x.rank_delta !== undefined)
     .sort((a, b) => a.rank_delta - b.rank_delta).slice(0, 3);
-  if (!disagreements.length) dis.append(el('div', 'empty', 'no model ranks'));
+  // Edge is the MODEL's rank minus the MARKET's, so it needs both. Before the
+  // market opens there is no second opinion to disagree with — and saying "no
+  // model ranks" then blamed the model for the market's absence, on a card
+  // whose SARR column was fully populated.
+  if (!disagreements.length) {
+    const rated = rows.some((x) => x.sarr_rank != null);
+    const priced = rows.some((x) => x.market_rank != null);
+    dis.append(el('div', 'empty',
+      !rated ? 'no model ranks — run the analysis'
+        : !priced ? 'no market yet — edge needs odds to disagree with'
+          : 'model and market agree'));
+  }
   disagreements.forEach((x) => {
     const row = el('div', 'dis-row');
     const e = el('span', 'e', x.rank_delta > 0 ? `+${x.rank_delta}` : String(x.rank_delta));
-    e.style.color = x.rank_delta <= -3 ? 'var(--edge)' : 'var(--text-dim)';
+    e.classList.add(x.rank_delta <= -3 ? 'strong' : 'quiet');
     row.append(e);
     row.append(el('span', null, `${x.horse_no} ${x.horse_name}`));
     row.append(el('span', 'r', `SARR ${x.sarr_rank ?? DASH} · MKT ${x.market_rank ?? DASH}`));

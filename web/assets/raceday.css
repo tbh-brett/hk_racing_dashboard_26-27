@@ -293,11 +293,18 @@ table.card td { padding: 6px 8px; }
  * passed post-race examination sits on nearly every runner's record, and a
  * badge that fires on everyone is a badge nobody reads. Copper rather than the
  * alert red — a vet note is information, not a warning about the bet.        */
+/* Sized and spaced like `.trip` beside it, which it now also carries: same
+   10px, same padding, same border weight. It was 9px with its own letter
+   spacing, so the row's one chip about the horse's SOUNDNESS read as a
+   different class of object from the chip about its trip. */
 .rd-row .vet {
-  font-size: 9px; letter-spacing: .04em; padding: 1px 4px;
+  font-size: 10px; letter-spacing: .04em; padding: 1px 5px;
   border: 1px solid var(--line-2); color: var(--text-muted); cursor: help;
   white-space: nowrap;
 }
+/* Copper, deliberately not the alert red the findings chip uses: a vet RECORD
+   is a history — often cleared, often months old — while "BLED" beside it is
+   what the stewards found last start. Two different claims, two tones. */
 .rd-row .vet-significant {
   color: var(--incident); border-color: var(--incident);
 }
@@ -402,3 +409,9 @@ table.card td { padding: 6px 8px; }
 .c-right.won   { color: var(--win); }
 .c-right.above { color: var(--win); }
 .c-right.below { color: var(--loss); }
+
+/* Model-vs-market disagreement, as classes rather than inline styles: a colour
+   written onto the element from JavaScript is beyond the reach of every rule
+   in this file and does not follow the tokens when they move. */
+.dis-row .e.strong { color: var(--edge); }
+.dis-row .e.quiet  { color: var(--text-dim); }
