@@ -131,6 +131,8 @@ def race_pace_rows(runners: Sequence[dict[str, Any]], distance: int) -> list[dic
         return []
     field_size = len(runners)
 
+    lengths = section_lengths(distance)      # raises if the distance is unknown
+
     parsed: list[dict[str, Any]] = []
     for r in runners:
         key = f"{r.get('race_date')} R{r.get('race_no')} #{r.get('horse_no')}"
@@ -138,6 +140,33 @@ def race_pace_rows(runners: Sequence[dict[str, Any]], distance: int) -> list[dic
             splits = parse_section_times(r.get("section_times"))
         except Exception as e:
             raise PaceError(f"{key}: {e}") from None
+
+        # A runner with FEWER splits than the distance calls for did not
+        # complete the race — pulled up, fell, unseated. It has no pace figure
+        # and never will, but it must not take the rest of the field with it.
+        # It did once: a single non-finisher raised out of this loop and voided
+        # the pace for all fourteen runners, which is how 377 runners across 30
+        # races ended up with no pace at all. AGENTS.md, Error handling: a
+        # missing minor input must never void a whole result.
+        #
+        # MORE splits than expected is a different thing entirely. That means
+        # the section layout for this distance is wrong, which is a fault in
+        # SECTION_LENGTHS rather than in one horse's race, and it still raises.
+        if splits and len(splits) > len(lengths):
+            raise PaceError(
+                f"{key}: distance {distance} expects {len(lengths)} sections, "
+                f"got {len(splits)} — the section layout is wrong, not the horse")
+
+        if splits and len(splits) < len(lengths):
+            parsed.append({
+                "race_date": r.get("race_date"), "race_no": r.get("race_no"),
+                "horse_no": r.get("horse_no"),
+                "sec_400": None, "early_pace": None, "late_pace": None,
+                "pace_style": classify_style(r.get("running_positions"), field_size),
+                "incomplete": True,
+            })
+            continue
+
         norm = per_400(splits, distance) if splits else ()
         early, late = _early_late(norm)
         parsed.append({
@@ -146,6 +175,7 @@ def race_pace_rows(runners: Sequence[dict[str, Any]], distance: int) -> list[dic
             "sec_400": ";".join(f"{v:.3f}" for v in norm) or None,
             "early_pace": early, "late_pace": late,
             "pace_style": classify_style(r.get("running_positions"), field_size),
+            "incomplete": False,
         })
 
     med_early = _median_of([p["early_pace"] for p in parsed])

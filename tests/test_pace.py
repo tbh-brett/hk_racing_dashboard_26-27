@@ -133,3 +133,66 @@ def test_runners_without_sectionals_degrade_rather_than_void_the_race():
 
 def test_empty_race_returns_empty():
     assert pace.race_pace_rows([], 1800) == []
+
+
+# ── one horse that did not finish must not void the field ────────────────────
+#
+# This was live. A runner that pulled up carries a short section list — HKJC
+# records what it completed and pads the rest — and per_400's length check
+# raised out of the per-runner loop in race_pace_rows, taking the whole race
+# with it. Measured on the real database: 30 races, 377 runners with no pace
+# figure at all, every one of them a full field killed by a single non-finisher.
+# AGENTS.md, Error handling: a missing minor input must never void a whole
+# result.
+
+def test_one_non_finisher_does_not_remove_the_fields_pace():
+    runners = _race([
+        [24.0, 23.0, 23.0],
+        [24.5, 23.2, 22.8],
+        [24.2, 23.1, 23.4],
+        [24.1],                      # pulled up after the first section
+    ])
+    rows = pace.race_pace_rows(runners, 1200)
+
+    assert len(rows) == 4, "every runner keeps a row"
+    finished = [r for r in rows if not r["incomplete"]]
+    assert len(finished) == 3
+    assert all(r["early_pace"] is not None for r in finished)
+
+
+def test_the_non_finisher_gets_no_figure_but_keeps_its_style():
+    """It has no pace and never will. Its running positions are still real."""
+    runners = _race([
+        [24.0, 23.0, 23.0],
+        [24.5, 23.2, 22.8],
+        [24.1],
+    ], positions=["1 1 1", "3 3 2", "8 9 9"])
+    rows = pace.race_pace_rows(runners, 1200)
+
+    short = [r for r in rows if r["incomplete"]]
+    assert len(short) == 1
+    assert short[0]["early_pace"] is None
+    assert short[0]["late_pace"] is None
+    assert short[0]["sec_400"] is None
+    assert short[0]["pace_style"] is not None
+
+
+def test_the_median_ignores_the_non_finisher():
+    """Otherwise one short runner drags the field's centre and every deviation
+    beside it is wrong — a quieter failure than the one this replaced."""
+    full = _race([[24.0, 23.0, 23.0], [26.0, 23.0, 23.0], [28.0, 23.0, 23.0]])
+    with_dnf = full + _race([[24.1]])[:1]
+    with_dnf[-1]["horse_no"] = 4
+
+    a = {r["horse_no"]: r["early_dev"] for r in pace.race_pace_rows(full, 1200)}
+    b = {r["horse_no"]: r["early_dev"] for r in pace.race_pace_rows(with_dnf, 1200)}
+    for horse in (1, 2, 3):
+        assert a[horse] == pytest.approx(b[horse])
+
+
+def test_too_many_sections_still_raises_because_that_is_our_bug():
+    """Short means a horse stopped. LONG means the section layout for this
+    distance is wrong, which is a fault in the table and must stay loud."""
+    runners = _race([[24.0, 23.0, 23.0], [24.0, 23.0, 23.0, 23.0, 23.0]])
+    with pytest.raises(pace.PaceError, match="section layout is wrong"):
+        pace.race_pace_rows(runners, 1200)

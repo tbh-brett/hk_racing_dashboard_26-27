@@ -214,3 +214,28 @@ Then just describe what you want in plain English. Useful things to say:
   down, and they are what keeps the rebuild from turning back into the old one
 - "run the tests before you tell me it works"
 - "show me the page before and after"
+
+---
+
+## 11. Missing pace figures, incidents or tags on Results
+
+Different from section 9. That one is about data the archive never had; this is
+about data an earlier scrape got wrong or skipped.
+
+```powershell
+.\ops\repair.ps1          # what is damaged — fetches nothing
+.\ops\repair.ps1 -Fix     # repair it
+```
+
+Three problems, three costs, and the job separates them so you are not waiting
+on a fetch you do not need:
+
+| | What went wrong | Cost |
+|---|---|---|
+| **pace** | A horse that pulled up carries a short list of section times, and that used to void the pace figure for its **entire field** — 30 races, 377 runners. Fixed in the code; the figures just need recomputing. | instant, no fetching |
+| **comments on running** | 89 meetings have none, because the archive's incident reports only begin September 2025. Fetching the comments page alone is ~11 requests a meeting, not the ~30 a full re-scrape costs. **Tags come free** — they are read back out of the comments. | ~20 minutes |
+| **race headers** | Five races lost their distance and class, so no pace could be computed for them either. | seconds |
+
+Run `-Fix -Only pace` first if you want the instant half immediately. Repairing
+is always safe to re-run — every write replaces the same row rather than adding
+another.

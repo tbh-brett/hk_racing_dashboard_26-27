@@ -62,6 +62,7 @@ def rebuild_pace(db: Path | None = None, *, date: str | None = None,
 
         rows: list[tuple] = []
         malformed = 0
+        incomplete = 0
         for race in races:
             runners = [dict(r) for r in conn.execute(
                 "SELECT horse_no, section_times, running_positions, finish_time "
@@ -80,6 +81,13 @@ def rebuild_pace(db: Path | None = None, *, date: str | None = None,
                 malformed += 1
                 continue
             for row in computed:
+                # An incomplete runner still gets a row: its figures are null
+                # because it did not finish, but pace_style comes from the
+                # running positions and is real. A row of nulls and no row at
+                # all are different answers, and only one of them says "this
+                # horse pulled up".
+                if row.get("incomplete"):
+                    incomplete += 1
                 rows.append((
                     race["race_date"], race["race_no"], row["horse_no"],
                     row.get("sec_400"), row.get("early_pace"), row.get("late_pace"),
@@ -97,6 +105,8 @@ def rebuild_pace(db: Path | None = None, *, date: str | None = None,
                 "derive_version) VALUES (?,?,?,?,?,?,?,?,?,?,?)", rows)
         report.written["runner_pace"] = len(rows)
         report.skipped["pace"] = malformed
+        if incomplete:
+            report.skipped["pace, non-finishers"] = incomplete
     finally:
         conn.close()
     return report
