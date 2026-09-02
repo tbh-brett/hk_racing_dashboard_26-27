@@ -78,9 +78,16 @@ def tags_bulk(conn: Connection, keys: Sequence[tuple[str, int, int]]
     wanted = {(str(d), int(n), int(h)) for d, n, h in keys}
     if not wanted:
         return {}
+    # Bounded by the dates actually asked for. Reading the whole table and
+    # discarding the rest costs one full scan per page — 20,744 rows today and
+    # another 20,744 every season, to answer about 500. The date range is the
+    # cheap bound: a Lookup page spans days or months, never the archive.
+    lo = min(k[0] for k in wanted)
+    hi = max(k[0] for k in wanted)
     out: dict[tuple[str, int, int], tuple[list[str], list[str]]] = {}
     for r in conn.execute(
-            "SELECT race_date, race_no, horse_no, tag FROM runner_tags ORDER BY tag"):
+            "SELECT race_date, race_no, horse_no, tag FROM runner_tags "
+            "WHERE race_date BETWEEN ? AND ? ORDER BY tag", (lo, hi)):
         key = (r["race_date"], r["race_no"], r["horse_no"])
         if key not in wanted:
             continue
