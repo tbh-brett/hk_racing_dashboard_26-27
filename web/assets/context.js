@@ -18,6 +18,31 @@
  */
 import { api } from './api.js';
 import { el } from './vocab.js';
+import { flyout, place } from './overlay.js';
+
+/** The next Hong Kong race day, as {date, venue}.
+ *
+ *  Wednesday is Happy Valley, Saturday is Sha Tin. A default, not a schedule:
+ *  the season has festival meetings on other days and the odd swapped venue,
+ *  which is why the panel shows both fields rather than assuming. Today
+ *  counts — a card goes up days ahead and is worth fetching on the day too.
+ */
+function nextRaceDay(from = new Date()) {
+  const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  for (let i = 0; i < 8; i += 1) {
+    const day = d.getDay();
+    if (day === 3) return { date: iso(d), venue: 'HV' };   // Wednesday
+    if (day === 6) return { date: iso(d), venue: 'ST' };   // Saturday
+    d.setDate(d.getDate() + 1);
+  }
+  return { date: iso(d), venue: 'ST' };
+}
+
+function iso(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    + `-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 
 const LAYER_1 = '.chrome-meeting';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -196,6 +221,7 @@ class MeetingContext {
     if (!sources) return box;
     sources.forEach((s) => {
       const chip = el('span', `src${s.stale ? ' is-stale' : ''}`);
+      chip.dataset.source = s.key;      // so an outcome can find it after a redraw
       chip.append(el('span', 'name', s.name));
       chip.append(el('span', s.stale ? 'stale' : s.minutes === null ? 'never' : 'ok',
         `${s.mark}${s.minutes === null ? '' : ` ${s.age}`}`));
@@ -210,7 +236,15 @@ class MeetingContext {
       // you refresh just that source" since it was written. It was never wired.
       chip.setAttribute('role', 'button');
       chip.tabIndex = 0;
-      const go = () => this._scrape(s, chip);
+      // A meeting scrape needs a meeting, and the header only ever knows one
+      // that is ALREADY in the database — which a new card, by definition, is
+      // not. So the button that exists to fetch a card that has just gone up
+      // could only ever re-fetch one already held, and clicking it on the
+      // newest stored meeting asked HKJC for a card taken down weeks ago.
+      // Ask which meeting instead, defaulting to the next race day.
+      const go = (e) => (s.key === 'card' || s.key === 'results' || s.key === 'vet')
+        ? this._askMeeting(e, s, chip)
+        : this._scrape(s, chip);
       chip.addEventListener('click', go);
       chip.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
@@ -220,34 +254,90 @@ class MeetingContext {
     return box;
   }
 
+  /** Which meeting to fetch. Defaults to the next race day, editable.
+   *
+   *  Hong Kong races Wednesday and Saturday — Happy Valley midweek, Sha Tin at
+   *  the weekend — so the default is right most weeks and wrong harmlessly:
+   *  it is two fields the reader can see and correct before anything is
+   *  fetched.
+   */
+  _askMeeting(ev, source, chip) {
+    const next = nextRaceDay();
+    const panel = el('div', 'panel meeting-panel');
+    panel.append(el('div', 'cap', `FETCH ${source.name.toUpperCase()} FOR`));
+
+    const row = el('div', 'meeting-pick');
+    const date = el('input');
+    date.type = 'date';
+    date.value = next.date;
+    const venue = el('select');
+    [['ST', 'Sha Tin'], ['HV', 'Happy Valley']].forEach(([v, name]) => {
+      const o = el('option', null, name);
+      o.value = v;
+      if (v === next.venue) o.selected = true;
+      venue.append(o);
+    });
+    row.append(date, venue);
+    panel.append(row);
+
+    const act = el('button', 'go', 'FETCH');
+    panel.append(act);
+    panel.append(el('div', 'note',
+      'The card goes up a few days before the meeting. Nothing is stored '
+      + 'until HKJC has published it.'));
+
+    // A flyout, not the hover panel used elsewhere on this strip: this one has
+    // fields in it, and a panel that closes when the pointer leaves cannot be
+    // typed into.
+    const close = flyout(panel, {});
+    const pos = place(chip.getBoundingClientRect(),
+                      { width: panel.offsetWidth, height: panel.offsetHeight });
+    panel.style.left = `${pos.left}px`;
+    panel.style.top = `${pos.top}px`;
+    act.addEventListener('click', () => {
+      close();
+      this._scrape(source, chip, { date: date.value, venue: venue.value });
+    });
+    date.focus();
+  }
+
   /** Fetch one source now, and say what it wrote.
    *
    *  Never a spinner that ends in silence: the counts land on the chip itself,
    *  because a scrape that ran and stored nothing looks exactly like one that
    *  worked until somebody checks a price.
    */
-  async _scrape(source, chip) {
+  async _scrape(source, chip, meeting = null) {
     if (chip.dataset.running) return;
     chip.dataset.running = '1';
     const was = chip.lastChild.textContent;
     chip.lastChild.textContent = '…';
     try {
       const body = { source: source.key };
-      // The meeting scrape needs to be told which meeting. The header knows.
-      if (source.key !== 'trials') {
+      // The meeting the reader chose, or the one on screen for the sources
+      // that do not ask (odds price the meeting you are looking at).
+      if (meeting) {
+        body.date = meeting.date;
+        body.venue = meeting.venue;
+      } else if (source.key !== 'trials') {
         if (this.date) body.date = this.date;
         if (this.meeting?.venue) body.venue = this.meeting.venue;
       }
       const r = await api.scrape(body);
       const wrote = Object.entries(r.wrote ?? {})
         .filter(([, n]) => n).map(([k, n]) => `${n} ${k}`).join(' · ');
-      chip.lastChild.textContent = r.ok ? '✓ now' : '⚠';
-      chip.title = `${source.name}: ${wrote || 'wrote nothing'}`
+      const outcome = `${source.name}: ${wrote || 'wrote nothing'}`
         + (r.warnings?.length ? `\n${r.warnings.join('\n')}` : '')
         + (r.errors?.length ? `\n${r.errors.join('\n')}` : '');
       // Re-read the strip so every source's age is the truth again, not just
-      // the one that was clicked.
+      // the one that was clicked. THEN report — the refresh rebuilds these
+      // chips, so an outcome written before it lands on a discarded node and
+      // the counts this method exists to show never reach the screen.
       await this.refreshFreshness();
+      const fresh = this._chipFor(source.key) ?? chip;
+      fresh.lastChild.textContent = r.ok ? '✓ now' : '⚠';
+      if (!r.ok) fresh.classList.add('is-stale');
+      fresh.title = outcome;
     } catch (e) {
       chip.lastChild.textContent = '⚠';
       chip.title = `${source.name}: ${e.message}`;
@@ -257,6 +347,11 @@ class MeetingContext {
     } finally {
       delete chip.dataset.running;
     }
+  }
+
+  /** The chip for a source, after a redraw has replaced the old element. */
+  _chipFor(key) {
+    return document.querySelector(`.freshness .src[data-source="${key}"]`);
   }
 
   /** Re-read per-source freshness and redraw Layer 1. */

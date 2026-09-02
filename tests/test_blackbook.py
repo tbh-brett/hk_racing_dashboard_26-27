@@ -7,6 +7,8 @@ for 25 of its 196 entries; the derivation finds 429 runs across the same 196.
 """
 from __future__ import annotations
 
+import datetime as dt
+
 import json
 
 import pytest
@@ -186,7 +188,15 @@ def _bet(conn, bet_id, date, race_no, *horses, stake=100.0, returned=0.0,
 
 @pytest.fixture()
 def booked(tmp_path, db):
-    """FAST ONE booked 2026-04-10 — two runs before, three after."""
+    """FAST ONE booked 2026-04-10, expiring 2026-06-15 — two runs before the
+    booking, three after, and the expiry falling between two of the archived
+    races so `live_at_race` has something to separate.
+
+    That expiry is in the PAST, which is what the historical tests need and
+    what the "is it live now" tests must not silently inherit: an entry is
+    expired once its date passes, so any test about an ACTIVE entry extends the
+    date itself and says so.
+    """
     src = _write(tmp_path, _export([
         {"id": "bb_1", "horse_name": "FAST ONE", "added_date": "2026-04-10",
          "expiry_date": "2026-06-15", "status": "active", "tags": ["traffic"],
@@ -255,6 +265,12 @@ def test_an_entry_with_no_runs_since_reports_zero_not_absent(booked):
 
 def test_review_is_prompted_after_four_unresolved_runs(booked):
     conn = get_conn(booked)
+    # Review is only prompted on a LIVE entry, so this test needs one: the
+    # fixture's expiry is in the past, and an expired entry is not awaiting a
+    # verdict.
+    with transaction(conn):
+        conn.execute("UPDATE blackbook SET expiry_date = ? WHERE id = 'bb_1'",
+                     ((dt.date.today() + dt.timedelta(days=30)).isoformat(),))
     entry = bb.entry_detail("bb_1", conn=conn)
     assert entry["review_due"] is False              # three runs
     with transaction(conn):
@@ -350,6 +366,14 @@ def test_filters_are_applied_not_ignored(booked):
     conn = get_conn(booked)
     assert len(bb.list_entries(tag="traffic", conn=conn)) == 1
     assert bb.list_entries(tag="no_such_tag", conn=conn) == []
+    # The fixture's entry is past its expiry, so "active" must not return it
+    # and "expired" must — the status filter reads the date, not the flag the
+    # export happened to write.
+    assert bb.list_entries(status="active", conn=conn) == []
+    assert len(bb.list_entries(status="expired", conn=conn)) == 1
+    with transaction(conn):
+        conn.execute("UPDATE blackbook SET expiry_date = ? WHERE id = 'bb_1'",
+                     ((dt.date.today() + dt.timedelta(days=30)).isoformat(),))
     assert len(bb.list_entries(status="active", conn=conn)) == 1
     assert bb.list_entries(status="retired", conn=conn) == []
     conn.close()
@@ -588,4 +612,39 @@ def test_an_entry_with_no_bets_reports_zero_rather_than_an_roi(booked):
 def test_a_missing_entry_gives_nothing_not_an_empty_ledger(booked):
     conn = get_conn(booked)
     assert bb.entry_bets("bb_nope", conn=conn) == {}
+    conn.close()
+
+
+# ── an expiry date is a fact; the status flag is a cache of it ───────────────
+
+
+def test_an_entry_past_its_expiry_reads_expired(tmp_path):
+    """`status` is a snapshot taken when the JSON was last exported, and
+    nothing recomputes it on the way in. Without deriving it on read, the book
+    claims a horse is live because a file is stale."""
+    import datetime as dt
+    from hkrd.query import blackbook as bb
+    from hkrd.store.connect import get_conn, init_db, transaction
+
+    conn = get_conn(tmp_path / "t.db")
+    init_db(conn)
+    yesterday = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    tomorrow = (dt.date.today() + dt.timedelta(days=1)).isoformat()
+    with transaction(conn):
+        conn.executemany(
+            "INSERT INTO blackbook (id, horse_name, added_date, expiry_date, "
+            "status, reasoning, confidence) VALUES (?,?,?,?,?,?,?)",
+            [("x1", "LAPSED", "2026-01-01", yesterday, "active", "", "medium"),
+             ("x2", "LIVE", "2026-01-01", tomorrow, "active", "", "medium")])
+
+    by_name = {e["horse_name"]: e for e in bb.list_entries(conn=conn)}
+    assert by_name["LAPSED"]["status"] == "expired"
+    assert by_name["LIVE"]["status"] == "active"
+
+    # The filter must agree with the rows, or asking for "active" hands back an
+    # entry the row itself then prints as expired.
+    active = {e["horse_name"] for e in bb.list_entries(status="active", conn=conn)}
+    assert active == {"LIVE"}
+    expired = {e["horse_name"] for e in bb.list_entries(status="expired", conn=conn)}
+    assert expired == {"LAPSED"}
     conn.close()

@@ -720,3 +720,33 @@ select:hover, .btn:hover { background: var(--line-2); color: var(--text); }
 .acct-pick .a-chip.on { color: var(--text); border-color: var(--text-dim); }
 .acct-pick.acct-brett .a-chip.on { color: var(--acct-1); border-color: var(--acct-1); }
 .acct-pick.acct-kelvin .a-chip.on { color: var(--acct-2); border-color: var(--acct-2); }
+
+/* ── which meeting to fetch ──────────────────────────────────────────────────
+ *
+ * Two fields, because the header can only name a meeting the database already
+ * holds and a new card is not one. Shown before anything is fetched, so a
+ * wrong default is a correction rather than a failed scrape.
+ */
+.meeting-panel { min-width: 244px; padding: 10px 12px; }
+.meeting-panel .cap {
+  font-size: var(--fs-xs); letter-spacing: .08em; color: var(--text-dim);
+  margin-bottom: 8px;
+}
+.meeting-pick { display: flex; gap: 6px; }
+.meeting-pick input, .meeting-pick select {
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+  color: var(--text); background: var(--surface-2);
+  border: 1px solid var(--line-3); padding: 3px 6px; min-width: 0;
+}
+.meeting-pick input { flex: 1 1 auto; }
+.meeting-panel .go {
+  width: 100%; margin-top: 8px; cursor: pointer;
+  font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .08em;
+  color: var(--edge); background: var(--edge-ground);
+  border: 1px solid var(--edge-ground-2); padding: 4px 0;
+}
+.meeting-panel .go:hover { color: var(--text); border-color: var(--edge); }
+.meeting-panel .note {
+  margin-top: 8px; font-size: var(--fs-xs); color: var(--text-faint);
+  line-height: 1.4;
+}

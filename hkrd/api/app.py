@@ -534,10 +534,26 @@ def scrape_job(body: dict = Body(...)) -> JSONResponse:
                 f"this host cannot get out to it — {text[:160]}"))
         raise HTTPException(500, f"{source} scrape failed — {text[:400]}")
 
+    # 200 whenever the job RAN. Its outcome — landed nothing, HKJC has not
+    # published that card yet, three races were short — is data, and it is in
+    # the payload. Returning 500 for it said the server broke, and because the
+    # payload has no `detail` key the browser fell back to the status line and
+    # showed "Card: 500 Internal Server Error": the one message that contains
+    # none of what the run actually reported. A genuine fault still raises
+    # above this line, where the reason is known and can be said.
+    #
+    # `detail` is carried too, so any client that reads only that — the shape
+    # FastAPI uses for its own errors — still gets the sentence rather than a
+    # status code.
     payload = {"source": source, "job": job, "date": date, "venue": venue,
                "wrote": wrote, "total": sum(wrote.values()),
                "ok": ok, "errors": errors, "warnings": warnings}
-    return JSONResponse(payload, status_code=200 if ok else 500)
+    if not ok:
+        payload["detail"] = "; ".join(errors) or (
+            f"{source} scrape ran and stored nothing for "
+            f"{date or 'the default date'}"
+            + (f" {venue}" if venue else ""))
+    return JSONResponse(payload, status_code=200)
 
 
 @app.post("/api/jobs/rebuild-et")

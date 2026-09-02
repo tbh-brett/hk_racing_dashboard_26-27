@@ -27,7 +27,14 @@ async function post(path, body) {
     }),
   });
   const out = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(out.detail ?? `${res.status} ${res.statusText}`);
+  // `detail` first, then whatever the body reported, and the status line only
+  // when the server said nothing at all. Reading `detail` alone turned a job
+  // that had named its own failure into "500 Internal Server Error".
+  if (!res.ok) {
+    throw new Error(out.detail
+      ?? (out.errors?.length ? out.errors.join('; ') : null)
+      ?? `${res.status} ${res.statusText}`);
+  }
   return out;
 }
 

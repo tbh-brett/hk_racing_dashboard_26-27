@@ -24,6 +24,8 @@ were the source runs themselves.
 """
 from __future__ import annotations
 
+import datetime as dt
+
 from typing import Any
 
 from hkrd.derive.probability import actual_over_expected
@@ -100,10 +102,22 @@ def _entry_rows(conn: Connection, where: str = "", params: Any = ()) -> list[dic
         ORDER BY b.added_date DESC, b.id
     """, params).fetchall()
 
+    today = dt.date.today().isoformat()
     out = []
     for row in rows:
         d = dict(row)
         d["tags"] = sorted((d.pop("tag_csv") or "").split(",")) if d["tag_csv"] else []
+        # `status` is a snapshot taken when the JSON was last exported, and
+        # nothing recomputes it on the way in. An entry whose expiry has passed
+        # therefore keeps reading "active" until somebody exports the file
+        # again — the book quietly claims a horse is live because a file is
+        # stale, which is the opposite of what an expiry date is for.
+        #
+        # The date is the fact; the flag is a cache of it. An entry still
+        # inside its window keeps whatever the file said, so a horse retired
+        # early by hand stays retired.
+        if d.get("expiry_date") and d["expiry_date"] < today:
+            d["status"] = "expired"
         # Four runs without resolution is the brief's prompt-for-review
         # threshold. A book that only grows is unusable within a season.
         d["review_due"] = d["status"] == "active" and d["runs_since"] >= 4
@@ -119,8 +133,21 @@ def list_entries(*, status: str | None = None, tag: str | None = None,
     try:
         clauses, params = [], []
         if status:
-            clauses.append("b.status = ?")
-            params.append(status)
+            # The same rule the rows are read by, or the filter and the list
+            # disagree: asking for "active" would hand back an entry the row
+            # itself then prints as expired.
+            today = dt.date.today().isoformat()
+            if status == "active":
+                clauses.append("b.status = 'active' AND (b.expiry_date IS NULL "
+                               "OR b.expiry_date >= ?)")
+                params.append(today)
+            elif status == "expired":
+                clauses.append("(b.status = 'expired' OR (b.expiry_date IS NOT NULL "
+                               "AND b.expiry_date < ?))")
+                params.append(today)
+            else:
+                clauses.append("b.status = ?")
+                params.append(status)
         if tag:
             clauses.append("EXISTS (SELECT 1 FROM blackbook_tags t "
                            "WHERE t.id = b.id AND t.tag = ?)")

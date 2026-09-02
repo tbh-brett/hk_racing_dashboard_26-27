@@ -338,3 +338,63 @@ def test_a_filter_reaches_every_lookup_route_not_just_the_grid(client):
     one = client.get("/api/lookup/breakdown?dimension=draw&draw_max=2").json()
     assert one["baseline"]["runs"] < whole["baseline"]["runs"]
     assert {r["value"] for r in one["rows"]} <= {1, 2}
+
+
+# ── a scrape that ran is a result, not a server fault ────────────────────────
+#
+# Clicking Card returned "Card: 500 Internal Server Error" and nothing else.
+# Three things stacked up: the endpoint used 500 for "the job ran and landed
+# nothing", the payload carried its reason under `errors` with no `detail`, and
+# the browser reads `detail` and falls back to the status line. The one message
+# the reader got was the only one containing none of what the run reported.
+
+
+def _report(**kw):
+    from hkrd.jobs.scrape_meeting import ScrapeReport
+    r = ScrapeReport(date="2026-09-06", venue="ST")
+    for k, v in kw.items():
+        setattr(r, k, v)
+    return r
+
+
+def test_a_scrape_that_stored_nothing_is_not_a_server_error(client, monkeypatch):
+    r = _report()
+    r.errors.append("racecard: no runners found for 2026-09-06 ST")
+    monkeypatch.setattr("hkrd.jobs.scrape_meeting.scrape_meeting",
+                        lambda *a, **k: r)
+    resp = client.post("/api/jobs/scrape",
+                       json={"source": "card", "date": "2026-09-06", "venue": "ST"})
+    assert resp.status_code == 200, "the job ran; its outcome is data"
+    body = resp.json()
+    assert body["ok"] is False
+    assert body["errors"] == ["racecard: no runners found for 2026-09-06 ST"]
+
+
+def test_a_failed_scrape_says_why_where_the_browser_reads_it(client, monkeypatch):
+    """`detail` is the key api.js reads. Without it the reader got a status code."""
+    r = _report()
+    r.errors.append("racecard: no runners found for 2026-09-06 ST")
+    monkeypatch.setattr("hkrd.jobs.scrape_meeting.scrape_meeting",
+                        lambda *a, **k: r)
+    body = client.post("/api/jobs/scrape",
+                       json={"source": "card", "date": "2026-09-06",
+                             "venue": "ST"}).json()
+    assert "no runners found" in body["detail"]
+
+
+def test_a_scrape_that_landed_reports_what_it_wrote(client, monkeypatch):
+    monkeypatch.setattr("hkrd.jobs.scrape_meeting.scrape_meeting",
+                        lambda *a, **k: _report(races=11, runners=132))
+    body = client.post("/api/jobs/scrape",
+                       json={"source": "card", "date": "2026-09-06",
+                             "venue": "ST"}).json()
+    assert body["ok"] is True
+    assert body["wrote"]["races"] == 11 and body["wrote"]["runners"] == 132
+    assert body["total"] == 143
+
+
+def test_a_meeting_scrape_still_needs_a_meeting(client):
+    """The 400 stays a 400: this one IS the caller's fault."""
+    resp = client.post("/api/jobs/scrape", json={"source": "card"})
+    assert resp.status_code == 400
+    assert "date" in resp.json()["detail"]
