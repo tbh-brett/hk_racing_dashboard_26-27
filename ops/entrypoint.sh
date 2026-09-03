@@ -20,6 +20,31 @@ CONFIG=/app/ops/litestream.yml
 
 say() { printf '  %-14s %s\n' "$1" "$2"; }
 
+# ── 0. what the container actually received ──────────────────────────────────
+# Printed BEFORE the restore, because the restore's own failure names the
+# symptom and never the cause: R2 answers a bad signature with a 403 that says
+# "check your secret access key", which is true of four different mistakes.
+# Endpoint doubled with the bucket, region not "auto", the wrong key pair, or
+# a value that never reached the container at all -- the Dockerfile declares
+# LITESTREAM_ENDPOINT and LITESTREAM_REGION as empty image defaults, and if
+# those ever won over the Fly secrets the request would go out unsigned for R2
+# and look exactly like a wrong password.
+#
+# Everything here is safe in a log. The endpoint, region and bucket are not
+# secrets. The access key id is an identifier, not a credential -- it is the
+# username half. The secret appears ONLY as a character count, which separates
+# "arrived mangled" from "arrived intact but wrong" and tells you nothing else.
+_ep="${LITESTREAM_ENDPOINT:-}"
+_rg="${LITESTREAM_REGION:-}"
+_ak="${LITESTREAM_ACCESS_KEY_ID:-}"
+_sk="${LITESTREAM_SECRET_ACCESS_KEY:-}"
+
+say "replica url" "${LITESTREAM_REPLICA_URL:-<unset>}"
+say "endpoint"    "${_ep:-<EMPTY - would talk to AWS, not R2>}"
+say "region"      "${_rg:-<EMPTY - R2 needs auto>}"
+say "access key"  "${_ak:-<unset>} (${#_ak} chars, R2 uses 32)"
+say "secret key"  "${#_sk} chars (R2 uses 64) - value never printed"
+
 # ── 1. the database ──────────────────────────────────────────────────────────
 mkdir -p "$(dirname "$DB")"
 
