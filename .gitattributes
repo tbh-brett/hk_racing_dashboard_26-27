@@ -1,0 +1,34 @@
+# Line endings.
+#
+# `fly deploy` builds from the WORKING TREE, and on Windows that working tree
+# is CRLF: core.autocrlf is on by default there, so a file committed as LF is
+# checked out with CRLF and the Dockerfile copies it in that form.
+#
+# A shell script with CRLF line endings is not a shell script to Linux. The
+# kernel reads the shebang as `/usr/bin/env bash\r`, looks for an interpreter
+# literally named "bash\r", and the container dies at startup with
+#
+#   exec /app/ops/entrypoint.sh: no such file or directory
+#
+# naming a file that is plainly there. The crontab is the same failure one
+# level quieter: every line's last argument gains a \r, so the scrape writes
+# to "/data/hkrd.db\r" — a second database, on the volume, that the dashboard
+# never reads and nothing reports.
+#
+# So everything the container reads is pinned to LF regardless of platform.
+
+* text=auto
+
+*.sh            text eol=lf
+ops/crontab     text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+Dockerfile      text eol=lf
+.dockerignore   text eol=lf
+
+# Read by PowerShell on Windows and by nothing in the container. CRLF is what
+# a Windows editor writes anyway, so pinning it keeps them out of every diff.
+*.ps1           text eol=crlf
+
+# Fixtures are compared byte for byte by the parser tests. Never touched.
+tests/fixtures/*.html   -text

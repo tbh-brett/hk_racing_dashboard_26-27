@@ -40,7 +40,7 @@ JUL07 = ("https://racing.hkjc.com/contentAsset/videoplayer_v4/"
 
 def _call(expr: str):
     """Evaluate an expression against the real vocab.js and return its value."""
-    script = (f"import {{ trialReplayUrl, replayUrl }} from {str(VOCAB)!r};\n"
+    script = (f"import {{ trialReplayUrl, replayUrl }} from {VOCAB.as_uri()!r};\n"
               f"process.stdout.write(JSON.stringify({expr}));\n")
     out = subprocess.run(  # noqa: S603 - a JS unit under test needs a JS runtime
         [NODE, "--input-type=module", "-e", script],

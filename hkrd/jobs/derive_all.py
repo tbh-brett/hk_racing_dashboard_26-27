@@ -116,7 +116,7 @@ def run(db: Path | None = None, *, date: str | None = None,
         report.errors += out.errors
     if "sarr" in only:
         from hkrd.jobs import rebuild_sarr
-        out = rebuild_sarr.rebuild(target)
+        out = rebuild_sarr.rebuild(target, date=date)
         report.written["runner_sarr"] = out.rows_written
         report.written["sarr_component"] = out.component_rows
         report.skipped["sarr"] = out.skipped_no_history + out.skipped_no_distance

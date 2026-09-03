@@ -90,7 +90,7 @@ COPY ops/ ops/
 # of a package where one is a stub is a fault that surfaces as an ImportError
 # for a module that is plainly on disk. Reinstalling outright leaves one copy.
 RUN pip install --no-cache-dir --no-deps --force-reinstall . \
-    && chmod +x ops/entrypoint.sh
+    && chmod +x ops/*.sh
 
 # LITESTREAM_ENDPOINT and _REGION are declared here so the two knobs R2 needs
 # are visible in the image rather than only in a Fly secret. Litestream expands

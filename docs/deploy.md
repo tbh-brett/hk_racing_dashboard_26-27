@@ -181,14 +181,34 @@ MB doing exactly that).
 # locally, from a checkout with ../hk_race_dashboard beside it
 python -m hkrd.jobs.bootstrap --legacy ../hk_race_dashboard
 
-# push it, with the app stopped so nothing writes underneath the copy
+# push it, with the machine RUNNING and to a path beside the live file
 fly machine list                      # note the machine id
-fly machine stop <id>
-fly sftp shell -a hkrd
-  put hkrd.db /data/hkrd.db
-  exit
-fly machine start <id>
+fly sftp put hkrd.db /data/hkrd.db.new -a hkrd
+fly ssh console -a hkrd -C /app/ops/install-db.sh
+fly machine restart <id> -a hkrd
 ```
+
+**Not with the machine stopped, and not straight over `/data/hkrd.db`.** Both
+are the obvious thing and both are wrong, for different reasons:
+
+- **SFTP needs the machine running.** hallpass — the SSH server flyctl
+  connects to — is a process *inside* the VM. A stopped machine has no SSH
+  server, so the transfer has nothing to reach. Stopping first to make the
+  copy safe is not an option that exists.
+- **A running machine holds the database open**, with a WAL and a shared
+  memory index beside it describing the file being replaced. Written over in
+  place, SQLite recovers the old WAL onto the new database. It opens fine
+  afterwards and is wrong in ways nothing reports.
+
+`ops/install-db.sh` is the middle step and does three things: it checks that
+what arrived is a readable database with an intact `runners` table and refuses
+without changing anything if it is not; it renames the new file over the old
+one, which is atomic and leaves the running processes on the old inode until
+they exit; and it deletes the WAL, the shared memory index and Litestream's
+local generation state, all of which belong to the database that was replaced.
+The restart is what makes uvicorn and Litestream reopen the new file — and
+Litestream, finding no local state, takes a fresh snapshot of what is actually
+there rather than continuing a generation that no longer matches.
 
 Within ten seconds Litestream will have replicated it. Confirm:
 

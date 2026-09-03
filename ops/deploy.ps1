@@ -201,17 +201,32 @@ Ok "deployed"
 # ── 8. upload ────────────────────────────────────────────────────────────────
 if (-not $SkipUpload -and (Test-Path "hkrd.db")) {
     Step 8 "Uploading the database"
-    # Stopped first: copying a SQLite file while something is writing to it
-    # produces a file that opens fine and is subtly wrong.
+
     $machine = (& $script:FlyExe machine list -a $App --json | ConvertFrom-Json)[0].id
     if (-not $machine) { Die "No machine found for $App." }
 
-    Invoke-Fly machine stop $machine -a $App | Out-Null
-    Note "machine $machine stopped"
-    Invoke-Fly sftp put hkrd.db /data/hkrd.db -a $App | Out-Null
+    # Sent up BESIDE the live file, with the machine left RUNNING.
+    #
+    # Stopping first and writing straight over /data/hkrd.db is the obvious
+    # sequence and it does not work: hallpass, the SSH server flyctl connects
+    # to, is a process inside the VM, so a stopped machine has no SSH server
+    # for SFTP to reach. And the running machine holds that database open with
+    # a WAL beside it, so overwriting it in place leaves SQLite recovering the
+    # old WAL onto the new file. ops/install-db.sh does the swap safely and
+    # explains it at length.
+    Note "sending 31 MB to /data/hkrd.db.new — a minute or two"
+    Invoke-Fly sftp put hkrd.db /data/hkrd.db.new -a $App | Out-Null
     Ok "uploaded"
-    Invoke-Fly machine start $machine -a $App | Out-Null
-    Note "machine restarted"
+
+    # Verifies the transfer, renames it over the live file and clears the WAL
+    # and Litestream state belonging to the database it replaced. Refuses, and
+    # changes nothing, if what arrived is not a readable database.
+    Invoke-Fly ssh console -a $App -C "/app/ops/install-db.sh" | Out-Null
+    Ok "installed"
+
+    # Restart, so uvicorn and Litestream reopen the file that is now there.
+    Invoke-Fly machine restart $machine -a $App | Out-Null
+    Note "machine $machine restarted on the uploaded database"
 }
 
 # ── 9. check ─────────────────────────────────────────────────────────────────

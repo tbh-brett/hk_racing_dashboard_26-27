@@ -13,7 +13,7 @@ import datetime as dt
 import pytest
 
 from hkrd.derive import pace
-from hkrd.jobs import rebuild_sarr
+from hkrd.jobs import derive_all, rebuild_sarr
 from hkrd.model import sarr
 from hkrd.store import upsert
 from hkrd.store.connect import get_conn, init_db, transaction
@@ -144,6 +144,37 @@ def test_a_horse_with_no_history_is_skipped_and_counted(tmp_path):
         "SELECT count(*) FROM runner_sarr WHERE race_date = ?", (first,)).fetchone()[0]
     conn.close()
     assert rated == 0
+
+
+def test_date_scoped_rebuild_scores_a_declared_card_from_prior_runs(tmp_path):
+    db = tmp_path / "t.db"
+    _seed(db, meetings=3)
+    date = "2026-09-06"
+    conn = get_conn(db)
+    with transaction(conn):
+        upsert.upsert_races(conn, [{
+            "race_date": date, "race_no": 1, "venue": "ST", "course": "A",
+            "surface": "Turf", "going": "G", "distance": 1800,
+            "race_class": "4",
+        }])
+        upsert.upsert_runners(conn, [{
+            "race_date": date, "race_no": 1, "horse_no": horse_no + 1,
+            "horse_name": f"HORSE {horse_no}", "draw": horse_no + 1,
+            "rating": 60 + horse_no,
+        } for horse_no in range(8)])
+    conn.close()
+
+    report = derive_all.run(db, date=date, only=("sarr",))
+
+    conn = get_conn(db)
+    rows = conn.execute(
+        "SELECT s.horse_no, s.sarr_rank, r.finish_time "
+        "FROM runner_sarr s JOIN runners r USING (race_date, race_no, horse_no) "
+        "WHERE s.race_date = ? ORDER BY s.sarr_rank", (date,)).fetchall()
+    conn.close()
+    assert report.written["runner_sarr"] == 8
+    assert [row["sarr_rank"] for row in rows] == list(range(1, 9))
+    assert all(row["finish_time"] is None for row in rows)
 
 
 def test_a_race_without_a_distance_is_skipped_not_crashed(tmp_path):

@@ -31,3 +31,6 @@ Thumbs.db
 
 # pytest
 .pytest_cache/
+
+# Editor workspace files. Local to whoever opened the folder.
+*.code-workspace

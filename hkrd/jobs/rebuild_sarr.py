@@ -40,6 +40,17 @@ WHERE r.finish_time IS NOT NULL
 ORDER BY r.race_date, r.race_no, r.horse_no
 """
 
+CARD_SQL = """
+SELECT r.race_date, r.race_no, r.horse_no, r.horse_name, r.place,
+       r.finish_time, r.draw, r.rating,
+       r.section_times AS sectiontimes, r.running_positions,
+       a.distance, a.going, a.venue, a.surface
+FROM runners r
+JOIN races a ON a.race_date = r.race_date AND a.race_no = r.race_no
+WHERE r.race_date = ?
+ORDER BY r.race_date, r.race_no, r.horse_no
+"""
+
 
 @dataclass
 class SarrReport:
@@ -66,7 +77,8 @@ class SarrReport:
         return "\n".join(lines)
 
 
-def rebuild(db: Path | None = None, *, min_prior: int = 2) -> SarrReport:
+def rebuild(db: Path | None = None, *, min_prior: int = 2,
+            date: str | None = None) -> SarrReport:
     report = SarrReport()
     conn = get_conn(db if db is not None else db_path())
     try:
@@ -78,6 +90,8 @@ def rebuild(db: Path | None = None, *, min_prior: int = 2) -> SarrReport:
             return report
 
         runs = sarr.annotate_runs(raw)
+        targets = (pd.read_sql(CARD_SQL, conn, params=(date,))
+                   if date else runs)
 
         # Index each horse's runs by date once, rather than filtering the whole
         # frame per runner -- 21,280 runners against a full scan is minutes.
@@ -89,7 +103,7 @@ def rebuild(db: Path | None = None, *, min_prior: int = 2) -> SarrReport:
 
         rows: list[tuple] = []
         component_rows: list[tuple] = []
-        for (date, race_no), race in runs.groupby(["race_date", "race_no"]):
+        for (race_date, race_no), race in targets.groupby(["race_date", "race_no"]):
             med_rating = pd.to_numeric(race["rating"], errors="coerce").median()
             scored: list[tuple[int, float]] = []
             for rec in race.to_dict("records"):
@@ -101,7 +115,7 @@ def rebuild(db: Path | None = None, *, min_prior: int = 2) -> SarrReport:
                     report.skipped_no_distance += 1
                     continue
                 prior = [r for r in by_horse[rec["horse_name"]]
-                         if (r["race_date"], r["race_no"]) < (date, race_no)]
+                         if (r["race_date"], r["race_no"]) < (race_date, race_no)]
                 if len(prior) < min_prior:
                     report.skipped_no_history += 1
                     continue
@@ -117,7 +131,7 @@ def rebuild(db: Path | None = None, *, min_prior: int = 2) -> SarrReport:
                     continue
                 scored.append((rec["horse_no"], float(value), len(prior)))
                 component_rows.extend(
-                    (date, race_no, rec["horse_no"], k, float(v))
+                    (race_date, race_no, rec["horse_no"], k, float(v))
                     for k, v in parts.items())
 
             if not scored:
@@ -126,11 +140,15 @@ def rebuild(db: Path | None = None, *, min_prior: int = 2) -> SarrReport:
             # Lower is better, so rank ascending.
             for rank, (horse_no, value, n_prior) in enumerate(
                     sorted(scored, key=lambda s: s[1]), start=1):
-                rows.append((date, race_no, horse_no, value, rank, n_prior,
+                rows.append((race_date, race_no, horse_no, value, rank, n_prior,
                              sarr.DERIVE_VERSION if hasattr(sarr, "DERIVE_VERSION")
                              else "sarr-1.0"))
 
         with transaction(conn):
+            if date:
+                conn.execute("DELETE FROM runner_sarr_component WHERE race_date = ?",
+                             (date,))
+                conn.execute("DELETE FROM runner_sarr WHERE race_date = ?", (date,))
             conn.executemany(
                 "INSERT INTO runner_sarr (race_date, race_no, horse_no, sarr, "
                 "sarr_rank, n_prior, derive_version) VALUES (?, ?, ?, ?, ?, ?, ?) "
@@ -158,10 +176,11 @@ def rebuild(db: Path | None = None, *, min_prior: int = 2) -> SarrReport:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--db", type=Path, default=None)
+    ap.add_argument("--date", default=None, help="one meeting; omit for all")
     ap.add_argument("--min-prior", type=int, default=2,
                     help="runs of history required before a horse is rated")
     a = ap.parse_args(argv)
-    report = rebuild(a.db, min_prior=a.min_prior)
+    report = rebuild(a.db, min_prior=a.min_prior, date=a.date)
     print(report.render())
     return 1 if report.errors else 0
 
