@@ -26,7 +26,7 @@ It replaces the old Streamlit app — 135 files, ~120,000 lines, with a
 things that were wrong in it were found by measurement and fixed; the things
 that were guesses were deleted.
 
-## 2. The three files you double-click
+## 2. The files you double-click
 
 Once it is on your PC, you never need PowerShell again. In the project folder:
 
@@ -35,6 +35,7 @@ Once it is on your PC, you never need PowerShell again. In the project folder:
 | **Start dashboard** | Opens the dashboard in your browser |
 | **Repair data** | Fixes pace figures, comments on running and tags. Shows what is wrong first and asks before fetching |
 | **Update data** | Fetches race meetings and trials the database is missing |
+| **Deploy to Fly** | Puts the dashboard on the internet. Only ever needed once, and it says what it will cost before it starts |
 
 They are `.bat` files, which is deliberate: Windows refuses to run `.ps1`
 scripts by default, and a `.bat` can lift that for its own run without changing
@@ -135,16 +136,27 @@ nothing — the dashboard keeps working on your laptop exactly as it does now.
 
 ## 6. If you do want to host it
 
-One command, from PowerShell in this folder:
-
-```powershell
-.\ops\deploy.ps1
-```
+Double-click **Deploy to Fly**. It tells you what it is about to create and
+what it costs, and waits for you to say yes.
 
 It installs the Fly command-line tool, signs you in, creates everything, asks
 for your two Cloudflare values, generates the dashboard password, uploads the
 database and then checks that it actually worked. Safe to re-run if it stops
 partway.
+
+Two things it will ask you for, both from your Cloudflare R2 key file: the
+**Access Key ID** and the **Secret Access Key**. The secret does not appear on
+screen as you paste it — it is read straight into the Fly command rather than
+typed anywhere it could be recorded, so there is nothing to see and nothing
+left behind.
+
+It then prints a **dashboard password** once. Save it before pressing Enter.
+
+The same thing from PowerShell, if you would rather:
+
+```powershell
+.\ops\deploy.ps1
+```
 
 `docs/deploy.md` is the detail: what to do if a scrape fails, how to restore
 from backup, and what each error means.
