@@ -100,6 +100,56 @@ function Invoke-Fly {
     return $out
 }
 
+# Feed text to a flyctl command on stdin, byte for byte. Returns the exit code.
+#
+# NOT `$text | & $script:FlyExe ...`, which is what this was and which broke on
+# the very first secret. Two independent faults in PowerShell 5.1's native
+# pipe, both measured against a program that prints the bytes it receives
+# rather than reasoned about:
+#
+#   A BOM ARRIVES FIRST. .NET Framework builds the child's stdin StreamWriter
+#   from [Console]::InputEncoding and sets AutoFlush on it, and that flush
+#   writes the encoding's preamble before any content does. Under the UTF-8
+#   console this runs in, flyctl received "﻿HKRD_PASSWORD" and refused it
+#   as a secret name. Setting $OutputEncoding does nothing — it is the INPUT
+#   encoding that builds this writer, and that is the part that took a while.
+#
+#   A CRLF ARRIVES LAST. Piping a string appends PowerShell's line terminator,
+#   so the final line gains a stray \r. The final line here is the R2 secret,
+#   and a secret access key with a carriage return on the end fails against R2
+#   as a 401 — indistinguishable from wrong keys, which is precisely the
+#   afternoon docs/deploy.md warns about losing.
+#
+# Writing bytes to the raw stream answers both: no preamble, and nothing
+# appended that we did not put there. It stays in memory — no temp file, so
+# the secret still never touches disk, which is the whole point of using stdin
+# rather than `fly secrets set KEY=value`.
+function Send-FlyStdin {
+    param([string] $Text, [string[]] $FlyArgs)
+
+    # Must be BOM-less BEFORE Start(). The writer is constructed during Start
+    # and its preamble is decided there; setting this afterwards is too late.
+    try { [Console]::InputEncoding = New-Object System.Text.UTF8Encoding $false } catch { }
+
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName              = $script:FlyExe
+    # .Arguments, not .ArgumentList — the latter is .NET Core only and this is
+    # Windows PowerShell 5.1, on .NET Framework.
+    $psi.Arguments             = ($FlyArgs | ForEach-Object {
+                                    if ($_ -match '\s') { '"' + $_ + '"' } else { $_ }
+                                  }) -join ' '
+    $psi.RedirectStandardInput = $true
+    $psi.UseShellExecute       = $false
+
+    $proc  = [System.Diagnostics.Process]::Start($psi)
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($Text)   # GetBytes omits the preamble
+    $proc.StandardInput.BaseStream.Write($bytes, 0, $bytes.Length)
+    $proc.StandardInput.BaseStream.Flush()
+    $proc.StandardInput.Close()
+    $proc.WaitForExit()
+    return $proc.ExitCode
+}
+
 # Output streams to the window as it happens, non-zero exit is fatal. For the
 # slow ones — the build, the 31 MB transfer — where a silent five minutes is
 # indistinguishable from a hang, and for install-db.sh, whose report is the
@@ -257,8 +307,8 @@ $payload = @(
     "LITESTREAM_SECRET_ACCESS_KEY=$r2Secret"
 ) -join "`n"
 
-$payload | & $script:FlyExe secrets import -a $App --stage
-if ($LASTEXITCODE -ne 0) { Die "Setting the secrets failed." }
+$code = Send-FlyStdin -Text $payload -FlyArgs @("secrets", "import", "-a", $App, "--stage")
+if ($code -ne 0) { Die "Setting the secrets failed." }
 
 $payload = $null; $r2Secret = $null; $secure.Dispose()
 [System.GC]::Collect()
