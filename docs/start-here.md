@@ -26,7 +26,24 @@ It replaces the old Streamlit app — 135 files, ~120,000 lines, with a
 things that were wrong in it were found by measurement and fixed; the things
 that were guesses were deleted.
 
-## 2. Getting it onto your PC the first time
+## 2. The three files you double-click
+
+Once it is on your PC, you never need PowerShell again. In the project folder:
+
+| Double-click | What it does |
+|---|---|
+| **Start dashboard** | Opens the dashboard in your browser |
+| **Repair data** | Fixes pace figures, comments on running and tags. Shows what is wrong first and asks before fetching |
+| **Update data** | Fetches race meetings and trials the database is missing |
+
+They are `.bat` files, which is deliberate: Windows refuses to run `.ps1`
+scripts by default, and a `.bat` can lift that for its own run without changing
+anything about the machine.
+
+Leave the black window open while any of them is working. Closing it stops
+whatever is running.
+
+## 3. Getting it onto your PC the first time
 
 Open **PowerShell** (press Start, type PowerShell, Enter) and paste this one
 line:
@@ -48,7 +65,7 @@ two reasons that both bite otherwise:
   text is not a file, so it runs — and the first thing it does is lift that
   restriction for that window only, so `.\ops\start.ps1` works afterwards.
 
-## 3. How to open it after that
+## 4. How to open it from PowerShell
 
 Open **PowerShell**, go to this folder, and run one command:
 
@@ -72,7 +89,7 @@ If it cannot find the old repo, tell it where that is:
 **No accounts are involved.** No Fly.io, no Cloudflare, no password. This runs
 entirely on your machine.
 
-## 4. What hosting is for, and why you do not need it yet
+## 5. What hosting is for, and why you do not need it yet
 
 You asked what platforms you would need to *host* this. Hosting means putting
 it on the internet, and it buys exactly two things:
@@ -97,7 +114,7 @@ know whether you want it on your phone.
 If you decide not to host it, cancel Fly and delete the R2 bucket. You lose
 nothing — the dashboard keeps working on your laptop exactly as it does now.
 
-## 5. If you do want to host it
+## 6. If you do want to host it
 
 One command, from PowerShell in this folder:
 
@@ -113,7 +130,7 @@ partway.
 `docs/deploy.md` is the detail: what to do if a scrape fails, how to restore
 from backup, and what each error means.
 
-## 6. What happens on a race day
+## 7. What happens on a race day
 
 **On your laptop.** Nothing is automatic. Start the dashboard, then run this
 when you want the latest meeting:
@@ -130,7 +147,7 @@ itself. The **Model Analysis** page tells you whether that is working — if the
 last scrape failed, it says so there rather than quietly showing you last
 week's card.
 
-## 7. Things worth knowing
+## 8. Things worth knowing
 
 **Every view is a URL.** `?date=2026-07-15&race=4` — a page can be bookmarked
 or shared exactly as you left it.
@@ -147,7 +164,7 @@ written on the Model Analysis page rather than hidden. The dashboard is for
 finding horses and understanding races; the staking advice that the old system
 implied was never supported by its own numbers.
 
-## 8. If something goes wrong
+## 9. If something goes wrong
 
 Stop the dashboard (Ctrl+C) and start it again. That fixes most things.
 
@@ -163,7 +180,7 @@ you have to notice yourself.
 
 ---
 
-## 9. Filling in missing data
+## 10. Filling in missing data
 
 The database was built from your old archive folder, and that archive stops at
 some point — the dashboard is not broken, it simply has not been told about
@@ -194,7 +211,7 @@ recover them. They come from your account statements:
 .venv\Scripts\python -m hkrd.jobs.import_statement --src "C:\folder\statement.txt"
 ```
 
-## 10. Making changes to the dashboard
+## 11. Making changes to the dashboard
 
 Install **Claude Code** on your PC and open it in this folder. It can then read
 the code, make the change, run the tests and show you the result — which is a
@@ -217,7 +234,7 @@ Then just describe what you want in plain English. Useful things to say:
 
 ---
 
-## 11. Missing pace figures, incidents or tags on Results
+## 12. Missing pace figures, incidents or tags on Results
 
 Different from section 9. That one is about data the archive never had; this is
 about data an earlier scrape got wrong or skipped.
