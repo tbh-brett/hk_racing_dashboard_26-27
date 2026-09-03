@@ -26,7 +26,24 @@ It replaces the old Streamlit app — 135 files, ~120,000 lines, with a
 things that were wrong in it were found by measurement and fixed; the things
 that were guesses were deleted.
 
-## 2. Getting it onto your PC the first time
+## 2. The three files you double-click
+
+Once it is on your PC, you never need PowerShell again. In the project folder:
+
+| Double-click | What it does |
+|---|---|
+| **Start dashboard** | Opens the dashboard in your browser |
+| **Repair data** | Fixes pace figures, comments on running and tags. Shows what is wrong first and asks before fetching |
+| **Update data** | Fetches race meetings and trials the database is missing |
+
+They are `.bat` files, which is deliberate: Windows refuses to run `.ps1`
+scripts by default, and a `.bat` can lift that for its own run without changing
+anything about the machine.
+
+Leave the black window open while any of them is working. Closing it stops
+whatever is running.
+
+## 3. Getting it onto your PC the first time
 
 Open **PowerShell** (press Start, type PowerShell, Enter) and paste this one
 line:
@@ -48,7 +65,26 @@ two reasons that both bite otherwise:
   text is not a file, so it runs — and the first thing it does is lift that
   restriction for that window only, so `.\ops\start.ps1` works afterwards.
 
-## 3. How to open it after that
+### Updating it later, when a new version is published
+
+Not the same thing as **Update data**, and the difference is worth holding on
+to. *Update data* fetches race meetings and trials the database is missing —
+new *results*. This fetches new *dashboard*: the pages, the figures and the
+fixes themselves.
+
+```powershell
+.\ops\update.ps1
+```
+
+It downloads the latest changes from the online branch this copy follows, stops
+the running dashboard, updates the Python packages, and opens the new version.
+You do not need to visit GitHub or wait for someone to send you a file.
+
+It stops and explains if this folder has dashboard code you have edited, so it
+cannot overwrite work in progress. Your database, your workspace settings and
+anything else of your own are left alone.
+
+## 4. How to open it from PowerShell
 
 Open **PowerShell**, go to this folder, and run one command:
 
@@ -71,23 +107,6 @@ If it cannot find the old repo, tell it where that is:
 
 **No accounts are involved.** No Fly.io, no Cloudflare, no password. This runs
 entirely on your machine.
-
-## 4. Updating it after a new version is published
-
-When you are told there is an update, open PowerShell in this folder and run:
-
-```powershell
-.\ops\update.ps1
-```
-
-It downloads the latest changes from the online branch this dashboard is using,
-stops the previous local copy, updates the ordinary Python packages, and opens
-the new version. You do not need to visit GitHub or ask someone to download a
-document each time.
-
-It will stop and explain if this folder contains uncommitted dashboard code, so
-it cannot accidentally overwrite work in progress. Files such as your VS Code
-workspace settings and the local database are left alone.
 
 ## 5. What hosting is for, and why you do not need it yet
 
@@ -231,3 +250,28 @@ Then just describe what you want in plain English. Useful things to say:
   down, and they are what keeps the rebuild from turning back into the old one
 - "run the tests before you tell me it works"
 - "show me the page before and after"
+
+---
+
+## 12. Missing pace figures, incidents or tags on Results
+
+Different from section 9. That one is about data the archive never had; this is
+about data an earlier scrape got wrong or skipped.
+
+```powershell
+.\ops\repair.ps1          # what is damaged — fetches nothing
+.\ops\repair.ps1 -Fix     # repair it
+```
+
+Three problems, three costs, and the job separates them so you are not waiting
+on a fetch you do not need:
+
+| | What went wrong | Cost |
+|---|---|---|
+| **pace** | A horse that pulled up carries a short list of section times, and that used to void the pace figure for its **entire field** — 30 races, 377 runners. Fixed in the code; the figures just need recomputing. | instant, no fetching |
+| **comments on running** | 89 meetings have none, because the archive's incident reports only begin September 2025. Fetching the comments page alone is ~11 requests a meeting, not the ~30 a full re-scrape costs. **Tags come free** — they are read back out of the comments. | ~20 minutes |
+| **race headers** | Five races lost their distance and class, so no pace could be computed for them either. | seconds |
+
+Run `-Fix -Only pace` first if you want the instant half immediately. Repairing
+is always safe to re-run — every write replaces the same row rather than adding
+another.

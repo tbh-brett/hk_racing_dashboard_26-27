@@ -30,5 +30,11 @@ Dockerfile      text eol=lf
 # a Windows editor writes anyway, so pinning it keeps them out of every diff.
 *.ps1           text eol=crlf
 
+# The three double-click files, and the one place the rule runs the other way:
+# a .bat with Unix line endings can mis-execute on Windows. They were written
+# CRLF deliberately (ba31b61) and this is what keeps them that way in every
+# checkout, on every platform, rather than leaving it to whoever cloned.
+*.bat           text eol=crlf
+
 # Fixtures are compared byte for byte by the parser tests. Never touched.
 tests/fixtures/*.html   -text
