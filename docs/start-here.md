@@ -36,6 +36,7 @@ Once it is on your PC, you never need PowerShell again. In the project folder:
 | **Repair data** | Fixes pace figures, comments on running and tags. Shows what is wrong first and asks before fetching |
 | **Update data** | Fetches race meetings and trials the database is missing |
 | **Deploy to Fly** | Puts the dashboard on the internet. Only ever needed once, and it says what it will cost before it starts |
+| **Show deploy logs** | Asks the deployed machine what went wrong and writes it to a file you can send on. Reads only |
 
 They are `.bat` files, which is deliberate: Windows refuses to run `.ps1`
 scripts by default, and a `.bat` can lift that for its own run without changing
