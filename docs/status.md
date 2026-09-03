@@ -142,8 +142,9 @@ Five things had to be fixed before it would deploy at all, and none of them
 could have been caught by a test, because every one is about what LEAVES this
 machine rather than what runs on it. 959 tests passed throughout.
 
-- CRLF line endings, so the container read its shebang as `bash` and died
-  naming a file that was plainly there
+- CRLF line endings, so the container read its shebang as an interpreter
+  named "bash" with a carriage return on the end, and died naming a file
+  that was plainly there
 - No .dockerignore, so 345 MB of .venv and database went to the builder
 - `fly sftp put` against a stopped machine, which cannot work: the SSH server
   is a process inside the VM
