@@ -2,13 +2,20 @@
 #
 # Docker does not read .gitignore, and without this file the build context is
 # the whole folder: .venv is 307 MB and hkrd.db is 31 MB, neither of which the
-# image wants. Both would be uploaded to Fly's remote builder on every deploy,
-# and the database would sit in the context of an image whose whole design is
-# that the database lives on a volume instead.
+# image wants. Both would go to Fly's remote builder on every deploy, and the
+# database would sit in the context of an image whose whole design is that the
+# database lives on a volume instead.
+#
+# THE PATTERNS ARE NOT .gitignore PATTERNS, and the difference is the trap.
+# In .gitignore, `__pycache__/` matches at every depth. Here it matches only
+# the one at the root: Docker's `*` does not cross a `/`, so nine nested
+# __pycache__ directories full of .pyc files compiled for a DIFFERENT Python
+# than the image runs would have been copied in by a rule that reads as if it
+# already excluded them. Anything meant to match at depth says `**/`.
 #
 # A denylist rather than an allowlist. The Dockerfile COPYs five things —
 # pyproject.toml, README.md, hkrd/, web/, ops/ — and an allowlist would make a
-# sixth silently arrive empty. Anything added here fails loudly instead.
+# sixth arrive silently empty. Anything added here fails loudly instead.
 
 # The virtualenv. The image builds its own from pyproject.toml.
 .venv/
@@ -21,18 +28,26 @@ venv/
 *.db-shm
 *.sqlite
 *.sqlite3
+**/*.db
+**/*.sqlite
+**/*.sqlite3
 
-# History. The image is built from a checkout; it does not need the checkout's
-# past, and .git grows without bound.
+# History. The image is built from a checkout; it does not need the
+# checkout's past, and .git grows without bound.
 .git/
 .gitignore
+.gitattributes
 .dockerignore
 
-# Build and test leavings.
+# Build and test leavings, at every depth.
 __pycache__/
+**/__pycache__/
 *.py[cod]
+**/*.py[cod]
 *.egg-info/
+**/*.egg-info/
 .pytest_cache/
+**/.pytest_cache/
 
 # Not in the image: the Dockerfile copies neither, and docs/ changing should
 # not invalidate a layer.
@@ -49,7 +64,10 @@ reports/
 cache/
 racecards/
 
-# Local editor state.
+# Windows-side entry points and local editor state. Nothing in the container
+# reads a .ps1 or a .bat.
+*.bat
+ops/*.ps1
 *.code-workspace
 .vscode/
 .idea/
