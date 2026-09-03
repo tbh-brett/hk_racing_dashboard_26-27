@@ -127,9 +127,38 @@ page:
 The token layer, shared overlay, row grammar and API client are all in place,
 so these follow an established pattern rather than starting fresh.
 
-### Not started
+### Deployed
 
-- Deployment: Litestream is configured but never run
+Live at https://hkrd.fly.dev — one machine in `sin`, one 1 GB volume, the
+database on it, Litestream replicating to R2 on a 10s interval. Verified
+2026-09-03: health 200, root 303 to the sign-in page, `/api/ops/status` 401
+without a session, HTTP 301 to HTTPS, and two generations in the bucket, the
+live one a 12 MB snapshot of the real database.
+
+`sin` and not `hkg`: Fly retired Hong Kong in its 2025 region consolidation.
+The comment in fly.toml says why Singapore and not Tokyo.
+
+Five things had to be fixed before it would deploy at all, and none of them
+could have been caught by a test, because every one is about what LEAVES this
+machine rather than what runs on it. 959 tests passed throughout.
+
+- CRLF line endings, so the container read its shebang as `bash` and died
+  naming a file that was plainly there
+- No .dockerignore, so 345 MB of .venv and database went to the builder
+- `fly sftp put` against a stopped machine, which cannot work: the SSH server
+  is a process inside the VM
+- `2>&1` on a native command being TERMINATING under
+  `$ErrorActionPreference = "Stop"`, which killed the sign-in step in the exact
+  case it existed to handle
+- PowerShell prepending a byte order mark to anything piped to a native
+  program, which made the first secret unnameable
+
+The sixth was not ours. The first R2 token's access key id and secret were not
+a pair, and R2 answers that with a 403 saying "check your secret access key" —
+equally true of four other mistakes. The entrypoint refused to start rather
+than come up empty and replicate that emptiness over the backup within ten
+seconds. The guard worked exactly as designed; the diagnosis did not exist, and
+now does.
 
 `derive/sectionals.py` is built. `export/pdf.py` is **dropped** — the owner
 confirmed the form-guide PDF is no longer wanted.
