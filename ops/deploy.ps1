@@ -21,7 +21,7 @@
 [CmdletBinding()]
 param(
     [string] $App        = "hkrd",
-    [string] $Region     = "hkg",
+    [string] $Region     = "",      # blank: read primary_region from fly.toml
     [string] $Volume     = "hkrd_data",
     [string] $Bucket     = "hkrd-backups",
     [string] $AccountId  = "e5d11ee7921c7b9774b52de38dd915bf",
@@ -74,8 +74,16 @@ function Resolve-Fly {
 
 # Output captured as text, exit code in $script:FlyExit. Never throws — for
 # the questions whose answer is "no" as often as "yes".
+#
+# SilentlyContinue, not Continue. flyctl writes a "Metrics token unavailable"
+# warning to stderr on most commands, and with Continue that warning is DISPLAYED
+# as a red NativeCommandError quoting this function's own source line — six
+# times over a deploy, each one looking like the thing that just went wrong.
+# Nothing is lost by silencing it: the 2>&1 above still captures the text into
+# $text, and Invoke-Fly prints all of it when the exit code is non-zero. The
+# display is suppressed; the evidence is not.
 function Invoke-FlyText {
-    $ErrorActionPreference = "Continue"
+    $ErrorActionPreference = "SilentlyContinue"
     $text = (& $script:FlyExe @args 2>&1 | Out-String)
     $script:FlyExit = $LASTEXITCODE
     return $text
@@ -104,9 +112,25 @@ function Invoke-FlyLive {
     }
 }
 
+# The region is declared in fly.toml, and read from there rather than repeated
+# here. Two copies drift, and the way this one drifts is quiet: the volume is
+# created in one region, `fly deploy` places the machine per fly.toml in
+# another, and the machine comes up unable to find the volume it exists to
+# mount. -Region still overrides, for trying somewhere else without editing
+# the file.
+if (-not $Region) {
+    if (-not (Test-Path "fly.toml")) {
+        Die "No fly.toml here. Run this from the project folder, not from ops\."
+    }
+    $m = Select-String -Path "fly.toml" -Pattern '^\s*primary_region\s*=\s*"([a-z]{3})"' |
+         Select-Object -First 1
+    if (-not $m) { Die "Could not read primary_region from fly.toml." }
+    $Region = $m.Matches[0].Groups[1].Value
+}
+
 Write-Host ""
-Write-Host "  Deploying $App to Fly.io" -ForegroundColor White
-Write-Host "  ------------------------"
+Write-Host "  Deploying $App to Fly.io, region $Region" -ForegroundColor White
+Write-Host "  ----------------------------------------"
 
 # ── 1. flyctl ────────────────────────────────────────────────────────────────
 Step 1 "Checking for flyctl"
@@ -155,6 +179,25 @@ $vols = Invoke-FlyText volumes list -a $App
 if ($vols -match [regex]::Escape($Volume)) {
     Ok "$Volume already exists"
 } else {
+    # Checked BEFORE anything is created, because Fly's answer on its own does
+    # not lead anywhere. This deploy stopped at `Error: region hkg not found`
+    # — true, and no help: hkg was retired in Fly's 2025 region consolidation
+    # along with sixteen others, and nothing on screen said so or named a
+    # replacement. Listing what IS on offer turns a dead end into a choice.
+    #
+    # A loose substring match on purpose. The point is to catch a region that
+    # has been withdrawn entirely, and a stricter column-anchored regex would
+    # start rejecting valid codes the day flyctl changes its table layout.
+    $regions = Invoke-FlyText platform regions
+    if ($script:FlyExit -eq 0 -and $regions -and $regions -notmatch [regex]::Escape($Region)) {
+        Write-Host ""
+        Write-Host $regions -ForegroundColor DarkGray
+        Warn "Fly does not offer '$Region' any more."
+        Warn "Pick a code from the list above, then run this again as:"
+        Warn "    .\ops\deploy.ps1 -Region <code>"
+        Die  "Nothing was created."
+    }
+
     # 1 GB is about thirty times the current database. Fly volumes can be
     # grown later and cannot be shrunk.
     Invoke-Fly volumes create $Volume -a $App --region $Region --size 1 --yes | Out-Null

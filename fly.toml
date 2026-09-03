@@ -12,9 +12,24 @@
 # every one of them, and there are hundreds per page.
 
 app = "hkrd"
-primary_region = "hkg"          # the data, the races and the reader are all
-                                # in Hong Kong; anywhere else adds latency to
-                                # every request for no benefit
+primary_region = "sin"          # Singapore, and only because Hong Kong is no
+                                # longer on offer. Fly retired hkg in the 2025
+                                # region consolidation — 17 regions closed, and
+                                # `volumes create --region hkg` now answers
+                                # "region hkg not found". Found by deploying.
+                                #
+                                # sin over nrt because it is nearer to both
+                                # ends of this workload: ~2,600 km to Hong Kong
+                                # against Tokyo's ~2,900, and every request the
+                                # reader makes AND every page the scraper pulls
+                                # from HKJC crosses that gap. Roughly 35ms
+                                # instead of 50ms, on a dashboard read between
+                                # races — noticeable to nobody, but there is no
+                                # reason to take the slower one.
+                                #
+                                # TZ stays Asia/Hong_Kong regardless. That is
+                                # about when a race is run, not where the
+                                # machine sits.
 
 [build]
   dockerfile = "Dockerfile"

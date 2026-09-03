@@ -137,7 +137,7 @@ fly storage create        # prints the bucket name and the three credentials
 
 ```bash
 fly apps create hkrd
-fly volumes create hkrd_data --region hkg --size 1
+fly volumes create hkrd_data --region sin --size 1
 ```
 
 1 GB is roughly thirty times the current database. Fly volumes can be grown
