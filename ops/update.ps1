@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Download the latest dashboard update and open it locally.
 

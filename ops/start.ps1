@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Open the dashboard on this computer. Nothing else needed.
 

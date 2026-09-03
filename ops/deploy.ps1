@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Deploy the dashboard to Fly.io. One command, start to finish.
 
@@ -54,15 +54,54 @@ function Resolve-Fly {
     return [bool]$cmd
 }
 
-# Run flyctl and fail loudly. Every step here is one a silent failure would
-# make invisible until the dashboard is serving an empty page.
+# Running flyctl. Three ways, and NONE of them redirects with `2>&1` at the
+# call site — which is the whole reason these exist.
+#
+# In Windows PowerShell 5.1, `2>&1` on a NATIVE program does not merge two text
+# streams. It wraps every stderr line in an ErrorRecord, and with
+# $ErrorActionPreference = "Stop" set at the top of this script that ErrorRecord
+# is a TERMINATING error. The script dies AT the redirect and never reaches the
+# next line — the one that reads $LASTEXITCODE and decides what to do.
+#
+# Which killed this deploy at step 2, in precisely the case step 2 exists to
+# handle. `fly auth whoami` reports "no access token available" on stderr and
+# exits non-zero; the sign-in that should have followed never ran, and the
+# window closed on a NativeCommandError naming a command that had worked
+# correctly. Found by running it on a machine that was not yet signed in.
+#
+# $ErrorActionPreference assigned INSIDE a function is function-scoped, so it
+# reverts on return with no try/finally to get wrong.
+
+# Output captured as text, exit code in $script:FlyExit. Never throws — for
+# the questions whose answer is "no" as often as "yes".
+function Invoke-FlyText {
+    $ErrorActionPreference = "Continue"
+    $text = (& $script:FlyExe @args 2>&1 | Out-String)
+    $script:FlyExit = $LASTEXITCODE
+    return $text
+}
+
+# Output captured and swallowed, non-zero exit is fatal. For short commands
+# whose success is the only interesting thing about them.
 function Invoke-Fly {
-    $out = & $script:FlyExe @args 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host ($out | Out-String) -ForegroundColor Red
+    $out = Invoke-FlyText @args
+    if ($script:FlyExit -ne 0) {
+        Write-Host $out -ForegroundColor Red
         Die "fly $($args -join ' ') failed. Nothing after this point ran."
     }
     return $out
+}
+
+# Output streams to the window as it happens, non-zero exit is fatal. For the
+# slow ones — the build, the 31 MB transfer — where a silent five minutes is
+# indistinguishable from a hang, and for install-db.sh, whose report is the
+# point of running it.
+function Invoke-FlyLive {
+    $ErrorActionPreference = "Continue"
+    & $script:FlyExe @args
+    if ($LASTEXITCODE -ne 0) {
+        Die "fly $($args -join ' ') failed. Nothing after this point ran."
+    }
 }
 
 Write-Host ""
@@ -83,19 +122,26 @@ Ok "flyctl $((& $script:FlyExe version) -join ' ')"
 
 # ── 2. login ─────────────────────────────────────────────────────────────────
 Step 2 "Checking you are signed in to Fly"
-$who = & $script:FlyExe auth whoami 2>&1
-if ($LASTEXITCODE -ne 0) {
+$who = (Invoke-FlyText auth whoami).Trim()
+if ($script:FlyExit -ne 0) {
     Note "Not signed in. A browser window will open — sign in with the same"
     Note "account you subscribed with, then come back here."
-    & $script:FlyExe auth login
-    if ($LASTEXITCODE -ne 0) { Die "Sign-in did not complete." }
-    $who = & $script:FlyExe auth whoami 2>&1
+    Note "If no browser opens, copy the URL it prints and open that yourself."
+
+    # Not captured: this one prints a URL and waits, and a captured prompt is
+    # a hang with nothing on screen to explain it.
+    Invoke-FlyLive auth login
+
+    $who = (Invoke-FlyText auth whoami).Trim()
+    if ($script:FlyExit -ne 0) {
+        Die "Signed in, but Fly still reports no account. Run 'fly auth login' by hand and then run this again."
+    }
 }
 Ok "signed in as $who"
 
 # ── 3. the app ───────────────────────────────────────────────────────────────
 Step 3 "Creating the app"
-$existing = & $script:FlyExe apps list 2>&1 | Out-String
+$existing = Invoke-FlyText apps list
 if ($existing -match "(?m)^\s*$([regex]::Escape($App))\s") {
     Ok "$App already exists"
 } else {
@@ -105,7 +151,7 @@ if ($existing -match "(?m)^\s*$([regex]::Escape($App))\s") {
 
 # ── 4. the volume ────────────────────────────────────────────────────────────
 Step 4 "Creating the volume the database lives on"
-$vols = & $script:FlyExe volumes list -a $App 2>&1 | Out-String
+$vols = Invoke-FlyText volumes list -a $App
 if ($vols -match [regex]::Escape($Volume)) {
     Ok "$Volume already exists"
 } else {
@@ -195,14 +241,14 @@ if ($SkipUpload) {
 # ── 7. deploy ────────────────────────────────────────────────────────────────
 Step 7 "Deploying"
 Note "First build pulls Python, numpy, scipy and pandas — several minutes."
-Invoke-Fly deploy -a $App
+Invoke-FlyLive deploy -a $App
 Ok "deployed"
 
 # ── 8. upload ────────────────────────────────────────────────────────────────
 if (-not $SkipUpload -and (Test-Path "hkrd.db")) {
     Step 8 "Uploading the database"
 
-    $machine = (& $script:FlyExe machine list -a $App --json | ConvertFrom-Json)[0].id
+    $machine = ((Invoke-FlyText machine list -a $App --json) | ConvertFrom-Json)[0].id
     if (-not $machine) { Die "No machine found for $App." }
 
     # Sent up BESIDE the live file, with the machine left RUNNING.
@@ -215,13 +261,13 @@ if (-not $SkipUpload -and (Test-Path "hkrd.db")) {
     # old WAL onto the new file. ops/install-db.sh does the swap safely and
     # explains it at length.
     Note "sending 31 MB to /data/hkrd.db.new — a minute or two"
-    Invoke-Fly sftp put hkrd.db /data/hkrd.db.new -a $App | Out-Null
+    Invoke-FlyLive sftp put hkrd.db /data/hkrd.db.new -a $App
     Ok "uploaded"
 
     # Verifies the transfer, renames it over the live file and clears the WAL
     # and Litestream state belonging to the database it replaced. Refuses, and
     # changes nothing, if what arrived is not a readable database.
-    Invoke-Fly ssh console -a $App -C "/app/ops/install-db.sh" | Out-Null
+    Invoke-FlyLive ssh console -a $App -C "/app/ops/install-db.sh"
     Ok "installed"
 
     # Restart, so uvicorn and Litestream reopen the file that is now there.
@@ -241,7 +287,7 @@ try {
     Warn "health check did not answer yet. Give it a minute, then: fly logs -a $App"
 }
 
-$snaps = & $script:FlyExe ssh console -a $App -C "litestream snapshots -config /app/ops/litestream.yml /data/hkrd.db" 2>&1 | Out-String
+$snaps = Invoke-FlyText ssh console -a $App -C "litestream snapshots -config /app/ops/litestream.yml /data/hkrd.db"
 if ($snaps -match "generation") {
     Ok "replication is live — R2 has a snapshot"
 } else {

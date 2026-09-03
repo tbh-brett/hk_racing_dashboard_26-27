@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     First time on a new PC: find the old dashboard, download this one, start it.
 

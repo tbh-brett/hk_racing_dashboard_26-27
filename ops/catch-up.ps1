@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Fill in the racing data the database is missing.
 

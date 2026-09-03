@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Fix pace figures, comments on running, and tags that earlier scrapes left out.
 
