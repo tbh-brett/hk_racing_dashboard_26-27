@@ -59,6 +59,24 @@ WEIGHTS = {
     "f_rating": 0.0137, "f_traj": -0.0711, "f_wpr": 0.0540, "f_dist": -0.0147,
 }
 
+# The draw term's multiplier, kept OUT of WEIGHTS deliberately. Those eight came
+# from one OLS on ~15,500 runners that never saw a draw term; folding a ninth in
+# beside them would misrepresent how it was obtained. This one was fitted on its
+# own, by out-of-sample sweep over 306 held-out races after 29 Mar 2026 -- the
+# rows the eight weights have never seen either.
+#
+#   variant                        rho     vs none        t        p
+#   none (what shipped)         0.3786    +0.0000     +0.00   1.0000
+#   legacy (venue, fixed 6.5)   0.3735    -0.0051     -0.38   0.7018
+#   slope, w=1.0                0.3962    +0.0176     +2.89   0.0041
+#   slope, w=1.5                0.4003    +0.0217     +2.77   0.0059
+#   slope, w=2.0                0.3956    +0.0171     +1.89   0.0603
+#
+# The sweep turns over at 1.5 rather than running to the edge, so the optimum is
+# interior and not a boundary artefact. Note the legacy term made the model
+# WORSE; derive/draw explains the three reasons why.
+DRAW_MULTIPLIER = 1.5
+
 
 def parse_sections(s) -> list[float]:
     """Sectional splits as a list. Delegates to store.coerce.
@@ -202,10 +220,9 @@ def build_profile(runs: list[dict], today_dist, today_venue,
 
 
 # The order the Model Analysis page shows them in: widest weight first, so the
-# eye lands on the term that actually moves the score. `draw` carries no weight
-# entry because it is applied as a flat 0.3 multiplier rather than a fitted
-# coefficient -- and nothing currently supplies a draw score, which the page
-# says rather than hiding a column that is always zero.
+# eye lands on the term that actually moves the score. `draw` is applied as a
+# multiplier rather than one of the fitted WEIGHTS, and is named apart from them
+# on purpose -- see DRAW_MULTIPLIER.
 COMPONENTS = ("fmrp", "lsa", "traj", "esz", "wpr", "style", "dist", "rating",
               "draw")
 COMPONENT_WEIGHTS = {
@@ -213,7 +230,7 @@ COMPONENT_WEIGHTS = {
     "traj": WEIGHTS["f_traj"], "esz": WEIGHTS["f_esz"],
     "wpr": WEIGHTS["f_wpr"], "style": WEIGHTS["f_style"],
     "dist": WEIGHTS["f_dist"], "rating": WEIGHTS["f_rating"],
-    "draw": 0.3,
+    "draw": DRAW_MULTIPLIER,
 }
 
 
@@ -253,7 +270,7 @@ def contributions(profile: dict, distance, venue, med_rating,
         "wpr": WEIGHTS["f_wpr"] * (-pr * 5),
         "dist": WEIGHTS["f_dist"] * abs(
             nan0(profile["avg_ssi"]) - IDEAL_SSI.get(int(distance), -0.20)),
-        "draw": nan0(draw_score) * 0.3,
+        "draw": nan0(draw_score) * DRAW_MULTIPLIER,
     }
 
 

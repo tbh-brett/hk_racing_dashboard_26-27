@@ -24,6 +24,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from hkrd.derive import draw as draw_d
 from hkrd.model import sarr
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
@@ -60,6 +61,7 @@ class SarrReport:
     component_rows: int = 0
     skipped_no_history: int = 0
     skipped_no_distance: int = 0
+    scored_without_draw: int = 0
     errors: list[str] = field(default_factory=list)
 
     def render(self) -> str:
@@ -70,6 +72,7 @@ class SarrReport:
             f"  component rows     {self.component_rows:>7,}",
             f"  skipped, no prior history {self.skipped_no_history:>7,}",
             f"  skipped, no distance      {self.skipped_no_distance:>7,}",
+            f"  scored, but no gate       {self.scored_without_draw:>7,}",
         ]
         if self.errors:
             lines.append(f"  ERRORS             {len(self.errors):>7,}")
@@ -101,10 +104,33 @@ def rebuild(db: Path | None = None, *, min_prior: int = 2,
         for recs in by_horse.values():
             recs.sort(key=lambda r: (r["race_date"], r["race_no"]), reverse=True)
 
+        # One draw table per MEETING, fitted from runs strictly before it -- the
+        # same walk-forward rule the horse profiles already obey. Cached because
+        # a meeting's races all share it, and refitting per race would be the
+        # same answer computed eleven times.
+        draw_tables: dict[str, draw_d.DrawTable | None] = {}
+
+        def table_for(meeting_date: str) -> draw_d.DrawTable | None:
+            if meeting_date not in draw_tables:
+                hist = runs[runs["race_date"] < meeting_date]
+                try:
+                    draw_tables[meeting_date] = draw_d.draw_table(hist)
+                except draw_d.DrawError:
+                    # The first meetings in the archive have nothing before
+                    # them. They score on the other eight terms, as they did
+                    # before this term existed.
+                    draw_tables[meeting_date] = None
+            return draw_tables[meeting_date]
+
         rows: list[tuple] = []
         component_rows: list[tuple] = []
         for (race_date, race_no), race in targets.groupby(["race_date", "race_no"]):
             med_rating = pd.to_numeric(race["rating"], errors="coerce").median()
+            dtable = table_for(race_date)
+            # The declared field, not the count that ends up scored: both axes
+            # of the draw score are normalised by it, so a horse dropped for
+            # thin history must not shrink the field its rivals are measured in.
+            field_size = len(race)
             scored: list[tuple[int, float]] = []
             for rec in race.to_dict("records"):
                 # SARR's distance term needs a distance. Five legacy races
@@ -124,8 +150,13 @@ def rebuild(db: Path | None = None, *, min_prior: int = 2,
                 if profile is None:
                     report.skipped_no_history += 1
                     continue
+                ds = (0.0 if dtable is None else draw_d.draw_score(
+                    rec["draw"], field_size, rec["venue"], rec["distance"], dtable))
+                if dtable is not None and pd.isna(rec["draw"]):
+                    report.scored_without_draw += 1
                 parts = sarr.contributions(
-                    profile, rec["distance"], rec["venue"], med_rating)
+                    profile, rec["distance"], rec["venue"], med_rating,
+                    draw_score=ds)
                 value = sum(parts.values())
                 if value is None or pd.isna(value):
                     continue

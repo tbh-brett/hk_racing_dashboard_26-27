@@ -166,15 +166,20 @@ def test_the_breakdown_reports_whether_its_own_rows_add_up(db):
 
 
 def test_influence_separates_the_fitted_weight_from_the_realised_one(db):
-    """`draw` carries the widest multiplier (0.3) and contributes nothing,
-    because nothing supplies a draw score. A page showing only the coefficient
-    would put it at the top of the table."""
+    """`draw` carries the widest multiplier (1.5) and nothing like the widest
+    realised influence, because its score is a small centred number rather than
+    a raw deviation. A page showing only the coefficient would put it at the top
+    of the table.
+
+    This test used to assert the opposite -- that draw moved scores by exactly
+    zero -- and it was right to: the term was wired end to end and fed no value.
+    That is now fixed, and the assertion is inverted rather than deleted so the
+    two readings of "how big is this term" stay pinned apart."""
     conn = get_conn(db)
     rows = {c["component"]: c for c in model.sarr_influence(conn=conn)}
     conn.close()
     assert rows["draw"]["weight_share"] == 1.0        # widest coefficient
-    assert rows["draw"]["influence_share"] == 0.0     # moves nothing
-    assert rows["draw"]["inert"] is True
+    assert rows["draw"]["influence_share"] < 1.0      # not the widest influence
     assert rows["fmrp"]["influence_share"] > rows["traj"]["influence_share"]
 
 

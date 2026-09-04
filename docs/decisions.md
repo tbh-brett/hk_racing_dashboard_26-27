@@ -138,6 +138,66 @@ rules on drift.
 
 ---
 
+## A5 — Should SARR score the barrier draw? **Settled: yes, refitted**
+
+SARR carried a `draw` component from the day it was written: the parameter, the
+multiplier, the `runner_sarr_component` row and a column on the Model Analysis
+page. Nothing ever supplied a value, so it contributed exactly 0.0 to all 17,262
+scored runners. The old dashboard DID score it
+(`sarr_raceday.py:598`, `get_draw_score(...) * 0.3`), so the rebuild dropped a
+live term rather than declining to add one.
+
+**Restoring it verbatim was rejected.** Measured walk-forward over 306 held-out
+races after 29 Mar 2026, the legacy term made rank correlation WORSE — rho
+0.3735 against 0.3786 with no draw term at all. Three reasons, all measured:
+
+1. **A fixed mid-place.** Legacy scored `mean(place) - 6.5`. Gates 13 and 14
+   only exist in 14-runner fields, so a neutral wide gate collected field-size
+   artefact rather than effect. Normalising BOTH axes by field size is the whole
+   correction.
+2. **Venue-only keying.** The effect is strongly distance-specific, and at
+   ST 1000 it **reverses** — fitted slope −0.093 raw against a +0.114 global. A
+   venue-only table averages that away and penalises the gate it should reward.
+3. **An unfitted multiplier.** `0.3` was hand-chosen, carried in a comment
+   reading `# conservative draw weight`. Legacy's OLS ran on eight factors, none
+   of them the draw.
+
+**What replaced it.** One slope of normalised finishing position on normalised
+draw per `(venue, distance)`, shrunk toward the global slope by `n/(n+200)`,
+scored centred so the term reorders a field rather than shifting it:
+
+```
+npos  = (place - 1) / (field_size - 1)      ndraw = (draw - 1) / (field_size - 1)
+slope = regress(npos ~ ndraw) per cell, shrunk to global
+score = slope * (ndraw - 0.5)               contribution = score * 1.5
+```
+
+| variant | Spearman rho | vs none | t | p |
+|---|---|---|---|---|
+| none (what shipped) | 0.3786 | +0.0000 | — | — |
+| legacy (venue, fixed 6.5, w=0.3) | 0.3735 | −0.0051 | −0.38 | 0.7018 |
+| slope, w=1.0 | 0.3962 | +0.0176 | +2.89 | 0.0041 |
+| **slope, w=1.5** | **0.4003** | **+0.0217** | **+2.77** | **0.0059** |
+| slope, w=2.0 | 0.3956 | +0.0171 | +1.89 | 0.0603 |
+
+The sweep turns over at 1.5 rather than running to the edge, so the optimum is
+interior and not a boundary artefact. `DRAW_MULTIPLIER` is named apart from the
+eight fitted `WEIGHTS` deliberately: those came from one OLS that never saw a
+draw term, and folding a ninth in beside them would misrepresent how it was
+obtained. Refitting all nine together is the cleaner design and a real piece of
+work; it is not something to do by accident.
+
+Post-rebuild, `draw` is the **third-largest term by realised influence** —
+mean |contribution| 0.0464, behind `fmrp` (0.1033) and `wpr` (0.0689), range
+±0.157. Components still sum to the score on all 17,376 rows.
+
+**It creates no betting edge, and must not be framed as one.** This makes SARR a
+better DESCRIPTIVE rating of who ran well relative to the field they met. The
+corrected model still sits well short of the market, and `model/backtest.py`
+documents why that road is closed.
+
+---
+
 ## Corrections to the handoff figures
 
 Verified against the data; the bundle's estimates were close but low in two places.

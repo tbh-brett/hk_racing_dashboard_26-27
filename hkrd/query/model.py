@@ -189,10 +189,16 @@ def sarr_influence(*, conn: Connection | None = None) -> list[dict]:
     noting that fmrp "carries roughly 3x the weight of the next-largest term".
     That is true of the COEFFICIENT and misleading on its own: measured across
     every scored runner, `wpr` carries the fifth-largest weight and the SECOND
-    largest realised influence, and `draw` carries the largest multiplier of
-    all (0.3) while contributing exactly zero, because nothing supplies a draw
-    score. A page about why a model ranked a horse has to show the realised
-    figure or it documents the intention rather than the model.
+    largest realised influence, while `draw` carries the largest multiplier of
+    all (1.5) and a realised influence a fraction of it, because its score is a
+    small centred number rather than a raw deviation. A page about why a model
+    ranked a horse has to show the realised figure or it documents the intention
+    rather than the model.
+
+    `inert` stays in the output even though nothing is inert today. It is the
+    check that caught the draw term contributing 0.0 to all 17,376 scored
+    runners while every part of the plumbing around it looked correct, and a
+    column that only exists while something is broken cannot catch the next one.
     """
     own = conn is None
     conn = conn or get_conn()
