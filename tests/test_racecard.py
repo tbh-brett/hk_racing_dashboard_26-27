@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from bs4 import BeautifulSoup
 
 from hkrd.ingest import racecard as rc
 
@@ -78,6 +79,60 @@ def test_columns_are_found_by_header_not_by_position(html, reordered):
     assert a[1]["jockey"] == b[1]["jockey"] == "J Moreira"
     assert a[6]["draw"] == b[6]["draw"] == 12
     assert a[6]["rating"] == b[6]["rating"] == 68
+
+
+def _with_intl_rating_column(html: str) -> str:
+    """HKJC's June 2026 layout: an "Int'l Rtg." column immediately left of
+    "Rtg.", holding "-" for every domestic horse."""
+    soup = BeautifulSoup(html, "html.parser")
+    table = rc._find_table(soup)
+    header = rc._header_row(table)
+    cells = header.find_all(["th", "td"])
+    idx = next(i for i, c in enumerate(cells)
+               if rc._clean(c.get_text()) == "Rtg.")
+    th = soup.new_tag("th")
+    th.string = "Int'l Rtg."
+    cells[idx].insert_before(th)
+    for tr in table.find_all("tr"):
+        if tr is header:
+            continue
+        tds = tr.find_all(["td", "th"])
+        if len(tds) <= idx:
+            continue
+        td = soup.new_tag("td")
+        td.string = "-"
+        tds[idx].insert_before(td)
+    return str(soup)
+
+
+def test_an_international_rating_column_does_not_capture_the_rating(html):
+    """HKJC added "Int'l Rtg." left of "Rtg." in June 2026. Aliases match as
+    substrings and the first field to match a column claims it, so "int'l rtg."
+    contains "rtg." and `rating` read the international column -- "-" for every
+    domestic horse. Nine meetings ingested with rating NULL and nothing raised,
+    because _SHAPES lets a rating be "-": a wrong column that validates."""
+    rows = {r["horse_no"]: r
+            for r in rc.parse_racecard(_with_intl_rating_column(html), 4)}
+    assert rows[1]["rating"] == 72
+    assert rows[6]["rating"] == 68
+
+
+@pytest.mark.parametrize("label", ["Int'l Rtg.", "Int’l Rtg.", "Intl Rtg."])
+def test_the_decoy_is_claimed_however_its_apostrophe_is_written(label):
+    """The straight apostrophe is what HKJC serves today. A curly one is one
+    CMS change away, and the failure it would cause is silent."""
+    cols = rc._map_columns(
+        ["Horse No.", "Horse", "Draw", "Trainer", label, "Rtg.", "Rtg.+/-"],
+        "probe")
+    assert cols["int_rating"] == 4
+    assert cols["rating"] == 5
+    assert cols["rating_change"] == 6
+
+
+def test_a_card_with_no_international_column_still_finds_the_rating(html):
+    """The fix must not depend on the decoy being present."""
+    rows = {r["horse_no"]: r for r in rc.parse_racecard(html, 4)}
+    assert rows[1]["rating"] == 72
 
 
 def test_a_missing_required_column_raises_rather_than_guessing(html):

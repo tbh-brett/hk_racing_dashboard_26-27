@@ -48,6 +48,17 @@ _COLUMNS: dict[str, tuple[str, ...]] = {
     "over_weight": ("over wt", "overwt"),
     "draw": ("draw",),
     "trainer": ("trainer",),
+    # MUST stay above `rating`, and that ordering is the entire entry. Aliases
+    # match as substrings and the first field to match a column claims it, so
+    # "int'l rtg." contains "rtg." and `rating` bound to the INTERNATIONAL
+    # rating column HKJC added in June 2026, immediately left of "Rtg.". That
+    # column is "-" for every domestic horse, and _SHAPES lets a rating be "-",
+    # so nine meetings ingested with rating NULL and nothing raised. Claiming
+    # the decoy here leaves "Rtg." for `rating`. Nothing stores int_rating --
+    # scrape_meeting picks fields by name and never asks for it. It exists to
+    # be matched.
+    "int_rating": ("int'l rtg", "int’l rtg", "intl rtg",
+                   "international rtg", "int'l rating"),
     "rating": ("rtg.", "rating"),
     "rating_change": ("rtg.+/-", "rtg +/-"),
     "declared_weight": ("horse wt", "declar"),
