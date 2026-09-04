@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dashboard",
+      "runtimeExecutable": ".venv\\Scripts\\python.exe",
+      "runtimeArgs": ["-m", "hkrd.serve", "--port", "8801"],
+      "port": 8801,
+      "env": {
+        "HKRD_ALLOW_NO_AUTH": "1"
+      }
+    }
+  ]
+}

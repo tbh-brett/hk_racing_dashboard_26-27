@@ -30,6 +30,24 @@
 45 22 * * *   python -m hkrd.jobs.nightly --db /data/hkrd.db
 45 23 * * *   python -m hkrd.jobs.nightly --db /data/hkrd.db
 
+# The pre-race speed map. Its own line rather than a step inside `nightly`,
+# for the reason the trials line gives: a projection that fails must not take
+# the race-day scrape down with it, and the two have nothing to say to each
+# other.
+#
+# No date here either. `--pending` asks the database which stored cards have no
+# results yet, so the calendar stays in one place.
+#
+# Three runs, placed against how the card actually changes. It is published and
+# revised in the morning, and then SCRATCHINGS arrive right up to the off --
+# `field_size` scales both axes of every projection, so a map built before a
+# scratching and read after it is wrong for every runner in the race, not just
+# the one that came out. The last two lines are that guard: one before a Sha Tin
+# afternoon, one before a Happy Valley evening.
+20 7  * * *   python -m hkrd.jobs.project_card --pending --db /data/hkrd.db
+20 12 * * *   python -m hkrd.jobs.project_card --pending --db /data/hkrd.db
+20 18 * * *   python -m hkrd.jobs.project_card --pending --db /data/hkrd.db
+
 # Barrier trials. A separate line because they are a different source on a
 # different schedule, and folding them into `nightly` would mean a failed
 # race-day scrape takes the trials down with it.

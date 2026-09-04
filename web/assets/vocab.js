@@ -34,6 +34,7 @@ export const $ = (id) => document.getElementById(id);
  */
 export const NAV = [
   ['Race Day', 'raceday.html'],
+  ['Speed Map', 'speed-map.html'],
   ['Form Guide', 'form-guide.html'],
   ['Bets', 'bets.html'],
   ['Blackbook', 'blackbook.html'],

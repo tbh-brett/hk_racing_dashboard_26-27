@@ -46,6 +46,7 @@ export const api = {
   race: (date, no) => get(`/race/${date}/${no}`),
   horse: (name, limit = 6) => get(`/horse/${encodeURIComponent(name)}?limit=${limit}`),
   raceCard: (date, no) => get(`/raceday/${date}/${no}`),
+  speedMap: (date) => get(`/speedmap/${date}`),
   raceDayMeeting: (date) => get(`/raceday/${date}`),
   meetingBlackbook: (date) => get(`/raceday/${date}/blackbook`),
   blackbook: (q = '') => get(`/blackbook${q}`),

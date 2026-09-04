@@ -1,0 +1,220 @@
+/* Speed Map — the gate ladder.
+ *
+ * The square 1px-border vocabulary of every other page. One rule carried over
+ * from the brief and worth restating here because a stylesheet is where it
+ * would be broken: THE BAR ENCODES EARLY SPEED ONLY, in the amber --edge hue.
+ * Style keeps the --style-* hues and the settle band gets the slate --cool.
+ * Three readings, three hue families, so no reader has to work out which of
+ * them a colour is talking about.
+ */
+
+.speedmap-page {
+  padding: 14px 16px 40px;
+  max-width: 1180px;
+}
+
+.map-section {
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  margin-bottom: 18px;
+}
+
+.map-section .section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line-2);
+  flex-wrap: wrap;
+}
+
+.map-section .section-head .title {
+  font: 600 12px/1 'IBM Plex Mono', monospace;
+  letter-spacing: .08em;
+  color: var(--text);
+}
+
+.map-section .section-head .sub {
+  font: 400 10px/1.4 'IBM Plex Mono', monospace;
+  letter-spacing: .06em;
+  color: var(--text-dim);
+}
+
+.speedmap-page .note {
+  margin: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  font: 400 10px/1.5 'IBM Plex Mono', monospace;
+  letter-spacing: .05em;
+  color: var(--text-muted);
+}
+
+/* ── the ladder ───────────────────────────────────────────────────────────
+ * A grid rather than a table: the bar column has to stretch and the gate
+ * column must not, and a table would need a fixed layout to promise either.
+ */
+
+.ladder { padding: 4px 0 6px; }
+
+.rung {
+  display: grid;
+  grid-template-columns: 44px minmax(180px, 1fr) 110px 96px minmax(160px, 1.4fr) 62px;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rung:last-child { border-bottom: 0; }
+.rung:hover { background: var(--run-hover); }
+
+.rung-head {
+  border-bottom: 1px solid var(--line-2);
+  font: 500 9px/1 'IBM Plex Mono', monospace;
+  letter-spacing: .1em;
+  color: var(--text-faint);
+}
+.rung-head:hover { background: none; }
+
+/* The gate is the one thing here that is not a projection, so it is the only
+   boxed cell — it reads as given rather than derived. */
+.rung .gate {
+  font: 600 12px/1 'IBM Plex Mono', monospace;
+  color: var(--text-2);
+  text-align: center;
+  border: 1px solid var(--box-rule);
+  background: var(--box);
+  padding: 4px 0;
+}
+
+.rung-head .gate { border: 0; background: none; padding: 0; }
+
+.who { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+
+.who .no {
+  font: 400 10px/1 'IBM Plex Mono', monospace;
+  color: var(--text-faint);
+  min-width: 16px;
+}
+
+.who .name {
+  font: 500 12px/1.2 'IBM Plex Sans', sans-serif;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rung .jockey {
+  font: 400 10px/1.2 'IBM Plex Mono', monospace;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── how quickly it gets away ─────────────────────────────────────────────
+ * Amber, and amber only. This bar is early speed and nothing else: it does not
+ * know about the gate, and folding the gate in would make the ladder argue
+ * with its own y-axis.
+ */
+
+.away { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+.away-track {
+  flex: 1;
+  height: 9px;
+  background: var(--meter);
+  border: 1px solid var(--box-rule);
+  min-width: 60px;
+}
+
+.away-fill {
+  height: 100%;
+  background: var(--edge);
+  min-width: 1px;
+}
+
+.away-rank {
+  font: 500 10px/1 'IBM Plex Mono', monospace;
+  color: var(--text-muted);
+  min-width: 22px;
+  text-align: right;
+}
+
+.away-none {
+  font: 400 9px/1.3 'IBM Plex Mono', monospace;
+  letter-spacing: .04em;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+/* ── where it settles ─────────────────────────────────────────────────────
+ * Slate, one family, four weights. The band is a SUMMARY of the bar plus the
+ * gate plus the style, so it must not compete with any of them for attention —
+ * a fifth hue here would read as a fifth independent fact.
+ */
+
+.proj { text-align: right; }
+
+.band {
+  display: inline-block;
+  font: 500 9px/1 'IBM Plex Mono', monospace;
+  letter-spacing: .08em;
+  padding: 3px 5px;
+  border: 1px solid var(--cool-dim);
+  color: var(--cool);
+  background: transparent;
+  min-width: 38px;
+  text-align: center;
+}
+
+.band-lead { color: var(--text); border-color: var(--cool); background: var(--ci); }
+.band-pace { color: var(--text-2); border-color: var(--cool); }
+.band-mid  { color: var(--text-muted); }
+.band-back { color: var(--text-dim); border-color: var(--line-2); }
+.band-none { color: var(--text-faint); border-color: var(--line); }
+
+/* ── the ones it will not place ───────────────────────────────────────────
+ * Dimmed on the ladder AND listed underneath with a reason. Not hidden: a
+ * season opener is full of first-starters, and a page that quietly showed 108
+ * of 114 runners would be reporting a complete card.
+ */
+
+.rung-unprojected .who .name { color: var(--text-muted); }
+
+.unprojected {
+  border-top: 1px solid var(--line-2);
+  padding: 8px 12px 10px;
+  background: var(--bg-deep);
+}
+
+.unproj-head {
+  font: 500 9px/1 'IBM Plex Mono', monospace;
+  letter-spacing: .1em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.unproj-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 2px 0;
+  font: 400 10px/1.4 'IBM Plex Mono', monospace;
+}
+
+.unproj-row .gate { color: var(--text-faint); min-width: 20px; }
+.unproj-row .name { color: var(--text-2); min-width: 170px; }
+.unproj-row .why  { color: var(--text-dim); font-style: italic; }
+
+.speedmap-page .empty {
+  padding: 18px 12px;
+  font: 400 11px/1.5 'IBM Plex Mono', monospace;
+  color: var(--text-dim);
+}
+
+@media (max-width: 900px) {
+  .rung { grid-template-columns: 38px minmax(120px, 1fr) 84px minmax(110px, 1fr) 56px; }
+  .rung .jockey { display: none; }
+}

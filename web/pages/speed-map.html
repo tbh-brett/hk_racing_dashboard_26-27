@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Speed Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/pages.css">
+<link rel="stylesheet" href="../assets/speedmap.css">
+</head>
+<body>
+
+<!-- Layer 1. Rendered by context.js and identical on every page; no page
+     writes into it. See design brief 08 §1. -->
+<div class="chrome-meeting"></div>
+
+<nav class="chrome-nav" id="nav"></nav>
+
+<div class="race-strip">
+  <div class="label">RACE</div>
+  <div class="race-chips" id="race-chips"></div>
+  <div class="strip-right">
+    <span class="sep">|</span>
+    <span id="strip-note"></span>
+  </div>
+</div>
+
+<main class="speedmap-page">
+
+  <section class="map-section">
+    <div class="section-head">
+      <span class="title">SPEED MAP</span>
+      <span class="sub">WHERE THE FIELD WILL BE AT THE FIRST CALL ·
+        BUILT FROM FORM AND THE GATE, BEFORE THE RACE IS RUN</span>
+    </div>
+
+    <!-- The precision statement is part of the reading, not a footnote. A
+         speed map that implies more than this is lying, and the whole
+         codebase is built the other way. -->
+    <p class="note" id="precision"></p>
+
+    <div class="ladder" id="ladder"></div>
+
+    <div class="section-foot">
+      <span>THE BAR IS EARLY SPEED ONLY — HOW QUICKLY THIS HORSE HABITUALLY GETS
+        AWAY, RANKED INSIDE THIS RACE</span>
+      <span class="right">PROFILE IS ITS HABITUAL STYLE AND PROJ FOLDS IN THE
+        GATE — THEY ARE INDEPENDENT AXES AND DO NOT SHARE A HUE</span>
+    </div>
+
+    <!-- Named, never counted. A horse that cannot be projected is a fact about
+         the card; a zero bar would read as "breaks at field average", which is
+         a claim about a horse we know nothing about. -->
+    <div class="unprojected" id="unprojected" hidden></div>
+  </section>
+
+</main>
+
+<script type="module" src="../assets/speed-map.js"></script>
+</body>
+</html>

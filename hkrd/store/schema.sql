@@ -419,6 +419,33 @@ CREATE TABLE IF NOT EXISTS bet_blackbook_links (
 
 CREATE INDEX IF NOT EXISTS ix_bets_account_date ON bets(account, race_date);
 
+-- ── the pre-race speed map ───────────────────────────────────────────────────
+-- Where each runner is projected to be at the first call, written BEFORE the
+-- race. A job writes it rather than a query computing it live: building a SARR
+-- profile per runner over 21k annotated runs is tens of seconds, which is fine
+-- once a night and impossible inside a request.
+--
+-- `settle` and `settle_band` are NULLABLE on purpose. A horse with no gate, or
+-- with fewer than the two prior runs a profile needs, gets NULL and is named on
+-- the page as an absence. A zero would read as "breaks at field average", which
+-- is a claim about a horse we know nothing about.
+CREATE TABLE IF NOT EXISTS runner_projection (
+  race_date      TEXT    NOT NULL,
+  race_no        INTEGER NOT NULL,
+  horse_no       INTEGER NOT NULL,
+  esz            REAL,               -- the SARR profile trait, signed, lower = quicker
+  esz_rank       REAL,               -- within-race percentile, 0 = quickest away
+  ndraw          REAL,               -- (draw - 1) / (field_size - 1)
+  draw_score     REAL,               -- derive/draw, centred
+  settle         REAL,               -- projected normalised first-call position
+  settle_band    TEXT,               -- LEAD | PACE | MID | BACK
+  style          TEXT,               -- habitual profile style
+  n_prior        INTEGER,
+  field_size     INTEGER NOT NULL,   -- the declared field both axes are scaled by
+  derive_version TEXT    NOT NULL,
+  PRIMARY KEY (race_date, race_no, horse_no)
+);
+
 -- ── indexes ──────────────────────────────────────────────────────────────────
 -- History is looked up by horse across dates constantly (form guide, lookup,
 -- horse page); the meeting index serves race day.

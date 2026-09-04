@@ -237,7 +237,7 @@ def test_the_navigation_is_defined_once_and_in_order() -> None:
     text = VOCAB.read_text(encoding="utf-8")
     order = re.findall(r"\['([^']+)', '([^']+\.html)'\]", text)
     assert [name for name, _ in order] == [
-        "Race Day", "Form Guide", "Bets", "Blackbook",
+        "Race Day", "Speed Map", "Form Guide", "Bets", "Blackbook",
         "Results", "Lookup", "Trials", "Model Analysis"]
 
 

@@ -16,7 +16,7 @@ from hkrd.query import (blackbook as bb_q, formguide as fg_q,
                         health as health_q, market as market_q, model,
                         race as race_q, raceday as raceday_q,
                         vet as vet_q, freshness as fresh_q,
-                        pace as pace_q)
+                        pace as pace_q, speedmap as speedmap_q)
 
 WEB = Path(__file__).resolve().parent.parent.parent / "web"
 
@@ -192,6 +192,30 @@ def race_pace(date: str, race_no: int) -> dict:
     out = pace_q.race_pace(date, race_no)
     if not out["field_size"]:
         raise HTTPException(404, f"no race {race_no} on {date}")
+    return out
+
+
+@app.get("/api/speedmap/{date}")
+def speed_map_meeting(date: str) -> dict:
+    """The pre-race speed map for a whole card — a gate ladder per race.
+
+    Read from `runner_projection`, which `jobs/project_card` writes. Runners
+    with no gate or too little form come back with a null `settle` and a stated
+    reason rather than being dropped: a horse that cannot be projected is a fact
+    about the card, and a zero would read as "breaks at field average".
+    """
+    out = speedmap_q.meeting_speed_map(date)
+    if not out["races"]:
+        raise HTTPException(404, f"no projection stored for {date}")
+    return out
+
+
+@app.get("/api/speedmap/{date}/{race_no}")
+def speed_map_race(date: str, race_no: int) -> dict:
+    """One race's gate ladder."""
+    out = speedmap_q.speed_map(date, race_no)
+    if not out["runners"]:
+        raise HTTPException(404, f"no projection for race {race_no} on {date}")
     return out
 
 
