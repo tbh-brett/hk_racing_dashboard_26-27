@@ -168,7 +168,10 @@ def test_the_job_stores_snapshots_and_reports_counts(db, monkeypatch):
         return [odds_ingest.fetch_race(page, date, venue, n) for n in races]
 
     monkeypatch.setattr(odds_ingest, "fetch_meeting", fake_meeting)
-    report = scrape_odds.run(DATE, "HV", db=str(db))
+    # turnover and doubles off: this is the win/place path, and leaving them on
+    # sends a unit test to bet.hkjc.com in a real browser.
+    report = scrape_odds.run(DATE, "HV", db=str(db),
+                             turnover=False, doubles=False)
     assert report.races == 2
     assert report.win_place == 6            # 3 runners x 2 races
     assert "2 races" in report.line()
@@ -193,7 +196,8 @@ def test_a_stale_race_is_skipped_rather_than_stored(db, monkeypatch):
         return out
 
     monkeypatch.setattr(odds_ingest, "fetch_meeting", fake_meeting)
-    report = scrape_odds.run(DATE, "HV", db=str(db))
+    report = scrape_odds.run(DATE, "HV", db=str(db),
+                             turnover=False, doubles=False)
     assert report.races == 1
     assert any("stale DOM" in s for s in report.skipped)
 
@@ -291,3 +295,121 @@ def test_an_unreadable_off_time_keeps_the_race():
     import datetime as dt
     now = dt.datetime.fromisoformat("2026-07-15T17:30:00")
     assert scrape_odds._is_settled("2026-07-15", "not a time", now) is False
+
+
+# ─── turnover and doubles ─────────────────────────────────────────────────────
+
+def _fake_meeting(date, venue, races, **kw):
+    page = FakePage([PANEL] * 4)
+    return [odds_ingest.fetch_race(page, date, venue, n) for n in races]
+
+
+def test_a_leg_closes_when_its_FIRST_race_goes_off():
+    """Leg N couples race N with race N+1, so it shuts when race N runs -- not
+    when race N+1 does. Getting this backwards keeps paying for a page whose
+    market has already closed."""
+    assert scrape_odds.live_legs([1, 2, 3], 3) == [1, 2]
+    assert scrape_odds.live_legs([3], 3) == []          # nothing left to pair
+    assert scrape_odds.live_legs([2, 3], 3) == [2]
+
+
+def test_the_last_race_has_no_leg():
+    assert scrape_odds.live_legs([10], 10) == []
+    assert scrape_odds.live_legs(list(range(1, 11)), 10) == list(range(1, 10))
+
+
+def test_turnover_and_doubles_are_stored_and_counted(db, monkeypatch):
+    monkeypatch.setattr(odds_ingest, "fetch_meeting", _fake_meeting)
+
+    def fake_extras(date, venue, races, legs, **kw):
+        turnover_rows = [
+            {"race_date": date, "race_no": n, "pool": p,
+             "captured_at": "2026-07-15T09:00:00", "turnover": amount}
+            for n in races for p, amount in (("WIN", 100.0), ("QIN", 50.0))]
+        double_rows = [
+            {"race_date": date, "leg_no": leg, "horse_first": 1,
+             "horse_second": 2, "captured_at": "2026-07-15T09:00:00",
+             "odds": 12.0} for leg in legs]
+        return turnover_rows, double_rows, ["a note that was kept"]
+
+    monkeypatch.setattr(scrape_odds, "_capture_extras", fake_extras)
+    report = scrape_odds.run(DATE, "HV", db=str(db))
+
+    assert report.turnover == 4          # 2 races x 2 pools
+    assert report.doubles == 1           # only leg 3, since race 4 is last
+    assert report.legs == 1
+    assert "turnover" in report.line() and "legs" in report.line()
+    assert "a note that was kept" in report.notes
+
+    conn = get_conn(db)
+    try:
+        assert conn.execute(
+            "SELECT count(*) FROM odds_pool_turnover").fetchone()[0] == 4
+        assert conn.execute(
+            "SELECT leg_no FROM odds_doubles").fetchone()["leg_no"] == 3
+    finally:
+        conn.close()
+
+
+def test_switching_the_extras_off_leaves_the_prices_alone(db, monkeypatch):
+    """The two are separable on purpose: on a small machine the win and place
+    prices are the ones that must not be missed."""
+    monkeypatch.setattr(odds_ingest, "fetch_meeting", _fake_meeting)
+
+    def explode(*a, **kw):
+        raise AssertionError("extras were captured despite being switched off")
+
+    monkeypatch.setattr(scrape_odds, "_capture_extras", explode)
+    report = scrape_odds.run(DATE, "HV", db=str(db),
+                             turnover=False, doubles=False)
+    assert report.win_place == 6 and report.turnover == 0 and report.doubles == 0
+
+
+def test_a_failed_doubles_grid_does_not_cost_the_meeting_its_prices(db, monkeypatch):
+    """Prices are committed before the extras are attempted. A grid that will
+    not render is a lost denominator, never a lost market."""
+    monkeypatch.setattr(odds_ingest, "fetch_meeting", _fake_meeting)
+
+    def half_broken(date, venue, races, legs, **kw):
+        return ([], [], [f"leg {legs[0]}: DoublesError: no doubles grid"])
+
+    monkeypatch.setattr(scrape_odds, "_capture_extras", half_broken)
+    report = scrape_odds.run(DATE, "HV", db=str(db))
+    assert report.win_place == 6
+    assert report.doubles == 0
+    assert any("no doubles grid" in n for n in report.notes)
+
+    conn = get_conn(db)
+    try:
+        assert conn.execute(
+            "SELECT count(*) FROM odds_snapshots").fetchone()[0] == 6
+    finally:
+        conn.close()
+
+
+def test_a_browser_that_will_not_start_twice_still_records_the_run(db, monkeypatch):
+    """Chromium wants ~512MB and the deployed machine has 1GB, so the second
+    launch failing is a real outcome. The prices are already committed by then;
+    raising here would skip the job_log write and report the whole capture as
+    missing when the irreplaceable half of it landed."""
+    monkeypatch.setattr(odds_ingest, "fetch_meeting", _fake_meeting)
+
+    def no_browser(*a, **kw):
+        raise odds_ingest.OddsError("playwright is installed but has no browser")
+
+    monkeypatch.setattr(scrape_odds, "_capture_extras", no_browser)
+    report = scrape_odds.run(DATE, "HV", db=str(db))
+    assert report.win_place == 6
+    assert report.races == 2
+    assert any("did not run" in n for n in report.notes)
+
+    conn = get_conn(db)
+    try:
+        assert conn.execute(
+            "SELECT count(*) FROM odds_snapshots").fetchone()[0] == 6
+        # The run is on the record, so the freshness strip does not report a
+        # gap for a capture that actually stored its prices.
+        assert conn.execute(
+            "SELECT count(*) FROM job_runs WHERE job LIKE '%odds%'").fetchone()[0] >= 1
+    finally:
+        conn.close()

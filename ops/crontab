@@ -57,6 +57,17 @@
 # A race is dropped 30 minutes after its off time. Its price cannot move again,
 # and this is the one table nothing prunes, so re-capturing a settled market
 # would grow it forever without recording a single new fact.
+#
+# WHAT ONE RUN NOW COSTS. The capture reads three pages per meeting rather than
+# one: win/place with the quinella matrices, pool turnover, and the doubles
+# grid. On a ten-race card that is 10 + 10 + 9 = 29 page loads at midday,
+# falling to 2 by the last race, because a doubles leg closes when its FIRST
+# race goes off and settled races drop out. Roughly four minutes inside a
+# fifteen-minute slot, through a single browser.
+#
+# If that is too much for the machine, --no-doubles halves it and --no-turnover
+# takes another third off. Drop doubles first: turnover is the denominator that
+# every other figure needs, and a price without it is a ratio with no scale.
 # NOT ARMED YET. The image carries no browser, so this line would fail every
 # 15 minutes -- loud, useless noise rather than a working capture. Uncomment
 # once the Dockerfile installs playwright and chromium (~400MB, and chromium

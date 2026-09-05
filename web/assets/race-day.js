@@ -136,6 +136,63 @@ async function renderChanges() {
   if (!ch.drifts && !ch.firmers && !ch.fav_swaps.length && !ch.scratched.length) {
     host.append(el('span', 'ch-none', 'nothing moved'));
   }
+  await appendPoolChanges(host);
+}
+
+/* The other pools, on the same strip.
+ *
+ * Drift is movement WITHIN the win market. These two are the things drift
+ * cannot see: a runner the quinella pool will not combine at the rate its win
+ * price implies, and how much money is behind the race at all.
+ *
+ * Measured over 69 archived races, a horse whose share of the pair pool is
+ * below 0.85 of what its win price implies won at an A/E of 0.48 — 7 winners
+ * against 18.0 expected, a Poisson p of 0.003. Only the COLD end is shown:
+ * the hot end's apparent edge is one 20/1 winner and does not survive its
+ * removal, so flagging it would dress up noise as a signal.
+ *
+ * Eight meetings is a thin archive. This is a flag to look at a race with, not
+ * a reason to bet or lay one.
+ */
+async function appendPoolChanges(host) {
+  let pools;
+  try {
+    pools = await api.poolChanges(state.date);
+  } catch {
+    // The win-market changes above are the headline and already rendered.
+    // A pool read that fails must not blank them.
+    return;
+  }
+  if (!pools.observed) return;
+
+  const cold = pools.races.filter((r) => r.cold_in_pairs.length);
+  if (cold.length) {
+    const chip = el('span', 'ch-cold',
+      `${cold.length} COLD IN PAIRS`);
+    chip.title = cold.map((r) => r.cold_in_pairs
+      .map((c) => `R${r.race_no} #${c.horse_no} @ ${c.win_odds} — pair pool `
+        + `carries ${Math.round(c.ratio * 100)}% of what its win price implies`
+        + (c.dollars ? ` ($${c.dollars.toLocaleString()} on it to win)` : ''))
+      .join('
+')).join('
+');
+    host.append(chip);
+  }
+
+  // Total money on the meeting so far. A denominator, never a tip: the biggest
+  // win pool on a card is usually just an odds-on favourite in a small field.
+  const money = pools.races.reduce((sum, r) => sum + (r.win_pool ?? 0), 0);
+  if (money > 0) {
+    const chip = el('span', 'ch-money',
+      `$${(money / 1e6).toFixed(1)}M WIN POOL`);
+    chip.title = pools.races
+      .filter((r) => r.win_pool)
+      .map((r) => `R${r.race_no}: $${Math.round(r.win_pool).toLocaleString()}`
+        + (r.pool_growth_pct !== null ? ` (+${r.pool_growth_pct}% since first look)` : ''))
+      .join('
+');
+    host.append(chip);
+  }
 }
 
 /* ── bands ───────────────────────────────────────────────────────────────── */

@@ -38,6 +38,8 @@ Everything below is populated from the real archive:
 | `trials` | 7,750 | `import_legacy_reports` |
 | `odds_snapshots` | 4,289 | `import_legacy_odds` |
 | `odds_pairs` | 47,385 | `import_legacy_odds` |
+| `odds_doubles` | 0 | `scrape_odds` — new, nothing archived |
+| `odds_pool_turnover` | 0 | `scrape_odds` — new, nothing archived |
 | `bets` | 1,078 | `import_bets` + `import_statement` |
 | `bet_selections` | 4,116 | ditto |
 | `blackbook` | 196 | `import_blackbook` |

@@ -341,6 +341,11 @@ table.card td { padding: 6px 8px; }
 #strip-right .ch-swap { color: var(--edge); cursor: help; }
 #strip-right .ch-scr { color: var(--alert); cursor: help; }
 #strip-right .ch-none { color: var(--text-muted); }
+/* The pair-pool flag reads as a WARNING, not an opportunity: the archive
+   supports the cold direction only. Money is muted on purpose — it is a
+   denominator, and colouring it would invite reading it as a tip. */
+#strip-right .ch-cold { color: var(--alert); cursor: help; }
+#strip-right .ch-money { color: var(--text-muted); cursor: help; }
 #strip-right > span + span { margin-left: 10px; }
 
 

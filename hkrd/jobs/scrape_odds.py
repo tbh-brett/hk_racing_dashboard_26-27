@@ -28,7 +28,9 @@ import datetime as dt
 from dataclasses import dataclass, field
 from typing import Any
 
+from hkrd.ingest import doubles as doubles_ingest
 from hkrd.ingest import odds as odds_ingest
+from hkrd.ingest import turnover as turnover_ingest
 from hkrd.store import job_log, upsert
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
@@ -44,6 +46,9 @@ class OddsRun:
     attempted: int = 0
     win_place: int = 0
     pairs: int = 0
+    legs: int = 0
+    doubles: int = 0
+    turnover: int = 0
     skipped: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
@@ -52,6 +57,13 @@ class OddsRun:
             return f"{self.race_date}: nothing to price"
         head = (f"{self.race_date} {self.venue}: {self.races} races · "
                 f"{self.win_place} win/place · {self.pairs} pair odds")
+        # Reported separately rather than folded into one number. A run that
+        # captured every price and no turnover is a specific, fixable failure,
+        # and a single total would hide it behind a plausible figure.
+        if self.turnover:
+            head += f" · {self.turnover} turnover"
+        if self.legs:
+            head += f" · {self.legs} legs/{self.doubles} doubles"
         if self.skipped:
             head += f" · {len(self.skipped)} SKIPPED"
         return head
@@ -64,7 +76,7 @@ SETTLED_AFTER_MINUTES = 30
 
 
 def _meeting_races(conn, date: str, *, now: dt.datetime | None = None
-                   ) -> tuple[str | None, list[int], int]:
+                   ) -> tuple[str | None, list[int], int, int]:
     """The venue and the races still worth pricing on this date.
 
     The card is scraped first, so the meeting shape is a fact by the time odds
@@ -78,7 +90,7 @@ def _meeting_races(conn, date: str, *, now: dt.datetime | None = None
         "SELECT race_no, venue, off_time FROM races WHERE race_date = ? "
         "ORDER BY race_no", (date,)).fetchall()
     if not rows:
-        return None, [], 0
+        return None, [], 0, 0
 
     now = now or dt.datetime.now()
     live: list[int] = []
@@ -87,7 +99,10 @@ def _meeting_races(conn, date: str, *, now: dt.datetime | None = None
         if off and _is_settled(date, off, now):
             continue
         live.append(r["race_no"])
-    return rows[0]["venue"], live, len(rows)
+    # The LAST race number, not the count. A card that loses a race keeps the
+    # numbering of the ones that remain, so counting rows would place the final
+    # double a leg short and stop capturing it.
+    return rows[0]["venue"], live, len(rows), max(r["race_no"] for r in rows)
 
 
 def _is_settled(date: str, off_time: str, now: dt.datetime) -> bool:
@@ -106,11 +121,70 @@ def _is_settled(date: str, off_time: str, now: dt.datetime) -> bool:
     return now - off > dt.timedelta(minutes=SETTLED_AFTER_MINUTES)
 
 
+def live_legs(live_races: list[int], last_race: int) -> list[int]:
+    """The doubles legs still bettable, given which races are still to run.
+
+    Leg N couples race N with race N+1, so it closes when race N goes off — not
+    when race N+1 does. The list therefore shortens through the afternoon on
+    its own, which is also what bounds the cost of capturing it: nine legs at
+    midday, one by the second-last race.
+
+    There is no leg on the last race: it has nothing to pair with.
+    """
+    return [n for n in sorted(live_races) if n < last_race]
+
+
+def _capture_extras(date: str, venue: str, races: list[int], legs: list[int], *,
+                    headless: bool = True, executable_path: str | None = None
+                    ) -> tuple[list[dict], list[dict], list[str]]:
+    """Pool turnover per race and doubles grids per leg, through ONE browser.
+
+    A separate pass from the win/place capture rather than one interleaved
+    loop, because the two have different failure modes and different value: a
+    price that fails to render is the thing this job exists for, while a
+    turnover figure that fails to render costs a denominator and nothing else.
+    Kept behind one function so a caller can substitute it whole.
+
+    Failures are collected and returned, never raised: a doubles grid that did
+    not render must not cost the meeting its prices.
+    """
+    turnovers: list[dict] = []
+    doubles: list[dict] = []
+    notes: list[str] = []
+    with odds_ingest.browser_page(headless=headless,
+                                  executable_path=executable_path) as page:
+        for race_no in races:
+            try:
+                parsed = turnover_ingest.fetch_race(page, date, venue, race_no)
+            except Exception as exc:                # noqa: BLE001 - recorded
+                notes.append(f"R{race_no} turnover: {type(exc).__name__}: {exc}")
+                continue
+            notes.extend(f"R{race_no} turnover: {n}" for n in parsed["notes"])
+            turnovers.extend(turnover_ingest.turnover_rows(parsed))
+        for leg_no in legs:
+            try:
+                parsed = doubles_ingest.fetch_leg(page, date, venue, leg_no)
+            except Exception as exc:                # noqa: BLE001 - recorded
+                notes.append(f"leg {leg_no} doubles: {type(exc).__name__}: {exc}")
+                continue
+            notes.extend(f"leg {leg_no}: {n}" for n in parsed["notes"])
+            doubles.extend(doubles_ingest.double_rows(parsed))
+    return turnovers, doubles, notes
+
+
 def run(date: str | None = None, venue: str | None = None, *,
         races: list[int] | None = None, db: str | None = None,
         headless: bool = True, executable_path: str | None = None,
-        today: dt.date | None = None) -> OddsRun:
-    """Fetch and store one meeting's odds. Returns the counts it wrote."""
+        today: dt.date | None = None,
+        turnover: bool = True, doubles: bool = True) -> OddsRun:
+    """Fetch and store one meeting's odds, turnover and doubles.
+
+    `turnover` and `doubles` are switches rather than always-on because they
+    roughly triple the pages a capture loads, and on a small machine the win
+    and place prices are the ones that must not be missed. Both default on:
+    turnover is the denominator every other figure needs, and neither can be
+    reconstructed after the meeting.
+    """
     conn = get_conn(db) if db else get_conn(db_path())
     try:
         init_db(conn)
@@ -123,7 +197,7 @@ def run(date: str | None = None, venue: str | None = None, *,
         explicit = date is not None
         date = date or (today or dt.date.today()).isoformat()
 
-        known_venue, live_races, stored = _meeting_races(conn, date)
+        known_venue, live_races, stored, last_race = _meeting_races(conn, date)
         venue = venue or known_venue
         targets = races or live_races
 
@@ -172,6 +246,35 @@ def run(date: str | None = None, venue: str | None = None, *,
                 report.pairs += upsert.upsert_odds_pairs(conn, pairs)
             report.races += 1
 
+        # Turnover and doubles. Second, and deliberately after the prices are
+        # already committed: if the browser dies here the meeting still has its
+        # win, place and quinella odds for this moment, which is the half that
+        # cannot be reconstructed.
+        legs = live_legs(targets, last_race) if doubles else []
+        if turnover or legs:
+            try:
+                turnover_rows, double_rows, extra_notes = _capture_extras(
+                    date, venue, targets if turnover else [], legs,
+                    headless=headless, executable_path=executable_path)
+            except Exception as exc:                # noqa: BLE001 - recorded
+                # The browser itself failed to start for the second pass --
+                # chromium wants ~512MB and the deployed machine has 1GB, so
+                # this is a real outcome rather than a theoretical one. The
+                # prices are already committed; letting it propagate would skip
+                # the job_log write below and report the whole capture as
+                # missing, when the half that cannot be reconstructed landed.
+                report.notes.append(
+                    f"turnover/doubles pass did not run: "
+                    f"{type(exc).__name__}: {exc}")
+            else:
+                report.notes.extend(extra_notes)
+                with transaction(conn):
+                    report.turnover += upsert.upsert_pool_turnover(
+                        conn, turnover_rows)
+                    report.doubles += upsert.upsert_odds_doubles(
+                        conn, double_rows)
+                report.legs = len({r["leg_no"] for r in double_rows})
+
         # Recorded so the freshness strip can say when odds last landed, and
         # so a run that stored nothing is visible as such rather than as
         # silence indistinguishable from a run that never happened.
@@ -193,10 +296,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--headed", action="store_true",
                     help="show the browser, for diagnosing a render problem")
     ap.add_argument("--chromium", help="path to a chromium binary, if not the default")
+    ap.add_argument("--no-turnover", action="store_true",
+                    help="skip pool turnover (one extra page per race)")
+    ap.add_argument("--no-doubles", action="store_true",
+                    help="skip doubles grids (one extra page per live leg)")
     args = ap.parse_args(argv)
 
     report = run(args.date, args.venue, races=args.races, db=args.db,
-                 headless=not args.headed, executable_path=args.chromium)
+                 headless=not args.headed, executable_path=args.chromium,
+                 turnover=not args.no_turnover, doubles=not args.no_doubles)
     print(report.line())
     for note in report.notes:
         print(f"  note: {note}")

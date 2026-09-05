@@ -88,6 +88,13 @@ export const api = {
   scrape: (body) => post('/jobs/scrape', body),
   changes: (date, since) => get(
     `/changes/${date}${since ? `?since=${encodeURIComponent(since)}` : ''}`),
+  // The other pools. `poolChanges` is meeting-wide and answers a different
+  // question from `changes`: not what moved in the win market, but where the
+  // pair market refuses to follow it and how much money is behind the race.
+  poolChanges: (date) => get(`/pools/${date}/changes`),
+  racePools: (date, raceNo, pool) => get(
+    `/pools/${date}/${raceNo}${pool ? `?pool=${encodeURIComponent(pool)}` : ''}`),
+  doubles: (date, legNo) => get(`/doubles/${date}/${legNo}`),
   lookup: (q) => get(`/lookup?${q}`),
   lookupInsight: (q) => get(`/lookup/insight?${q}`),
   lookupFilters: () => get('/lookup/filters'),

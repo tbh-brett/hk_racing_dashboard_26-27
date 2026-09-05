@@ -16,7 +16,7 @@ from hkrd.query import (blackbook as bb_q, formguide as fg_q,
                         health as health_q, market as market_q, model,
                         race as race_q, raceday as raceday_q,
                         vet as vet_q, freshness as fresh_q,
-                        pace as pace_q)
+                        pace as pace_q, pools as pools_q)
 
 WEB = Path(__file__).resolve().parent.parent.parent / "web"
 
@@ -102,6 +102,46 @@ def changes(date: str, since: str | None = None) -> dict:
     nothing to diff, and the answer says so rather than inventing a baseline.
     """
     return market_q.changes_since(date, since)
+
+
+@app.get("/api/pools/{date}/changes")
+def pool_changes(date: str) -> dict:
+    """Where the OTHER pools disagree with the win market, meeting-wide.
+
+    The companion to /api/changes, which reports drift out of the win pool.
+    This reports the two things drift cannot see: a runner the quinella pool
+    will not combine, and how much money is behind the race at all.
+    """
+    return pools_q.pool_changes(date)
+
+
+@app.get("/api/pools/{date}/{race_no}")
+def race_pools(date: str, race_no: int, pool: str = "QIN") -> dict:
+    """One race across every pool that prices it.
+
+    `market` is what the pair pool itself pays and `model` is what win odds
+    imply through Harville. Both are returned, deliberately: they disagree, and
+    the design brief's rule is that a figure the reader can see disagreeing is
+    worth more than one quietly chosen for them.
+    """
+    return {
+        "race_date": date, "race_no": race_no,
+        "market": pools_q.market_pairs(date, race_no, pool=pool),
+        "model": market_q.ranked_pairs(date, race_no),
+        "divergence": pools_q.pair_divergence(date, race_no, pool=pool),
+        "turnover": pools_q.pool_turnover(date, race_no),
+        "money": pools_q.money_flow(date, race_no),
+    }
+
+
+@app.get("/api/doubles/{date}/{leg_no}")
+def doubles(date: str, leg_no: int) -> dict:
+    """What the doubles pool implies about the leg's SECOND race.
+
+    Money bet on this before the second race's own win pool has matured, so
+    where the two disagree early, one of them is stale.
+    """
+    return pools_q.doubles_conditional(date, leg_no)
 
 
 @app.get("/api/meetings")

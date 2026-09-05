@@ -17,6 +17,7 @@ from . import coerce
 __all__ = [
     "upsert_races", "upsert_runners", "upsert_dividends",
     "upsert_comments", "upsert_odds_snapshots", "upsert_odds_pairs",
+    "upsert_odds_doubles", "upsert_pool_turnover",
     "upsert_trials", "upsert_vet_records",
 ]
 
@@ -254,3 +255,57 @@ def upsert_odds_pairs(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
     return _upsert(conn, "odds_pairs", cols,
                    ["race_date", "race_no", "pool", "horse_a", "horse_b", "captured_at"],
                    prepared)
+
+
+def upsert_odds_doubles(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
+    """Doubles grids. Append-only, keyed on captured_at like every other price.
+
+    horse_first and horse_second are written AS GIVEN. `upsert_odds_pairs`
+    above stores its pair with horse_a < horse_b so that one quinella cannot
+    have two contradictory rows; doing the same here would be a bug, because a
+    double IS ordered — first-leg 3 with second-leg 7 is a different bet, at a
+    different price, from 7 then 3, and sorting would leave whichever was
+    written last standing for both.
+    """
+    prepared = [{
+        "race_date": coerce.to_date(r.get("race_date")),
+        "leg_no": coerce.to_int(r.get("leg_no"), field="leg_no"),
+        "horse_first": coerce.to_int(r.get("horse_first"), field="horse_first"),
+        "horse_second": coerce.to_int(r.get("horse_second"), field="horse_second"),
+        "captured_at": r.get("captured_at"),
+        "odds": coerce.to_odds(r.get("odds")),
+    } for r in rows]
+    cols = ["race_date", "leg_no", "horse_first", "horse_second",
+            "captured_at", "odds"]
+    return _upsert(conn, "odds_doubles", cols,
+                   ["race_date", "leg_no", "horse_first", "horse_second",
+                    "captured_at"], prepared)
+
+
+def upsert_pool_turnover(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
+    """How much money each pool holds, at one moment.
+
+    Turnover only ever rises within a race, so a later capture is never a
+    correction of an earlier one — which is why captured_at is in the key here
+    exactly as it is for prices. The series IS the data: a single figure says
+    how big the pool is, two say how fast the money is arriving.
+    """
+    prepared = []
+    for r in rows:
+        amount = r.get("turnover")
+        if amount is not None:
+            amount = float(str(amount).replace(",", "").replace("$", "").strip())
+            if amount < 0:
+                raise ValueError(
+                    f"turnover cannot be negative: {r.get('pool')!r} "
+                    f"{r.get('race_date')} R{r.get('race_no')} = {amount}")
+        prepared.append({
+            "race_date": coerce.to_date(r.get("race_date")),
+            "race_no": coerce.to_int(r.get("race_no"), field="race_no"),
+            "pool": (r.get("pool") or "").strip().upper(),
+            "captured_at": r.get("captured_at"),
+            "turnover": amount,
+        })
+    cols = ["race_date", "race_no", "pool", "captured_at", "turnover"]
+    return _upsert(conn, "odds_pool_turnover", cols,
+                   ["race_date", "race_no", "pool", "captured_at"], prepared)

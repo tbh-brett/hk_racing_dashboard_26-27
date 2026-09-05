@@ -24,10 +24,42 @@ Every source, what fetches it, what runs that, and when.
 | Vet records | `ingest/vet.py` | `jobs/scrape_meeting` (post-race) | 5×/day via `nightly` |
 | Comments on running | `ingest/corunning.py` | `jobs/scrape_corunning` | with the meeting |
 | Barrier trials | `ingest/trials.py` | `jobs/scrape_trials` | 12:00 and 20:00 |
-| Live odds | `ingest/odds.py` | `jobs/scrape_odds` | every 15 min, 12:00–23:59 |
+| Live odds (win, place, QIN, QPL) | `ingest/odds.py` | `jobs/scrape_odds` | every 15 min, 12:00–23:59 |
+| Pool turnover | `ingest/turnover.py` | `jobs/scrape_odds` | with the odds |
+| Doubles | `ingest/doubles.py` | `jobs/scrape_odds` | with the odds |
 | Account statements | `ingest/statement.py` | `jobs/import_statement` | by hand — see below |
 
 `ops/crontab` is the schedule; `docs/deploy.md` explains each line.
+
+### What one odds run reads
+
+Three pages per meeting, through one browser:
+
+| Page | Gives | Table |
+|---|---|---|
+| `/wpq/<date>/<venue>/<race>` | win, place, and the QIN/QPL matrices | `odds_snapshots`, `odds_pairs` |
+| `/turnover/<date>/<venue>/<race>` | money in every pool | `odds_pool_turnover` |
+| `/dbl/<date>/<venue>/<leg>` | the doubles grid | `odds_doubles` |
+
+A doubles leg N couples race N with race N+1, so a ten-race card has nine legs
+and leg N closes when race N goes off — not race N+1. That, plus dropping races
+30 minutes past their off time, is what makes the cost fall through the
+afternoon: 29 page loads at midday, 2 by the last race.
+
+`--no-doubles` and `--no-turnover` switch the extra two off. Drop doubles
+first: turnover is the denominator every other figure needs, because a price
+is a ratio and says nothing about how much money is behind it.
+
+Two things the pages tell you that are easy to misread:
+
+- **A pool with no line is not offered.** Race 3 of 2026-09-06 had six declared
+  starters, so HKJC ran no quinella place pool and the turnover page simply
+  omitted the row. That absence is a fact. `odds.py` knows the same rule and
+  no longer reports an empty QPL matrix as a render failure below seven
+  runners.
+- **`999` on the doubles grid is a display cap, not a price.** Three digits is
+  all the column can hold, so a combination worth several thousand prints 999.
+  `query/pools.py` excludes capped cells rather than inverting them.
 
 ### Two things that are not scraped
 

@@ -92,6 +92,61 @@ CREATE TABLE IF NOT EXISTS odds_pairs (
   PRIMARY KEY (race_date, race_no, pool, horse_a, horse_b, captured_at)
 );
 
+-- Doubles: one bet spanning two consecutive races. Leg N couples race N with
+-- race N+1, so a card of R races offers R-1 legs.
+--
+-- horse_first and horse_second are ORDERED and must never be sorted the way
+-- `odds_pairs` sorts horse_a/horse_b. A quinella pair is unordered -- 3 with 7
+-- is the same bet as 7 with 3 -- so storing it one way round removes a
+-- contradiction. A double is the opposite: 3 in the first leg with 7 in the
+-- second is a different bet, at a different price, from 7 then 3. Normalising
+-- it would silently merge two prices into one.
+--
+-- Why this pool is worth its own table rather than being folded into
+-- odds_pairs: it is the only market that prices a race BEFORE that race's own
+-- win pool has matured. Doubles money on the second leg arrives hours ahead of
+-- the win money, so dividing a double by its first-leg win odds gives an early,
+-- independently funded read on a race the win market has barely looked at.
+CREATE TABLE IF NOT EXISTS odds_doubles (
+  race_date    TEXT    NOT NULL,
+  leg_no       INTEGER NOT NULL,   -- leg N = race N + race N+1
+  horse_first  INTEGER NOT NULL,   -- runner in race N
+  horse_second INTEGER NOT NULL,   -- runner in race N+1
+  captured_at  TEXT    NOT NULL,
+  odds         REAL,
+  PRIMARY KEY (race_date, leg_no, horse_first, horse_second, captured_at)
+);
+
+-- How much money is in each pool, per race, over time.
+--
+-- Odds are a RATIO and say nothing about scale: a price of 4.0 in a $91,000
+-- double leg and in a $4,300,000 win pool are the same number describing
+-- amounts that differ by a factor of forty. Turnover is the denominator that
+-- turns a price into an amount, and a 20% drift into "$210,000 arrived".
+--
+-- Long format, one row per pool, so HKJC adding a pool needs no migration --
+-- the same reason runner_sarr_component is long rather than one column per
+-- component.
+--
+-- A pool that is NOT OPERATED has no line on the page at all: race 3 of
+-- 2026-09-06 had six declared starters, so no Quinella Place pool existed and
+-- the page simply omitted the row. That absence is a fact, not a failure, and
+-- it is distinguishable from a scrape that never ran because a scrape that DID
+-- run always writes WIN and PLACE at that captured_at.
+--
+-- RACE_TOTAL_SINGLE and RACE_TOTAL_ALL are the page's own published totals.
+-- They are redundant with the sum of the pools, which is exactly why they are
+-- stored: if the sum stops matching, HKJC has added a pool this parser does
+-- not know about, and the totals are what make that visible instead of silent.
+CREATE TABLE IF NOT EXISTS odds_pool_turnover (
+  race_date   TEXT    NOT NULL,
+  race_no     INTEGER NOT NULL,
+  pool        TEXT    NOT NULL,     -- WIN PLACE QIN QPL FCT TCE TRIO DBL ...
+  captured_at TEXT    NOT NULL,
+  turnover    REAL,
+  PRIMARY KEY (race_date, race_no, pool, captured_at)
+);
+
 CREATE TABLE IF NOT EXISTS trials (
   trial_date        TEXT    NOT NULL,
   trial_no          INTEGER NOT NULL,
@@ -426,3 +481,6 @@ CREATE INDEX IF NOT EXISTS ix_bets_account_date ON bets(account, race_date);
 CREATE INDEX IF NOT EXISTS ix_runners_horse ON runners(horse_name, race_date);
 CREATE INDEX IF NOT EXISTS ix_runners_date  ON runners(race_date);
 CREATE INDEX IF NOT EXISTS ix_snap_race     ON odds_snapshots(race_date, race_no, captured_at);
+CREATE INDEX IF NOT EXISTS ix_pairs_race    ON odds_pairs(race_date, race_no, pool, captured_at);
+CREATE INDEX IF NOT EXISTS ix_dbl_leg       ON odds_doubles(race_date, leg_no, captured_at);
+CREATE INDEX IF NOT EXISTS ix_turnover_race ON odds_pool_turnover(race_date, race_no, captured_at);

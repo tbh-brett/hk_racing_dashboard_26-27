@@ -15,13 +15,14 @@ the fact. A season is a few hundred megabytes.
 from __future__ import annotations
 
 import re
+from contextlib import contextmanager
 from datetime import datetime
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from typing import Any
 
-__all__ = ["OddsError", "fetch_race", "fetch_meeting",
+__all__ = ["OddsError", "fetch_race", "fetch_meeting", "browser_page",
            "parse_snapshot", "snapshot_rows", "pair_rows",
-           "BET_URL"]
+           "BET_URL", "QPL_MIN_FIELD"]
 
 BET_URL = "https://bet.hkjc.com/en/racing"
 
@@ -135,6 +136,12 @@ def pair_rows(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
 # is still the previous race's while the route settles.
 
 _WPQ_URL = "https://bet.hkjc.com/en/racing/wpq/{date}/{venue}/{race_no}"
+
+# HKJC operates no quinella place pool below this many declared starters, and
+# pays two place dividends rather than three. `query/market.PLACE_PAYING_FIELD`
+# is the same number for the same reason; it is repeated rather than imported
+# because ingest/ must not depend on query/.
+QPL_MIN_FIELD = 7
 
 # The QIN/QPL pair odds render as a triangular matrix packed into a roughly
 # square table, so the grid is rebuilt from cell bounding boxes rather than
@@ -334,8 +341,20 @@ def fetch_race(page, date: str, venue: str, race_no: int, *,
     matrices = page.evaluate(_MATRIX_JS) or []
     pools = {m.get("label"): m.get("pairs") or [] for m in matrices}
     for pool in ("qin", "qpl"):
-        if not pools.get(pool):
-            notes.append(f"{pool} matrix did not render")
+        if pools.get(pool):
+            continue
+        if pool == "qpl" and len(runners) < QPL_MIN_FIELD:
+            # NOT a failure. HKJC does not operate a quinella place pool in a
+            # field of fewer than seven, and the page says so in as many words:
+            # race 3 of 2026-09-06 had six starters, rendered the heading and
+            # an empty grid, and omitted the pool from its turnover table
+            # entirely. Reporting that as a render fault trains the reader to
+            # ignore the one note that means something.
+            notes.append(
+                f"qpl pool not operated — {len(runners)} declared starters, "
+                f"fewer than the {QPL_MIN_FIELD} HKJC requires")
+            continue
+        notes.append(f"{pool} matrix did not render")
 
     snap: dict[str, Any] = {
         "scraped_at": datetime.now().isoformat(timespec="seconds"),
@@ -372,6 +391,35 @@ def fetch_meeting(date: str, venue: str, races: Sequence[int], *,
         ) from exc
 
     out: list[dict[str, Any]] = []
+    with browser_page(headless=headless, executable_path=executable_path) as page:
+        previous: str | None = None
+        for race_no in races:
+            snap = fetch_race(page, date, venue, race_no, previous=previous)
+            previous = snap["_fingerprint"]
+            out.append(snap)
+    return out
+
+
+@contextmanager
+def browser_page(*, headless: bool = True,
+                 executable_path: str | None = None) -> Iterator[Any]:
+    """One Chromium page, for as long as the caller needs it.
+
+    Exposed because a full capture now reads three different pages per meeting
+    — win/place with the quinella matrices, pool turnover, and the doubles grid
+    — and each opening its own browser would triple the memory a scrape needs
+    on a 1GB machine for no gain. The caller drives all three through this one
+    page.
+    """
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as exc:
+        raise OddsError(
+            "live odds need a browser, which is an optional extra: install it "
+            'with `pip install -e ".[odds]"` then `playwright install chromium`. '
+            "Every other page in the dashboard works without it."
+        ) from exc
+
     launch: dict[str, Any] = {"headless": headless}
     if executable_path:
         launch["executable_path"] = executable_path
@@ -386,12 +434,6 @@ def fetch_meeting(date: str, venue: str, races: Sequence[int], *,
                 "`playwright install chromium`, or pass --chromium with the "
                 f"path to one. ({exc.__class__.__name__})") from exc
         try:
-            page = browser.new_page()
-            previous: str | None = None
-            for race_no in races:
-                snap = fetch_race(page, date, venue, race_no, previous=previous)
-                previous = snap["_fingerprint"]
-                out.append(snap)
+            yield browser.new_page()
         finally:
             browser.close()
-    return out
