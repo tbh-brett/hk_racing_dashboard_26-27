@@ -109,20 +109,11 @@ def scrape_job(body: dict = Body(...)) -> JSONResponse:
     except HTTPException:
         raise
     except Exception as exc:
-        # A scrape reaches the network and a browser, so it fails for reasons
-        # that are about the HOST rather than about the code, and the person
-        # clicking the strip is the one who can fix them. A bare 500 tells them
-        # nothing; these say which thing is missing and what to do about it.
+        # A scrape reaches the network, so it fails for reasons that are about
+        # the HOST rather than about the code, and the person clicking the
+        # strip is the one who can fix them. A bare 500 tells them nothing;
+        # these say which thing is missing and what to do about it.
         text = f"{type(exc).__name__}: {exc}"
-        missing_browser = ("Executable doesn't exist" in text
-                           or "playwright install" in text.lower()
-                           or isinstance(exc, ImportError))
-        if missing_browser:
-            raise HTTPException(503, (
-                "live odds need a real browser and this host has none. "
-                "Install one with `python -m playwright install chromium`, or "
-                "add it to the image — see docs/deploy.md. Every other source "
-                "scrapes without a browser and still works."))
         if "getaddrinfo" in text or "Max retries" in text or "Timeout" in text:
             raise HTTPException(503, (
                 f"could not reach HKJC to fetch {source}. The site is up or "

@@ -1,0 +1,136 @@
+{
+ "data": {
+  "raceMeetings": [
+   {
+    "id": "20260905S1",
+    "venueCode": "S1",
+    "date": "2026-09-05",
+    "changeHistories": [
+     {
+      "type": "400",
+      "time": "2026-09-04T16:54:55.913+08:00",
+      "raceNo": 4,
+      "runnerNo": "3",
+      "horseName_ch": "士別三日",
+      "horseName_en": "Valedictory (GB)",
+      "jockeyName_ch": null,
+      "jockeyName_en": null,
+      "scratchHorseName_ch": null,
+      "scratchHorseName_en": null,
+      "handicapWeight": null,
+      "scrResvIndicator": "N"
+     },
+     {
+      "type": "400",
+      "time": "2026-09-04T15:44:29.717+08:00",
+      "raceNo": 4,
+      "runnerNo": "6",
+      "horseName_ch": "山路",
+      "horseName_en": "Mountain Road (FR)",
+      "jockeyName_ch": null,
+      "jockeyName_en": null,
+      "scratchHorseName_ch": null,
+      "scratchHorseName_en": null,
+      "handicapWeight": null,
+      "scrResvIndicator": "N"
+     },
+     {
+      "type": "400",
+      "time": "2026-09-04T15:44:29.717+08:00",
+      "raceNo": 4,
+      "runnerNo": "8",
+      "horseName_ch": "相得益彰",
+      "horseName_en": "Synergism (GER)",
+      "jockeyName_ch": null,
+      "jockeyName_en": null,
+      "scratchHorseName_ch": null,
+      "scratchHorseName_en": null,
+      "handicapWeight": null,
+      "scrResvIndicator": "N"
+     },
+     {
+      "type": "400",
+      "time": "2026-09-04T15:44:56.010+08:00",
+      "raceNo": 5,
+      "runnerNo": "2",
+      "horseName_ch": "美利事",
+      "horseName_en": "American Affair (GB)",
+      "jockeyName_ch": null,
+      "jockeyName_en": null,
+      "scratchHorseName_ch": null,
+      "scratchHorseName_en": null,
+      "handicapWeight": null,
+      "scrResvIndicator": "N"
+     }
+    ]
+   },
+   {
+    "id": "MTG_20260906_0001",
+    "venueCode": "ST",
+    "date": "2026-09-06",
+    "changeHistories": [
+     {
+      "type": "98",
+      "time": "2026-09-02T12:33:02.760+08:00",
+      "raceNo": 5,
+      "runnerNo": "13",
+      "horseName_ch": "戀愛狂",
+      "horseName_en": "SUPER LOVE",
+      "jockeyName_ch": null,
+      "jockeyName_en": null,
+      "scratchHorseName_ch": null,
+      "scratchHorseName_en": null,
+      "handicapWeight": "123",
+      "scrResvIndicator": null
+     },
+     {
+      "type": "99",
+      "time": "2026-09-02T12:32:32.560+08:00",
+      "raceNo": 5,
+      "runnerNo": "13",
+      "horseName_ch": "戀愛狂",
+      "horseName_en": "SUPER LOVE",
+      "jockeyName_ch": "巴度",
+      "jockeyName_en": "A Badel",
+      "scratchHorseName_ch": null,
+      "scratchHorseName_en": null,
+      "handicapWeight": null,
+      "scrResvIndicator": null
+     },
+     {
+      "type": "96",
+      "time": "2026-09-02T12:32:13.983+08:00",
+      "raceNo": 5,
+      "runnerNo": "13",
+      "horseName_ch": "戀愛狂",
+      "horseName_en": "SUPER LOVE",
+      "jockeyName_ch": null,
+      "jockeyName_en": null,
+      "scratchHorseName_ch": "星光快驅",
+      "scratchHorseName_en": "STAR FIGURE",
+      "handicapWeight": null,
+      "scrResvIndicator": null
+     }
+    ]
+   },
+   {
+    "id": "20260906S2",
+    "venueCode": "S2",
+    "date": "2026-09-06",
+    "changeHistories": []
+   },
+   {
+    "id": "20260906S3",
+    "venueCode": "S3",
+    "date": "2026-09-06",
+    "changeHistories": []
+   },
+   {
+    "id": "20260906S4",
+    "venueCode": "S4",
+    "date": "2026-09-06",
+    "changeHistories": []
+   }
+  ]
+ }
+}

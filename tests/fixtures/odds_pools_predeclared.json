@@ -1,0 +1,143 @@
+{
+ "data": {
+  "raceMeetings": [
+   {
+    "pmPools": [
+     {
+      "id": "MTG_20260906_0001PLA1",
+      "status": "DEFINED",
+      "sellStatus": "STOP_SELL",
+      "oddsType": "PLA",
+      "lastUpdateTime": "",
+      "guarantee": null,
+      "minTicketCost": 0,
+      "name_en": null,
+      "name_ch": null,
+      "leg": {
+       "number": 1,
+       "races": [
+        1
+       ]
+      },
+      "cWinSelections": [],
+      "oddsNodes": []
+     },
+     {
+      "id": "MTG_20260906_0001PLA3",
+      "status": "DEFINED",
+      "sellStatus": "STOP_SELL",
+      "oddsType": "PLA",
+      "lastUpdateTime": "",
+      "guarantee": null,
+      "minTicketCost": 0,
+      "name_en": null,
+      "name_ch": null,
+      "leg": {
+       "number": 3,
+       "races": [
+        3
+       ]
+      },
+      "cWinSelections": [],
+      "oddsNodes": []
+     },
+     {
+      "id": "MTG_20260906_0001QIN1",
+      "status": "DEFINED",
+      "sellStatus": "STOP_SELL",
+      "oddsType": "QIN",
+      "lastUpdateTime": "",
+      "guarantee": null,
+      "minTicketCost": 0,
+      "name_en": null,
+      "name_ch": null,
+      "leg": {
+       "number": 1,
+       "races": [
+        1
+       ]
+      },
+      "cWinSelections": [],
+      "oddsNodes": []
+     },
+     {
+      "id": "MTG_20260906_0001QIN3",
+      "status": "DEFINED",
+      "sellStatus": "STOP_SELL",
+      "oddsType": "QIN",
+      "lastUpdateTime": "",
+      "guarantee": null,
+      "minTicketCost": 0,
+      "name_en": null,
+      "name_ch": null,
+      "leg": {
+       "number": 3,
+       "races": [
+        3
+       ]
+      },
+      "cWinSelections": [],
+      "oddsNodes": []
+     },
+     {
+      "id": "MTG_20260906_0001QPL1",
+      "status": "DEFINED",
+      "sellStatus": "STOP_SELL",
+      "oddsType": "QPL",
+      "lastUpdateTime": "",
+      "guarantee": null,
+      "minTicketCost": 0,
+      "name_en": null,
+      "name_ch": null,
+      "leg": {
+       "number": 1,
+       "races": [
+        1
+       ]
+      },
+      "cWinSelections": [],
+      "oddsNodes": []
+     },
+     {
+      "id": "MTG_20260906_0001WIN1",
+      "status": "DEFINED",
+      "sellStatus": "STOP_SELL",
+      "oddsType": "WIN",
+      "lastUpdateTime": "",
+      "guarantee": null,
+      "minTicketCost": 0,
+      "name_en": null,
+      "name_ch": null,
+      "leg": {
+       "number": 1,
+       "races": [
+        1
+       ]
+      },
+      "cWinSelections": [],
+      "oddsNodes": []
+     },
+     {
+      "id": "MTG_20260906_0001WIN3",
+      "status": "DEFINED",
+      "sellStatus": "STOP_SELL",
+      "oddsType": "WIN",
+      "lastUpdateTime": "",
+      "guarantee": null,
+      "minTicketCost": 0,
+      "name_en": null,
+      "name_ch": null,
+      "leg": {
+       "number": 3,
+       "races": [
+        3
+       ]
+      },
+      "cWinSelections": [],
+      "oddsNodes": []
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -66,19 +66,37 @@
 # time in 44% of races, and every odds-dependent figure on the dashboard is
 # required to read the LATEST snapshot rather than the morning's.
 #
-# Every 15 minutes across the widest window racing plausibly occupies. That is
-# ~46 runs a day and almost all of them do nothing: the job reads the card,
-# finds no meeting today or no race still to run, and returns without opening a
-# browser. Same principle as `nightly` above — the schedule stays dumb so the
-# race calendar lives in one place, which is the database.
+# EVERY MINUTE, and the job decides whether that minute is worth a capture.
 #
-# A race is dropped 30 minutes after its off time. Its price cannot move again,
-# and this is the one table nothing prunes, so re-capturing a settled market
-# would grow it forever without recording a single new fact.
-# NOT ARMED YET. The image carries no browser, so this line would fail every
-# 15 minutes -- loud, useless noise rather than a working capture. Uncomment
-# once the Dockerfile installs playwright and chromium (~400MB, and chromium
-# wants roughly 512MB of RAM while it runs, so revisit the Fly machine size
-# at the same time). Until then it runs on the PC by hand:
-#     .\.venv\Scripts\python -m hkrd.jobs.scrape_odds
-# */15 12-23 * * *   python -m hkrd.jobs.scrape_odds --db /data/hkrd.db
+# The schedule is the dumbest line in this file on purpose, for the same
+# reason `nightly` has no race calendar in it: the interesting question is
+# "how far is this race from its off", and the database is the only thing that
+# knows. `scrape_odds.CADENCE_MINUTES` holds the answer — hourly the day
+# before, every 15 minutes from three hours out, every 5 from thirty minutes,
+# and EVERY MINUTE through the last ten and past the off. That last band is
+# the point: the late money does not show until the final five to ten minutes,
+# and a flat 15-minute schedule samples the only window that moves three times.
+#
+# A tick with nothing due costs 0.3s and no network. Simulated against a real
+# Sha Tin card, 1,103 of 1,501 ticks over a meeting's 25-hour cycle answer
+# from the database alone; the other 398 make two requests.
+#
+# No hour restriction either, and that is deliberate rather than lazy. HKJC
+# opens a market at 13:00 the day BEFORE racing, so a 12:00-23:59 window would
+# capture Saturday evening, stop at midnight, and resume at noon on Sunday —
+# thirteen hours of silence ending thirty minutes before race 1. The job looks
+# at today's meeting first and falls through to tomorrow's, so the overnight
+# market is recorded rather than lost.
+#
+# ARMED. It was commented out for as long as the capture needed a browser: the
+# image carries no Chromium, so the line would have failed every quarter hour —
+# loud, useless noise rather than a working capture — and the odds table stayed
+# at whatever the legacy import rescued. `ingest/odds.py` now reads the JSON
+# endpoint the betting site's own front end reads, which needs nothing the
+# image does not already have, so a meeting costs one request and under a
+# second.
+#
+# SIZE. Measured, not estimated: ~63,000 rows and ~6.7 MB per meeting, so
+# ~0.6 GB a season, against a 1 GB volume that nothing ever deletes from.
+# Extend the volume before the second season — see docs/deploy.md.
+* * * * *   python -m hkrd.jobs.scrape_odds --db /data/hkrd.db

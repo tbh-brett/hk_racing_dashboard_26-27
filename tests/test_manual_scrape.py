@@ -11,6 +11,8 @@ the person clicking is the one who can fix them. A bare 500 tells them nothing.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -53,23 +55,41 @@ def test_every_source_on_the_strip_can_be_run() -> None:
     assert not missing, f"the strip shows {missing} with no way to fetch them"
 
 
-def test_a_missing_browser_explains_itself(monkeypatch) -> None:
-    """Only the odds need a browser, and a host without one is a real and
-    likely state — the deploy image does not carry Chromium today."""
+def test_a_refused_odds_capture_reaches_the_caller(monkeypatch) -> None:
+    """The odds no longer need a browser — this used to check the 503 for a
+    host without one, which was the reason the capture could not be automated.
+
+    What can still go wrong is HKJC answering about a different meeting than
+    the one asked for, which `ingest/odds` refuses. That refusal is an ANSWER,
+    not a fault: the run happened, it stored nothing, and it knows why. So it
+    comes back 200 with the reason in the payload rather than as a status code
+    the strip has to translate.
+    """
     from hkrd.jobs import scrape_odds
 
-    def no_browser(*a, **k):
-        raise RuntimeError(
-            "BrowserType.launch: Executable doesn't exist at /opt/pw/chrome")
+    class Report:
+        races, attempted, win_place, pairs = 0, 11, 0, 0
+        notes: list = []
+        skipped = ["HKJC lists no meeting for 2026-09-06 ST"]
 
-    monkeypatch.setattr(scrape_odds, "run", no_browser)
+    monkeypatch.setattr(scrape_odds, "run", lambda *a, **k: Report())
     r = client.post("/api/jobs/scrape", json={"source": "odds"})
-    assert r.status_code == 503
-    detail = r.json()["detail"]
-    assert "playwright install" in detail
-    # And it must say the rest of the dashboard is unaffected, or a missing
-    # browser reads as a broken dashboard.
-    assert "without a browser" in detail
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is False
+    assert body["wrote"] == {"races": 0, "win_place": 0, "pairs": 0}
+    assert "lists no meeting" in body["warnings"][0]
+
+
+def test_no_source_asks_the_owner_to_install_a_browser(monkeypatch) -> None:
+    """A capture that needs Chromium cannot run on the deploy image, so it
+    cannot be automated — which is exactly why the odds cron line spent a
+    season commented out."""
+    from hkrd.api.routes import jobs as route
+
+    src = Path(route.__file__).read_text(encoding="utf-8").lower()
+    for banned in ("playwright", "chromium", "selenium"):
+        assert banned not in src
 
 
 def test_an_unreachable_hkjc_is_not_reported_as_our_bug(monkeypatch) -> None:
