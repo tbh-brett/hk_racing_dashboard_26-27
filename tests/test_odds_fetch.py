@@ -623,3 +623,30 @@ def test_with_no_meeting_on_either_day_the_report_names_today(db):
                              now=dt.datetime(2026, 7, 20, 14, 0))
     assert report.race_date == "2026-07-20"
     assert "nothing to price" in report.line()
+
+
+def test_quiet_silences_only_the_idle_tick(tmp_path, db, endpoint, capsys):
+    """The every-minute cron line would otherwise put ~1,400 lines a day of
+    "nothing to price" into the log and bury the runs that captured something.
+
+    What it must NOT silence is a zero with something attempted, or a skip.
+    Silent success and silent failure looking the same is the failure this
+    whole rebuild exists to remove.
+    """
+    # No meeting on any date: the shape of ~1,400 ticks a day.
+    idle_db = tmp_path / "idle.db"
+    assert scrape_odds.main(["--db", str(idle_db), "--quiet"]) == 0
+    assert capsys.readouterr().out == ""          # nothing to do, nothing said
+    # Without --quiet the same tick still explains itself, for a person.
+    scrape_odds.main(["--db", str(idle_db)])
+    assert "nothing to price" in capsys.readouterr().out
+
+    # A refused capture has plenty to say, quiet or not.
+    _, replies = endpoint
+    tampered = json.loads(json.dumps(replies["racing"]))
+    tampered["data"]["raceMeetings"][0]["pmPools"][0]["id"] = "20260906S2PLA1"
+    replies["racing"] = tampered
+    scrape_odds.main(["--db", str(db), "--date", DATE, "--venue", VENUE,
+                      "--quiet"])
+    said = capsys.readouterr().out
+    assert "SKIPPED" in said and "different meeting" in said

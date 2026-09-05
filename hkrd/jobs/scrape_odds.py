@@ -341,14 +341,25 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--race", type=int, action="append", dest="races",
                     help="one race number; repeat for several. Default: all")
     ap.add_argument("--db", help="database path; defaults to HKRD_DB")
+    ap.add_argument("--quiet", action="store_true",
+                    help="say nothing on a tick that had nothing to do. For "
+                         "the every-minute cron line: without it the log is "
+                         "~1,400 lines a day of 'nothing to price' and the "
+                         "runs that DID capture something are buried in them.")
     args = ap.parse_args(argv)
 
     report = run(args.date, args.venue, races=args.races, db=args.db)
-    print(report.line())
-    for note in report.notes:
-        print(f"  note: {note}")
-    for skip in report.skipped:
-        print(f"  SKIPPED {skip}")
+    # Quiet covers exactly one case: a tick that attempted nothing and has
+    # nothing to complain about. A zero WITH something attempted still speaks,
+    # and so does every skip -- silent success and silent failure must never
+    # look the same, and this does not make them.
+    idle = args.quiet and not report.attempted and not report.skipped
+    if not idle:
+        print(report.line())
+        for note in report.notes:
+            print(f"  note: {note}")
+        for skip in report.skipped:
+            print(f"  SKIPPED {skip}")
     # Nothing to price is not a failure -- most days have no meeting. Having
     # something to price and storing none of it is.
     if report.attempted and not report.races:

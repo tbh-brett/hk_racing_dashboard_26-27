@@ -81,6 +81,11 @@
 # Sha Tin card, 1,103 of 1,501 ticks over a meeting's 25-hour cycle answer
 # from the database alone; the other 398 make two requests.
 #
+# --quiet, because an idle tick that announced itself would put ~1,400 lines of
+# "nothing to price" a day into `fly logs` and bury the runs that captured
+# something. It silences ONLY the idle tick: a zero with something attempted,
+# and every skip, still speak.
+#
 # No hour restriction either, and that is deliberate rather than lazy. HKJC
 # opens a market at 13:00 the day BEFORE racing, so a 12:00-23:59 window would
 # capture Saturday evening, stop at midnight, and resume at noon on Sunday —
@@ -99,4 +104,4 @@
 # SIZE. Measured, not estimated: ~63,000 rows and ~6.7 MB per meeting, so
 # ~0.6 GB a season, against a 1 GB volume that nothing ever deletes from.
 # Extend the volume before the second season — see docs/deploy.md.
-* * * * *   python -m hkrd.jobs.scrape_odds --db /data/hkrd.db
+* * * * *   python -m hkrd.jobs.scrape_odds --db /data/hkrd.db --quiet
