@@ -32,7 +32,9 @@ ingest → store → derive → query → api → web
 - `ingest/` knows about HKJC and returns plain dicts. It does not know the database exists.
 - `derive/` reads raw tables, writes derived tables. Every derived table must be safe to
   `DROP` and rebuild from raw.
-- Never call our own Python via `subprocess`. Import it. `subprocess` is for Playwright only.
+- Never call our own Python via `subprocess`. Import it. Nothing in this codebase
+  needs a browser: the odds are the one JavaScript-rendered source and `ingest/odds.py`
+  reads the JSON endpoint the betting site itself reads.
 
 If a task seems to need a violation, stop and say so rather than working around it.
 

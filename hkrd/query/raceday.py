@@ -17,12 +17,14 @@ rather than left for the eye to find.
 """
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 from hkrd.derive.probability import devig
 from hkrd.query import (blackbook as bb_q, formguide as fg_q,
                         market as market_q, vet as vet_q)
 from hkrd.query.race import get_horse_form, get_race, vet_form
+from hkrd.query.types import RaceLine
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["build_card", "meeting_blackbook", "meeting_summary",
@@ -56,6 +58,50 @@ def spark_points(series: list[float], *, width: int = 66, height: int = 18
     return (" ".join(f"{x},{y}" for x, y in pts), pts[-1][0], pts[-1][1])
 
 
+def _with_live_prices(conn: Connection, date: str, race_no: int,
+                      race: RaceLine) -> RaceLine:
+    """The card, repriced from the latest odds capture.
+
+    `runners.win_odds` is the STARTING price. It is written by the results
+    scrape and by nothing else, so on a card that has not been run it is NULL
+    for every runner — which is how this page came to show an empty price
+    column, no market rank, no de-vigged percentage and no overround at
+    exactly the moment it exists for: twenty minutes before the off. The
+    concentration figure was right all along, because it reads
+    `odds_snapshots`; nothing else on the card did.
+
+    So the live capture fills the gaps here, once, and everything downstream —
+    the price, the rank, the de-vig, the overround, the place ratio — reads
+    the same number rather than each reaching for its own.
+
+    It FILLS rather than overwrites, and win and place fill independently.
+    Where a starting price exists the race is over and that price is the final
+    one, later than any snapshot could be. Place has no starting price at all
+    — `runners` has no such column, only the settled `place_dividend` — so a
+    place price on this page always comes from a capture, which is why the
+    measured place/win ratio read as absent for every race until now.
+
+    Only this page is repriced at all: `get_race` is left alone, because the
+    Form Guide, Results and every backtest are asking what a run actually
+    paid, which is a different question from what it is trading at now.
+    """
+    live = market_q.live_prices(date, race_no, conn=conn)
+    if not live:
+        return race
+
+    def priced(r):
+        got = live.get(r.horse_no)
+        if got is None:
+            return r
+        return replace(
+            r,
+            win_odds=r.win_odds if r.win_odds is not None else got["win_odds"],
+            place_odds=(r.place_odds if r.place_odds is not None
+                        else got["place_odds"]))
+
+    return replace(race, runners=tuple(priced(r) for r in race.runners))
+
+
 def _odds_series(conn: Connection, date: str, race_no: int) -> dict[int, list[float]]:
     rows = conn.execute(
         "SELECT horse_no, win_odds FROM odds_snapshots "
@@ -76,6 +122,10 @@ def build_card(date: str, race_no: int, *,
         race = get_race(date, race_no, conn=conn)
         if not race.runners:
             return {"race_date": date, "race_no": race_no, "runners": []}
+        # Before anything reads a price off it. Every figure below — rank,
+        # de-vig, overround, place ratio — has to come from one set of odds,
+        # or the page disagrees with itself about what the market is doing.
+        race = _with_live_prices(conn, date, race_no, race)
 
         conc = market_q.concentration(date, race_no, conn=conn)
         booked = {b["horse_name"]: b

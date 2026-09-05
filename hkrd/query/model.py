@@ -9,6 +9,7 @@ from __future__ import annotations
 
 
 from hkrd.model import blend as blend_m, sarr as sarr_m
+from hkrd.query import market as market_q
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["et_breakdown", "et_reference_summary", "model_status",
@@ -252,13 +253,25 @@ def blend_breakdown(date: str, race_no: int, *, weight: float | None = None,
     weight = (blend_m.DEFAULT_BLEND_WEIGHT if weight is None
               else max(0.0, min(1.0, float(weight))))
     try:
-        rows = conn.execute("""
+        rows = [dict(r) for r in conn.execute("""
             SELECT r.horse_no, r.horse_name, r.win_odds, s.sarr, s.sarr_rank
             FROM runners r
             LEFT JOIN runner_sarr s USING (race_date, race_no, horse_no)
             WHERE r.race_date = ? AND r.race_no = ?
             ORDER BY r.horse_no
-        """, (date, race_no)).fetchall()
+        """, (date, race_no))]
+        # `runners.win_odds` is the starting price and the results scrape is
+        # the only thing that writes it, so before a race it is NULL for the
+        # whole field. The market stream then has nothing to normalise, the
+        # blend degrades to pure SARR, and the page that exists to show the
+        # model against the market shows it against nothing -- on the only day
+        # anyone reads it. The latest capture fills those gaps; a race that has
+        # been run keeps its starting price, which is what the weight below was
+        # fitted and backtested against.
+        live = market_q.live_prices(date, race_no, conn=conn)
+        for r in rows:
+            if r["win_odds"] is None and r["horse_no"] in live:
+                r["win_odds"] = live[r["horse_no"]]["win_odds"]
         # Both streams need the whole field: a softmax over some of the runners
         # and a de-vig over some of the prices are each normalised against a
         # denominator missing terms. Say which is short rather than blending

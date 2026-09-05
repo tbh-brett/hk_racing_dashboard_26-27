@@ -31,12 +31,17 @@ def db(tmp_path):
                  "jockey": f"J{i}", "trainer": f"T{i}",
                  "running_positions": "1 1 1"}
                 for i, o in enumerate(odds)])
+        # Place odds are NOT a fixed fraction of the win price. The ratio
+        # runs from about 0.16 to 0.62 across a real card, which is the whole
+        # reason place has to be captured rather than derived, so a fixture
+        # that used o/3 would make the test that checks this tautological.
         upsert.upsert_odds_snapshots(conn, [
             {"race_date": "2026-07-15", "race_no": 1, "horse_no": i + 1,
-             "captured_at": ts, "win_odds": o, "place_odds": o / 3}
-            for ts, prices in (("2026-07-15T06:00:00", [6.0, 5.0, 20.0]),
-                               ("2026-07-15T12:30:00", [3.0, 6.0, 20.0]))
-            for i, o in enumerate(prices)])
+             "captured_at": ts, "win_odds": o, "place_odds": pl}
+            for ts, prices in (
+                ("2026-07-15T06:00:00", [(6.0, 2.4), (5.0, 2.0), (20.0, 4.0)]),
+                ("2026-07-15T12:30:00", [(3.0, 1.5), (6.0, 2.2), (20.0, 3.4)]))
+            for i, (o, pl) in enumerate(prices)])
         conn.executemany(
             "INSERT INTO runner_sarr (race_date, race_no, horse_no, sarr, "
             "sarr_rank, n_prior, derive_version) VALUES (?,?,?,?,?,?,?)",
@@ -173,13 +178,28 @@ def test_overround_is_the_book_percentage_over_a_hundred(db):
 
 def test_place_ratio_range_is_measured_not_assumed(db):
     """Place odds cannot be derived from win odds -- the "one third" rule is
-    structurally invalid, and showing the real spread keeps that obvious."""
+    structurally invalid, and showing the real spread keeps that obvious.
+
+    The prices come from the latest CAPTURE, not from `runners`, which holds
+    the starting price and is empty until the race has been run. This used to
+    assert None: the fixture had place odds all along, in the snapshot, and
+    nothing on the card was reading them.
+    """
     conn = get_conn(db)
     card = raceday.build_card("2026-07-15", 1, conn=conn)
     conn.close()
-    # This fixture has no place odds stored on runners, so it reports nothing
-    # rather than inventing a ratio.
+    # 1.5/3.0 = 0.50 at the short end, 3.4/20.0 = 0.17 at the long one.
+    assert card["place_ratio_range"] == "0.17–0.50"
+
+
+def test_a_card_with_no_capture_invents_no_ratio(db):
+    """The 2026-06-01 race has no snapshot. Nothing is better than a third."""
+    conn = get_conn(db)
+    card = raceday.build_card("2026-06-01", 1, conn=conn)
+    conn.close()
     assert card["place_ratio_range"] is None
+    # And the card still builds: a race with no market is not an error.
+    assert len(card["runners"]) == 3
 
 
 def test_head_to_head_pairs_are_sorted_by_weight_swing(db):
@@ -213,3 +233,59 @@ def test_a_trainer_change_is_measured_against_one_run_back(db):
     for r in card["runners"]:
         assert r["trainer_changed"] is False    # same trainer in the fixture
         assert r["trainer_prev"] is None
+
+
+def test_the_card_is_priced_from_the_latest_capture(db):
+    """`runners.win_odds` is the STARTING price, written by the results scrape
+    after the race. On a card that has not been run it is NULL for every
+    runner, which is how this page came to show an empty price column at
+    exactly the moment it exists for.
+
+    The fixture's two captures disagree — horse 1 was 6.0 in the morning and
+    3.0 at 12:30, horse 2 went the other way — so reading the wrong one is
+    visible rather than a coincidence.
+    """
+    conn = get_conn(db)
+    conn.execute("UPDATE runners SET win_odds = NULL "
+                 "WHERE race_date = '2026-07-15'")
+    conn.commit()
+    card = raceday.build_card("2026-07-15", 1, conn=conn)
+    conn.close()
+
+    by_no = {r["horse_no"]: r for r in card["runners"]}
+    assert by_no[1]["win_odds"] == pytest.approx(3.0)     # 12:30, not 06:00
+    assert by_no[2]["win_odds"] == pytest.approx(6.0)
+    assert by_no[1]["place_odds"] == pytest.approx(1.5)
+    # And every figure derived from a price is populated with it.
+    assert by_no[1]["market_rank"] == 1
+    assert by_no[1]["win_pct"] is not None
+    assert card["overround"] is not None
+
+
+def test_a_scratching_on_an_unrun_card_stays_unpriced(db):
+    """A runner the latest capture does not price must not acquire one from
+    somewhere else, or a horse that has come out reads as live money."""
+    conn = get_conn(db)
+    conn.execute("UPDATE runners SET win_odds = NULL "
+                 "WHERE race_date = '2026-07-15'")
+    conn.execute("UPDATE odds_snapshots SET win_odds = NULL, place_odds = NULL "
+                 "WHERE horse_no = 2 AND captured_at = '2026-07-15T12:30:00'")
+    conn.commit()
+    card = raceday.build_card("2026-07-15", 1, conn=conn)
+    conn.close()
+
+    by_no = {r["horse_no"]: r for r in card["runners"]}
+    assert by_no[2]["win_odds"] is None
+    assert by_no[2]["market_rank"] is None
+    assert by_no[1]["win_odds"] == pytest.approx(3.0)      # the rest stand
+
+
+def test_a_run_that_is_over_keeps_its_starting_price(db):
+    """Only Race Day is repriced. The Form Guide, Results and every backtest
+    are asking what a run actually paid, which is a different question."""
+    from hkrd.query.race import get_race
+
+    conn = get_conn(db)
+    race = get_race("2026-07-15", 1, conn=conn)
+    conn.close()
+    assert [r.win_odds for r in race.runners] == [3.0, 6.0, 20.0]

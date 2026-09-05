@@ -22,10 +22,13 @@ from hkrd.derive.probability import devig, pair_probability, place_probability
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["concentration", "band", "price_movement", "odds_coverage",
-           "latest_prices", "snapshot_age_hours", "STALE_AFTER_HOURS",
-           "MIN_WINDOW_MINUTES", "warm", "place_probabilities",
-           "ranked_pairs", "PLACE_PAYING_FIELD", "changes_since",
-           "MOVE_THRESHOLD"]
+           "latest_prices", "live_prices", "snapshot_age_hours",
+           "STALE_AFTER_HOURS", "MIN_WINDOW_MINUTES", "warm",
+           "place_probabilities", "ranked_pairs", "PLACE_PAYING_FIELD",
+           "changes_since", "MOVE_THRESHOLD", "CADENCE_MINUTES",
+           "PAIR_CADENCE_MINUTES", "SETTLED_AFTER_MINUTES", "interval_for",
+           "minutes_to_off", "poll_seconds", "MIN_POLL_SECONDS", "stamp",
+           "poll_state"]
 
 # A price captured well before the off is not the price the rule was measured
 # on. Concentration moves from a mean of 0.539 in the morning to 0.637 at post
@@ -41,6 +44,158 @@ _HKT = timezone(timedelta(hours=8))
 # movement from them claims the market held steady, which is a different
 # and unsupported statement.
 MIN_WINDOW_MINUTES = 20.0
+
+# ── how fast this market moves, by distance from the off ─────────────────────
+#
+# One definition, two readers. `jobs/scrape_odds` uses it to decide when a race
+# is worth re-pricing; `api/` uses it to tell the browser when it is worth
+# asking again. They must not drift: a page polling every thirty seconds
+# against an hourly capture is 120 pointless requests, and a page polling
+# hourly against a minute-by-minute capture shows a price from before the money
+# arrived.
+#
+# The shape is not uniform because the market is not. Money arrives in the last
+# five to ten minutes; the overnight market barely moves. A flat schedule spends
+# most of its rows recording that nothing happened and then samples the only
+# interesting window three times.
+
+# A race whose off time is this far past is settled. Its price cannot move
+# again, and `odds_snapshots` is the one table nothing prunes, so re-capturing
+# it would grow the table forever without adding a fact. Kept this long rather
+# than cut at the off because a delayed start is real, and the price that
+# settles the bet is the one at the ACTUAL off.
+SETTLED_AFTER_MINUTES = 30
+
+# Read as: with more than 180 minutes to go, once an hour.
+CADENCE_MINUTES: tuple[tuple[float, float], ...] = (
+    (180, 60),      # the day before, and race morning
+    (30, 15),
+    (10, 5),
+    (-SETTLED_AFTER_MINUTES, 1),
+)
+
+# Pair odds are sampled on their own, coarser ladder, and the reason is size
+# rather than taste. A 14-runner field has 14 win prices and 182 pair prices,
+# so pairs are 88% of the rows; measured on disk at 106 bytes a row, pairs on
+# the ladder above would be 0.93 GB a season, and nothing here ever deletes.
+# The two differ where it costs least — overnight, where the market barely
+# moves — and are identical where the money is.
+PAIR_CADENCE_MINUTES: tuple[tuple[float, float], ...] = (
+    (180, 180),     # the day before: eight captures, not twenty-one
+    (30, 15),
+    (-SETTLED_AFTER_MINUTES, 5),
+)
+
+
+def minutes_to_off(date: str, off_time: str | None,
+                   now: datetime | None = None) -> float | None:
+    """Minutes until this race is due off. Negative once it is past."""
+    try:
+        hh, mm = str(off_time or "").split(":")[:2]
+        off = datetime.fromisoformat(date).replace(hour=int(hh), minute=int(mm))
+    except (ValueError, IndexError):
+        return None
+    return ((off - (now or datetime.now())).total_seconds() / 60.0)
+
+
+def interval_for(to_off: float | None,
+                 ladder: tuple[tuple[float, float], ...] = CADENCE_MINUTES
+                 ) -> float:
+    """The capture interval, in minutes, for a race this far from its off.
+
+    An unreadable or missing off time falls back to the coarsest band rather
+    than the finest: a card without times must not be priced every minute all
+    day, and the freshness strip already says when odds last landed.
+    """
+    if to_off is None:
+        return ladder[0][1]
+    for threshold, every in ladder:
+        if to_off > threshold:
+            return every
+    return ladder[-1][1]
+
+
+# Half the capture interval, so a new price is on screen within half a cycle of
+# landing, and never below this many seconds however close the off is.
+MIN_POLL_SECONDS = 15
+
+
+def poll_seconds(date: str, off_time: str | None,
+                 now: datetime | None = None) -> int:
+    """How long a page should wait before asking for this race again.
+
+    Sampling twice as often as the capture is the classic answer and it is the
+    right one here: it bounds how stale the screen can be at half a capture
+    interval, without inventing a second schedule that can drift from the one
+    the data is actually written on.
+    """
+    every = interval_for(minutes_to_off(date, off_time, now))
+    return max(MIN_POLL_SECONDS, int(every * 60 / 2))
+
+
+def poll_state(date: str, race_no: int | None = None, *,
+               conn: Connection | None = None) -> tuple[str, str | None, int]:
+    """`(stamp, captured_at, poll_after_seconds)` for one race, in one open
+    connection.
+
+    Three indexed lookups, answered without assembling anything. This is the
+    whole cost of a poll that finds nothing new.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        identity = stamp(date, race_no, conn=conn)
+        captured = identity.split("|", 1)[0]
+        row = conn.execute(
+            "SELECT off_time FROM races WHERE race_date = ?"
+            + ("" if race_no is None else " AND race_no = ?"),
+            (date,) if race_no is None else (date, race_no)).fetchone()
+        after = poll_seconds(date, row["off_time"] if row else None)
+        return identity, (captured if captured != "-" else None), after
+    finally:
+        if own:
+            conn.close()
+
+
+def stamp(date: str, race_no: int | None = None, *,
+          conn: Connection | None = None) -> str:
+    """A short identity for the newest thing an odds-driven page would read.
+
+    This is what lets a page ask "anything new?" without the server building
+    an answer. The Race Day card is 36 KB and ~220ms to assemble — form,
+    veterinary history, head-to-head, blackbook, one query per runner — and on
+    race day a page has to ask every thirty seconds to keep up with a market
+    captured every minute. Assembling it each time to discover it had not
+    changed is the whole cost, and it is avoidable: the two `max()` lookups
+    below are indexed and answer in under a millisecond.
+
+    Two clocks, because two different things change what the card says:
+
+      the latest odds capture — the price, and everything derived from it
+      the latest job run     — a re-scraped card, a scratching, a re-derive
+
+    Blackbook edits are deliberately NOT in here. They are made by the person
+    looking at the page, which has already re-rendered locally by the time any
+    poll returns, and the next capture carries them anyway.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        if race_no is None:
+            odds = conn.execute(
+                "SELECT max(captured_at) FROM odds_snapshots "
+                "WHERE race_date = ?", (date,)).fetchone()[0]
+        else:
+            odds = conn.execute(
+                "SELECT max(captured_at) FROM odds_snapshots "
+                "WHERE race_date = ? AND race_no = ?",
+                (date, race_no)).fetchone()[0]
+        job = conn.execute(
+            "SELECT max(finished_at) FROM job_runs").fetchone()[0]
+        return f"{odds or '-'}|{job or '-'}"
+    finally:
+        if own:
+            conn.close()
 
 
 def snapshot_age_hours(race_date: str, captured_at: str | None) -> float | None:
@@ -108,6 +263,22 @@ def latest_prices(date: str, race_no: int, *, at: str = "latest",
     finally:
         if own:
             conn.close()
+
+
+def live_prices(date: str, race_no: int, *,
+                conn: Connection | None = None) -> dict[int, dict[str, Any]]:
+    """The latest capture, keyed by horse number.
+
+    `runners.win_odds` is written by the RESULTS scrape and by nothing else,
+    so it is the starting price and it does not exist until the race has been
+    run — NULL for all 120 runners of a card declared two days out. Anything
+    that has to price an upcoming race reads this instead, and every caller
+    fills gaps with it rather than overwriting: where a starting price exists
+    it is the final price, later than any snapshot, and it is what the models
+    were fitted and backtested against.
+    """
+    return {p["horse_no"]: p
+            for p in latest_prices(date, race_no, conn=conn)}
 
 
 def concentration(date: str, race_no: int, *, at: str = "latest",

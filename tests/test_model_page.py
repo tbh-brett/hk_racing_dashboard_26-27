@@ -236,3 +236,52 @@ def test_a_partly_priced_field_blanks_the_stream_rather_than_mixing_scales(db):
     assert out["missing"]["unpriced"] == 1
     assert out["overround"] is None
     assert all(r["market_devig"] is None for r in out["runners"])
+
+
+def test_the_blend_has_a_market_stream_before_the_race(tmp_path):
+    """`runners.win_odds` is the starting price and the results scrape is the
+    only thing that writes it, so before a race it is NULL for the whole field.
+    The market stream then had nothing to normalise and the blend degraded to
+    pure SARR — on the one day the page is read.
+
+    The fitted weight on the fundamental stream is 0.00, so a blend with no
+    market term is not a weaker answer, it is a different model.
+    """
+    from hkrd.query import model as model_q
+    from hkrd.store import upsert
+    from hkrd.store.connect import get_conn, init_db, transaction
+
+    path = tmp_path / "blend.db"
+    conn = get_conn(path)
+    init_db(conn)
+    with transaction(conn):
+        upsert.upsert_races(conn, [
+            {"race_date": "2026-09-06", "race_no": 1, "venue": "ST",
+             "course": "A", "surface": "Turf", "going": "G", "distance": 1200}])
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-09-06", "race_no": 1, "horse_no": i + 1,
+             "horse_name": f"HORSE {i}", "draw": i + 1, "actual_weight": 120}
+            for i in range(3)])
+        upsert.upsert_odds_snapshots(conn, [
+            {"race_date": "2026-09-06", "race_no": 1, "horse_no": i + 1,
+             "captured_at": "2026-09-05T16:00:00", "win_odds": o,
+             "place_odds": p}
+            for i, (o, p) in enumerate([(2.6, 1.6), (8.5, 3.0), (25.0, 4.1)])])
+        conn.executemany(
+            "INSERT INTO runner_sarr (race_date, race_no, horse_no, sarr, "
+            "sarr_rank, n_prior, derive_version) VALUES (?,?,?,?,?,?,?)",
+            [("2026-09-06", 1, n, s, r, 4, "t")
+             for n, s, r in ((1, 0.9, 1), (2, 0.2, 2), (3, 0.1, 3))])
+
+    out = model_q.blend_breakdown("2026-09-06", 1, conn=conn)
+    conn.close()
+
+    assert out["missing"]["unpriced"] == 0
+    assert out["overround"] is not None
+    for r in out["runners"]:
+        assert r["win_odds"] is not None
+        assert r["market_raw"] is not None
+        assert r["market_devig"] is not None
+    # The de-vigged market must sum to 100%, which is the check that says the
+    # whole field was priced rather than most of it.
+    assert sum(r["market_devig"] for r in out["runners"]) == pytest.approx(100.0, abs=0.2)
