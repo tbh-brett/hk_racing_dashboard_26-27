@@ -25,17 +25,39 @@
 .band-bb .sub { color: var(--book-dim); }
 .band-h2h .sub { color: var(--h2h-dim); }
 
-.band-body { display: flex; align-items: stretch; flex: 1; min-width: 0; }
+/* Scrolls rather than squeezes. Each item used to be `flex: 1`, so four booked
+   horses in one race got a quarter of the width each — but `.name` is nowrap
+   and cannot shrink below its text, so the names overflowed their own boxes and
+   painted over the next item. "5 RISING ELITEEMERGING STARUNJEET 11 YEE CHEONG"
+   was one race with four entries, not a rendering glitch.
+   Items now keep their natural width and the row scrolls, which is what
+   `.band-rest` beside it has always done. */
+.band-body {
+  display: flex; align-items: stretch; flex: 1; min-width: 0; overflow-x: auto;
+}
 .band-item {
   display: flex; align-items: center; gap: 9px; padding: 5px 12px;
-  min-width: 0; flex: 1; font-family: var(--font-mono); font-size: var(--fs);
+  min-width: 0; flex: none; max-width: 460px; overflow: hidden;
+  font-family: var(--font-mono); font-size: var(--fs);
 }
+/* Without its reason, so more than one fits. The reason is on the title
+   attribute, in the expanded grid, and on the card row. */
+.band-item.tight { max-width: 260px; }
+.band-item .od { font-weight: 600; }
 .band-bb .band-item { border-right: 1px solid var(--book-rule); }
 .band-item .name { font-weight: 600; white-space: nowrap; }
 .band-item .note {
   font-family: var(--font); font-size: var(--fs-sm); color: var(--text-muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  min-width: 0;
 }
+/* Visible, because a row that scrolls with no sign of it is a row that looks
+   truncated. Same treatment the head-to-head grid already gets. */
+.band-body::-webkit-scrollbar, .band-rest::-webkit-scrollbar { height: 6px; }
+.band-body::-webkit-scrollbar-thumb,
+.band-rest::-webkit-scrollbar-thumb { background: var(--book-rule); }
+.band-body::-webkit-scrollbar-thumb:hover,
+.band-rest::-webkit-scrollbar-thumb:hover { background: var(--book-dim); }
 .band-empty {
   display: flex; align-items: center; padding: 5px 12px;
   font-family: var(--font-mono); font-size: var(--fs-sm);
@@ -281,7 +303,23 @@ table.card td { padding: 6px 8px; }
 .shape-row .no { font-family: var(--font-mono); font-size: var(--fs-sm);
                  width: 18px; text-align: right; color: var(--text-muted); }
 .shape-track { flex: 1; height: 8px; background: var(--line); }
-.shape-track i { height: 8px; display: block; background: var(--text-dim); }
+/* Brightness runs with market standing, using the palette's existing neutral
+   steps: the head of the market is loudest, the tail is quietest. No hue,
+   because amber is model edge and teal is the blackbook on this same page —
+   a fifth meaning would need a fifth colour and a name for it. */
+.shape-track i { height: 8px; display: block; background: var(--text-faint); }
+.shape-track i.lead   { background: var(--text-2); }
+.shape-track i.strong { background: var(--text-muted); }
+.shape-track i.mid    { background: var(--text-dim); }
+.shape-track i.tail   { background: var(--text-faint); }
+/* The horse being looked at, marked the way "you are here" is marked
+   elsewhere — an outline, not a fill that competes with the value. */
+.shape-row.you .no { color: var(--text); font-weight: 600; }
+.shape-row.you .shape-track { box-shadow: inset 0 0 0 1px var(--edge); }
+.shape-row .od {
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+  color: var(--text-muted); width: 34px; text-align: right;
+}
 .shape-row .pct { font-family: var(--font-mono); font-size: var(--fs-sm);
                   width: 30px; text-align: right; }
 .dis-row { display: flex; align-items: baseline; gap: 8px; padding: 3px 0;

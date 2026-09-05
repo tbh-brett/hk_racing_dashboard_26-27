@@ -11,7 +11,7 @@
  * rather than buried in a commit message.
  */
 import { api, num, signed } from './api.js';
-import { el, $, DASH, renderNav } from './vocab.js';
+import { el, $, DASH, renderNav, compactDate } from './vocab.js';
 import { context } from './context.js';
 import { Live } from './live.js';
 import { install as installPalette } from './palette.js';
@@ -501,25 +501,47 @@ function renderEt() {
     body.firstChild.firstChild.colSpan = 10;
     return;
   }
+
+  /* An ET figure is measured FROM a finishing time, so a race that has not been
+     run has none — not one missing value, all of them. This table used to
+     render that as fourteen rows of dashes, which reads as broken on the one
+     day anyone opens the page. When the race is still to come it shows what
+     each horse LAST ran to instead, and says so rather than letting a figure
+     from three weeks ago pass for a measurement of today. */
+  const priorOnly = data.measured === false;
+  // The column carries a different fact in each mode, so it is renamed rather
+  // than left saying PL over a date.
+  $('et-col-3').textContent = priorOnly ? 'RAN' : 'PL';
+  $('et-mode').replaceChildren(priorOnly
+    ? el('span', 'inv fail',
+      'NOT RUN YET — showing each runner’s LAST figure, not today’s')
+    : el('span', 'inv pass', 'measured from this race'));
+
   body.replaceChildren(...data.runners.map((r) => {
+    const p = priorOnly ? (r.prior ?? {}) : r;
     const tr = el('tr');
+    if (priorOnly) tr.classList.add('et-prior');
     const cells = [
       ['centre', r.horse_no ?? DASH],
       ['left horse', r.horse_name ?? DASH],
-      ['centre', r.place ?? DASH],
-      ['', fmtTime(r.finish_time)],
-      ['', num(r.figure, 1)],
-      ['', signed(r.len_vs_par)],
-      ['', signed(r.len_vs_race)],
-      ['', r.et_n_eff ?? DASH],
-      [`left ${r.confidence ? `conf-${r.confidence}` : 'thin'}`, r.confidence ?? DASH],
-      ['left thin', r.et_level ?? DASH],
+      ['centre', priorOnly ? (p.race_date ? compactDate(p.race_date) : DASH)
+        : (r.place ?? DASH)],
+      ['', fmtTime(priorOnly ? null : r.finish_time)],
+      ['', num(p.figure, 1)],
+      ['', signed(p.len_vs_par)],
+      ['', signed(p.len_vs_race)],
+      ['', p.et_n_eff ?? DASH],
+      [`left ${p.confidence ? `conf-${p.confidence}` : 'thin'}`, p.confidence ?? DASH],
+      ['left thin', priorOnly ? 'LAST RUN' : (r.et_level ?? DASH)],
     ];
     cells.forEach(([cls, text], i) => {
       const td = el('td', cls, String(text));
       /* Sample size drives visual weight: a thin cell must not read as
          authoritative as a well-evidenced one. */
-      if (r.et_n_eff !== null && r.et_n_eff < 10 && i >= 4) td.classList.add('thin');
+      const nEff = priorOnly ? p.et_n_eff : r.et_n_eff;
+      if (nEff !== null && nEff !== undefined && nEff < 10 && i >= 4) {
+        td.classList.add('thin');
+      }
       if (i === 5 || i === 6) td.classList.add(Number(text) >= 0 ? 'pos' : 'neg');
       tr.append(td);
     });
@@ -671,13 +693,20 @@ async function init() {
   $('rebuild-et').addEventListener('click', onRebuild);
   document.addEventListener('keydown', onKey);
 
-  await settle(renderEtSummary(), () => {});
-  // Over the whole archive rather than this race, so it loads once here and
-  // not again on every race change.
-  await loadBacktest();
+  // The two archive-wide panels — the ET reference summary and the backtest —
+  // do not depend on which meeting is chosen, so they load ALONGSIDE it rather
+  // than in front of it. Awaiting them first put four sequential round trips
+  // between the click and the first section appearing, and over a Hong
+  // Kong-to-Singapore link that is long enough to read as "it did not show all
+  // the models", with a second click looking like the fix because by then
+  // everything was warm. They are still only loaded once, not per race.
+  const archive = Promise.all([
+    settle(renderEtSummary(), () => {}),
+    loadBacktest(),
+  ]);
   context.onChange(onContext);
   await context.init();
-  await onContext(context, 'meeting');
+  await Promise.all([onContext(context, 'meeting'), archive]);
 }
 
 init();

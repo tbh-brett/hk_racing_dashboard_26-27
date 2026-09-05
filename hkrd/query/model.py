@@ -42,8 +42,47 @@ def et_breakdown(date: str, race_no: int, *,
         runners = [dict(r) for r in rows]
         pars = {round((r["finish_time"] or 0) + r["sec_vs_par"], 4)
                 for r in runners if r["sec_vs_par"] is not None and r["finish_time"]}
+
+        # An ET figure is measured FROM a finishing time, so a race that has
+        # not been run has none — not one missing value, all of them, for every
+        # runner. The page rendered that as fourteen rows of dashes, which
+        # reads as a broken table on the one day anyone opens it.
+        #
+        # What IS knowable before the race is what each horse last ran to, so
+        # that is carried instead and labelled as what it is. The join is on
+        # horse_name: horse_id is 0% populated from July and 54.6% in June, so
+        # joining on it would silently return partial history from April on.
+        ran = any(r["figure"] is not None for r in runners)
+        if not ran and runners:
+            names = [r["horse_name"] for r in runners if r["horse_name"]]
+            prior: dict[str, dict] = {}
+            if names:
+                marks = ",".join("?" * len(names))
+                for p in conn.execute(f"""
+                    SELECT r.horse_name, r.race_date, r.race_no, r.place,
+                           e.figure, e.confidence, e.et_n_eff,
+                           e.len_vs_par, e.sec_vs_par, e.len_vs_race
+                      FROM runners r
+                      JOIN runner_et e USING (race_date, race_no, horse_no)
+                     WHERE r.horse_name IN ({marks}) AND r.race_date < ?
+                     ORDER BY r.horse_name, r.race_date DESC
+                """, (*names, date)):
+                    # First row per horse is its most recent, by the ORDER BY.
+                    prior.setdefault(p["horse_name"], dict(p))
+            for r in runners:
+                r["prior"] = prior.get(r["horse_name"])
+            # Best last figure first, so the section still ranks something.
+            runners.sort(key=lambda r: (
+                r["prior"] is None,
+                -(r["prior"]["figure"] if r["prior"]
+                  and r["prior"]["figure"] is not None else -9e9)))
+
         return {
             "race_date": date, "race_no": race_no, "runners": runners,
+            # False means every figure below is the horse's LAST run, not this
+            # one. The page has to say which, or a reader takes a figure from
+            # three weeks ago for a measurement of today.
+            "measured": ran,
             # A par is a property of a race. If this is ever not 1 the model is
             # broken, whatever its accuracy -- v4 produced up to 1.98s of spread
             # within a single race because weight_band was a lookup key.
@@ -126,14 +165,21 @@ def sarr_breakdown(date: str, race_no: int, *,
     own = conn is None
     conn = conn or get_conn()
     try:
-        rows = conn.execute("""
+        rows = [dict(r) for r in conn.execute("""
             SELECT s.horse_no, r.horse_name, s.sarr, s.sarr_rank, s.n_prior,
                    r.win_odds, r.draw, r.jockey, s.derive_version
             FROM runner_sarr s
             JOIN runners r USING (race_date, race_no, horse_no)
             WHERE s.race_date = ? AND s.race_no = ?
             ORDER BY s.sarr_rank
-        """, (date, race_no)).fetchall()
+        """, (date, race_no))]
+        # The same fill the card and the blend do. `runners.win_odds` is the
+        # starting price, so this column was empty on every card that had not
+        # been run -- on a page whose whole point is the model beside the price.
+        live = market_q.live_prices(date, race_no, conn=conn)
+        for r in rows:
+            if r["win_odds"] is None and r["horse_no"] in live:
+                r["win_odds"] = live[r["horse_no"]]["win_odds"]
         if not rows:
             return {"race_date": date, "race_no": race_no, "runners": [],
                     "components": [], "unscored": _unscored(conn, date, race_no)}

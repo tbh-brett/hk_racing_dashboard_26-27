@@ -289,3 +289,25 @@ def test_a_run_that_is_over_keeps_its_starting_price(db):
     race = get_race("2026-07-15", 1, conn=conn)
     conn.close()
     assert [r.win_odds for r in race.runners] == [3.0, 6.0, 20.0]
+
+
+def test_the_blackbook_band_carries_a_price_before_the_race(db):
+    """`blackbook.declared_on` reads runners.win_odds — the starting price, NULL
+    until the results scrape writes it. So the band showed a booked horse
+    drifting 6% with no price beside it to drift FROM: a movement without a
+    market, which is the one thing on that band you cannot act on."""
+    conn = get_conn(db)
+    conn.execute("UPDATE runners SET win_odds = NULL "
+                 "WHERE race_date = '2026-07-15'")
+    conn.execute(
+        "INSERT INTO blackbook (id, horse_name, status, confidence, "
+        "added_date, reasoning) VALUES ('bb1', 'HORSE 0', 'watch', 'high', "
+        "'2026-06-01', 'travelled well')")
+    conn.commit()
+
+    band = raceday.meeting_blackbook("2026-07-15", conn=conn)
+    conn.close()
+
+    entry = next(e for e in band["entries"] if e["horse_name"] == "HORSE 0")
+    assert entry["win_odds"] == pytest.approx(3.0)      # the 12:30 capture
+    assert entry["place_odds"] == pytest.approx(1.5)

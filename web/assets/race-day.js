@@ -174,7 +174,10 @@ function renderBlackbookBand() {
   tag.append(el('span', 'dot'));
   tag.append(document.createTextNode('BLACKBOOK'));
   tag.append(el('span', 'n', String(all.length)));
-  tag.append(el('span', 'sub', 'TODAY'));
+  // How many are in the race on screen, when that is more than one. The body
+  // scrolls, and a row that scrolls with no count beside it looks like it is
+  // showing everything there is.
+  tag.append(el('span', 'sub', here.length > 1 ? `${here.length} HERE` : 'TODAY'));
   row.append(tag);
 
   const body = el('div', 'band-body');
@@ -185,14 +188,22 @@ function renderBlackbookBand() {
     body.append(el('div', 'band-empty',
       all.length ? 'NONE IN THIS RACE' : 'NONE BOOKED TODAY'));
   } else {
+    // The reason for the booking is the first thing to go when the race is
+    // crowded. Five booked horses each carrying a sentence is five items the
+    // band can only show one of at a time; the name, the price and the move
+    // are what you act on, and the reason is a click away in the expanded
+    // grid and on the card row itself.
+    const roomy = here.length <= 2;
     here.forEach((e) => {
       const item = el('div', 'band-item');
       if (!e.booked_before_race) item.classList.add('bb-stale');
+      if (!roomy) item.classList.add('tight');
       item.append(el('span', 'name', `${e.horse_no} ${e.horse_name}`));
-      item.append(el('span', null, num(e.win_odds)));
+      item.append(el('span', 'od', num(e.win_odds)));
       const mv = bbMove(e);
       item.append(el('span', `pct ${mv.cls}`, mv.text));
-      item.append(el('span', 'note', bbNote(e)));
+      if (roomy) item.append(el('span', 'note', bbNote(e)));
+      else item.title = bbNote(e);
       body.append(item);
     });
   }
@@ -806,20 +817,59 @@ function renderDetail() {
     loadForm(r, form);
   }
 
+  /* MARKET SHAPE — the de-vigged win probability of every runner, so the whole
+   * race's money is one picture rather than fourteen numbers.
+   *
+   * Three things about it are deliberate.
+   *
+   * It is SORTED, shortest price first. Unsorted, in saddlecloth order, it is a
+   * list of bars and not a shape at all — you cannot see whether the money is
+   * on one horse or spread across six, which is the only question it answers.
+   *
+   * The bar runs with PROBABILITY, so the favourite is longest and the outsider
+   * shortest. That has always been true — the bar is win %, not the price — but
+   * it did not read that way, so the price now sits beside the percentage and
+   * the heading says which way round it is.
+   *
+   * The brightness runs with market standing, in the palette's existing neutral
+   * steps. It used to be one amber bar on whichever horse was being hovered,
+   * which meant a 26.0 outsider got the loudest bar on screen — and amber means
+   * "model edge" everywhere else on this page, so it was also saying something
+   * about the model that nothing had computed. The horse being looked at is now
+   * marked by an outline, which is what "you are here" means elsewhere.
+   */
   const shape = el('section');
-  shape.append(el('h6', null, 'MARKET SHAPE · WIN %'));
-  const maxPct = Math.max(...rows.map((x) => x.win_pct ?? 0), 1);
-  rows.forEach((x) => {
+  // One line, like every other heading here. The direction needs no words now:
+  // the rows descend by probability and the price column ascends beside them,
+  // which says "longer bar, shorter odds" more plainly than a label could.
+  const shapeHead = el('h6', null, 'MARKET SHAPE · WIN %');
+  shapeHead.title = 'Every runner’s de-vigged win probability, shortest '
+    + 'price first. A longer bar is a shorter price.';
+  shape.append(shapeHead);
+  const priced = rows
+    .filter((x) => x.win_pct !== null && x.win_pct !== undefined)
+    .sort((a, b) => b.win_pct - a.win_pct);
+  if (!priced.length) {
+    shape.append(el('div', 'empty', 'no market yet'));
+  }
+  const maxPct = Math.max(...priced.map((x) => x.win_pct), 1);
+  // Brightest at the head of the market, faintest at the tail. Four bands
+  // because the palette has four neutral steps and inventing a fifth would
+  // mean a colour with no name.
+  const weight = (i) => (i === 0 ? 'lead' : i < 3 ? 'strong' : i < 6 ? 'mid' : 'tail');
+  priced.forEach((x, i) => {
     const row = el('div', 'shape-row');
+    if (x.horse_no === r.horse_no) row.classList.add('you');
     row.append(el('span', 'no', String(x.horse_no ?? DASH)));
     const track = el('div', 'shape-track');
-    const i = el('i');
-    i.style.width = `${(100 * (x.win_pct ?? 0)) / maxPct}%`;
-    if (x.horse_no === r.horse_no) i.style.background = 'var(--edge)';
-    track.append(i);
+    const bar = el('i', weight(i));
+    bar.style.width = `${(100 * x.win_pct) / maxPct}%`;
+    track.append(bar);
     row.append(track);
-    row.append(el('span', 'pct', x.win_pct !== null && x.win_pct !== undefined
-      ? `${x.win_pct}` : DASH));
+    row.append(el('span', 'pct', `${x.win_pct}`));
+    // The price beside the share, because "longer bar = shorter odds" is the
+    // one thing about this panel that has to be unambiguous.
+    row.append(el('span', 'od', x.win_odds ? num(x.win_odds, 1) : DASH));
     shape.append(row);
   });
   host.append(shape);

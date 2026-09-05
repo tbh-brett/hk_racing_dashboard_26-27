@@ -285,3 +285,113 @@ def test_the_blend_has_a_market_stream_before_the_race(tmp_path):
     # The de-vigged market must sum to 100%, which is the check that says the
     # whole field was priced rather than most of it.
     assert sum(r["market_devig"] for r in out["runners"]) == pytest.approx(100.0, abs=0.2)
+
+
+def test_et_before_a_race_carries_last_run_not_dashes(tmp_path):
+    """An ET figure is measured FROM a finishing time, so a race that has not
+    been run has none — not one missing value, all of them, for every runner.
+    The page rendered that as fourteen rows of dashes, which reads as broken on
+    the one day anyone opens it.
+
+    What IS knowable beforehand is what each horse last ran to, so that is what
+    the section carries, flagged so nothing can pass a figure from three weeks
+    ago off as a measurement of today.
+    """
+    from hkrd.query import model as model_q
+    from hkrd.store import upsert
+    from hkrd.store.connect import get_conn, init_db, transaction
+
+    path = tmp_path / "et.db"
+    conn = get_conn(path)
+    init_db(conn)
+    with transaction(conn):
+        upsert.upsert_races(conn, [
+            {"race_date": d, "race_no": 1, "venue": "ST", "course": "A",
+             "surface": "Turf", "going": "G", "distance": 1200}
+            for d in ("2026-06-01", "2026-07-01", "2026-09-06")])
+        for d, place, ft in (("2026-06-01", "3", 69.9), ("2026-07-01", "1", 69.2)):
+            upsert.upsert_runners(conn, [
+                {"race_date": d, "race_no": 1, "horse_no": 1,
+                 "horse_name": "SUNNY Q", "place": place, "finish_time": ft,
+                 "draw": 1, "actual_weight": 120}])
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-09-06", "race_no": 1, "horse_no": 1,
+             "horse_name": "SUNNY Q", "draw": 1, "actual_weight": 120}])
+        conn.executemany(
+            "INSERT INTO runner_et (race_date, race_no, horse_no, figure, "
+            "confidence, et_n_eff, derive_version) VALUES (?,1,1,?,?,?,'t')",
+            [("2026-06-01", 101.0, "medium", 40),
+             ("2026-07-01", 109.6, "high", 383)])
+
+    out = model_q.et_breakdown("2026-09-06", 1, conn=conn)
+    conn.close()
+
+    assert out["measured"] is False
+    prior = out["runners"][0]["prior"]
+    # The MOST RECENT prior run, not the first one found.
+    assert prior["race_date"] == "2026-07-01"
+    assert prior["figure"] == pytest.approx(109.6)
+    assert prior["confidence"] == "high" and prior["et_n_eff"] == 383
+
+
+def test_et_after_a_race_is_the_race_and_says_so(tmp_path):
+    """A run race measures its own figures. Nothing about the pre-race
+    fallback may leak into it, or a real measurement gets labelled as history.
+    """
+    from hkrd.query import model as model_q
+    from hkrd.store import upsert
+    from hkrd.store.connect import get_conn, init_db, transaction
+
+    path = tmp_path / "et2.db"
+    conn = get_conn(path)
+    init_db(conn)
+    with transaction(conn):
+        upsert.upsert_races(conn, [
+            {"race_date": "2026-07-01", "race_no": 1, "venue": "ST",
+             "course": "A", "surface": "Turf", "going": "G", "distance": 1200}])
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-07-01", "race_no": 1, "horse_no": 1,
+             "horse_name": "SUNNY Q", "place": "1", "finish_time": 69.2,
+             "draw": 1, "actual_weight": 120}])
+        conn.execute(
+            "INSERT INTO runner_et (race_date, race_no, horse_no, figure, "
+            "confidence, et_n_eff, derive_version) VALUES "
+            "('2026-07-01',1,1,109.6,'high',383,'t')")
+
+    out = model_q.et_breakdown("2026-07-01", 1, conn=conn)
+    conn.close()
+
+    assert out["measured"] is True
+    assert "prior" not in out["runners"][0]
+    assert out["runners"][0]["figure"] == pytest.approx(109.6)
+
+
+def test_the_sarr_page_shows_a_price_before_the_race(tmp_path):
+    """Same fill the card and the blend got. runners.win_odds is the starting
+    price, so this column was empty on every card that had not been run — on a
+    page whose whole point is the model beside the price."""
+    from hkrd.query import model as model_q
+    from hkrd.store import upsert
+    from hkrd.store.connect import get_conn, init_db, transaction
+
+    path = tmp_path / "sarr.db"
+    conn = get_conn(path)
+    init_db(conn)
+    with transaction(conn):
+        upsert.upsert_races(conn, [
+            {"race_date": "2026-09-06", "race_no": 1, "venue": "ST",
+             "course": "A", "surface": "Turf", "going": "G", "distance": 1200}])
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-09-06", "race_no": 1, "horse_no": 1,
+             "horse_name": "SUNNY Q", "draw": 1, "actual_weight": 120}])
+        upsert.upsert_odds_snapshots(conn, [
+            {"race_date": "2026-09-06", "race_no": 1, "horse_no": 1,
+             "captured_at": "2026-09-05T16:00:00", "win_odds": 2.7}])
+        conn.execute(
+            "INSERT INTO runner_sarr (race_date, race_no, horse_no, sarr, "
+            "sarr_rank, n_prior, derive_version) VALUES "
+            "('2026-09-06',1,1,0.5,1,18,'t')")
+
+    out = model_q.sarr_breakdown("2026-09-06", 1, conn=conn)
+    conn.close()
+    assert out["runners"][0]["win_odds"] == pytest.approx(2.7)

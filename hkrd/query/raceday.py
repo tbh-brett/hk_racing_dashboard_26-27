@@ -266,18 +266,32 @@ def meeting_blackbook(date: str, *, conn: Connection | None = None
             "SELECT race_no, off_time FROM races WHERE race_date = ?", (date,))}
         # One movement query per race that actually has a booked runner, not
         # one per runner and not one for the whole card.
+        #
+        # Live prices come the same way and for the same reason the card's do:
+        # `blackbook.declared_on` reads `runners.win_odds`, which is the
+        # STARTING price and is NULL until the results scrape writes it. So the
+        # band showed a booked horse drifting 6% with no price beside it to
+        # drift FROM — a movement without a market, which is the one thing on
+        # this band you cannot act on.
         moves: dict[int, dict[int, dict]] = {}
+        live: dict[int, dict[int, dict]] = {}
         for race_no in sorted({e["race_no"] for e in entries}):
             moves[race_no] = {m["horse_no"]: m for m in
                               market_q.price_movement(date, race_no, conn=conn)}
+            live[race_no] = market_q.live_prices(date, race_no, conn=conn)
 
         out = []
         for e in entries:
             move = moves.get(e["race_no"], {}).get(e["horse_no"])
+            now = live.get(e["race_no"], {}).get(e["horse_no"]) or {}
+            # Fill, never overwrite: a race that has been run keeps the
+            # starting price, which is what it actually paid.
+            win = e["win_odds"] if e["win_odds"] is not None else now.get("win_odds")
             out.append({
                 "id": e["id"], "race_no": e["race_no"],
                 "horse_no": e["horse_no"], "horse_name": e["horse_name"],
-                "draw": e["draw"], "win_odds": e["win_odds"],
+                "draw": e["draw"], "win_odds": win,
+                "place_odds": now.get("place_odds"),
                 "off_time": off.get(e["race_no"]),
                 "status": e["status"], "confidence": e["confidence"],
                 "added_date": e["added_date"],
