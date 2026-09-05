@@ -189,6 +189,9 @@
 .conc-moderate { color: var(--text-2); border: 1px solid var(--line-3); }
 .conc-weak { color: var(--text-muted); border: 1px solid var(--line-2); }
 .conc-stale { color: var(--loss); font-size: var(--fs-sm); }
+/* When the price on screen was captured. Quiet on purpose — it is a
+   reassurance that the page is listening, not a reading to act on. */
+.priced-at { color: var(--text-muted); font-size: var(--fs-sm); letter-spacing: .04em; }
 
 /* ── card ────────────────────────────────────────────────────────────────── */
 

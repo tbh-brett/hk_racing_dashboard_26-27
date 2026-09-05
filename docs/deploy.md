@@ -310,9 +310,10 @@ The chip then shows what the run wrote — never a bare tick, because a scrape
 that succeeded and stored nothing is the failure the strip exists to catch.
 This is the fastest path and needs no SSH.
 
-Two failures it will tell you about in words rather than a 500: a host with no
-browser (only the live odds need one — see **Live odds** below), and HKJC not
-being reachable from the machine.
+The failure it will tell you about in words rather than a 500 is HKJC not being
+reachable from the machine. An odds capture that HKJC answered about the wrong
+meeting comes back 200 with the reason in the payload — the run happened, it
+stored nothing, and it knows why. See **Live odds** below.
 
 **Over SSH**, when you want the dry run or the whole nightly sweep:
 
@@ -390,35 +391,108 @@ button.
 
 ### Live odds
 
-`hkrd.jobs.scrape_odds` runs every 15 minutes between 12:00 and 23:59 Hong Kong
-time. It is the one job that needs a browser: odds are rendered by JavaScript on
-`bet.hkjc.com`, so Playwright drives a real Chromium, which is the single
-sanctioned use of a browser in this codebase.
+`hkrd.jobs.scrape_odds` runs **every minute**, all day. Almost every tick does
+nothing: it reads the card, finds no meeting due a capture, and returns in
+0.3 seconds without touching the network. Simulated against a real Sha Tin
+card, 1,103 of the 1,501 ticks over a meeting's 25-hour cycle answer from the
+database alone.
 
-Almost every run does nothing. The job reads the card first: no meeting today,
-or no race still to run, and it returns without launching anything. A race is
-dropped 30 minutes past its off time, because its price cannot move again and
-`odds_snapshots` is the one table nothing prunes.
+It needs no browser. Odds are rendered by JavaScript on `bet.hkjc.com`, but
+that page is a single-page app reading `info.cld.hkjc.com/graphql` — declared
+in the site's own `/Config/GlobalConfig.js` — and `ingest/odds.py` reads the
+same endpoint with `requests`. A whole meeting is one request and under a
+second. This is why the cron line is armed at all: the image carries no
+Chromium and never did, so for as long as the capture drove Playwright the
+line stayed commented out and the odds table held only what the legacy import
+rescued.
 
-Two failure modes are worth knowing, because both were real in the old scraper:
+**The schedule is dumb; the job decides.** How often a race is worth re-pricing
+depends on how far it is from its off, and only the database knows that.
+`scrape_odds.CADENCE_MINUTES` holds the ladder:
 
-**Stale DOM.** The betting site is a single-page app, and after routing to a new
-race the previous race's table can still be on screen. The job fingerprints the
-rendered page and, if the fingerprint has not changed, waits and then forces a
-reload. If it still has not changed, the race is **skipped and reported**, not
-stored — storing it would file race 3's prices under race 4's number in the one
-table that cannot be rebuilt. `1 SKIPPED` in the run line is this.
+| Time to off | Win/place | Pair odds |
+|---|---|---|
+| more than 3 hours | hourly | every 3 hours |
+| 3 hours – 30 min | every 15 min | every 15 min |
+| 30 – 10 min | every 5 min | every 5 min |
+| last 10 min, through the off | **every minute** | every 5 min |
+| more than 30 min past the off | settled — dropped | settled — dropped |
 
-**A changed page shape.** The parser finds the win/place table by its header
-text and raises if that header is absent, rather than returning an empty list.
-An empty list is indistinguishable from a race with no market, and that
-ambiguity is what let a parser put a trainer's name in the horse column for
-three days.
+The last band is the point. The money arrives in the final five to ten minutes;
+a flat 15-minute schedule samples the only window that moves three times. The
+band runs *through* the scheduled off rather than stopping at it, because a
+delayed start is real and the price that settles the bet is the one at the
+actual off.
 
-Run it by hand for one meeting:
+Pairs are sampled more coarsely for a reason that is arithmetic, not taste. A
+14-runner field has 14 win prices and 182 pair prices, so pairs are 88% of the
+rows. Measured on disk at 106 bytes a row, pairs on the win ladder would be
+0.93 GB a season against a 1 GB volume that nothing ever deletes from. The two
+ladders differ where it costs least: overnight, where the market barely moves.
 
-```powershell
-.\.venv\Scripts\python -m hkrd.jobs.scrape_odds --date 2026-07-15
+**The day before counts.** HKJC opens a market at 13:00 the day *before*
+racing. The job looks at today's meeting first and falls through to tomorrow's,
+so the overnight market is recorded rather than lost — before this it was
+picked up from noon on the day, by which time race 1 was thirty minutes from
+the off.
+
+**Size.** Measured, not estimated: ~63,000 rows and ~6.7 MB per meeting, so
+roughly **0.6 GB a season**, and `odds_snapshots` is the one table nothing
+prunes. The volume was extended from 1 GB to **5 GB** on 2026-09-05 — about
+eight seasons of headroom for US$0.75/month against US$0.15. It grew in place,
+with no restart and no downtime:
+
+```bash
+fly volumes list -a hkrd
+fly volumes extend <volume-id> -s 5
 ```
 
-Add `--headed` to watch the browser when a capture is coming back empty.
+Fly volumes can be grown but never shrunk, and they go to 500 GB, so running
+out of room is a one-command problem for as long as this app exists.
+
+### Why not a second machine for the scraper
+
+Because a Fly volume attaches to **exactly one machine**, and the database is a
+file on it. A second machine would either have no data or a second copy of it,
+and two SQLite files both taking writes diverge within one meeting — the
+scraper would be writing odds the dashboard could not see, and the dashboard
+would be settling bets the scraper did not know about. There is no merge back
+from that.
+
+It also would not buy anything. The whole reason to split a scraper off is that
+it is heavy, and this one is not: reading a meeting's odds is one HTTP request
+and 0.6 seconds, and ~73% of the one-minute ticks never leave the machine at
+all. The measured constraint was never CPU or memory — it was **disk**, and
+disk is a volume setting, not a machine count.
+
+The same answer applies to a separate analysis machine. The derive pass is the
+heaviest thing here (it holds a season in memory, which is why the VM has 1 GB
+rather than 512 MB), but it *writes* — `runner_et`, `runner_sarr`,
+`runner_pace` — so it has to run where the volume is for the same reason.
+
+If a second machine ever becomes genuinely necessary, the thing that changes
+first is the database: Postgres or LiteFS, not a second SQLite file. That is a
+much larger change than this app has earned, and `fly.toml` explains why one
+machine and a local file is the right trade for a dashboard read between races
+where every query measures 0.000s.
+
+One failure mode is worth knowing, because it is the reason this capture has a
+guard at all:
+
+**A reply about the wrong meeting.** `raceMeetings(date:, venueCode:)` does not
+answer "no such meeting". Measured against the live endpoint: asking on
+2026-09-04 for 2026-09-08 ST returned the 2026-09-05 S1 simulcast card, with
+nothing to say the filter had been ignored. Storing that would file one
+meeting's prices under another's race numbers, forever. So the job asks HKJC
+which meeting id it files this date and venue under, and refuses the whole
+capture if any pool does not carry that id as a prefix. The refusal is recorded
+as a failed run with the reason on it, not raised as a traceback — the next
+tick is a minute away. This replaces the old stale-DOM fingerprint guard, which
+existed for the same reason against a different mechanism.
+
+Run it by hand for one meeting. Naming a date bypasses the ladder and captures
+every race:
+
+```powershell
+.\.venv\Scripts\python -m hkrd.jobs.scrape_odds --date 2026-09-06 --venue ST
+```

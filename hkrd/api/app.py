@@ -8,10 +8,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import Body, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from hkrd.api import auth, routes
+from hkrd.api import auth, live, routes
 from hkrd.query import (blackbook as bb_q, formguide as fg_q,
                         health as health_q, market as market_q, model,
                         race as race_q, raceday as raceday_q,
@@ -346,12 +346,21 @@ def meeting_blackbook(date: str) -> dict:
 
 
 @app.get("/api/raceday/{date}/{race_no}")
-def race_card(date: str, race_no: int) -> dict:
-    """One race assembled for the card: prices, movement, models, last run."""
-    card = raceday_q.build_card(date, race_no)
-    if not card["runners"]:
-        raise HTTPException(404, f"no race {race_no} on {date}")
-    return card
+def race_card(request: Request, date: str, race_no: int) -> Response:
+    """One race assembled for the card: prices, movement, models, last run.
+
+    Conditional, because the page polls it. This is the expensive endpoint —
+    36 KB and ~220ms — and on race day it is asked every fifteen seconds by a
+    card that mostly has not changed. `live.conditional` answers those from two
+    indexed lookups and never calls the builder. See `api/live.py`.
+    """
+    def build() -> dict:
+        card = raceday_q.build_card(date, race_no)
+        if not card["runners"]:
+            raise HTTPException(404, f"no race {race_no} on {date}")
+        return card
+
+    return live.conditional(request, date=date, race_no=race_no, build=build)
 
 
 @app.get("/api/raceday/{date}")
@@ -427,13 +436,23 @@ def sarr_race(date: str, race_no: int) -> dict:
 
 
 @app.get("/api/model/blend/{date}/{race_no}")
-def blend_race(date: str, race_no: int, weight: float | None = None) -> dict:
+def blend_race(request: Request, date: str, race_no: int,
+               weight: float | None = None) -> Response:
     """The blend's components side by side. `weight` is the share carried by
-    the fundamental stream; omit it for the fitted value (0.00)."""
-    out = model.blend_breakdown(date, race_no, weight=weight)
-    if not out["runners"]:
-        raise HTTPException(404, f"no race {race_no} on {date}")
-    return out
+    the fundamental stream; omit it for the fitted value (0.00).
+
+    Conditional for the same reason the card is: the market stream in here is
+    the live price, so this answer changes exactly when a capture lands and at
+    no other time.
+    """
+    def build() -> dict:
+        out = model.blend_breakdown(date, race_no, weight=weight)
+        if not out["runners"]:
+            raise HTTPException(404, f"no race {race_no} on {date}")
+        return out
+
+    return live.conditional(request, date=date, race_no=race_no, build=build,
+                            variant=weight)
 
 
 @app.get("/api/model/et/summary")

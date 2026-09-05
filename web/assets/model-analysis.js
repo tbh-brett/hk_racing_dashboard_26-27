@@ -13,6 +13,7 @@
 import { api, num, signed } from './api.js';
 import { el, $, DASH, renderNav } from './vocab.js';
 import { context } from './context.js';
+import { Live } from './live.js';
 import { install as installPalette } from './palette.js';
 
 const VIEWS = [['sarr', 'SARR'], ['blend', 'BLEND'],
@@ -556,10 +557,36 @@ async function settle(promise, onError) {
   try { return await promise; } catch (e) { onError(e); return null; }
 }
 
+/* The blend follows the market, because half of it IS the market.
+ *
+ * The fitted weight on the fundamental stream is 0.00, so the blended column
+ * is the de-vigged price — and the price moves every minute in the last ten
+ * before a race. A page that read it once at load would be showing the model
+ * against a market that had since moved, which is the one comparison this
+ * section exists to make.
+ */
+const liveBlend = new Live((body) => {
+  state.blend = body;
+  renderBlend();
+}, (message) => {
+  $('blend-foot').replaceChildren(
+    el('span', 'warn', `blend not updating — ${message}`));
+});
+
 async function loadBlend() {
-  state.blend = await settle(
-    api.blendRace(state.date, state.race, state.weight ?? undefined),
+  const got = await settle(
+    api.blendRaceLive(state.date, state.race, state.weight ?? undefined),
     (e) => { $('blend-foot').replaceChildren(el('span', 'warn', `blend: ${e.message}`)); });
+  if (!got) { state.blend = null; liveBlend.stop(); renderBlend(); return; }
+  state.blend = got.body;
+  // The weight is part of what is being watched: moving the slider asks a
+  // different question of the same race, so the watch has to restart or the
+  // next poll would 304 against the previous weight's answer.
+  liveBlend.watch(`${state.date}/${state.race}/${state.weight ?? ''}`,
+                  `/model/blend/${state.date}/${state.race}`
+                  + (state.weight === undefined || state.weight === null
+                     ? '' : `?weight=${state.weight}`));
+  liveBlend.seed(got.etag, got.pollAfter);
   renderBlend();
 }
 

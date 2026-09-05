@@ -24,7 +24,7 @@ Every source, what fetches it, what runs that, and when.
 | Vet records | `ingest/vet.py` | `jobs/scrape_meeting` (post-race) | 5×/day via `nightly` |
 | Comments on running | `ingest/corunning.py` | `jobs/scrape_corunning` | with the meeting |
 | Barrier trials | `ingest/trials.py` | `jobs/scrape_trials` | 12:00 and 20:00 |
-| Live odds | `ingest/odds.py` | `jobs/scrape_odds` | every 15 min, 12:00–23:59 |
+| Live odds | `ingest/odds.py` | `jobs/scrape_odds` | every minute; the job decides |
 | Account statements | `ingest/statement.py` | `jobs/import_statement` | by hand — see below |
 
 `ops/crontab` is the schedule; `docs/deploy.md` explains each line.
@@ -38,10 +38,19 @@ They arrive from account statements:
 .\.venv\Scripts\python -m hkrd.jobs.import_statement --src "C:\folder\statement.txt"
 ```
 
-**Odds need a browser.** They are rendered by JavaScript on `bet.hkjc.com`, so
-`ingest/odds.py` drives a real Chromium through Playwright. That is the single
-sanctioned use of a browser in this codebase, and Playwright is an optional
-extra rather than a dependency — every other page works without it.
+**Odds are the one JSON source.** They are rendered by JavaScript on
+`bet.hkjc.com`, so no fetch of that HTML can see them — but the page is a
+single-page app reading `info.cld.hkjc.com/graphql`, declared in the site's own
+`/Config/GlobalConfig.js`, and `ingest/odds.py` reads the same endpoint. A whole
+meeting is one request. It used to drive Chromium through Playwright, which is
+why the deploy image (which carries no browser) could not run it and the cron
+line spent a season commented out.
+
+The endpoint whitelists queries: a syntactically valid one it has not seen is
+refused with `WHITELIST_ERROR`. The two queries in `ingest/odds.py` are
+reproduced from the site's bundle character for character, including fields
+nothing reads. Editing one to drop an unused field does not make it smaller, it
+makes it fail.
 
 ---
 
@@ -50,8 +59,8 @@ extra rather than a dependency — every other page works without it.
 One module per source, and each one:
 
 * **exposes `fetch_*` and `parse_*` separately.** Parsing is testable without a
-  network or a browser, which is why the odds extraction has tests despite the
-  fetch needing Chromium.
+  network, which is why the odds extraction is tested against recorded replies
+  from the live endpoint rather than against a live one.
 * **returns plain dicts and does not know the database exists.** Storing is
   `store/`'s job. This is what stops a scraper deciding what the interface may
   see — the old vet scraper scored records and dropped the low ones, so a
@@ -60,12 +69,20 @@ One module per source, and each one:
 * **maps columns by HEADER TEXT and raises on a shape it does not recognise.**
   Never by position. A parser confident about positions it never verified put a
   trainer's name in the horse column and nothing looked wrong for three days.
+  The odds capture's version of this is identity rather than headers: HKJC will
+  answer about a *different meeting* than the one asked for and say nothing, so
+  every pool is checked against the meeting id HKJC publishes for that date and
+  venue, and a capture that does not match is refused whole.
 * **never deletes.** `prune_old_snapshots` is why only 17 meetings of a full
   season of odds survived, and a test fails if anything like it comes back.
 
 `ingest/_client.py` holds what they share: the session, the URL templates, and
-a one-request-per-1.2-seconds throttle across all threads. HKJC is a public
-site run for punters, not an API with a quota; the courtesy is the point.
+a one-request-per-1.2-seconds throttle across all threads — `fetch_html` for
+the pages, `fetch_json` for the odds endpoint, same policy for both. HKJC is a
+public site run for punters, not an API with a quota; the courtesy is the point.
+`fetch_json` raises on a GraphQL `errors` key as well as on a bad status, because
+that endpoint answers 200 with `data: null` and a caller checking only the status
+would store a successful capture of nothing.
 
 ---
 
@@ -80,7 +97,13 @@ Card ✓2h   Odds ⚠47m   Results —   Trials ✓3d   Vet ✓2h
 ```
 
 Each source is judged against what is normal **for that source**: odds go stale
-in fifteen minutes, barrier trials are published weekly. Hovering a mark shows
+in fifteen minutes, barrier trials are published weekly.
+
+Race Day and Model Analysis do not wait for the strip. They poll their own
+endpoint on an interval the server sets from the capture ladder, so a price
+that lands is on screen within half a capture cycle — fifteen seconds inside
+the last ten minutes before a race. A poll that finds nothing new is a 304 with
+no body. See `hkrd/api/live.py`. Hovering a mark shows
 what the last run actually wrote. A zero is visible immediately, because a
 scrape that silently captured nothing must never look like one that worked.
 

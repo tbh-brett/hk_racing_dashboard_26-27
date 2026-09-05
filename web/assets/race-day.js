@@ -13,6 +13,7 @@ import { el, $, DASH, MINUS, renderNav, styleBadge, styleOrdinal,
          compactDate, ordinal, tagLabel, tripTagChips, drawText,
          isVetTag } from './vocab.js';
 import { context } from './context.js';
+import { Live } from './live.js';
 import { anchoredPanel } from './overlay.js';
 import { install as installPalette } from './palette.js';
 
@@ -440,6 +441,22 @@ function renderRaceBar() {
       s.title = conc.note ?? '';
       box.append(s);
     }
+  }
+
+  // When the price on screen was true. The page repaints itself as captures
+  // land, so without this there is no way to tell a market that has not moved
+  // from a page that has stopped listening — and those need different
+  // reactions twenty minutes before the off.
+  const at = conc.captured_at ?? c.captured_at;
+  if (state.liveError) {
+    const warn = el('span', 'conc-stale', '⚠ NOT UPDATING');
+    warn.title = `the last attempt to refresh failed — ${state.liveError}. `
+               + 'The price shown is the last one that was true.';
+    box.append(warn);
+  } else if (at) {
+    const t = el('span', 'priced-at', `PRICED ${String(at).slice(11, 16)}`);
+    t.title = `captured ${at}; refreshes on its own as new prices land`;
+    box.append(t);
   }
   bar.append(box);
 }
@@ -914,12 +931,42 @@ function selectRace(no) {
   context.setRace(no);
 }
 
+/* The card follows the market rather than the page load.
+ *
+ * Odds are captured every minute through the last ten before a race, so a card
+ * read once at load is showing the price from whenever it was opened — in the
+ * exact window brief 01 says this page is for. Every re-render is state-driven,
+ * so a fresh payload repaints without losing the selected row, an open detail
+ * panel or either band's expanded state.
+ *
+ * The freshness strip is refreshed with it: a new price landing and the header
+ * still claiming the odds are an hour old is a page disagreeing with itself.
+ */
+const liveCard = new Live((card) => {
+  state.card = card;
+  state.liveError = null;
+  render();
+  context.refreshFreshness();
+}, (message) => {
+  // Kept, not thrown away, and NOT allowed to blank the card: the price on
+  // screen is still the last one that was true. renderRaceBar says it is not
+  // being updated any more.
+  state.liveError = message;
+  renderRaceBar();
+});
+
 async function loadRace() {
   try {
-    state.card = await api.raceCard(state.date, state.race);
+    const { body, etag, pollAfter } = await api.raceCardLive(state.date, state.race);
+    state.card = body;
+    state.liveError = null;
     state.selected = 0;
+    liveCard.watch(`${state.date}/${state.race}`,
+                   `/raceday/${state.date}/${state.race}`);
+    liveCard.seed(etag, pollAfter);
   } catch (e) {
     state.card = null;
+    liveCard.stop();
     $('card-body').replaceChildren(el('tr', null, `failed to load: ${e.message}`));
     return;
   }

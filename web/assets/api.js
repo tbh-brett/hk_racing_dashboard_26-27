@@ -18,6 +18,29 @@ async function get(path) {
   return res.json();
 }
 
+/* The two endpoints a page polls answer conditionally, so their ETag matters
+ * as much as their body: handing it to `Live.seed` makes the first poll after
+ * a load a conditional one rather than a second full download of what is
+ * already on screen. `cache: 'no-store'` keeps the browser's own cache out of
+ * it — with it in play a 304 can be turned back into a 200 before JS sees it.
+ */
+async function getLive(path) {
+  const res = await fetch(`${BASE}${path}`, {
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { detail = (await res.json()).detail ?? detail; } catch { /* keep statusText */ }
+    throw new Error(`${res.status} ${detail}`);
+  }
+  return {
+    body: await res.json(),
+    etag: res.headers.get('ETag'),
+    pollAfter: Number(res.headers.get('X-Poll-After')) || null,
+  };
+}
+
 async function post(path, body) {
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
@@ -46,6 +69,7 @@ export const api = {
   race: (date, no) => get(`/race/${date}/${no}`),
   horse: (name, limit = 6) => get(`/horse/${encodeURIComponent(name)}?limit=${limit}`),
   raceCard: (date, no) => get(`/raceday/${date}/${no}`),
+  raceCardLive: (date, no) => getLive(`/raceday/${date}/${no}`),
   speedMap: (date) => get(`/speedmap/${date}`),
   raceDayMeeting: (date) => get(`/raceday/${date}`),
   meetingBlackbook: (date) => get(`/raceday/${date}/blackbook`),
@@ -134,6 +158,8 @@ export const api = {
   etSummary: () => get('/model/et/summary'),
   sarrRace: (date, no) => get(`/model/sarr/${date}/${no}`),
   blendRace: (date, no, weight) => get(
+    `/model/blend/${date}/${no}` + (weight === undefined ? '' : `?weight=${weight}`)),
+  blendRaceLive: (date, no, weight) => getLive(
     `/model/blend/${date}/${no}` + (weight === undefined ? '' : `?weight=${weight}`)),
   modelBacktest: (q = '') => get(`/model/backtest${q ? `?${q}` : ''}`),
   status: () => get('/status'),

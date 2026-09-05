@@ -45,7 +45,17 @@ dbs:
         access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
         secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}
 
-        retention: 720h          # 30 days
+        retention: 168h          # 7 days
+        # Shortened from 30 days when the odds capture went from a handful of
+        # snapshots a meeting to ~63,000 rows. Retention keeps a snapshot plus
+        # its WAL for the whole window, and the snapshot is a compressed copy
+        # of the WHOLE database -- measured on the live replica, 32 MB of
+        # database compresses to 12.5 MB, about 2.6x. A season of odds takes
+        # the database to roughly 1 GB, so a 30-day window would hold ~30
+        # snapshots of ~400 MB: 12 GB, against R2's 10 GB free tier. Seven days
+        # is ~2.8 GB and still generous for what this replica is FOR, which is
+        # "the machine died, restore the latest" -- not archaeology. The volume
+        # is the primary copy and it now has 5 GB.
         # 10s is the recovery point: the most that can be lost is the last ten
         # seconds of writes. A scrape takes minutes, so a machine dying
         # mid-scrape costs the tail of one meeting, which the next run re-fetches
