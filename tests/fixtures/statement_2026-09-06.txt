@@ -1,0 +1,308 @@
+﻿Account Records - Download version for reference only
+From 06/09/2026 To 06/09/2026
+Betting Account No.: 
+40067995
+Balance: 
+$2.80
+Ref No.
+Date/Time
+Race Day
+Bet Type
+Transaction Details
+Debit
+Credit
+****************************************
+3593
+06/09/2026 12:27
+Sha Tin
+Sunday
+All Up
+2X1
+Quinella - Quinella Place
+Place
+
+Race 5
+1 ISLAND BUDDY
+Banker with
+7 LIGHT YEARS GLORY +
+8 NEXT FORTUNE +
+10 RIDING HIGH +
+14 JOLLY COMPANION
+
+Race 10
+8 SUPER STRONG KID
+
+$20
+
+
+$160.00
+
+****************************************
+3594
+06/09/2026 12:27
+Sha Tin
+Sunday
+All Up
+2X1
+Quinella - Quinella Place
+Place
+
+Race 8
+4 POSITIVE SMILE
+Banker with
+1 JOYFUL JOY +
+3 ANOTHER WORLD +
+6 GRAND PATCH +
+10 GOLDENTRONICMIGHTY
+
+Race 10
+8 SUPER STRONG KID
+
+$20
+
+
+$160.00
+
+****************************************
+3597
+06/09/2026 12:27
+Sha Tin
+Sunday
+Quinella - Quinella Place
+Race 1
+2 FOREVER FANCY
+Banker with
+4 SUNNY Q +
+7 SO MY FOLKS
+
+$10
+
+
+$40.00
+$171.00
+****************************************
+3600
+06/09/2026 14:05
+Sha Tin
+Sunday
+Quinella - Quinella Place
+Race 4
+10 GENERAL SMART
+Banker with
+1 AMAZING DUCK +
+2 HAILTOTHEVICTORS +
+4 I EXCELLE +
+9 SETANTA
+
+$10
+
+
+$80.00
+$180.50
+****************************************
+3603
+06/09/2026 14:55
+Sha Tin
+Sunday
+Quinella - Quinella Place
+Race 5
+1 ISLAND BUDDY +
+7 LIGHT YEARS GLORY +
+8 NEXT FORTUNE
+
+$10
+
+
+$60.00
+
+****************************************
+3604
+06/09/2026 14:55
+Sha Tin
+Sunday
+Quinella - Quinella Place
+Race 5
+1 ISLAND BUDDY
+Banker with
+3 CAVA PIONEER +
+7 LIGHT YEARS GLORY +
+8 NEXT FORTUNE +
+10 RIDING HIGH +
+14 JOLLY COMPANION
+
+$10
+
+
+$100.00
+
+****************************************
+3607
+06/09/2026 16:16
+Sha Tin
+Sunday
+Quinella - Quinella Place
+Race 7
+5 MAX QUE
+Banker with
+3 WINNING OVATION +
+4 SIX PACK
+
+$20
+
+
+$80.00
+
+****************************************
+3610
+06/09/2026 16:44
+Sha Tin
+Sunday
+Quinella - Quinella Place
+Race 8
+4 POSITIVE SMILE
+Banker with
+1 JOYFUL JOY +
+3 ANOTHER WORLD +
+6 GRAND PATCH +
+10 GOLDENTRONICMIGHTY
+
+$10
+
+
+$80.00
+
+****************************************
+3611
+06/09/2026 16:44
+Sha Tin
+Sunday
+Quinella - Quinella Place
+Race 8
+1 JOYFUL JOY +
+3 ANOTHER WORLD +
+4 POSITIVE SMILE
+
+$10
+
+
+$60.00
+
+****************************************
+3614
+06/09/2026 17:18
+Sha Tin
+Sunday
+Quartet
+Multi-Banker
+Race 9
+5 BABY SAKURA +
+6 CIRCUIT CHAMPION
+Banker with
+4 AEROINVINCIBLE +
+5 BABY SAKURA +
+6 CIRCUIT CHAMPION +
+8 FLYING FORTRESS
+Banker with
+4 AEROINVINCIBLE +
+5 BABY SAKURA +
+6 CIRCUIT CHAMPION +
+8 FLYING FORTRESS
+Banker with
+1 LUCKY SAM GOR +
+2 THE RED HARE +
+4 AEROINVINCIBLE +
+5 BABY SAKURA +
+6 CIRCUIT CHAMPION +
+8 FLYING FORTRESS
+
+$3
+
+
+$108.00
+
+****************************************
+3621
+06/09/2026 17:41
+Sha Tin
+Sunday
+Win
+Race 10
+8 SUPER STRONG KID
+
+$50
+
+
+$50.00
+
+****************************************
+3622
+06/09/2026 17:41
+Sha Tin
+Sunday
+Place
+Race 10
+8 SUPER STRONG KID
+
+$100
+
+
+$100.00
+
+****************************************
+3623
+06/09/2026 17:41
+Sha Tin
+Sunday
+Quinella - Quinella Place
+Race 10
+8 SUPER STRONG KID
+Banker with
+1 PUBLIC ATTENTION +
+4 GUSTOSISIMO +
+6 GOLD PATCH +
+7 LUCY IN THE SKY +
+12 MASTER PAYMENT
+
+$10
+
+
+$100.00
+
+****************************************
+3624
+06/09/2026 17:41
+Sha Tin
+Sunday
+Quinella - Quinella Place
+Race 10
+8 SUPER STRONG KID
+Banker with
+6 GOLD PATCH +
+7 LUCY IN THE SKY +
+12 MASTER PAYMENT
+
+$10
+
+
+$60.00
+
+****************************************
+3627
+06/09/2026 17:51
+Sha Tin
+Sunday
+Forecast
+Multi-Banker
+Race 10
+8 SUPER STRONG KID
+Banker with
+6 GOLD PATCH +
+12 MASTER PAYMENT
+
+$10
+
+
+$20.00
+
+****************************************
+- End -

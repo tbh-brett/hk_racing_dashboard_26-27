@@ -47,8 +47,8 @@ ALL_UP_FORMULA_RE = re.compile(r"^(\d+)\s*[xX]\s*(\d+)$")
 BET_TYPE_KEYWORDS = (
     "quinella - quinella place", "quinella-quinella place", "quinella place",
     "quinella", "first 4", "first four", "quartet", "qtt", "trio",
-    "win-place", "win - place", "place", "win", "tierce", "trifecta",
-    "double trio", "six up", "all up",
+    "win-place", "win - place", "forecast", "place", "win", "tierce",
+    "trifecta", "double trio", "six up", "all up",
 )
 SUBTYPE_KEYWORDS = ("multi-banker", "multi banker")
 
@@ -151,11 +151,43 @@ def _bet_type_line(lines: list[str]) -> tuple[int | None, str, str]:
             j += 1
         nxt = lines[j].strip() if j < len(lines) else ""
         sub = nxt if any(k in nxt.lower() for k in SUBTYPE_KEYWORDS) else ""
-        if ("all up" in s and not sub
-                and any(k in nxt.lower() for k in _POOL_KEYWORDS)):
-            text = f"{text} {nxt}"
+        if "all up" in s and not sub:
+            # An All Up header is three things stacked, not one:
+            #
+            #     All Up
+            #     2X1                        <- the formula
+            #     Quinella - Quinella Place  <- the pool for leg 1
+            #     Place                      <- the pool for leg 2
+            #
+            # Only the first line was read, so every All Up classified as
+            # ALLUP_OTHER however plainly it named its pools. The pools are
+            # PER LEG and can differ, which is the whole point of the bet.
+            text = " ".join([text, *_all_up_pools(lines, j)])
         return idx, text, sub
     return None, "", ""
+
+
+def _all_up_pools(lines: list[str], start: int) -> list[str]:
+    """The pool named for each leg of an All Up, in leg order.
+
+    Reads from the formula line down to the first blank or `Race N`. Returns
+    [] rather than guessing when nothing pool-shaped is there — a ticket whose
+    pools cannot be read is still a ticket, and its legs and stake are right.
+    """
+    out: list[str] = []
+    for raw in lines[start:]:
+        s = raw.strip()
+        if not s:
+            break
+        if RACE_RE.match(s):
+            break
+        if ALL_UP_FORMULA_RE.match(s):
+            continue                       # the formula, not a pool
+        if any(k in s.lower() for k in _POOL_KEYWORDS):
+            out.append(s)
+            continue
+        break
+    return out
 
 
 # ── blocks ───────────────────────────────────────────────────────────────────
@@ -209,6 +241,17 @@ def _parse_all_up(lines: list[str], ref: str, placed_at: str, date: str,
         if picks:
             legs.append({"race_number": leg["race_number"], "banker": banker,
                          "selections": picks})
+
+    # The pool NAMED FOR EACH LEG, in leg order, attached to the leg it belongs
+    # to. An All Up's legs need not share a pool -- 2026-09-06 ref 3593 is a
+    # quinella-quinella place in race 5 carried into a place in race 10 -- and
+    # a ticket that says only "ALLUP_QQP" has lost half of what it is.
+    # The pool lines sit between the "All Up" header and the first `Race N`.
+    header = next((i for i, ln in enumerate(lines)
+                   if "all up" in ln.strip().lower()), None)
+    pools = _all_up_pools(lines, header + 1) if header is not None else []
+    for leg, pool in zip(legs, pools):
+        leg["pool"] = pool
 
     if len(legs) < 2 or len(stakes) < 2:
         return None
@@ -389,7 +432,15 @@ def _expand(parsed: dict) -> list[dict[str, Any]]:
 
     multi = parsed.get("multi_legs")
     if multi:
-        code = "QTT_MB"
+        # A multi-banker names one leg per finishing POSITION, and the pool it
+        # is for is on the bet-type line. Forecast, Quartet, Tierce and Trio
+        # all take this shape; coding every one of them QTT_MB filed a $20
+        # forecast as a quartet.
+        code = ("FCT_MB" if "forecast" in text
+                else "TCE_MB" if "tierce" in text or "trifecta" in text
+                else "TRI_MB" if "trio" in text
+                else "FF_MB" if "first 4" in text or "first four" in text
+                else "QTT_MB")
     elif "quinella - quinella place" in text or "quinella-quinella place" in text:
         code = None                      # the bundle, split below
     elif "quinella place" in text:

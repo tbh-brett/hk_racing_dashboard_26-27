@@ -192,10 +192,12 @@ def test_an_all_up_is_one_ticket_and_is_never_split():
     assert bet["stake_hkd"] == 144.0
     assert bet["all_up_formula"] == "3X4"
     assert [leg["race_number"] for leg in bet["legs"]] == [3, 5]
-    assert bet["legs"][0] == {"race_number": 3, "banker": None,
-                              "selections": [2, 5]}
-    assert bet["legs"][1] == {"race_number": 5, "banker": 1,
-                              "selections": [2, 3]}
+    # Compared field by field rather than as whole dicts: a leg also carries
+    # the pool NAMED FOR IT, which legs need not share — 2026-09-06 ref 3593 is
+    # a quinella-quinella place carried into a place — and pinning the exact
+    # dict here would make every new fact about a leg a failure in this test.
+    assert {k: bet["legs"][0][k] for k in ("race_number", "banker", "selections")}         == {"race_number": 3, "banker": None, "selections": [2, 5]}
+    assert {k: bet["legs"][1][k] for k in ("race_number", "banker", "selections")}         == {"race_number": 5, "banker": 1, "selections": [2, 3]}
     # The flattened selections carry the banker too, so a horse on an all-up
     # can still be found by number.
     assert bet["selections"] == [2, 5, 1, 2, 3]
@@ -488,3 +490,70 @@ def test_which_bets_a_statement_was_actually_read_for_is_recorded(tmp_path, db):
     # would prove nothing.
     assert {r["stake"] for r in seen} == {60.0}
     assert {r["returned"] for r in seen} == {129.5}
+
+
+# ─── a real statement, whole ─────────────────────────────────────────────────
+#
+# tests/fixtures/statement_2026-09-06.txt is the owner's own download for the
+# 2026-09-06 Sha Tin meeting, unedited. It is the regression corpus for the
+# formats HKJC actually produces, as opposed to the ones we imagined.
+
+def _real() -> tuple[list[dict], object]:
+    from pathlib import Path
+    from hkrd.ingest import statement
+    return statement.parse(
+        Path(__file__).parent / "fixtures" / "statement_2026-09-06.txt")
+
+
+def test_every_block_of_a_real_statement_parses():
+    """`unparsed` is the number that matters. A ledger built from a statement
+    that silently dropped a bet is worse than no ledger."""
+    rows, rep = _real()
+    assert rep.bets == 15
+    assert rep.unparsed == []
+    assert rep.records == 24        # the QIN/QPL bundles split in two
+
+
+def test_the_stakes_reconcile_with_the_statements_own_debits():
+    """The check that says nothing was lost or double-counted: every debit in
+    the file, against every stake that came out of it."""
+    rows, _ = _real()
+    assert sum(r["stake_hkd"] for r in rows) == pytest.approx(1258.00, abs=0.005)
+
+
+def test_a_forecast_multi_banker_is_not_filed_as_a_quartet():
+    """A multi-banker names one leg per finishing POSITION, and every pool that
+    takes that shape used to be coded QTT_MB — so a $20 forecast was filed as a
+    quartet."""
+    rows, _ = _real()
+    got = {r["bookie_ref"]: r["bet_type"] for r in rows}
+    assert got["3627"] == "FCT_MB"
+    assert got["3614"] == "QTT_MB"      # this one really is a quartet
+
+
+def test_an_all_up_keeps_the_pool_named_for_each_leg():
+    """An All Up's legs need not share a pool. Ref 3593 is a quinella-quinella
+    place in race 5 carried into a PLACE in race 10, and a ticket recorded as
+    only "ALLUP_QQP" has lost half of what it is.
+
+    Before this, the header's pool lines were never read at all and every All
+    Up classified as ALLUP_OTHER however plainly it named itself.
+    """
+    rows, _ = _real()
+    ticket = next(r for r in rows if r["bookie_ref"] == "3593")
+    assert ticket["bet_type"] == "ALLUP_QQP"
+    assert ticket["all_up_formula"] == "2X1"
+    legs = ticket["legs"]
+    assert [l["race_number"] for l in legs] == [5, 10]
+    assert legs[0]["pool"].lower().startswith("quinella - quinella place")
+    assert legs[1]["pool"].lower() == "place"
+    assert legs[0]["banker"] == 1 and legs[0]["selections"] == [7, 8, 10, 14]
+
+
+def test_a_settled_bet_carries_the_credit_the_bookie_paid():
+    """Settlement for an All Up and for anything the tote pays as one ticket
+    comes from the statement, not from a dividend we recompute."""
+    rows, _ = _real()
+    paid = {r["bookie_ref"]: r["block_credit"] for r in rows}
+    assert paid["3597"] == pytest.approx(171.00)
+    assert paid["3600"] == pytest.approx(180.50)
