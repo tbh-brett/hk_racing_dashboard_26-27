@@ -30,7 +30,14 @@ def db(tmp_path, monkeypatch):
 
 
 def _meeting(db, date: str, venue: str, *, races: int = 3,
-             results: bool = True, dividends: bool = True) -> None:
+             results: bool = True, dividends: bool = True,
+             sectionals: bool = True, comments: bool = True) -> None:
+    """A meeting in whatever state of completeness the test needs.
+
+    Four sources, not two. Results and dividends land within the hour; the
+    sectional times and the comments on running do not, and a meeting called
+    settled is never looked at again.
+    """
     conn = get_conn(db)
     with transaction(conn):
         upsert.upsert_races(conn, [
@@ -40,13 +47,25 @@ def _meeting(db, date: str, venue: str, *, races: int = 3,
         upsert.upsert_runners(conn, [
             {"race_date": date, "race_no": n, "horse_no": h,
              "horse_name": f"HORSE {n}{h}",
-             "place": str(h) if results else None}
+             "place": str(h) if results else None,
+             "section_times": "24.13; 22.33; 22.13" if sectionals else None}
             for n in range(1, races + 1) for h in (1, 2)])
         if dividends:
             upsert.upsert_dividends(conn, [
                 {"race_date": date, "race_no": n, "pool": "WIN",
                  "combination": "1", "dividend": 25.0}
                 for n in range(1, races + 1)])
+        # HKJC serves this exact sentence for every runner until the stewards'
+        # comments are published, so an unpublished meeting has rows and no
+        # content. Storing it and calling the meeting settled is what left
+        # 2026-09-06 with no tags on any runner.
+        conn.executemany(
+            "INSERT OR REPLACE INTO runner_comments (race_date, race_no, "
+            "horse_no, comment_text, source) VALUES (?,?,?,?,'corunning')",
+            [(date, n, h,
+              "Chased the leader, kept on well." if comments
+              else "No Comments on Running information for this horse.")
+             for n in range(1, races + 1) for h in (1, 2)])
     conn.close()
 
 
@@ -57,11 +76,30 @@ def _plans(db, **kw) -> dict[str, nightly.Plan]:
 # ── the decision ─────────────────────────────────────────────────────────────
 
 def test_a_settled_meeting_is_left_alone(db):
-    """Results and dividends for every race means it will never change again.
+    """All four sources for every race means it will never change again.
     Re-fetching it is eleven requests of noise against a public site."""
     _meeting(db, "2026-08-23", "ST")
     p = _plans(db)["2026-08-23"]
     assert not p.act and p.venue == "ST" and "settled" in p.reason
+
+
+def test_a_meeting_missing_sectionals_is_not_settled(db):
+    """Section times are published after the result, and a meeting called
+    settled is never looked at again. Testing only the fast sources is how
+    every meeting since mid-July ended up with none."""
+    _meeting(db, "2026-08-23", "ST", sectionals=False)
+    p = _plans(db)["2026-08-23"]
+    assert p.act and "without sectionals" in p.reason
+
+
+def test_a_meeting_whose_comments_are_all_placeholders_is_not_settled(db):
+    """HKJC serves "No Comments on Running information for this horse." for
+    every runner until the stewards' comments are published. Rows exist and say
+    nothing, and the tags derived from them are empty — which is how
+    2026-09-06 finished with 119 comments and 0 tags."""
+    _meeting(db, "2026-08-23", "ST", comments=False)
+    p = _plans(db)["2026-08-23"]
+    assert p.act and "without comments" in p.reason
 
 
 def test_a_meeting_missing_dividends_is_picked_up(db):

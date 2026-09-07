@@ -115,17 +115,45 @@ def plan_window(db: Path | None = None, *, today: dt.date | None = None,
 
 
 def _decide(conn, date: str, *, future: bool) -> Plan:
+    # WHAT "SETTLED" HAS TO MEAN. Results and dividends are published within
+    # the hour; the comments on running and the sectional times are not. A
+    # meeting called settled is never looked at again, so testing only the two
+    # fast sources meant the two slow ones never arrived: 2026-09-06 was marked
+    # settled with all 119 of its comments still reading "No Comments on
+    # Running information for this horse.", and therefore with no tags on any
+    # runner and nothing on the strip to say why.
+    #
+    # The window is four days, so a source HKJC never publishes is retried a
+    # handful of times and then falls out of range on its own. There is no
+    # runaway here to guard against.
     row = conn.execute(
         "SELECT r.venue AS venue, count(*) AS races, "
         "       sum(CASE WHEN r.finished  THEN 1 ELSE 0 END) AS finished, "
-        "       sum(CASE WHEN r.paid      THEN 1 ELSE 0 END) AS paid "
+        "       sum(CASE WHEN r.paid      THEN 1 ELSE 0 END) AS paid, "
+        "       sum(CASE WHEN r.timed     THEN 1 ELSE 0 END) AS timed, "
+        "       sum(CASE WHEN r.commented THEN 1 ELSE 0 END) AS commented "
         "FROM ("
         "  SELECT ra.race_date, ra.race_no, ra.venue,"
         "         EXISTS (SELECT 1 FROM runners ru WHERE ru.race_date = ra.race_date"
         "                  AND ru.race_no = ra.race_no AND ru.place IS NOT NULL)"
         "           AS finished,"
         "         EXISTS (SELECT 1 FROM dividends d WHERE d.race_date = ra.race_date"
-        "                  AND d.race_no = ra.race_no) AS paid"
+        "                  AND d.race_no = ra.race_no) AS paid,"
+        "         EXISTS (SELECT 1 FROM runners rs WHERE rs.race_date = ra.race_date"
+        "                  AND rs.race_no = ra.race_no"
+        "                  AND rs.section_times IS NOT NULL AND rs.section_times != '')"
+        "           AS timed,"
+        # A race whose every comment is HKJC's "No Comments on Running
+        # information for this horse." has not been commented on yet. Measured:
+        # a meeting that HAS them carries none of that placeholder at all, and
+        # one that has not carries nothing else — it is all or nothing per
+        # meeting, which is what makes this test reliable.
+        "         EXISTS (SELECT 1 FROM runner_comments rc"
+        "                  WHERE rc.race_date = ra.race_date"
+        "                    AND rc.race_no = ra.race_no"
+        "                    AND rc.comment_text IS NOT NULL"
+        "                    AND rc.comment_text NOT LIKE 'No Comments on Running%')"
+        "           AS commented"
         "  FROM races ra WHERE ra.race_date = ?"
         ") r", (date,)).fetchone()
 
@@ -137,13 +165,17 @@ def _decide(conn, date: str, *, future: bool) -> Plan:
         return Plan(date, None, "not in the database yet", act=True)
     if future:
         return Plan(date, venue, f"{races} races carded", act=True)
-    if row["finished"] == races and row["paid"] == races:
+    complete = all(row[k] == races
+                   for k in ("finished", "paid", "timed", "commented"))
+    if complete:
         return Plan(date, venue, f"settled, {races} races", act=False)
     missing = []
-    if row["finished"] != races:
-        missing.append(f"{races - (row['finished'] or 0)} without results")
-    if row["paid"] != races:
-        missing.append(f"{races - (row['paid'] or 0)} without dividends")
+    for key, label in (("finished", "without results"),
+                       ("paid", "without dividends"),
+                       ("timed", "without sectionals"),
+                       ("commented", "without comments")):
+        if row[key] != races:
+            missing.append(f"{races - (row[key] or 0)} {label}")
     return Plan(date, venue, ", ".join(missing), act=True)
 
 
