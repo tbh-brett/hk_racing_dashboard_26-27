@@ -132,6 +132,15 @@ def entry_card(date: str, race_no: int, *,
         by_no = {r["horse_no"]: r for r in probs.get("runners", [])}
 
         rows = []
+        # A horse is scratched when it is WITHDRAWN, not when nobody has
+        # priced it yet. `win_odds is None` alone badged every runner on the
+        # card SCR until the market opened at 13:00 the day before racing —
+        # a full field of twelve reading as a full field of withdrawals.
+        #
+        # The market is open when anyone in the race has a price. Then, and
+        # only then, is a runner without one actually out.
+        market_open = any(r.get("win_odds") is not None
+                          for r in card["runners"])
         for r in card["runners"]:
             p = by_no.get(r["horse_no"])
             rows.append({
@@ -150,7 +159,7 @@ def entry_card(date: str, race_no: int, *,
                 "place_pct": p["place_pct"] if p else None,
                 "linear_pct": p["linear_pct"] if p else None,
                 "gap_points": p["gap_points"] if p else None,
-                "scratched": r.get("win_odds") is None,
+                "scratched": market_open and r.get("win_odds") is None,
                 "blackbook": r.get("blackbook"),
                 "market_rank": r.get("market_rank"),
             })

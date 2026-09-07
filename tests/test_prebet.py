@@ -299,3 +299,39 @@ def test_both_combinations_are_offered_as_single_race_types():
 
     assert "WP" in prebet.SINGLE_RACE_TYPES
     assert "QQP" in prebet.SINGLE_RACE_TYPES
+
+
+def test_an_unopened_market_is_not_a_field_of_scratchings(tmp_path):
+    """`scratched = win_odds is None` badged every runner SCR until the market
+    opened at 13:00 the day before racing — a full field reading as a full
+    field of withdrawals. A horse is scratched when it is WITHDRAWN."""
+    from hkrd.query import prebet
+    from hkrd.store import upsert
+    from hkrd.store.connect import get_conn, init_db, transaction
+
+    path = tmp_path / "pb.db"
+    conn = get_conn(path)
+    init_db(conn)
+    with transaction(conn):
+        upsert.upsert_races(conn, [
+            {"race_date": "2026-09-09", "race_no": 1, "venue": "HV",
+             "course": "C", "surface": "Turf", "going": "G", "distance": 1650}])
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-09-09", "race_no": 1, "horse_no": n,
+             "horse_name": f"HORSE {n}", "draw": n, "actual_weight": 120}
+            for n in range(1, 5)])
+
+    card = prebet.entry_card("2026-09-09", 1, conn=conn)
+    assert not any(r["scratched"] for r in card["runners"]), \
+        "nobody is priced yet, so nobody is scratched"
+
+    # Open the market on three of the four. The fourth is genuinely out.
+    with transaction(conn):
+        upsert.upsert_odds_snapshots(conn, [
+            {"race_date": "2026-09-09", "race_no": 1, "horse_no": n,
+             "captured_at": "2026-09-08T13:00:00", "win_odds": 3.0 + n}
+            for n in (1, 2, 3)])
+    card = prebet.entry_card("2026-09-09", 1, conn=conn)
+    conn.close()
+    out = {r["horse_no"]: r["scratched"] for r in card["runners"]}
+    assert out == {1: False, 2: False, 3: False, 4: True}
