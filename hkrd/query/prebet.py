@@ -42,11 +42,28 @@ ACCOUNTS: tuple[dict[str, str], ...] = (
     {"key": "kelvin", "name": "Kelvin"},
 )
 
-SINGLE_RACE_TYPES: tuple[str, ...] = ("WIN", "PLACE", "QIN", "QPL")
+SINGLE_RACE_TYPES: tuple[str, ...] = ("WIN", "PLACE", "WP", "QIN", "QPL", "QQP")
 BET_TYPES: tuple[str, ...] = SINGLE_RACE_TYPES + ("ALLUP",)
 
 # A pair pool takes two runners per line; WIN and PLACE take one.
-_PICKS_PER_LINE = {"WIN": 1, "PLACE": 1, "QIN": 2, "QPL": 2}
+_PICKS_PER_LINE = {"WIN": 1, "PLACE": 1, "WP": 1,
+                   "QIN": 2, "QPL": 2, "QQP": 2}
+
+# HKJC sells two COMBINATIONS as a single ticket: WP is a win and a place on
+# the same horse, QQP a quinella and a quinella place on the same pair. The
+# selections are identical and only the settlement differs, so they cost twice
+# the lines.
+#
+# The arithmetic is checkable against a real statement. 2026-09-06 ref 3597 is
+# a quinella-quinella place, banker with two others, at $10: two lines, two
+# pools, $40 debited — which is what the statement says. Getting this wrong
+# under-quotes every combination ticket by half.
+_POOLS_PER_TICKET = {"WP": 2, "QQP": 2}
+
+
+def pools_per_ticket(bet_type: str) -> int:
+    """How many pools one line of this ticket is struck into."""
+    return _POOLS_PER_TICKET.get(bet_type.upper(), 1)
 
 
 def combination_count(bet_type: str, n_selected: int, *,
@@ -63,13 +80,14 @@ def combination_count(bet_type: str, n_selected: int, *,
         raise ValueError(f"not a single-race bet type: {bet_type!r}")
     if n_selected < 0:
         raise ValueError("selection count cannot be negative")
+    pools = pools_per_ticket(bet_type)
     if per_line == 1:
-        return n_selected
+        return n_selected * pools
     if has_banker:
         # The banker is the anchor; each remaining selection forms one line
         # with it. n_selected counts the legs, not the banker.
-        return n_selected
-    return comb(n_selected, 2) if n_selected >= 2 else 0
+        return n_selected * pools
+    return (comb(n_selected, 2) if n_selected >= 2 else 0) * pools
 
 
 def formulas(n_races: int) -> list[dict[str, Any]]:

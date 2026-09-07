@@ -254,3 +254,48 @@ def test_raceday_total_counts_what_is_already_staked(db):
 def test_accounts_are_brett_and_kelvin_only():
     """Design brief 07 §3.1 removed Client entirely."""
     assert [a["key"] for a in prebet.ACCOUNTS] == ["brett", "kelvin"]
+
+
+# ─── the two combination tickets ─────────────────────────────────────────────
+
+def test_a_combination_ticket_costs_twice_the_lines():
+    """HKJC sells two pools as ONE ticket: WP is a win and a place on the same
+    horse, QQP a quinella and a quinella place on the same pair. The selections
+    are identical and only the settlement differs, so the cost doubles.
+
+    Checked against a statement the owner actually placed, on 2026-09-06:
+
+      ref 3597  QQP banker with 2   $10   debited  $40
+      ref 3603  QQP 3 picks, no bnk $10   debited  $60
+      ref 3623  QQP banker with 5   $10   debited $100
+
+    Quoting these at half is how a ticket builder tells you a bet costs $50 and
+    the account is debited $100.
+    """
+    from hkrd.query.prebet import combination_count as cc
+
+    assert cc("QQP", 2, has_banker=True) * 10 == 40
+    assert cc("QQP", 3) * 10 == 60
+    assert cc("QQP", 5, has_banker=True) * 10 == 100
+    assert cc("WP", 1) * 50 == 100
+
+
+def test_the_single_pool_counts_are_unchanged():
+    """Design brief 07 §3.3's table still has to hold: four picks with no
+    banker is C(4,2) = 6, a banker plus four legs is 4."""
+    from hkrd.query.prebet import combination_count as cc
+
+    assert cc("QIN", 4) == 6
+    assert cc("QIN", 5) == 10
+    assert cc("QIN", 6) == 15
+    assert cc("QIN", 4, has_banker=True) == 4
+    assert cc("WIN", 3) == 3
+
+
+def test_both_combinations_are_offered_as_single_race_types():
+    """The entry form reads this list, and an All Up leg is very often a QQP
+    carried into a place."""
+    from hkrd.query import prebet
+
+    assert "WP" in prebet.SINGLE_RACE_TYPES
+    assert "QQP" in prebet.SINGLE_RACE_TYPES

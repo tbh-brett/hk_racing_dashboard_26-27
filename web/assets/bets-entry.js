@@ -110,11 +110,23 @@ function chip(label, on, click, cls) {
   return b;
 }
 
+/* The pool types that take a PAIR of horses rather than one. QQP is here
+   because it is a quinella and a quinella place on the same pair — the
+   selection UI is identical, and only the settlement differs. */
+const PAIR_TYPES = new Set(['QIN', 'QPL', 'QQP']);
+
+
 function renderTypes(host) {
   const row = el('div', 'entry-row');
   row.append(el('div', 'entry-lab', 'BET TYPE'));
   const chips = el('div', 'entry-chips');
-  ['WIN', 'PLACE', 'QIN', 'QPL', 'ALLUP'].forEach((t) => {
+  // WP and QQP are the two COMBINATIONS HKJC sells as one ticket: a win and a
+  // place on the same horse, and a quinella and a quinella place on the same
+  // pair. They are struck as one bet and the statement shows them as one
+  // debit — "Quinella - Quinella Place" — which is why the importer splits
+  // them into two records at half the stake each and this offers them whole.
+  // They are also what an All Up leg is usually made of.
+  ['WIN', 'PLACE', 'WP', 'QIN', 'QPL', 'QQP', 'ALLUP'].forEach((t) => {
     chips.append(chip(t === 'ALLUP' ? 'ALL-UP' : t, entry.betType === t, () => {
       entry.betType = t;
       entry.picks.clear();
@@ -171,7 +183,7 @@ function cardRow(r) {
   // Banker sits LEFT of selection (brief 08 §2): it is the structural
   // decision, and reading left to right should follow the logic of the bet.
   const bnk = el('span', 'bnk');
-  if (entry.betType === 'QIN' || entry.betType === 'QPL') {
+  if (PAIR_TYPES.has(entry.betType)) {
     const b = el('button', `pick banker${entry.banker === r.horse_no ? ' on' : ''}`,
       entry.banker === r.horse_no ? '◆' : '');
     b.type = 'button';
@@ -233,7 +245,7 @@ function renderCard(host) {
     host.append(el('div', 'entry-empty', 'Pick a race to see the card.'));
     return;
   }
-  const isPair = entry.betType === 'QIN' || entry.betType === 'QPL';
+  const isPair = PAIR_TYPES.has(entry.betType);
   if (isPair) {
     const b = el('div', 'entry-row');
     b.append(el('div', 'entry-lab', 'BANKER'));
@@ -333,7 +345,10 @@ function legPanel(no) {
   panel.append(head);
 
   const types = el('div', 'leg-types');
-  ['WIN', 'PLACE', 'QIN', 'QPL'].forEach((t) => {
+  // The same six on a leg. An All Up leg is very often a QQP carried into a
+  // place — 2026-09-06 ref 3593 is exactly that — and the leg could only be
+  // told one half of itself.
+  ['WIN', 'PLACE', 'WP', 'QIN', 'QPL', 'QQP'].forEach((t) => {
     types.append(chip(t, (leg?.betType ?? 'WIN') === t, () => {
       if (leg) leg.betType = t;
       priceTicket();
