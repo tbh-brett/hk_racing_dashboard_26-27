@@ -12,12 +12,19 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-__all__ = ["get_conn", "transaction", "init_db", "db_path", "Connection"]
+__all__ = ["get_conn", "transaction", "init_db", "db_path", "Connection",
+           "StoreError"]
 
 # Layers above store/ need to name a connection in a type hint without
 # importing the driver. They depend on this alias, so the driver stays
 # swappable and the "only store/ imports sqlite3" rule stays literal.
 Connection = sqlite3.Connection
+
+# Re-exported so a caller outside store/ can catch a write that the database
+# refused without importing sqlite3 itself — which the layering forbids, and
+# for good reason: `import sqlite3` in a job is one line away from a query in
+# a job. A job needs the EXCEPTION, not the driver.
+StoreError = sqlite3.Error
 
 _SCHEMA = Path(__file__).with_name("schema.sql")
 

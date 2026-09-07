@@ -30,9 +30,11 @@ from hkrd.ingest import (corunning, dividends as dividends_ingest,
                          racecard as racecard_ingest,
                          results as results_ingest, vet as vet_ingest)
 from hkrd.ingest._client import FetchError
+from hkrd.query import market as market_q
 from hkrd.store import job_log
 from hkrd.store import upsert
-from hkrd.store.connect import db_path, get_conn, init_db, transaction
+from hkrd.store.connect import (StoreError, db_path, get_conn, init_db,
+                                transaction)
 
 
 @dataclass
@@ -120,7 +122,7 @@ def scrape_meeting(date: str, venue: str, *, post_race: bool = False,
     # prices, with the two genuinely new runners left underneath.
     #
     # There is nothing to fetch yet, so the fix is to not ask.
-    if date >= _today():
+    if _still_to_run(date, db):
         # The VET RECORD is the exception, and the reason it is fetched here
         # rather than with the post-race sources: it is not an account of the
         # race, it is each declared runner's veterinary history — examinations
@@ -145,7 +147,7 @@ def scrape_meeting(date: str, venue: str, *, post_race: bool = False,
         # A meeting that has not been run yet HAS no results, and saying so is
         # a fact about the calendar rather than a failed scrape. After the day
         # it is a real failure and stays an error.
-        if date >= _today():
+        if _still_to_run(date, db):
             report.warnings.append(
                 f"results: not published yet — {date} has not been run")
         else:
@@ -172,10 +174,40 @@ def scrape_meeting(date: str, venue: str, *, post_race: bool = False,
     conn = get_conn(db if db is not None else db_path())
     try:
         init_db(conn)
-        with transaction(conn):
-            for race in races:
-                report.races += 1
-                report.runners += _store_race(conn, date, race)
+        # ONE TRANSACTION PER RACE, not one for the meeting. A single
+        # transaction meant race 5 of 2026-09-06 ST rolled back races 1 to 4
+        # with it, and the card finished the night with 0 of 120 results
+        # stored. A race is an independent fact and it is stored as one.
+        for race in races:
+            # A race with nobody in it is not a race. The results walk asks for
+            # race numbers until one fails, and an eleventh on a ten-race card
+            # came back parseable and EMPTY — which wrote a `races` row with a
+            # NULL distance, class, going and off time, and put an eleventh
+            # chip on Race Day leading to a card with no runners.
+            if not race.get("runners"):
+                continue
+            gone = withdrawn(race)
+            if gone:
+                # Named, not silently dropped. These are rows the results page
+                # carries with no saddlecloth number -- a horse withdrawn
+                # before the start never had one -- and `runners` cannot key
+                # them. See `withdrawn`.
+                report.warnings.append(
+                    f"results R{race.get('race_no')}: withdrawn, no saddlecloth "
+                    f"number to store against — {', '.join(gone)}")
+            try:
+                with transaction(conn):
+                    stored = _store_race(conn, date, race)
+            except StoreError as e:
+                # The other nine races are still worth having, and this one
+                # names itself. Letting it raise is what turned one odd row
+                # into a meeting with no results at all.
+                report.errors.append(
+                    f"results R{race.get('race_no')}: not stored — "
+                    f"{type(e).__name__}: {e}")
+                continue
+            report.races += 1
+            report.runners += stored
     finally:
         conn.close()
 
@@ -183,7 +215,13 @@ def scrape_meeting(date: str, venue: str, *, post_race: bool = False,
         # Comments on running are only published after the race is run.
         try:
             from hkrd.jobs import scrape_corunning
-            cr = scrape_corunning.scrape(date, db=db, max_races=max_races,
+            # Bounded by the races that actually exist, not by the walk limit.
+            # Asking for the comments on an eleventh race of a ten-race card
+            # is a guaranteed error, and it was the only error in an otherwise
+            # complete scrape — which made `ok` false and the strip red for a
+            # meeting that had landed everything.
+            cr = scrape_corunning.scrape(date, db=db,
+                                         max_races=report.races or max_races,
                                          session=session)
             report.comments += cr.comments
             report.lane_tags += cr.lane_tags
@@ -240,6 +278,51 @@ def _is_same_meeting(race: dict, declared: dict[int, set[str]]) -> bool:
 def _today() -> str:
     """Today in Hong Kong, where the meetings are."""
     return dt.datetime.now(_HK).date().isoformat()
+
+
+def _still_to_run(date: str, db: Path | None, *,
+                  now: dt.datetime | None = None) -> bool:
+    """True while this meeting has a race left to run, or has just finished.
+
+    This used to be `date >= _today()`, and that cost a whole evening. A Sha
+    Tin card whose last race is away at 17:55 is over by six o'clock, but the
+    date guard called it "not published yet" at 19:00, at 22:45 and again at
+    23:45 — so the results, dividends, comments and the derive pass all waited
+    for 07:00 the next morning, and the dashboard spent the entire evening of
+    the meeting showing the previous one.
+
+    The guard it replaces is still needed: asked about a meeting that has not
+    run, HKJC serves a page rather than answering 404. But that page is caught
+    by `_is_same_meeting`, which compares what came back against the field the
+    card declared — the substantive defence, and independent of any clock.
+    This is the cheap first pass in front of it, and it now asks the question
+    that actually matters: are the races over?
+
+    An unknown off time falls back to the old date rule. A missing column must
+    never be the reason a scrape asks HKJC about a race that has not been run.
+    """
+    now = now or dt.datetime.now(_HK).replace(tzinfo=None)
+    today = now.date().isoformat()      # derived from `now`, so this is testable
+    if date > today:
+        return True
+    if date < today:
+        return False
+    conn = get_conn(db if db is not None else db_path())
+    try:
+        init_db(conn)
+        row = conn.execute(
+            "SELECT max(off_time) FROM races WHERE race_date = ? "
+            "AND off_time IS NOT NULL AND off_time != ''", (date,)).fetchone()
+    finally:
+        conn.close()
+    last = (row[0] if row else None) or ""
+    to_off = market_q.minutes_to_off(date, last, now)
+    if to_off is None:
+        return True          # no time on the card: the old rule, unchanged
+    # The same settling allowance the odds capture uses, and for the same
+    # reason: a delayed start is real, and a result is not published the
+    # instant the field crosses the line.
+    return to_off > -market_q.SETTLED_AFTER_MINUTES
 
 
 def _log_sources(db, report: ScrapeReport, *, post_race: bool,
@@ -347,6 +430,29 @@ def _store_vet(db: Path | None, notes: dict[int, list[dict]]) -> int:
     return written
 
 
+def withdrawn(race: dict) -> list[str]:
+    """Runners the results page lists with no saddlecloth number.
+
+    HKJC's results table carries withdrawn horses as ordinary rows with a
+    status in the place column -- `WV` for withdrawn by vet -- and the number
+    column BLANK, because a horse withdrawn before the start never carried one.
+    2026-09-06 ST race 5 had one: STAR FIGURE, place `WV`, time `---`. It was
+    not on the declared card either, so there is no number to recover.
+
+    `runners` is keyed on (race_date, race_no, horse_no), so a row without one
+    cannot be stored -- it went in as NULL and raised `NOT NULL constraint
+    failed: runners.horse_no`, which took down the whole nightly and left the
+    meeting with no results, no dividends and no derive pass. One withdrawn
+    reserve cost a card.
+
+    They are dropped, and NAMED in the report rather than dropped quietly: a
+    parser that silently discards rows is the corunning lesson.
+    """
+    return [(r.get("horse_name") or "?").strip()
+            for r in race.get("runners", [])
+            if not str(r.get("horse_no") or "").strip()]
+
+
 def _store_race(conn, date: str, race: dict) -> int:
     upsert.upsert_races(conn, [{
         "race_date": date, "race_no": race.get("race_no"),
@@ -366,7 +472,8 @@ def _store_race(conn, date: str, race: dict) -> int:
         "win_odds": r.get("win_odds"),
         "running_positions": r.get("running_position"),
         "section_times": r.get("section_times"),
-    } for r in race.get("runners", [])]
+    } for r in race.get("runners", [])
+        if str(r.get("horse_no") or "").strip()]
     return upsert.upsert_runners(conn, runners)
 
 

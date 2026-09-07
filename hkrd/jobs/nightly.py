@@ -157,13 +157,13 @@ def probe(date: str, venue: str, *, session=None) -> tuple[str, str]:
     race 1 answers the same question, so a quiet night costs two requests
     instead of a hundred and seventy.
 
-    `unparsed` is kept separate from `none` on purpose. HKJC's behaviour for a
-    date with no meeting could not be measured from the machine this was
-    written on — the network policy there blocks racing.hkjc.com — so it may
-    404 (NotFound) or it may serve a page with no card table (RacecardError).
-    Either way there is no meeting and the decision is the same, but a window
-    where EVERY probe came back unparsed is the shape a layout change makes,
-    and that gets said out loud rather than passing as five quiet nights.
+    `unparsed` is kept separate from `none` on purpose. Measured since: for a
+    date with no meeting HKJC answers 200 with an error panel rather than a
+    404, and `racecard.fetch_race` recognises that panel and raises NotFound —
+    so a quiet night arrives here as `none`. A page that is neither a card nor
+    that panel is a third thing, and a window where EVERY probe came back
+    unparsed is the shape a layout change makes: that gets said out loud
+    rather than passing as five quiet nights.
     """
     try:
         got = racecard.fetch_race(date, venue, 1, session=session)

@@ -430,3 +430,81 @@ def test_the_vet_record_is_fetched_before_the_race(monkeypatch, tmp_path):
     assert "vet" in asked, "the vet record was not fetched for a live card"
     assert "results" not in asked
     assert r.vet_records == 1
+
+
+# ── a card that ended is not a card that failed ──────────────────────────────
+#
+# HKJC answers a race card page that does not exist with 200 and an error
+# panel, not a 404. Walking one past the last race of a ten-race card therefore
+# produced "race header unreadable", `_log_sources` read `racecard` out of that
+# warning, and scrape_meeting:card went into job_runs with ok=0. `_last_success`
+# only reads ok=1 rows, so the freshness strip rendered "Card —" — no age, no
+# tick — after a scrape that had just stored 120 declared runners. Every
+# meeting below the walk limit hit it; only one at the maximum race count
+# escaped. A complete success permanently displayed as a failure is the same
+# fault as a silent one, from the other side.
+
+NO_INFO_HTML = (FIXTURES / "racecard_no_information.html").read_text(
+    encoding="utf-8")
+
+
+class _HKJCSession(_FullSession):
+    """`_FullSession`, but answering a card that has ended the way HKJC does.
+
+    Set `broken` to serve one race a page that is neither a card nor the error
+    panel — a layout change, which must still fail loudly.
+    """
+
+    def __init__(self, races=3, broken: int | None = None):
+        super().__init__(races)
+        self.broken = broken
+
+    def get(self, url, params=None, timeout=None):
+        params = params or {}
+        no = int(params.get("RaceNo") or params.get("raceno") or 0)
+        if "racecard" in url:
+            if no > self.races:
+                return _Resp(200, NO_INFO_HTML, url=url)
+            if no == self.broken:
+                return _Resp(200, "<html><body><p>nothing</p></body></html>",
+                             url=url)
+        return super().get(url, params=params, timeout=timeout)
+
+
+def _logged(db):
+    conn = get_conn(db)
+    try:
+        return dict(conn.execute("SELECT job, ok FROM job_runs").fetchall())
+    finally:
+        conn.close()
+
+
+def test_a_card_shorter_than_the_walk_limit_is_logged_as_a_success(tmp_path):
+    """The reported bug. Three races, a limit of eleven, nothing wrong."""
+    db = tmp_path / "m.db"
+    report = scrape_meeting.scrape_meeting("2026-07-15", "HV", db=db,
+                                           max_races=11,
+                                           session=_HKJCSession(3))
+    assert report.declared > 0
+    assert not any("racecard" in w for w in report.warnings)
+    assert _logged(db)["scrape_meeting:card"] == 1
+
+
+def test_a_race_header_that_will_not_parse_still_logs_a_failed_card(tmp_path):
+    """The other half. Ending the card must stop being a warning without a
+    genuine layout change stopping being one."""
+    db = tmp_path / "m.db"
+    report = scrape_meeting.scrape_meeting("2026-07-15", "HV", db=db,
+                                           max_races=11,
+                                           session=_HKJCSession(3, broken=2))
+    assert any("racecard" in w and "R2" in w for w in report.warnings)
+    assert _logged(db)["scrape_meeting:card"] == 0
+
+
+def test_the_races_either_side_of_a_broken_one_are_still_stored(tmp_path):
+    """A failed race is named, not fatal: the walk carries on past it."""
+    db = tmp_path / "m.db"
+    report = scrape_meeting.scrape_meeting("2026-07-15", "HV", db=db,
+                                           max_races=11,
+                                           session=_HKJCSession(3, broken=2))
+    assert report.declared > 0

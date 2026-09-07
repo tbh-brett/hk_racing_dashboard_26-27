@@ -110,3 +110,42 @@ def test_a_tz_naive_job_row_does_not_crash_the_strip(db):
             "'2026-07-15T14:02:00', 1, '9 races')")
     conn.close()
     assert _by_key(db)["results"]["minutes"] == 140
+
+
+# ── a failed run is not a fresh one, and must not read as one ────────────────
+#
+# The strip's timestamp comes from `_last_success`, which reads ok=1 rows only.
+# That is the right rule and these pin it — but it is also what made a working
+# scraper unreadable. `scrape_meeting` logged the card source ok=0 whenever the
+# card ended below the walk limit, because HKJC answers the race after the last
+# one with an error panel and the parser filed that as an unreadable header.
+# Every 10-race meeting therefore rendered "Card —" on a scrape that had just
+# stored 120 declared runners, which trains the eye to ignore the strip.
+
+def _fail(path, job, minutes):
+    conn = get_conn(path)
+    with transaction(conn):
+        conn.execute(
+            "INSERT INTO job_runs (job, started_at, finished_at, ok, detail) "
+            "VALUES (?, ?, ?, 0, 'racecard: race header unreadable')",
+            (job, _ago(minutes + 1), _ago(minutes)))
+    conn.close()
+
+
+def test_a_newer_failed_run_does_not_freshen_a_source(db):
+    """A run that failed says nothing about how current the data is. The age
+    stays the last one that actually landed rows."""
+    _fail(db, "scrape_meeting:card", 5)
+    s = _by_key(db)
+    assert s["card"]["age"] == "2h"
+    assert s["card"]["mark"] == "✓"
+
+
+def test_a_source_whose_only_run_failed_reads_as_never_run(db):
+    """What the header actually showed: "Card —". No age, no tick, on a card
+    scrape that worked. Never-run and failed look the same from here, so
+    logging a success as a failure hides it completely."""
+    _fail(db, "scrape_meeting:results", 5)
+    s = _by_key(db)
+    assert s["results"]["minutes"] is None
+    assert s["results"]["mark"] == "—"

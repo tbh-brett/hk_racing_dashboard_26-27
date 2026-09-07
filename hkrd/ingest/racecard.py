@@ -26,7 +26,7 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
-from hkrd.ingest._client import fetch_html, urls
+from hkrd.ingest._client import FetchError, NotFound, fetch_html, urls
 
 __all__ = ["RacecardError", "parse_race_header", "parse_racecard",
            "fetch_race", "fetch_meeting"]
@@ -329,14 +329,41 @@ def parse_racecard(html: str, race_no: int, *,
 
 # ── fetching ─────────────────────────────────────────────────────────────────
 
+# HKJC does not 404 a race card page that does not exist. It answers 200 with
+# its own error page -- the site chrome wrapped around an empty "No
+# information." panel -- and serves that same body for a race past the end of
+# the card, for a wrong venue, and for a date with no meeting.
+#
+# Read as a card it has no distance and no venue, so it used to arrive as
+# "race header unreadable". Every card shorter than the walk limit therefore
+# reported a failure at the race after its last one, and because that warning
+# logged scrape_meeting:card with ok=0, a card scrape that had just stored a
+# full field showed on the freshness strip as a card that had never succeeded.
+#
+# The panel is what this site says instead of 404, so it is raised as NotFound
+# -- which every caller walking ?raceno=1..N already reads as "that page is
+# not there". Matched on the error container and its text together: a page
+# that is NOT this one and still will not parse must stay a RacecardError and
+# stay loud, because mistaking one for the other truncates a real card.
+_NO_INFORMATION = re.compile(
+    r"""id=["']?errorContainer["']?[^>]*>\s*No information""", re.IGNORECASE)
+
+
 def fetch_race(date: str, venue: str, race_no: int, *,
                session=None) -> dict[str, Any]:
-    """One race's card: the header and the declared field."""
+    """One race's card: the header and the declared field.
+
+    Raises NotFound when HKJC answers that there is no such page, which it
+    does with a 200 and an error panel rather than a status code.
+    """
     query = date.replace("-", "/")
     html = fetch_html(urls.racecard,
                       {"racedate": query, "Racecourse": venue,
                        "RaceNo": str(race_no)}, session=session)
     label = f"{date} {venue} R{race_no}"
+    if _NO_INFORMATION.search(html):
+        raise NotFound(f'{label}: no such page — HKJC answered '
+                       '"No information."')
     header = parse_race_header(html, race_no, source=label)
     header["race_date"] = date
     return {"race": header,
@@ -349,15 +376,26 @@ def fetch_meeting(date: str, venue: str, *, max_races: int = 11,
 
     A meeting that is nine races long and returns eight is a fact the caller
     needs; returning eight silently is the failure this package removes.
-    """
-    from hkrd.ingest._client import FetchError, NotFound
 
+    Reaching the end of the card is NOT one of those facts. Cards run eight to
+    eleven races, the walk asks for one more than the last, and HKJC answers
+    that there is no such page. That is the card ending, not a race that
+    failed, so it leaves nothing in `errors` — recording it there marked every
+    meeting shorter than `max_races` as a broken card scrape.
+
+    No card AT ALL is different again, and raises rather than returning an
+    empty list of races: "the card is not published" and "the card is
+    published and has no races" are different answers, and `{"races": []}`
+    cannot tell the caller which one it got.
+    """
     races: list[dict[str, Any]] = []
     errors: list[str] = []
     for race_no in range(1, max_races + 1):
         try:
             races.append(fetch_race(date, venue, race_no, session=session))
         except NotFound:
+            if not races:
+                raise
             break
         except FetchError as exc:
             # Transport, not content. If the host will not answer for race 1

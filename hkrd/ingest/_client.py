@@ -66,12 +66,17 @@ class FetchError(RuntimeError):
 
 
 class NotFound(FetchError):
-    """The page does not exist (404).
+    """The page does not exist.
 
     Kept distinct from every other failure because callers walking ?raceno=1..N
     need "the card ended here" to mean something different from "the request
     failed". Collapsing the two is how a broken scraper looks like a short
     meeting.
+
+    Raised here for a 404, and raised by a parser that recognises the page a
+    host serves INSTEAD of one: the race card endpoint answers 200 with an
+    error panel, so `ingest.racecard` raises this rather than let a card that
+    ended at race ten look like a race ten could not be read.
     """
 
 

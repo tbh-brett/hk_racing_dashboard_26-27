@@ -225,18 +225,36 @@ def parse_section_times(token: object) -> tuple[float, ...]:
 
     Trailing empty fields are normal — HKJC pads to a fixed column count.
     """
-    if token is None:
+    if token is None or is_absent(token):
         return ()
     out: list[float] = []
     for part in str(token).split(";"):
         p = part.strip()
-        if not p:
+        if not p or is_absent(p):
             continue
         try:
             out.append(float(p))
         except ValueError:
             raise CoerceError(f"section_times: bad split {p!r} in {token!r}") from None
     return tuple(out)
+
+
+# HKJC writes a run of dashes where a value does not apply — `---` for the
+# finishing time, running positions and section times of a horse that was
+# withdrawn, `--` for a horse carrying no gear. It is a real answer meaning
+# "there is none", and it is not a malformed number.
+#
+# 2026-09-06 ST race 7 is what this cost: INVINCIBLE SHIELD was withdrawn by
+# the vet at the start (`WV-A`), so its running positions came back as `---`,
+# `parse_running_positions` raised, and the CoerceError took down the whole
+# derive pass — pace, ET, SARR and tags, for the entire archive, over one
+# horse that did not run.
+_ABSENT = re.compile(r"^-+$")
+
+
+def is_absent(token: object) -> bool:
+    """True for HKJC's not-applicable marker: a token that is only dashes."""
+    return bool(_ABSENT.match(str(token if token is not None else "").strip()))
 
 
 def parse_running_positions(token: object) -> tuple[int, ...]:
@@ -246,7 +264,7 @@ def parse_running_positions(token: object) -> tuple[int, ...]:
     twice, in two shapes, and one copy silently died in May 2026. One
     representation is stored from here on.
     """
-    if token is None:
+    if token is None or is_absent(token):
         return ()
     out: list[int] = []
     for part in re.split(r"[;\s]+", str(token).strip()):

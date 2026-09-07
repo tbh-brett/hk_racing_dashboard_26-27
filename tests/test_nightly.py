@@ -113,8 +113,9 @@ def test_a_404_means_no_meeting(db, monkeypatch):
 
 
 def test_a_page_that_will_not_parse_is_not_the_same_as_no_meeting(db, monkeypatch):
-    """HKJC's behaviour on a non-race day could not be measured where this was
-    written, so both shapes are handled — but they stay distinguishable."""
+    """A non-race day is `none`: HKJC serves an error panel for it and
+    `racecard.fetch_race` raises NotFound. A page that is neither a card nor
+    that panel is the third shape, and it stays distinguishable from both."""
     monkeypatch.setattr(racecard, "fetch_race", lambda *a, **k: (
         _ for _ in ()).throw(racecard.RacecardError("no race card table found")))
     assert nightly.probe("2026-08-22", "ST")[0] == "unparsed"
