@@ -557,3 +557,24 @@ def test_a_settled_bet_carries_the_credit_the_bookie_paid():
     paid = {r["bookie_ref"]: r["block_credit"] for r in rows}
     assert paid["3597"] == pytest.approx(171.00)
     assert paid["3600"] == pytest.approx(180.50)
+
+
+def test_a_statement_can_be_uploaded_as_text(tmp_path):
+    """The dashboard runs on a machine in Singapore and the statement is
+    downloaded on whichever device the owner is holding, so the route that
+    took a server-side path was one only the server could use."""
+    from pathlib import Path
+    from hkrd.jobs import import_statement
+    from hkrd.store.connect import get_conn, init_db
+
+    db = tmp_path / "up.db"
+    init_db(get_conn(db))
+    text = (Path(__file__).parent / "fixtures" / "statement_2026-09-06.txt"
+            ).read_text(encoding="utf-8")
+    report = import_statement.run_text(text, name="acctstmt.txt", db=db)
+    assert report.files == 1 and report.bets == 24 and report.new_bets == 24
+    assert report.errors == [] and report.unparsed == []
+
+    # Idempotent: the same upload twice does not double the ledger.
+    again = import_statement.run_text(text, name="acctstmt.txt", db=db)
+    assert again.bets == 24 and again.new_bets == 0

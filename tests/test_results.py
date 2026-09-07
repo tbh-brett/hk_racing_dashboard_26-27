@@ -198,3 +198,51 @@ def test_a_meeting_that_does_not_exist_comes_back_empty_not_invented(db):
     m = rq.meeting_results("1999-01-01", conn=conn)
     conn.close()
     assert m["races"] == [] and m["total"] == 0
+
+
+def test_the_stewards_panel_shows_one_entry_per_horse(tmp_path):
+    """There are two sources — the objective comments on running and the
+    stewards' incident report — and this returned both, so every runner
+    appeared twice: once saying "No Comments on Running information for this
+    horse." and once with the actual finding.
+
+    The incident report wins where there is one, which is the preference
+    `query/race` already applies to the same two rows. The placeholder is never
+    shown: it is stored so the nightly planner can see the comments have not
+    landed, and it is a sentence about nothing.
+    """
+    from hkrd.query import results as results_q
+    from hkrd.store import upsert
+    from hkrd.store.connect import get_conn, init_db, transaction
+
+    db = tmp_path / "st.db"
+    conn = get_conn(db)
+    init_db(conn)
+    with transaction(conn):
+        upsert.upsert_races(conn, [
+            {"race_date": "2026-09-06", "race_no": 1, "venue": "ST",
+             "course": "A", "surface": "Turf", "going": "G", "distance": 1200}])
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-09-06", "race_no": 1, "horse_no": n,
+             "horse_name": f"HORSE {n}", "place": str(n)} for n in (1, 2)])
+        upsert.upsert_comments(conn, [
+            {"race_date": "2026-09-06", "race_no": 1, "horse_no": 1,
+             "comment_text": "No Comments on Running information for this horse.",
+             "source": "corunning"},
+            {"race_date": "2026-09-06", "race_no": 1, "horse_no": 1,
+             "comment_text": "Raced wide and without cover.",
+             "source": "incident"},
+            # A horse with only the objective description still appears.
+            {"race_date": "2026-09-06", "race_no": 1, "horse_no": 2,
+             "comment_text": "Settled midfield, one off the fence.",
+             "source": "corunning"},
+        ])
+    got = results_q.stewards("2026-09-06", 1, conn=conn)
+    conn.close()
+
+    assert len(got) == 2
+    by_no = {r["horse_no"]: r for r in got}
+    assert by_no[1]["source"] == "incident"
+    assert "wide" in by_no[1]["comment_text"]
+    assert by_no[2]["source"] == "corunning"
+    assert not any("No Comments on Running" in r["comment_text"] for r in got)

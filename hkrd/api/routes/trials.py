@@ -40,14 +40,23 @@ def trials_standouts(days: int = 21, limit: int = 40) -> dict:
 def trials_calibration() -> dict:
     """What each band actually went on to do at the races. The rating is only
     worth showing if the bands separate, so the page prints this beside them."""
-    return trials_q.calibration()
+    from hkrd.query import trial_calibration
+    return trial_calibration.calibration()
 
 
 @router.get("/api/trials/batch/{date}/{trial_no}")
-def trials_batch(date: str, trial_no: int) -> dict:
-    body = trials_q.batch(date, trial_no)
+def trials_batch(date: str, trial_no: int, venue: str | None = None) -> dict:
+    """One batch. `venue` separates two that share a number.
+
+    HKJC numbers each venue's batches from 1 and two venues run on the same
+    day — 2026-08-25 had four at Conghua and five at Sha Tin, both from 1 — so
+    a date and a number alone name two different trials.
+    """
+    body = trials_q.batch(date, trial_no, venue=venue)
     if not body:
-        raise HTTPException(404, f"no trial {date} T{trial_no}")
+        raise HTTPException(
+            404, f"no trial {date} T{trial_no}"
+                 + (f" at {venue}" if venue else ""))
     return body
 
 

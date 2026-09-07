@@ -475,11 +475,22 @@ def import_statement_job(body: dict = Body(...)) -> JSONResponse:
     """
     from hkrd.jobs import import_statement
 
-    src = Path(body.get("path", "")).expanduser()
-    if not src.exists():
-        raise HTTPException(404, f"not found: {src}")
-    report = import_statement.run(
-        src, account=body.get("account", import_statement.DEFAULT_ACCOUNT))
+    account = body.get("account", import_statement.DEFAULT_ACCOUNT)
+    text = body.get("text")
+    if text is not None:
+        # Uploaded from the browser. The dashboard runs on a machine in
+        # Singapore and the statement is downloaded on whichever device the
+        # owner is holding, so a server-side path is a route only the server
+        # can use. A statement is a few kilobytes and travels in the request.
+        if not str(text).strip():
+            raise HTTPException(400, "the uploaded statement is empty")
+        report = import_statement.run_text(
+            str(text), name=str(body.get("name") or "upload"), account=account)
+    else:
+        src = Path(body.get("path", "")).expanduser()
+        if not src.exists():
+            raise HTTPException(404, f"not found: {src}")
+        report = import_statement.run(src, account=account)
     payload = {
         "files": report.files, "bets": report.bets,
         "new_bets": report.new_bets, "selections": report.selections,
@@ -500,5 +511,29 @@ def root() -> RedirectResponse:
     return RedirectResponse("/pages/raceday.html")
 
 
+class _RevalidatingStatic(StaticFiles):
+    """The dashboard's own files, always revalidated.
+
+    Served with no Cache-Control at all, a browser applies HEURISTIC freshness
+    — typically a tenth of the file's age — and simply does not ask again. A
+    deploy then lands on the machine and never reaches the screen: the bet-type
+    chips gained WP and QQP, shipped, and the page went on drawing five chips
+    from a copy in the browser's cache. There is nothing on screen to say that
+    is what happened, which makes it the worst kind of stale.
+
+    `no-cache` does not mean "do not store" — the file stays in the cache and
+    the ETag still saves the download. It means "ask first", so a deploy costs
+    one 304 per asset and is always the thing being looked at.
+    """
+
+    def is_not_modified(self, response_headers, request_headers) -> bool:
+        return super().is_not_modified(response_headers, request_headers)
+
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        response.headers.setdefault("Cache-Control", "no-cache")
+        return response
+
+
 if WEB.is_dir():
-    app.mount("/", StaticFiles(directory=WEB, html=True), name="web")
+    app.mount("/", _RevalidatingStatic(directory=WEB, html=True), name="web")

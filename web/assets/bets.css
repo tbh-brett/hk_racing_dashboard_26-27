@@ -538,3 +538,15 @@
   margin-top: 4px; font-size: var(--fs-xs); color: var(--text-faint);
   letter-spacing: 0; text-transform: none;
 }
+
+/* ── import a statement ──────────────────────────────────────────────────── */
+.import-wrap { display: inline-flex; align-items: center; gap: 9px; margin-left: 14px; }
+.import-btn {
+  font-family: var(--font-mono); font-size: var(--fs-sm); letter-spacing: .08em;
+  padding: 3px 10px; cursor: pointer; background: none;
+  border: 1px solid var(--line-3); color: var(--text-muted);
+}
+.import-btn:hover:not(:disabled) { color: var(--text); border-color: var(--text-muted); }
+.import-btn:disabled { opacity: .5; cursor: default; }
+.import-out { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted); }
+.import-out.warn { color: var(--loss); }

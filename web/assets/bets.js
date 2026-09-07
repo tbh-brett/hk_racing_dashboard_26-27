@@ -92,7 +92,63 @@ function renderViewToggle() {
     b.setAttribute('aria-pressed', String(state.view === key));
     b.addEventListener('click', () => { state.view = key; render(); });
     return b;
-  }));
+  }), importButton());
+}
+
+/* IMPORT A STATEMENT, from the browser.
+ *
+ * The file is read here and its TEXT is posted, because the server is in
+ * Singapore and the download is on whatever device is to hand — the older
+ * route took a server-side path, which only the server could satisfy.
+ *
+ * What it reports is what it WROTE, and what it could not read. A statement
+ * that silently dropped a bet leaves a ledger that reads as a bet never
+ * placed, and the Blackbook then calls that run a missed chance. */
+function importButton() {
+  const wrap = el('span', 'import-wrap');
+  const input = el('input');
+  input.type = 'file';
+  input.accept = '.txt,text/plain';
+  input.hidden = true;
+
+  const btn = el('button', 'import-btn', 'IMPORT STATEMENT');
+  btn.title = 'the .txt account statement downloaded from HKJC';
+  btn.addEventListener('click', () => input.click());
+
+  const out = el('span', 'import-out');
+  input.addEventListener('change', async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    btn.disabled = true;
+    out.className = 'import-out';
+    out.textContent = `reading ${file.name}…`;
+    try {
+      const text = await file.text();
+      const r = await api.importStatementText(text, file.name);
+      const bits = [`${r.new_bets} new of ${r.bets} bets`,
+                    `${r.selections} selections`];
+      if (r.cash_movements) bits.push(`${r.cash_movements} cash`);
+      out.textContent = bits.join(' · ');
+      if (r.unparsed?.length) {
+        // Never silent. A block that did not read is the one thing about an
+        // import worth interrupting for.
+        out.className = 'import-out warn';
+        out.textContent += ` · ${r.unparsed.length} UNREAD`;
+        out.title = r.unparsed.join('\n');
+      }
+      await loadLedger();
+      render();
+    } catch (e) {
+      out.className = 'import-out warn';
+      out.textContent = e.message;
+    } finally {
+      btn.disabled = false;
+      input.value = '';
+    }
+  });
+
+  wrap.append(btn, input, out);
+  return wrap;
 }
 
 function money(v, { sign = false } = {}) {

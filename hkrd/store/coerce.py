@@ -257,6 +257,22 @@ def is_absent(token: object) -> bool:
     return bool(_ABSENT.match(str(token if token is not None else "").strip()))
 
 
+# The comments-on-running endpoint answers this sentence, for every runner, for
+# as long as the stewards' comments are unpublished. It is the same kind of
+# thing as a row of dashes: a marker meaning "there is none", not a comment.
+#
+# It is STORED rather than discarded, because its presence is what tells the
+# nightly planner the comments have not landed yet and the meeting is not
+# settled. It is never DISPLAYED, because a stewards' panel that prints it
+# beside the real report shows every horse twice.
+NO_COMMENT_PREFIX = "No Comments on Running"
+
+
+def is_no_comment(text: object) -> bool:
+    """True for HKJC's "nothing published yet" comment placeholder."""
+    return str(text or "").strip().startswith(NO_COMMENT_PREFIX)
+
+
 def parse_running_positions(token: object) -> tuple[int, ...]:
     """'10 9 6 3 2' or '4; 4; 4; 1' -> (10, 9, 6, 3, 2).
 

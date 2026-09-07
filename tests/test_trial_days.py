@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import pytest
 
+from hkrd.query import trial_calibration as trial_cal
 from hkrd.query import trials as tq
 from hkrd.store.connect import get_conn, init_db, transaction
 
@@ -154,7 +155,7 @@ def test_the_band_hold_sentence_is_computed_not_quoted(db) -> None:
     claim about the archive that stops being true the first time the archive
     grows — and a calibration figure nobody recomputes is exactly the kind of
     number this page exists to argue against."""
-    c = tq.calibration(conn=db)
+    c = trial_cal.calibration(conn=db)
     for band in c["order"]:
         hold = c["bands"][band]["hold"]
         assert hold and band in hold
@@ -166,7 +167,7 @@ def test_the_band_hold_sentence_is_computed_not_quoted(db) -> None:
 
 
 def test_a_band_with_nothing_to_show_says_so_rather_than_zero(db) -> None:
-    c = tq.calibration(conn=db)
+    c = trial_cal.calibration(conn=db)
     for band in c["order"]:
         row = c["bands"][band]
         if not row["with_next"]:

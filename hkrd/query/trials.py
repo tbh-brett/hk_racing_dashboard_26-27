@@ -39,20 +39,6 @@ __all__ = ["recent_batches", "batch", "for_horses", "standouts",
 SECONDS_PER_LENGTH = 0.16
 
 
-def _wilson(hits: int, n: int) -> tuple[float, float] | None:
-    """95% Wilson interval on a rate. Small bands here -- STANDOUT is 233 runs
-    with a next start -- and Wilson keeps a near-zero cell from claiming a
-    certainty its sample cannot support."""
-    if n <= 0:
-        return None
-    z = 1.96
-    phat = hits / n
-    denom = 1 + z * z / n
-    centre = (phat + z * z / (2 * n)) / denom
-    half = z * ((phat * (1 - phat) / n + z * z / (4 * n * n)) ** 0.5) / denom
-    return round(max(0.0, centre - half), 4), round(min(1.0, centre + half), 4)
-
-
 def _column(row, name: str):
     """Read a column that may predate this schema version.
 
@@ -106,12 +92,25 @@ def _runner(row, field_size: int, best: float | None) -> dict[str, Any]:
     }
 
 
+# A BATCH IS (DATE, VENUE, NUMBER), never (date, number).
+#
+# HKJC numbers each venue's batches from 1, and two venues run trials on the
+# same day: 2026-08-25 had four batches at Conghua AND five at Sha Tin, both
+# numbered from 1. Pooled on (date, number) alone, "trial 1" was twenty horses
+# instead of ten — and `field_size` and `best_time` are computed here, so every
+# margin in those batches was measured against the faster of two different
+# tracks (Conghua turf against Sha Tin all-weather) and every quality rating
+# was scored against a field twice its real size.
+#
+# Seven days in the archive have two venues, back to 2025-08-29.
 _BATCH_SQL = """
     SELECT t.*,
            (SELECT count(*) FROM trials f
-             WHERE f.trial_date = t.trial_date AND f.trial_no = t.trial_no) field_size,
+             WHERE f.trial_date = t.trial_date AND f.trial_no = t.trial_no
+               AND f.venue IS t.venue) field_size,
            (SELECT min(f.finish_time) FROM trials f
-             WHERE f.trial_date = t.trial_date AND f.trial_no = t.trial_no) best_time
+             WHERE f.trial_date = t.trial_date AND f.trial_no = t.trial_no
+               AND f.venue IS t.venue) best_time
     FROM trials t
 """
 
@@ -226,10 +225,11 @@ def recent_batches(*, limit: int = 12, venue: str | None = None,
             params.append(date)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         keys = conn.execute(
-            f"SELECT DISTINCT trial_date, trial_no FROM trials {where} "
-            f"ORDER BY trial_date DESC, trial_no LIMIT ?",
+            f"SELECT DISTINCT trial_date, trial_no, venue FROM trials {where} "
+            f"ORDER BY trial_date DESC, venue, trial_no LIMIT ?",
             [*params, limit]).fetchall()
-        return [batch(k["trial_date"], k["trial_no"], conn=conn) for k in keys]
+        return [batch(k["trial_date"], k["trial_no"], venue=k["venue"],
+                      conn=conn) for k in keys]
     finally:
         if own:
             conn.close()
@@ -285,16 +285,29 @@ def _is_archived(conn: Connection, trial_date: str) -> bool:
     return bool(row and row["v"] and str(trial_date) < str(row["v"]))
 
 
-def batch(date: str, trial_no: int, *,
+def batch(date: str, trial_no: int, *, venue: str | None = None,
           conn: Connection | None = None) -> dict[str, Any]:
-    """One batch: its runners in finishing order, each rated."""
+    """One batch: its runners in finishing order, each rated.
+
+    `venue` is what separates two batches that share a number. It is optional
+    only so an existing link without one still resolves — with two venues on
+    the date and no venue given, the FIRST is returned and the reply says which,
+    rather than silently merging them into a twenty-horse trial.
+    """
     own = conn is None
     conn = conn or get_conn()
     try:
+        if venue is None:
+            venues = [r[0] for r in conn.execute(
+                "SELECT DISTINCT venue FROM trials "
+                "WHERE trial_date = ? AND trial_no = ? ORDER BY venue",
+                (date, trial_no))]
+            venue = venues[0] if venues else None
         rows = conn.execute(
             f"{_BATCH_SQL} WHERE t.trial_date = ? AND t.trial_no = ? "
+            f"AND t.venue IS ? "
             f"ORDER BY t.place IS NULL, t.place, t.horse_name",
-            (date, trial_no)).fetchall()
+            (date, trial_no, venue)).fetchall()
         if not rows:
             return {}
         field_size = rows[0]["field_size"]
@@ -458,127 +471,3 @@ def _batch_next(conn: Connection, date: str, trial_no: int, *,
              "next_start": nxt[(r["horse_name"], date)]} for r in rows]
 
 
-def _booked(conn: Connection, names: list[str]) -> dict[str, dict[str, Any]]:
-    if not names:
-        return {}
-    marks = ",".join("?" * len(names))
-    return {r["horse_name"]: dict(r) for r in conn.execute(
-        f"SELECT horse_name, id, status, added_date FROM blackbook "
-        f"WHERE horse_name IN ({marks})", [n.upper() for n in names])}
-
-
-def _hold_sentence(band: str, row: dict[str, Any],
-                   base: dict[str, Any]) -> str:
-    """What this band went on to do, in a sentence, from the live numbers.
-
-    The artboard hard-codes one of these per band. Hard-coded, it is a claim
-    about the archive that stops being true the first time the archive grows —
-    and a calibration figure nobody recomputes is exactly the kind of number
-    this page exists to argue against.
-    """
-    n, win = row["with_next"], row["next_win_rate"]
-    if not n or win is None:
-        return f"{band} has no next start on record yet."
-    pct, basis = f"{win:.1%}", f"{base['next_win_rate']:.1%}"
-    if band == "UNTESTED":
-        return (f"UNTESTED sits on the baseline at {pct} against {basis} over "
-                f"{n:,} next starts — the trial told you nothing either way, "
-                f"which is the intent rather than a shortcoming.")
-    if not row["clears_baseline"]:
-        return (f"{band} went {pct} next-start wins over {n:,}, against a "
-                f"baseline of {basis}. The interval contains the baseline, so "
-                f"this band is not separating.")
-    better = win > (base["next_win_rate"] or 0)
-    tail = ("Screening it out is the point." if not better
-            else f"{row['next_place_rate']:.1%} placed.")
-    return (f"{band} went {pct} next-start wins over {n:,} next starts, "
-            f"against a baseline of {basis}. {tail}")
-
-
-def calibration(*, conn: Connection | None = None) -> dict[str, Any]:
-    """What each band actually went on to do at the races.
-
-    The rating is only worth showing if the bands separate, so the page shows
-    this beside them rather than asking anyone to take the mark on trust. Over
-    the archive:
-
-        STANDOUT  next-win 15.6%   next-place 34.6%
-        POSITIVE  next-win 13.1%   next-place 31.9%
-        NEUTRAL   next-win  7.8%   next-place 22.1%
-        NEGATIVE  next-win  4.2%   next-place 12.0%
-        UNTESTED  next-win  7.7%   next-place 23.3%
-        baseline  next-win  8.2%   next-place 21.9%
-
-    Recomputed here rather than quoted, so the table on the page is the table
-    the archive currently supports.
-
-    UNTESTED landing on the baseline is the design intent, not a shortcoming: a
-    trial the horse was not asked to win says nothing about it either way.
-    """
-    own = conn is None
-    conn = conn or get_conn()
-    try:
-        rows = conn.execute(f"""
-            SELECT t.trial_date, t.trial_no, t.horse_name, t.place,
-                   t.finish_time, t.comment_text, t.field_size, t.best_time,
-                   n.place next_place, n.field_size next_field
-            FROM ({_BATCH_SQL}) t
-            LEFT JOIN (
-              SELECT r.horse_name, r.race_date, r.place,
-                     (SELECT count(*) FROM runners f
-                       WHERE f.race_date = r.race_date
-                         AND f.race_no = r.race_no) field_size
-              FROM runners r WHERE r.place IS NOT NULL
-            ) n ON n.horse_name = t.horse_name
-               AND n.race_date = (SELECT min(r2.race_date) FROM runners r2
-                                   WHERE r2.horse_name = t.horse_name
-                                     AND r2.race_date > t.trial_date
-                                     AND r2.place IS NOT NULL)
-        """).fetchall()
-
-        buckets: dict[str, dict[str, int]] = {
-            b: {"trials": 0, "with_next": 0, "wins": 0, "places": 0}
-            for b in BANDS}
-        overall = {"trials": 0, "with_next": 0, "wins": 0, "places": 0}
-        for row in rows:
-            band = rate(place=row["place"], field_size=row["field_size"],
-                        margin=_margin(row["finish_time"], row["best_time"]),
-                        comment=row["comment_text"])["band"]
-            for target in (buckets[band], overall):
-                target["trials"] += 1
-                if row["next_place"] is None:
-                    continue
-                target["with_next"] += 1
-                target["wins"] += 1 if row["next_place"] == 1 else 0
-                placed = 3 if (row["next_field"] or 0) >= 7 else 2
-                target["places"] += 1 if row["next_place"] <= placed else 0
-
-        def finish(d: dict[str, int]) -> dict[str, Any]:
-            n = d["with_next"]
-            return {**d,
-                    "next_win_rate": round(d["wins"] / n, 4) if n else None,
-                    "next_place_rate": round(d["places"] / n, 4) if n else None,
-                    "next_win_ci": list(_wilson(d["wins"], n) or ())}
-
-        base = finish(overall)
-        out = {}
-        for name, value in buckets.items():
-            row = finish(value)
-            # Whether the band is DIFFERENT from the baseline, not merely on
-            # the other side of it. NEUTRAL at 7.9% against a baseline of 8.2%
-            # is the same number; painting it as a shortfall would invent a
-            # finding out of a rounding difference.
-            # Named `base_rate`, not `rate`: assigning `rate` here would make
-            # the imported rating function a local of this whole scope, and
-            # the call above it would fail with an UnboundLocalError.
-            ci = row["next_win_ci"]
-            base_rate = base["next_win_rate"]
-            row["clears_baseline"] = bool(
-                ci and base_rate is not None
-                and (ci[0] > base_rate or ci[1] < base_rate))
-            row["hold"] = _hold_sentence(name, row, base)
-            out[name] = row
-        return {"bands": out, "overall": base, "order": list(BANDS)}
-    finally:
-        if own:
-            conn.close()

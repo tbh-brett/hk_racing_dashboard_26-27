@@ -15,6 +15,7 @@ import pytest
 
 from hkrd.derive import trial_quality as tq
 from hkrd.query import trials as trials_q
+from hkrd.query import trial_calibration as trial_cal
 from hkrd.store import upsert
 from hkrd.store.connect import get_conn, init_db, transaction
 
@@ -238,7 +239,7 @@ def test_the_calibration_table_is_recomputed_not_quoted(db):
     """The rating is only worth showing if the bands separate, so the page
     prints this rather than asking anyone to take the mark on trust."""
     conn = get_conn(db)
-    cal = trials_q.calibration(conn=conn)
+    cal = trial_cal.calibration(conn=conn)
     conn.close()
     assert cal["order"] == list(tq.BANDS)
     assert sum(v["trials"] for v in cal["bands"].values()) == cal["overall"]["trials"] == 5
@@ -251,7 +252,7 @@ def test_a_band_sitting_on_the_baseline_does_not_read_as_below_it(db):
     it as a shortfall would invent a finding out of a rounding difference, so
     the page colours by whether the interval EXCLUDES the baseline."""
     conn = get_conn(db)
-    cal = trials_q.calibration(conn=conn)
+    cal = trial_cal.calibration(conn=conn)
     conn.close()
     for band, v in cal["bands"].items():
         assert "clears_baseline" in v, band
@@ -263,5 +264,46 @@ def test_a_band_sitting_on_the_baseline_does_not_read_as_below_it(db):
 
 def test_the_interval_keeps_a_near_zero_band_from_claiming_certainty(db):
     """0 of 3 is not 'never'. Wilson gives an upper bound instead."""
-    lo, hi = trials_q._wilson(0, 3)
+    lo, hi = trial_cal._wilson(0, 3)
     assert lo == 0.0 and hi > 0.5
+
+
+# ─── two venues, one day ─────────────────────────────────────────────────────
+
+def test_a_batch_is_identified_by_venue_as_well_as_number(tmp_path):
+    """HKJC numbers each venue's batches from 1, and two venues run trials on
+    the same day: 2026-08-25 had four at Conghua AND five at Sha Tin, both
+    numbered from 1.
+
+    Pooled on (date, number) alone, "trial 1" was twenty horses instead of ten
+    — and `field_size` and `best_time` are computed from that grouping, so
+    every margin was measured against the faster of two different tracks
+    (Conghua turf against Sha Tin all-weather) and every quality rating scored
+    against a field twice its real size. Seven days in the archive have two
+    venues, back to 2025-08-29.
+    """
+    from hkrd.query import trials as trials_q
+    from hkrd.store import upsert
+    from hkrd.store.connect import get_conn, init_db, transaction
+
+    path = tmp_path / "t.db"
+    conn = get_conn(path)
+    init_db(conn)
+    with transaction(conn):
+        upsert.upsert_trials(conn, [
+            {"trial_date": "2026-08-25", "trial_no": 1, "venue": venue,
+             "horse_name": f"{venue} HORSE {i}", "place": i,
+             "finish_time": base + i * 0.2, "course": course,
+             "surface": "Turf", "distance": 1200}
+            for venue, course, base in (("ST", "SHA TIN ALL WEATHER TRACK", 71.0),
+                                        ("CH", "CONGHUA TURF", 69.0))
+            for i in range(1, 6)])
+    st = trials_q.batch("2026-08-25", 1, venue="ST", conn=conn)
+    ch = trials_q.batch("2026-08-25", 1, venue="CH", conn=conn)
+    conn.close()
+
+    assert len(st["runners"]) == 5 and len(ch["runners"]) == 5
+    assert st["runners"][0]["field_size"] == 5
+    # Each batch is timed against its OWN track, not the faster of the two.
+    assert st["runners"][0]["margin"] == 0
+    assert ch["runners"][0]["margin"] == 0

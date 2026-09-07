@@ -23,6 +23,7 @@ from __future__ import annotations
 from typing import Any
 
 from hkrd.derive import sectionals as sx
+from hkrd.store import coerce
 from hkrd.query import bets as bets_q
 from hkrd.query import formguide as fg_q
 from hkrd.query import pace as pace_q
@@ -101,19 +102,39 @@ def stewards(date: str, race_no: int, *,
     trip tags derived from it live on the runner already (`runner_tags`), and
     duplicating the derivation here would give the page two versions of the
     same judgement.
+
+    ONE ENTRY PER HORSE. There are two sources — the objective comments on
+    running, and the stewards' incident report — and this returned both, so
+    every runner appeared twice: once saying "No Comments on Running
+    information for this horse." and once with the actual finding. The incident
+    report is preferred where there is one, which is the same preference
+    `query/race` already applies to the same two rows.
+
+    And the placeholder is never shown. It means the comments have not been
+    published; it is stored because the nightly planner reads its presence to
+    know the meeting is not settled, and it is a sentence about nothing.
     """
     own = conn is None
     conn = conn or get_conn()
     try:
-        return [dict(r) for r in conn.execute("""
+        said = (f"c.comment_text IS NOT NULL AND c.comment_text != '' "
+                f"AND c.comment_text NOT LIKE '{coerce.NO_COMMENT_PREFIX}%'")
+        return [dict(r) for r in conn.execute(f"""
             SELECT c.horse_no, c.comment_text, c.source, r.horse_name, r.place
             FROM runner_comments c
             LEFT JOIN runners r ON r.race_date = c.race_date
                                AND r.race_no = c.race_no
                                AND r.horse_no = c.horse_no
             WHERE c.race_date = ? AND c.race_no = ?
-              AND c.comment_text IS NOT NULL AND c.comment_text != ''
-            ORDER BY c.horse_no, c.source""", (date, race_no))]
+              AND {said}
+              AND c.source = (
+                    SELECT c2.source FROM runner_comments c2
+                     WHERE c2.race_date = c.race_date
+                       AND c2.race_no = c.race_no
+                       AND c2.horse_no = c.horse_no
+                       AND {said.replace('c.', 'c2.')}
+                     ORDER BY (c2.source = 'incident') DESC LIMIT 1)
+            ORDER BY c.horse_no""", (date, race_no))]
     finally:
         if own:
             conn.close()

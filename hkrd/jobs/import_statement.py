@@ -105,9 +105,29 @@ def _race_date(compact: str) -> str | None:
 
 def run(src: Path, *, db: Path | None = None,
         account: str = DEFAULT_ACCOUNT) -> StatementImportReport:
+    return _run([(src.name, src.read_text(encoding="utf-8", errors="replace"))]
+                if not src.is_dir() else
+                [(p.name, p.read_text(encoding="utf-8", errors="replace"))
+                 for p in sorted(src.iterdir())
+                 if p.suffix.lower() == ".txt"],
+                db=db, account=account)
+
+
+def run_text(text: str, *, name: str = "upload", db: Path | None = None,
+             account: str = DEFAULT_ACCOUNT) -> StatementImportReport:
+    """Import a statement handed over as TEXT rather than as a path.
+
+    The dashboard runs on a machine in Singapore and the statement is
+    downloaded on whichever device the owner is holding, so "give me a path"
+    was a route only the server itself could use. A statement is a few
+    kilobytes; it travels in the request.
+    """
+    return _run([(name, text)], db=db, account=account)
+
+
+def _run(files: list[tuple[str, str]], *, db: Path | None = None,
+         account: str = DEFAULT_ACCOUNT) -> StatementImportReport:
     report = StatementImportReport()
-    paths = (sorted(p for p in src.iterdir() if p.suffix.lower() == ".txt")
-             if src.is_dir() else [src])
 
     conn = get_conn(db if db is not None else db_path())
     try:
@@ -119,20 +139,20 @@ def run(src: Path, *, db: Path | None = None,
         seen: list[tuple] = []          # what each statement actually covered
         stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
-        for path in paths:
+        for name, text in files:
             try:
-                records, parsed = statement.parse(path)
+                records, parsed = statement.parse_text(text, source=name)
             except statement.StatementError as exc:
-                report.errors.append(f"{path.name}: {exc}")
+                report.errors.append(f"{name}: {exc}")
                 continue
             report.files += 1
             report.cash_movements += parsed.cash_movements
-            report.unparsed += [f"{path.name}: {u}" for u in parsed.unparsed]
+            report.unparsed += [f"{name}: {u}" for u in parsed.unparsed]
 
             for rec in records:
                 date = _race_date(rec["meeting_date"])
                 if not date:
-                    report.errors.append(f"{path.name}: unreadable date "
+                    report.errors.append(f"{name}: unreadable date "
                                          f"{rec['meeting_date']!r}")
                     continue
                 is_new = (rec["bookie_ref"], date, rec["bet_type"]) not in known
@@ -182,7 +202,7 @@ def run(src: Path, *, db: Path | None = None,
                     rec.get("placed_at"), None, "statement",
                     f"Imported from statement (ref {rec['bookie_ref']})."))
 
-                seen.append((bet_id, rec["bookie_ref"], path.name,
+                seen.append((bet_id, rec["bookie_ref"], name,
                              float(rec.get("block_debit") or stake),
                              float(rec.get("block_credit") or 0.0), stamp))
 
