@@ -17,7 +17,7 @@ from . import coerce
 __all__ = [
     "upsert_races", "upsert_runners", "upsert_dividends",
     "upsert_comments", "upsert_odds_snapshots", "upsert_odds_pairs",
-    "upsert_trials", "upsert_vet_records",
+    "upsert_trials", "upsert_vet_records", "upsert_market_close",
 ]
 
 Row = dict[str, Any]
@@ -236,6 +236,26 @@ def upsert_vet_records(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
     return _upsert(conn, "vet_records", cols,
                    ["race_date", "race_no", "horse_name", "record_date",
                     "detail"], prepared)
+
+
+def upsert_market_close(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
+    """When HKJC actually shut the betting on a race.
+
+    Written once per race, by the first capture that sees the pool stop
+    selling. `_upsert` leaves a stored value alone when the incoming row has
+    none, and the key is (date, race) — so a second sighting refreshes the
+    status text but the `closed_at` of the FIRST sighting is the one kept,
+    which is the one nearest the true close.
+    """
+    prepared = [{
+        "race_date": coerce.to_date(r.get("race_date")),
+        "race_no": coerce.to_int(r.get("race_no"), field="race_no"),
+        "closed_at": r.get("closed_at"),
+        "status": (r.get("status") or "").strip() or None,
+    } for r in rows]
+    return _upsert(conn, "market_close",
+                   ["race_date", "race_no", "closed_at", "status"],
+                   ["race_date", "race_no"], prepared)
 
 
 def upsert_odds_pairs(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:

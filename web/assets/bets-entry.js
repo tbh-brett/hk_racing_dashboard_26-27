@@ -7,13 +7,13 @@
  * Four figures sit in front of the confirm button, each because a measurement
  * said the intuitive version is wrong:
  *
- *   banker place probability   Harville-Henery, shown beside the 3x rule of
- *                              thumb it corrects — which overstates a short
- *                              banker by ~34 points. Both are on screen: a
- *                              wrong number the user can SEE failing is worth
- *                              more than one quietly corrected, because the
- *                              rule of thumb is what they would otherwise reach
- *                              for.
+ *   banker place probability   from the PLACE POOL, which is captured on
+ *                              every race and prices the question directly.
+ *                              Harville-Henery sits beside it as the check —
+ *                              the model was the answer only while the pool
+ *                              was not captured, and the 3× rule of thumb it
+ *                              replaced is not a transform at all and is gone
+ *                              from the screen entirely.
  *   market concentration       from the LATEST snapshot. The morning price
  *                              misclassifies the band in 60% of races, always
  *                              downward.
@@ -39,7 +39,7 @@ export const entry = {
   account: 'brett', accounts: [], date: null, meeting: null,
   betType: 'WIN', raceNo: null, card: null,
   picks: new Set(), banker: null, unit: 100,
-  allUpRaces: [], legs: new Map(), legsRequired: null,
+  allUpRaces: [], legs: new Map(), legsRequired: null, formula: null,
   ticket: null, acknowledged: new Set(), bbLinks: [], bbLink: null,
   placed: null, busy: false,
 };
@@ -165,8 +165,8 @@ const CARD_COLS = [
   ['no', 'NO'], ['bnk', 'BNK'], ['sel', 'SEL'], ['horse', 'HORSE'],
   ['style', 'STYLE'], ['dr', 'DR'], ['jockey', 'JOCKEY'],
   ['win', 'WIN'], ['place', 'PLACE'],
-  ['winp', 'WIN %'], ['placep', 'PLACE % · HARVILLE-HENERY'],
-  ['linear', 'v OLD 3× RULE'],
+  ['winp', 'WIN %'], ['placep', 'PLACE %'],
+  ['model', 'v HARVILLE-HENERY'],
 ];
 
 function styleCell(r) {
@@ -226,14 +226,33 @@ function cardRow(r) {
   row.append(el('span', 'win', r.win_odds == null ? DASH : r.win_odds.toFixed(1)));
   row.append(el('span', 'place', r.place_odds == null ? DASH : r.place_odds.toFixed(1)));
   row.append(el('span', 'winp', pct(r.win_pct)));
-  row.append(el('span', 'placep', pct(r.place_pct)));
 
-  // The rule of thumb, kept on screen next to the honest figure.
-  const lin = el('span', 'linear');
-  lin.append(el('span', 'v', pct(r.linear_pct)));
+  // The figure the ticket is sized on, and where it came from. A model
+  // fallback is marked, because a race whose place pool has not opened is
+  // priced by a different method and that must not be invisible.
+  const pp = el('span', 'placep', pct(r.place_pct));
+  if (r.place_source && r.place_source !== 'place pool') pp.classList.add('modelled');
+  pp.title = r.place_source === 'place pool'
+    ? 'from the place pool'
+    : 'no place pool captured — Harville-Henery on the win odds';
+  row.append(pp);
+
+  // The model, kept on screen beside the pool. Where they disagree the pool
+  // wins; the size of the disagreement is the only reading on the model that
+  // does not have to wait for a result.
+  const lin = el('span', 'model');
+  lin.append(el('span', 'v', pct(r.model_pct)));
   if (r.gap_points != null && Math.abs(r.gap_points) >= 1) {
-    lin.append(el('span', r.gap_points > 0 ? 'over' : 'under',
-      `${r.gap_points > 0 ? '+' : '−'}${Math.abs(r.gap_points).toFixed(1)}`));
+    // Signed from the MODEL's side, which is the side being judged: +8.2 means
+    // Harville-Henery says this horse places 8.2 points more often than the
+    // pool does. The other direction reads as an arithmetic sign rather than
+    // as an error, and it is an error that is being shown.
+    const err = -r.gap_points;
+    const tag = el('span', err > 0 ? 'over' : 'under',
+      `${err > 0 ? '+' : '−'}${Math.abs(err).toFixed(1)}`);
+    tag.title = `the model ${err > 0 ? 'overstates' : 'understates'} the pool `
+      + `by ${Math.abs(err).toFixed(1)} points`;
+    lin.append(tag);
   }
   row.append(lin);
   return row;
@@ -275,7 +294,9 @@ function renderCard(host) {
     host.append(el('div', 'entry-foot',
       'Win and place are both scraped prices at equal weight — place is never '
       + `derived from win. The ratio on this card ranges ${entry.card.place_ratio_range}, `
-      + 'which is why the 3× rule of thumb cannot work.'));
+      + 'which is why no single multiple of the win odds can stand in for it. '
+      + 'PLACE % is the place pool de-vigged; the column beside it is what '
+      + 'Harville-Henery makes of the win odds alone.'));
   }
 }
 
@@ -301,6 +322,10 @@ function renderAllUp(host) {
         await loadLeg(r.race_no);
       }
       entry.legsRequired = null;
+      // A formula names a leg COUNT — 4x11 is meaningless over three legs —
+      // so adding or dropping one clears it rather than pricing a ticket
+      // HKJC would not sell.
+      entry.formula = null;
       priceTicket();
     }));
   });
@@ -339,6 +364,7 @@ function legPanel(no) {
     entry.allUpRaces = entry.allUpRaces.filter((n) => n !== no);
     entry.legs.delete(no);
     entry.legsRequired = null;
+    entry.formula = null;
     priceTicket();
   });
   head.append(rm);
@@ -410,32 +436,95 @@ function legPanel(no) {
 
 function renderFormulas(host) {
   const options = entry.ticket?.formulas ?? [];
-  if (!options.length) return;
+  const n = entry.allUpRaces.length;
   const step = el('div', 'entry-step');
   step.append(el('span', 'n', 'STEP 3'));
-  step.append(el('span', 't',
-    `HOW MANY OF MY ${entry.allUpRaces.length} LEGS MUST WIN`));
+  step.append(el('span', 't', `ALL UP FORMULA · ${n} LEGS`));
   host.append(step);
-  host.append(el('div', 'entry-count',
-    'Generated from the race count — an invalid formula cannot be picked'));
 
-  const chips = el('div', 'entry-chips wrap');
+  if (!options.length) {
+    host.append(el('div', 'entry-empty',
+      n > 6 ? 'HKJC sells at most six legs.'
+        : 'Pick at least two races to choose a formula.'));
+    return;
+  }
+
+  // A dropdown, not a row of chips. Six legs is fifteen formulas and the chip
+  // grid wrapped to four rows of near-identical buttons; the list is HKJC's
+  // own and reading it as a list is how it is read on their slip.
+  const row = el('div', 'entry-row');
+  row.append(el('div', 'entry-lab', 'FORMULA'));
+  const zone = el('div', 'entry-chips');
+
+  const sel = el('select', 'formula-pick');
+  sel.setAttribute('aria-label', 'All up formula');
   options.forEach((f) => {
-    const on = (entry.ticket?.legs_required ?? null) === f.legs;
-    const b = el('button', `entry-formula${on ? ' on' : ''}`);
-    b.type = 'button';
-    b.append(el('span', 'lab', f.label));
-    b.append(el('span', 'legs', `${f.legs} of ${entry.allUpRaces.length} must win`));
-    b.append(el('span', 'combos',
-      `${f.combinations} combination${f.combinations === 1 ? '' : 's'}`));
-    b.addEventListener('click', () => {
-      entry.legsRequired = f.legs;
-      priceTicket();
-    });
-    chips.append(b);
+    const o = el('option', null, `${f.code}  —  ${f.label}`);
+    o.value = f.code;
+    if (entry.ticket?.formula === f.code) o.selected = true;
+    sel.append(o);
   });
-  host.append(chips);
+  sel.addEventListener('change', () => {
+    entry.formula = sel.value;
+    entry.legsRequired = null;
+    priceTicket();
+  });
+  zone.append(sel);
+  row.append(zone);
+  host.append(row);
+
+  const chosen = options.find((f) => f.code === entry.ticket?.formula);
+  if (!chosen) return;
+
+  // What the code actually buys, spelled out. "4x11" is 6 doubles, 4 trebles
+  // and 1 quadruple, and the 11 IS that total — which is the thing about
+  // HKJC's codes that nobody remembers.
+  const parts = el('div', 'formula-parts');
+  chosen.breakdown.forEach((b) => {
+    const chip = el('span', 'part');
+    chip.append(el('span', 'c', String(b.count)));
+    chip.append(el('span', 'k', `${b.name}${b.count === 1 ? '' : 's'}`));
+    parts.append(chip);
+  });
+  parts.append(el('span', 'sum',
+    `= ${chosen.combinations} line${chosen.combinations === 1 ? '' : 's'} `
+    + 'with one combination in every leg'));
+  host.append(parts);
+
+  renderLegMultiplier(host);
 }
+
+/* Where the second multiplication becomes visible.
+ *
+ * The formula's own number assumes one combination per leg. A leg is a whole
+ * ticket in its own race, so a QQP banker with four others is eight — and the
+ * chain multiplies those, not the legs. A 2X1 over that leg and a single place
+ * is eight lines, not one, which is $160 at $20 rather than $20. */
+function renderLegMultiplier(host) {
+  const t = entry.ticket;
+  const per = t?.leg_combinations ?? [];
+  if (per.length < 2) return;
+  const box = el('div', 'formula-mult');
+  box.append(el('span', 'k', 'LINES PER LEG'));
+  entry.allUpRaces.forEach((no, i) => {
+    if (per[i] == null) return;
+    const leg = entry.legs.get(no);
+    const chip = el('span', 'leg');
+    chip.append(el('span', 'r', `R${no}`));
+    chip.append(el('span', 'ty', leg?.betType ?? 'WIN'));
+    chip.append(el('span', 'c', `${per[i]}`));
+    box.append(chip);
+  });
+  if (t.formula_combinations && t.combinations
+      && t.combinations !== t.formula_combinations) {
+    box.append(el('span', 'note',
+      `${t.formula_combinations} formula line`
+      + `${t.formula_combinations === 1 ? '' : 's'} × the legs = `
+      + `${t.combinations} bets`));
+  }
+  host.append(box);
+}
+
 
 /* ── stake, and the HKJC-shaped total ─────────────────────────────────────── */
 
@@ -498,7 +587,7 @@ function bankerPanel(t) {
       'All selections combine with each other. A banker is optional — this is '
       + 'a complete ticket, not an unfinished one.');
   }
-  const p = panel('BANKER PLACE PROBABILITY · HARVILLE-HENERY');
+  const p = panel('BANKER PLACE PROBABILITY · FROM THE PLACE POOL');
   if (b.place_pct == null) {
     p.append(el('div', 'pre-thin', b.note ?? 'no priced snapshot'));
     return p;
@@ -511,12 +600,19 @@ function bankerPanel(t) {
   g.append(el('span', 'k', 'place odd'));
   g.append(el('span', 'v sm', b.place_odds == null ? DASH : b.place_odds.toFixed(1)));
   p.append(g);
-  const cmp = el('div', 'pre-compare');
-  cmp.append(el('span', 'old', `3× rule ${pct(b.linear_pct)}`));
-  cmp.append(el('span', b.overstated ? 'over' : 'under',
-    `${b.overstated ? 'overstates' : 'understates'} by ${Math.abs(b.gap_points).toFixed(1)} points`));
-  p.append(cmp);
-  p.append(el('div', 'pre-note', '3 × win% is not a place probability.'));
+  if (b.gap_points != null) {
+    const cmp = el('div', 'pre-compare');
+    cmp.append(el('span', 'old', `Harville-Henery ${pct(b.model_pct)}`));
+    cmp.append(el('span', b.model_overstates ? 'over' : 'under',
+      `the model ${b.model_overstates ? 'overstates' : 'understates'} this by `
+      + `${Math.abs(b.gap_points).toFixed(1)} points`));
+    p.append(cmp);
+  }
+  p.append(el('div', 'pre-note', b.place_source === 'place pool'
+    ? 'The place pool prices this directly. The model is the check on it, '
+      + 'not the source.'
+    : 'No place pool captured for this race — this is Harville-Henery on the '
+      + 'win odds.'));
   return p;
 }
 
@@ -541,12 +637,23 @@ function concentrationPanel(t) {
 
 function pairsPanel(t) {
   if (!t.pairs?.length) return null;
-  const p = panel('PAIR RANKING',
-    'Ranking pairs beats boxing a set at every ticket size.');
+  // Ranked in the pool the ticket is struck into. QPL pays for both in the
+  // first three and QIN for the first two: they are different questions, and
+  // ranking a quinella-place ticket on a quinella number recommends a
+  // different set of pairs. Where no pair pool was captured this falls back
+  // to Harville-Henery and says so rather than looking like a price.
+  const from = t.pairs[0]?.pool;
+  const p = panel(`PAIR RANKING · ${from === 'model' ? 'HARVILLE-HENERY' : from}`,
+    from === 'model'
+      ? 'No pair pool captured for this race — this is the model on the win '
+        + 'odds, which prices the quinella question.'
+      : 'De-vigged from the prices in that pool itself, so what the ticket '
+        + 'pays and what it is ranked by are the same money.');
   t.pairs.forEach((pr) => {
     const row = el('div', `pre-pair${pr.in_ticket ? ' in' : ''}`);
     row.append(el('span', 'r', String(pr.rank)));
     row.append(el('span', 'l', pr.horse_nos.join(' · ')));
+    row.append(el('span', 'o', pr.odds == null ? '' : pr.odds.toFixed(1)));
     row.append(el('span', 'p', pct(pr.prob)));
     row.append(el('span', 'in', pr.in_ticket ? 'in ticket' : ''));
     p.append(row);
@@ -676,6 +783,7 @@ function ticketBody() {
     return {
       race_date: entry.date, bet_type: 'ALLUP', account: entry.account,
       unit_stake: entry.unit, legs_required: entry.legsRequired,
+      formula: entry.formula,
       legs: entry.allUpRaces.map((no) => {
         const l = entry.legs.get(no);
         return {

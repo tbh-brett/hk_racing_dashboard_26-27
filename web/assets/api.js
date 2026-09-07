@@ -67,6 +67,7 @@ export const api = {
    * the older `path` form is a route only the server can use. */
   importStatementText: (text, name, account) => post('/jobs/import-statement',
     { text, name, ...(account ? { account } : {}) }),
+  betsAnchor: (qs) => get(`/bets/anchor${qs}`),
   meetings: (limit = 50) => get(`/meetings?limit=${limit}`),
   meeting: (date) => get(`/meeting/${date}`),
   horses: (limit = 400, q) => get(

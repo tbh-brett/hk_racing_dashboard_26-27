@@ -254,3 +254,43 @@ def test_the_summary_splits_by_bet_type(booked):
     assert s["bets"] == 2 and s["staked"] == 200.0
     assert s["roi"] == pytest.approx(0.25)
     assert [t["bet_type"] for t in s["by_type"]] == ["QIN"]
+
+# ── which day the ledger measures back from ──────────────────────────────────
+
+def test_the_ledger_knows_its_own_last_day(db):
+    """The Bets page cannot anchor on the meeting in the header.
+
+    Every other page should: "this week" while looking at an April meeting
+    means that April week. Here the header points at the NEXT race day, so on
+    the Tuesday after a Sunday meeting a DAY window resolved to a meeting
+    nobody had bet into. Every panel then correctly reported nothing, which
+    reads exactly like an analysis that has not been updated — and was read as
+    one.
+    """
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.executemany(
+            "INSERT INTO bets (bet_id, account, race_date, bet_type, stake, "
+            "status, source) VALUES (?, ?, ?, 'WIN', 100, 'settled', 'manual')",
+            [("b1", "brett", "2026-06-01"), ("b2", "brett", "2026-08-01"),
+             ("b3", "kelvin", "2026-05-01")])
+    try:
+        assert bq.latest_bet_date(conn=conn) == "2026-08-01"
+        assert bq.latest_bet_date(conn=conn, account="kelvin") == "2026-05-01"
+        # The meeting choice still means something: looking at a June card
+        # anchors on June, not on the newest bet in the book.
+        assert bq.latest_bet_date(
+            conn=conn, on_or_before="2026-06-30") == "2026-06-01"
+        # And a day before anything was bet has no anchor to offer, rather
+        # than silently reaching forward past the meeting on screen.
+        assert bq.latest_bet_date(conn=conn, on_or_before="2026-01-01") is None
+    finally:
+        conn.close()
+
+
+def test_an_empty_ledger_has_no_anchor_rather_than_todays_date(db):
+    conn = get_conn(db)
+    try:
+        assert bq.latest_bet_date(conn=conn) is None
+    finally:
+        conn.close()

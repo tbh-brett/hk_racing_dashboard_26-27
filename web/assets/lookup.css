@@ -136,18 +136,22 @@
 
 .lk-head, .lk-row {
   display: grid; align-items: center;
-  /* 27 columns, in the old dashboard's order. The table scrolls sideways
+  /* 26 columns, in the old dashboard's order. The table scrolls sideways
      rather than dropping information: this page's whole job is having every
-     fact about a run on one line. */
+     fact about a run on one line.
+
+     The placing column is gone: rows come back in finishing order, so it
+     repeated the sort. The FIGURE moved into its slot, beside the field size
+     it is measured against, and the winner is marked on the horse name. */
   grid-template-columns:
-    /* date  R    trk  crs  surf cls  dist going fld  pl */
-    62px  30px 34px 34px 40px 34px 42px 44px 30px 30px
+    /* date  R    trk  crs  surf cls  dist going fld  figure */
+    62px  30px 34px 34px 40px 34px 42px 44px 30px 50px
     /* horse                  gate wt   jockey trainer */
     minmax(124px, 1fr) 34px 34px 74px 74px
     /* style  run pos.  pace      time  finΔ lbw  odds gear */
     64px    82px      96px      62px  50px 46px 44px 58px
-    /* figure  trip  ▶    hkjc */
-    50px     206px 22px 40px;
+    /* trip  ▶    hkjc */
+    206px 22px 40px;
   gap: 7px; padding: 0 14px;
 }
 .lk-head {
@@ -166,8 +170,11 @@
 .lk-row .date { color: var(--text-2); }
 .lk-row .horse { color: var(--text); overflow: hidden; text-overflow: ellipsis; }
 .lk-row .r { text-align: right; }
-.lk-row .fin.win { color: var(--win); font-weight: 600; }
-.lk-row .fin.plc { color: var(--text-2); }
+/* The result, carried on the horse's own name now that the placing has no
+   column of its own. A winner still reads as one at a glance. */
+.lk-row .horse.win { color: var(--win); font-weight: 600; }
+.lk-row .horse.plc { color: var(--text-2); }
+.lk-row .fig { color: var(--text); }
 /* A trial has no odds, no draw and no class. Marked rather than blank, so the
    gap reads as "trials do not have this" rather than "this is missing". */
 .lk-row.trial { background: var(--thesis); }
@@ -347,6 +354,21 @@
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   border-bottom: 1px solid var(--page-rule-2);
 }
+/* A long group scrolls inside itself rather than pushing the panel down the
+   page. Seventy jockeys is a list; a panel seventy chips tall is a wall. */
+.filter-panel .fp-chips.long {
+  max-height: 108px; overflow-y: auto; align-content: flex-start;
+}
+.filter-panel .fp-find {
+  width: 100%; margin: 4px 0; padding: 3px 6px;
+  background: var(--bg); border: 1px solid var(--line-2);
+  color: var(--text); font-family: var(--font); font-size: var(--fs-xs);
+}
+.filter-panel .fp-find:focus {
+  outline: 1px solid var(--page-accent); outline-offset: -1px;
+}
+.filter-panel .fp-k .of { color: var(--page-dim); font-size: var(--fs-xs); }
+.filter-panel .fp-none { color: var(--page-dim); font-size: var(--fs-xs); }
 .filter-panel .fp-group {
   padding: 8px 12px; border-right: 1px solid var(--page-rule-2);
   min-width: 0;

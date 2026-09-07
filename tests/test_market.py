@@ -179,3 +179,22 @@ def test_a_tz_aware_capture_does_not_crash_the_age():
 def test_a_capture_in_another_offset_lands_on_the_hong_kong_clock():
     """01:00 UTC is 09:00 in Hong Kong, four hours before the 13:00 reference."""
     assert market.snapshot_age_hours("2026-07-15", "2026-07-15T01:00:00+00:00") == 4.0
+
+def test_the_ladder_stops_once_a_race_is_settled():
+    """A settled race cannot move again, so the ladder ends rather than
+    repeating its finest rung forever.
+
+    The capture already drops a settled race. The PAGE did not: a card left
+    open on a finished meeting asked every thirty seconds all evening and the
+    answer was always 304. An hour away from a race that has been run is the
+    same distance from the action as the day before it.
+    """
+    assert market.interval_for(5) == 1
+    assert market.interval_for(-10) == 1
+    assert market.interval_for(-31) == market.SETTLED_INTERVAL_MINUTES
+    assert market.interval_for(-600) == market.SETTLED_INTERVAL_MINUTES
+    assert market.interval_for(-31, market.PAIR_CADENCE_MINUTES) == (
+        market.SETTLED_INTERVAL_MINUTES)
+    # And an unreadable off time still falls back to the COARSEST rung, not
+    # the finest: a card with no times must not be priced every minute all day.
+    assert market.interval_for(None) == market.CADENCE_MINUTES[0][1]

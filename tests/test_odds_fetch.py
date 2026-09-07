@@ -28,6 +28,7 @@ system, and the one that would have cost it here:
 """
 from __future__ import annotations
 
+import datetime as dt
 import json
 from pathlib import Path
 
@@ -650,3 +651,140 @@ def test_quiet_silences_only_the_idle_tick(tmp_path, db, endpoint, capsys):
                       "--quiet"])
     said = capsys.readouterr().out
     assert "SKIPPED" in said and "different meeting" in said
+
+
+# ─── stopping when the race is actually over ─────────────────────────────────
+#
+# The capture used to run on the clock alone: thirty minutes past the SCHEDULED
+# off and then stop. That is ~30 dead win/place captures and ~6 dead pair
+# captures per race — several thousand rows a meeting recording a market that
+# could no longer move — and it is wrong in the other direction too, because a
+# delayed start moves the real close and the clock does not know.
+#
+# HKJC's own `sellStatus` does know. These pin the three states apart, because
+# conflating any two of them either fills the table or loses the late money.
+
+def _stop_selling(reply: dict) -> None:
+    for pool in reply["data"]["raceMeetings"][0]["pmPools"]:
+        pool["status"] = pool["sellStatus"] = "STOP_SELL"
+
+
+def _closed(db) -> dict[int, str]:
+    conn = get_conn(db)
+    try:
+        return {r["race_no"]: r["status"] for r in conn.execute(
+            "SELECT race_no, status FROM market_close")}
+    finally:
+        conn.close()
+
+
+def test_a_selling_market_is_never_recorded_as_closed(db, hk_endpoint):
+    report = scrape_odds.run(DATE, HK_VENUE, db=str(db))
+    assert report.closed == []
+    assert _closed(db) == {}
+
+
+def test_the_pool_shutting_is_what_stops_the_capture(db, hk_endpoint):
+    """Not the clock. The close is recorded the first tick that sees it."""
+    _, replies = hk_endpoint
+    scrape_odds.run(DATE, HK_VENUE, db=str(db))       # a normal capture first
+    _stop_selling(replies["odds_pools_live"])
+
+    report = scrape_odds.run(DATE, HK_VENUE, db=str(db))
+    assert sorted(report.closed) == [1, 2, 4]
+    assert _closed(db) == {1: "STOP_SELL", 2: "STOP_SELL", 4: "STOP_SELL"}
+    assert "market shut on R1, R2, R4" in report.line()
+
+
+def test_a_closed_race_is_not_asked_about_again(db, hk_endpoint):
+    """The whole point: a meeting that finished at six costs nothing for the
+    rest of the evening, rather than a request a minute per race."""
+    calls, replies = hk_endpoint
+    scrape_odds.run(DATE, HK_VENUE, db=str(db))
+    _stop_selling(replies["odds_pools_live"])
+    scrape_odds.run(DATE, HK_VENUE, db=str(db))
+    before = len(calls)
+
+    # Unattended, as cron runs it — no explicit date, so the ladder and the
+    # closed-race list both apply.
+    report = scrape_odds.run(db=str(db), today=dt.date.fromisoformat(DATE))
+    assert report.attempted == 0
+    assert len(calls) == before, "a closed meeting reached the network"
+
+
+def test_a_market_that_has_not_opened_is_not_a_finished_race(db, hk_endpoint):
+    """Both look identical in the pool status — DEFINED / STOP_SELL, no prices.
+
+    The recorded pre-declared reply IS that state. Treating it as an ending
+    would stop the capture before the market ever opened, which is the whole
+    overnight move and the one thing here that cannot be reconstructed after
+    the fact.
+    """
+    _, replies = hk_endpoint
+    replies["odds_pools_live"] = _fixture("odds_pools_predeclared")
+    conn = get_conn(db)
+    with transaction(conn):
+        upsert.upsert_races(conn, [
+            {"race_date": PRE_DATE, "race_no": n, "venue": PRE_VENUE,
+             "course": "A", "surface": "Turf", "going": "G", "distance": 1200}
+            for n in (1, 3)])
+    conn.close()
+
+    report = scrape_odds.run(PRE_DATE, PRE_VENUE, db=str(db))
+    assert report.closed == []
+    assert _closed(db) == {}
+
+
+def test_a_pool_that_stops_before_the_off_is_a_suspension_not_an_ending(
+        db, hk_endpoint):
+    """A market withdrawn and restored mid-afternoon must not end the race.
+
+    Dropping a race for good over a blip would lose exactly the window the
+    ladder exists to sample.
+    """
+    _, replies = hk_endpoint
+    conn = get_conn(db)
+    with transaction(conn):
+        upsert.upsert_races(conn, [
+            {"race_date": DATE, "race_no": n, "venue": HK_VENUE, "course": "A",
+             "surface": "Turf", "going": "G", "distance": 1800,
+             "off_time": "14:00"} for n in (1, 2, 4)])
+    conn.close()
+
+    scrape_odds.run(DATE, HK_VENUE, db=str(db),
+                    now=dt.datetime.fromisoformat(f"{DATE}T13:30:00"))
+    _stop_selling(replies["odds_pools_live"])
+    report = scrape_odds.run(DATE, HK_VENUE, db=str(db),
+                             now=dt.datetime.fromisoformat(f"{DATE}T13:30:00"))
+    assert report.closed == []
+
+    # Past the off, the same status means what it says.
+    after = scrape_odds.run(DATE, HK_VENUE, db=str(db),
+                            now=dt.datetime.fromisoformat(f"{DATE}T14:02:00"))
+    assert sorted(after.closed) == [1, 2, 4]
+
+
+def test_a_shut_pool_with_no_prices_is_not_reported_as_a_failed_capture(
+        db, hk_endpoint):
+    """A race that has been run comes back empty, and so does a broken scrape.
+
+    They must not share a line: one is the expected end of the day and the
+    other is the thing the freshness strip exists to go amber for.
+    """
+    _, replies = hk_endpoint
+    scrape_odds.run(DATE, HK_VENUE, db=str(db))
+    _stop_selling(replies["odds_pools_live"])
+    for pool in replies["odds_pools_live"]["data"]["raceMeetings"][0]["pmPools"]:
+        pool["oddsNodes"] = []
+
+    report = scrape_odds.run(DATE, HK_VENUE, db=str(db))
+    assert report.skipped == []
+    assert sorted(report.closed) == [1, 2, 4]
+
+    conn = get_conn(db)
+    try:
+        run = conn.execute("SELECT ok FROM job_runs WHERE job = 'scrape_odds' "
+                           "ORDER BY rowid DESC LIMIT 1").fetchone()
+    finally:
+        conn.close()
+    assert run["ok"] == 1, "recording a close is an outcome, not a miss"

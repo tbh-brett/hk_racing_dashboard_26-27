@@ -48,7 +48,7 @@ const COLS = [
   { k: 'venue', label: 'TRACK' }, { k: 'course', label: 'CRS' },
   { k: 'surface', label: 'SURF' }, { k: 'class', label: 'CLASS' },
   { k: 'dist', label: 'DIST', cls: 'r' }, { k: 'going', label: 'GOING' },
-  { k: 'field', label: 'FLD', cls: 'r' }, { k: 'fin', label: 'PL', cls: 'r' },
+  { k: 'field', label: 'FLD', cls: 'r' }, { k: 'fig', label: 'FIGURE', cls: 'r' },
   { k: 'horse', label: 'HORSE' }, { k: 'draw', label: 'GATE', cls: 'r' },
   { k: 'wt', label: 'WT', cls: 'r' },
   { k: 'jockey', label: 'JOCKEY' }, { k: 'trainer', label: 'TRAINER' },
@@ -57,7 +57,6 @@ const COLS = [
   { k: 'delta', label: 'FIN \u0394', cls: 'r' },
   { k: 'lbw', label: 'LBW', cls: 'r' },
   { k: 'sp', label: 'ODDS', cls: 'r' }, { k: 'gear', label: 'GEAR' },
-  { k: 'fig', label: 'FIGURE', cls: 'r' },
   // The grid could already FILTER on a tag and had nowhere to show one, so a
   // search for every run where a horse bled returned rows that looked like
   // every other row. Veterinary findings sort to the front here as everywhere.
@@ -207,6 +206,16 @@ function countFor(name) {
   return Array.isArray(cur) ? cur.length : 1;
 }
 
+/* Past this many values a group gets its own search box and scrolls.
+ *
+ * The jockey and trainer groups used to be capped at the fourteen busiest,
+ * with a free-text box elsewhere for the rest — so four names in five were in
+ * the archive, filterable, and not on the panel. A filter that does not offer
+ * its own values is a filter you have to already know the answer to. Both
+ * lists are now whole; a list of seventy needs finding rather than scanning,
+ * which is what the box is for. */
+const SEARCHABLE_FROM = 20;
+
 /** One labelled group of toggle chips. */
 function chipGroup(name, label, values, { format = String } = {}) {
   const box = el('div', 'fp-group');
@@ -214,17 +223,41 @@ function chipGroup(name, label, values, { format = String } = {}) {
   head.append(el('span', null, label));
   const n = countFor(name);
   if (n) head.append(el('span', 'badge', String(n)));
+  if (values.length >= SEARCHABLE_FROM) {
+    head.append(el('span', 'of', `${values.length}`));
+  }
   box.append(head);
 
-  const chips = el('div', 'fp-chips');
-  values.forEach((v) => {
-    const on = chosen(name, v);
-    const b = el('button', `fchip${on ? ' on' : ''}`, format(v));
-    b.type = 'button';
-    b.setAttribute('aria-pressed', String(on));
-    b.addEventListener('click', () => toggleValue(name, v));
-    chips.append(b);
-  });
+  const chips = el('div', `fp-chips${values.length >= SEARCHABLE_FROM ? ' long' : ''}`);
+  const draw = (needle = '') => {
+    chips.replaceChildren();
+    const want = needle.trim().toLowerCase();
+    // A chosen value never scrolls out of reach, and never hides behind a
+    // search term that no longer matches it: the selection IS the state, and
+    // a filter you cannot see to turn off is one you cannot turn off.
+    const shown = values.filter((v) => chosen(name, v)
+      || !want || String(format(v)).toLowerCase().includes(want));
+    shown.sort((a, b) => Number(chosen(name, b)) - Number(chosen(name, a)));
+    shown.forEach((v) => {
+      const on = chosen(name, v);
+      const b = el('button', `fchip${on ? ' on' : ''}`, format(v));
+      b.type = 'button';
+      b.setAttribute('aria-pressed', String(on));
+      b.addEventListener('click', () => toggleValue(name, v));
+      chips.append(b);
+    });
+    if (!shown.length) chips.append(el('span', 'fp-none', 'no match'));
+  };
+
+  if (values.length >= SEARCHABLE_FROM) {
+    const find = el('input', 'fp-find');
+    find.type = 'search';
+    find.placeholder = `find in ${values.length}`;
+    find.setAttribute('aria-label', `Find ${label}`);
+    find.addEventListener('input', () => draw(find.value));
+    box.append(find);
+  }
+  draw();
   box.append(chips);
   return box;
 }
@@ -479,13 +512,24 @@ function runRow(r) {
   cell(null, r.going);
   cell('r', r.field_size ? String(r.field_size) : DASH);
 
-  const fin = el('div', 'r fin', r.place_display ?? r.place ?? DASH);
-  if (r.place === 1) fin.classList.add('win');
-  else if (r.placed) fin.classList.add('plc');
-  row.append(fin);
+  // The FIGURE, where the finishing position used to be. Rows are now
+  // returned in finishing order — the winner first, the last horse last — so
+  // a column repeating the position said what the order already said, and the
+  // figure is the thing the position does not tell you: a 96.4 beaten a length
+  // is a better run than an 88.1 that won. The placing survives on the horse
+  // itself, which is where the eye goes anyway.
+  const fig = el('div', 'r fig',
+    r.et_figure === null || r.et_figure === undefined ? DASH : num(r.et_figure, 1));
+  if (r.figure_display) fig.title = r.figure_display;
+  row.append(fig);
 
   const horse = el('div', 'horse', r.horse_name);
-  horse.title = r.horse_name;
+  if (r.place === 1) horse.classList.add('win');
+  else if (r.placed) horse.classList.add('plc');
+  horse.title = r.place == null
+    ? `${r.horse_name} — no finishing position recorded`
+    : `${r.horse_name} — finished ${r.place_display ?? r.place}`
+      + (r.field_size ? ` of ${r.field_size}` : '');
   row.append(horse);
   cell('r', drawText(r.draw));
   cell('r', r.actual_weight ? String(r.actual_weight) : DASH);
@@ -520,11 +564,6 @@ function runRow(r) {
   cell('r', r.lengths_behind == null ? DASH : num(r.lengths_behind, 2));
   cell('r', r.win_odds ? num(r.win_odds, 1) : DASH);
   cell('gear', r.gear);
-
-  const fig = el('div', 'r', r.et_figure === null || r.et_figure === undefined
-    ? DASH : num(r.et_figure, 1));
-  if (r.figure_display) fig.title = r.figure_display;
-  row.append(fig);
 
   // What the stewards recorded about the run, as the shared chips rather than
   // as prose: the whole point of a grid is that a row is comparable with the

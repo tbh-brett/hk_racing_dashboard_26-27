@@ -392,3 +392,107 @@ def test_the_corpus_line_quantifies_what_is_missing(db):
     assert c["pace_labelled"] == 8
     assert c["pace_share"] == 0.5
     assert c["latest"] == "2026-06-01"
+
+
+# ── what counts as a run ─────────────────────────────────────────────────────
+
+def test_a_card_that_has_not_been_run_is_not_in_the_archive(db):
+    """The next meeting's card is scraped days ahead, and every one of its
+    runners has a horse, a draw and nothing else.
+
+    Those rows filled the top of the grid with blanks while the insight panel
+    beside it — which has always required a placing — counted none of them. One
+    of the two was wrong about what this page is for, and it was the grid.
+    """
+    conn = get_conn(db)
+    with transaction(conn):
+        upsert.upsert_races(conn, [
+            {"race_date": "2026-06-08", "race_no": 1, "venue": "ST",
+             "course": "A", "surface": "Turf", "going": "G", "distance": 1400}])
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-06-08", "race_no": 1, "horse_no": i,
+             "horse_name": f"DECLARED {i}", "draw": i}
+            for i in range(1, 9)])
+    try:
+        dates = {r.race_date for r in lookup.search_runs(conn=conn)}
+    finally:
+        conn.close()
+    assert "2026-06-08" not in dates
+    assert dates == {"2026-05-01", "2026-06-01"}
+
+
+def test_a_scratching_in_a_race_that_was_run_stays_visible(db):
+    """The test is on the RACE, not the runner. A horse that was withdrawn or
+    did not finish has no placing in a meeting that certainly happened, and its
+    absence is information worth seeing."""
+    conn = get_conn(db)
+    with transaction(conn):
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-05-01", "race_no": 1, "horse_no": 9,
+             "horse_name": "WITHDRAWN", "draw": 9}])
+    try:
+        names = [r.horse_name for r in lookup.search_runs(
+            conn=conn, date_from="2026-05-01", date_to="2026-05-01")]
+    finally:
+        conn.close()
+    assert "WITHDRAWN" in names
+
+
+def test_rows_come_back_in_finishing_order(db):
+    """Winner first, last horse last — the order the race happened in, and the
+    order every other results surface uses. It is also what lets the placing
+    column be spent on the ET figure instead."""
+    conn = get_conn(db)
+    try:
+        runs = [r for r in lookup.search_runs(conn=conn)
+                if r.race_date == "2026-05-01"]
+        trials = lookup.search_runs(conn=conn, source="trial")
+    finally:
+        conn.close()
+    assert [r.place for r in runs] == sorted(r.place for r in runs)
+    assert [t.place for t in trials] == [1, 2]
+
+
+def test_an_unplaced_runner_sorts_to_the_end_not_the_front(db):
+    """NULL sorts first in SQLite left to itself, which would put the horse
+    that did not finish above the winner."""
+    conn = get_conn(db)
+    with transaction(conn):
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-05-01", "race_no": 1, "horse_no": 9,
+             "horse_name": "PULLED UP", "draw": 9}])
+    try:
+        runs = [r for r in lookup.search_runs(conn=conn)
+                if r.race_date == "2026-05-01"]
+    finally:
+        conn.close()
+    assert runs[0].place == 1
+    assert runs[-1].horse_name == "PULLED UP" and runs[-1].place is None
+
+def test_the_filter_offers_every_jockey_and_trainer_it_holds(db):
+    """A chip grid capped at the busiest fourteen was a filter that silently
+    did not offer most of its own values.
+
+    The archive holds 70 jockeys and 67 trainers; four names in five were
+    reachable only by typing them exactly into the box beside the grid, which
+    means knowing the answer before asking the question.
+    """
+    conn = get_conn(db)
+    with transaction(conn):
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-06-01", "race_no": 1, "horse_no": i,
+             "horse_name": f"HORSE {i}", "place": str(i),
+             "jockey": f"RIDER {i:02d}", "trainer": f"YARD {i:02d}"}
+            for i in range(1, 41)])
+        upsert.upsert_races(conn, [
+            {"race_date": "2026-06-01", "race_no": 1, "venue": "ST"}])
+    try:
+        options = lookup.filter_options(conn=conn)
+    finally:
+        conn.close()
+    # 40 added, plus the two the fixture already rode with.
+    assert len(options["jockey"]) == 42
+    assert len(options["trainer"]) == 41
+    # Busiest first, so the names actually riding lead the list even though
+    # the whole of it is now there.
+    assert options["jockey"][0] == "J MOREIRA"

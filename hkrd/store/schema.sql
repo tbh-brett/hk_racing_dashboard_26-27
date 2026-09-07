@@ -92,6 +92,26 @@ CREATE TABLE IF NOT EXISTS odds_pairs (
   PRIMARY KEY (race_date, race_no, pool, horse_a, horse_b, captured_at)
 );
 
+-- When HKJC actually shut the betting on a race, as opposed to when the card
+-- said it would go off. The two are not the same and the difference is not
+-- small: a delayed start moves the real close by minutes, and the capture
+-- ladder used to bridge that by simply carrying on for half an hour past the
+-- SCHEDULED off on every race. That is ~30 dead win/place captures and ~6 dead
+-- pair captures per race -- on a ten-race card, several thousand rows a
+-- meeting recording a market that could no longer move.
+--
+-- The pool's own `sellStatus` is the honest signal, so it is stored the first
+-- time a capture sees it stop selling. Recorded rather than recomputed because
+-- the capture must not re-derive it on every one of the ~1,400 ticks a day: a
+-- closed race is skipped by a local lookup, and never reaches HKJC again.
+CREATE TABLE IF NOT EXISTS market_close (
+  race_date TEXT    NOT NULL,
+  race_no   INTEGER NOT NULL,
+  closed_at TEXT    NOT NULL,         -- when a capture first saw it shut
+  status    TEXT,                     -- what HKJC called the pool
+  PRIMARY KEY (race_date, race_no)
+);
+
 CREATE TABLE IF NOT EXISTS trials (
   trial_date        TEXT    NOT NULL,
   trial_no          INTEGER NOT NULL,

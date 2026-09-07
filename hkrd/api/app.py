@@ -465,41 +465,6 @@ def status() -> dict:
     return model.model_status()
 
 
-@app.post("/api/jobs/import-statement")
-def import_statement_job(body: dict = Body(...)) -> JSONResponse:
-    """Read an account statement and add its bets to the ledger.
-
-    Reports counts rather than succeeding silently — a bet missing from the
-    ledger reads as a bet never placed, and the Blackbook would then call that
-    run a missed chance.
-    """
-    from hkrd.jobs import import_statement
-
-    account = body.get("account", import_statement.DEFAULT_ACCOUNT)
-    text = body.get("text")
-    if text is not None:
-        # Uploaded from the browser. The dashboard runs on a machine in
-        # Singapore and the statement is downloaded on whichever device the
-        # owner is holding, so a server-side path is a route only the server
-        # can use. A statement is a few kilobytes and travels in the request.
-        if not str(text).strip():
-            raise HTTPException(400, "the uploaded statement is empty")
-        report = import_statement.run_text(
-            str(text), name=str(body.get("name") or "upload"), account=account)
-    else:
-        src = Path(body.get("path", "")).expanduser()
-        if not src.exists():
-            raise HTTPException(404, f"not found: {src}")
-        report = import_statement.run(src, account=account)
-    payload = {
-        "files": report.files, "bets": report.bets,
-        "new_bets": report.new_bets, "selections": report.selections,
-        "cash_movements": report.cash_movements,
-        "unparsed": report.unparsed, "errors": report.errors,
-    }
-    return JSONResponse(payload, status_code=200 if not report.errors else 500)
-
-
 # Which job answers for which source on the freshness strip. `scrape_meeting`
 # fetches the card, the results, the dividends and the vet records in one pass,
 # so three of the five names map onto it — the strip reports them separately

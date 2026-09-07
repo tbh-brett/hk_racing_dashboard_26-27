@@ -952,8 +952,11 @@ function renderFoot() {
   if (c?.overround !== null && c?.overround !== undefined) {
     bits.push(`OVERROUND ${c.overround}%`);
   }
+  // The 3× rule of thumb used to be named here, because it was the thing the
+  // ratio disproved. It is gone from the whole dashboard now, so what the
+  // range says is simply that no single multiple works.
   bits.push(c?.place_ratio_range
-    ? `PLACE ODDS ARE SCRAPED, NEVER 3× WIN — RATIO RUNS ${c.place_ratio_range} ON THIS CARD`
+    ? `PLACE ODDS ARE SCRAPED — WIN/PLACE RATIO RUNS ${c.place_ratio_range} ON THIS CARD`
     : 'PLACE ODDS ARE SCRAPED, NEVER DERIVED FROM WIN');
   bits.push('STYLE SORTS LEADER → ON-PACE → MIDFIELD → CLOSER');
   bits.push('MODEL AUC .727 · MARKET AUC .785');
