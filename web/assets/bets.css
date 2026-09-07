@@ -310,7 +310,7 @@
 /* One line per header. A wrapped label doubles the head's height and breaks
    the fixed row rhythm the whole grid depends on. */
 .entry-chead > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.entry-chead .placep, .entry-chead .linear, .entry-chead .winp,
+.entry-chead .placep, .entry-chead .model, .entry-chead .winp,
 .entry-chead .win, .entry-chead .place { text-align: right; }
 .entry-crow { height: 28px; border-bottom: 1px solid var(--bet-rule-2); font-size: 12px; }
 .entry-crow:hover { background: var(--bet-hover); }
@@ -331,12 +331,15 @@
 }
 .entry-crow .place { color: var(--text-dim); }
 .entry-crow .placep { font-family: var(--font-mono); text-align: right; color: var(--text); }
-.entry-crow .linear {
+/* A place % the pool did not price is a different measurement wearing the
+   same column. Marked rather than footnoted. */
+.entry-crow .placep.modelled { color: var(--text-muted); font-style: italic; }
+.entry-crow .model {
   display: flex; gap: 5px; justify-content: flex-end; align-items: baseline;
   font-family: var(--font-mono); color: var(--text-muted);
 }
-.entry-crow .linear .over { color: var(--alert); font-size: 10px; }
-.entry-crow .linear .under { color: var(--cool); font-size: 10px; }
+.entry-crow .model .over { color: var(--alert); font-size: 10px; }
+.entry-crow .model .under { color: var(--cool); font-size: 10px; }
 
 .pick {
   width: 20px; height: 20px; line-height: 1; cursor: pointer;
@@ -404,17 +407,44 @@
 .leg-row .win, .leg-row .place { font-family: var(--font-mono); text-align: right; }
 .leg-row .place { color: var(--text-dim); }
 
-.entry-formula {
-  display: flex; flex-direction: column; gap: 2px; text-align: left;
-  background: var(--surface); border: 1px solid var(--line-2);
-  padding: 6px 10px; cursor: pointer; font-family: var(--font);
+/* HKJC's formula list, read as a list. Six legs is fifteen formulas and the
+   chip grid it used to be wrapped to four rows of near-identical buttons. */
+.formula-pick {
+  background: var(--bg-deep); border: 1px solid var(--line-2);
+  color: var(--text); font-family: var(--font-mono); font-size: 13px;
+  padding: 4px 8px; min-width: 320px;
 }
-.entry-formula:hover { background: var(--surface-2); border-color: var(--line-3); }
-.entry-formula.on { background: var(--edge-ground); border-color: var(--edge); }
-.entry-formula.on:hover { background: var(--edge-ground-2); border-color: var(--edge); }
-.entry-formula .lab { font-family: var(--font-mono); font-size: 13px; color: var(--text); }
-.entry-formula .legs { font-size: 10px; color: var(--text-dim); }
-.entry-formula .combos { font-size: 10px; color: var(--text-muted); }
+.formula-pick:focus { outline: 1px solid var(--edge); }
+
+/* What the code buys, spelled out. The 11 in 4x11 IS 6 + 4 + 1. */
+.formula-parts {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline;
+  padding: 4px 0 2px;
+}
+.formula-parts .part {
+  display: inline-flex; gap: 4px; align-items: baseline;
+  border: 1px solid var(--line-2); background: var(--surface); padding: 2px 7px;
+}
+.formula-parts .part .c { font-family: var(--font-mono); color: var(--text); }
+.formula-parts .part .k { font-size: 10px; color: var(--text-dim);
+  letter-spacing: .04em; text-transform: uppercase; }
+.formula-parts .sum { font-size: 10px; color: var(--text-muted); }
+
+/* The second multiplication. A leg is a whole ticket in its own race. */
+.formula-mult {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline;
+  padding: 2px 0 6px; font-size: 11px;
+}
+.formula-mult > .k { font-size: 10px; letter-spacing: .04em;
+  color: var(--text-muted); }
+.formula-mult .leg {
+  display: inline-flex; gap: 5px; align-items: baseline;
+  border: 1px solid var(--line-2); padding: 1px 6px;
+}
+.formula-mult .leg .r { font-family: var(--font-mono); color: var(--text-dim); }
+.formula-mult .leg .ty { font-size: 10px; color: var(--text-muted); }
+.formula-mult .leg .c { font-family: var(--font-mono); color: var(--text); }
+.formula-mult .note { color: var(--edge); font-family: var(--font-mono); }
 
 .stake-field {
   display: inline-flex; align-items: center; gap: 3px;
@@ -477,12 +507,15 @@
 .pre-compare .under { color: var(--cool); }
 
 .pre-pair {
-  display: grid; grid-template-columns: 16px 1fr auto 56px; gap: 6px;
+  /* rank, pair, the pool's own price, the probability it implies, in ticket */
+  display: grid; grid-template-columns: 16px 1fr 42px auto 56px; gap: 6px;
   align-items: baseline; font-size: 11px; padding: 2px 0;
   font-variant-numeric: tabular-nums;
 }
 .pre-pair .r { color: var(--text-muted); font-family: var(--font-mono); }
 .pre-pair .l { font-family: var(--font-mono); color: var(--text-dim); }
+.pre-pair .o { font-family: var(--font-mono); color: var(--text-muted);
+  text-align: right; }
 .pre-pair .p { font-family: var(--font-mono); }
 .pre-pair .in { font-size: 9px; color: var(--text-faint); text-align: right; }
 .pre-pair.in .l { color: var(--text); }

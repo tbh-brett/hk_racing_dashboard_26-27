@@ -4,8 +4,11 @@ Design brief 06 Part 2 puts four figures in front of a ticket before it is
 confirmed, and each is here because a measurement said the intuitive version is
 wrong:
 
-  * **Banker place probability** must be Harville-Henery. The linear rule
-    overstates a short banker by ~34 points — 94.5% where the truth is 60.3%.
+  * **Banker place probability** comes from the place pool, which is captured
+    on every race since the move to the JSON endpoint and prices the question
+    directly. Harville-Henery is shown beside it as the check, and stands in
+    where no pool was captured; the linear `p × 3` rule is not a transform at
+    all and is not offered — it overstates a short banker by ~34 points.
   * **Market concentration** must come from the LATEST snapshot. The morning
     price misclassifies the band in 60% of races, always downward, which
     under-covers exactly the races a top-3 box performs best in.
@@ -23,17 +26,22 @@ possible if the override is logged rather than the bet blocked."
 """
 from __future__ import annotations
 
-from itertools import combinations
-from math import comb
 from typing import Any
 
 from hkrd.query import market as market_q
+from hkrd.query.tickets import (
+    BET_TYPES, MAX_ALLUP_LEGS, PAIR_TYPES, SINGLE_RACE_TYPES, allup_formula,
+    allup_formulas, allup_lines, combination_count, formula_text, lines_for,
+    pools_per_ticket,
+)
+from hkrd.query import pools as pools_q
 from hkrd.query import raceday as raceday_q
 from hkrd.store.bets import DEFAULT_SETTINGS, settings
 from hkrd.store.connect import Connection, get_conn
 
-__all__ = ["entry_card", "accounts", "raceday_total", "evaluate", "formulas",
-           "combination_count", "ACCOUNTS", "SINGLE_RACE_TYPES", "BET_TYPES"]
+__all__ = ["entry_card", "accounts", "raceday_total", "evaluate",
+           "allup_formulas", "combination_count", "pools_per_ticket",
+           "ACCOUNTS", "SINGLE_RACE_TYPES", "BET_TYPES"]
 
 # Design brief 07 §3.1: two accounts. The Client account specified in the
 # earlier brief was removed there, along with its read-mostly variant.
@@ -41,71 +49,6 @@ ACCOUNTS: tuple[dict[str, str], ...] = (
     {"key": "brett", "name": "Brett"},
     {"key": "kelvin", "name": "Kelvin"},
 )
-
-SINGLE_RACE_TYPES: tuple[str, ...] = ("WIN", "PLACE", "WP", "QIN", "QPL", "QQP")
-BET_TYPES: tuple[str, ...] = SINGLE_RACE_TYPES + ("ALLUP",)
-
-# A pair pool takes two runners per line; WIN and PLACE take one.
-_PICKS_PER_LINE = {"WIN": 1, "PLACE": 1, "WP": 1,
-                   "QIN": 2, "QPL": 2, "QQP": 2}
-
-# HKJC sells two COMBINATIONS as a single ticket: WP is a win and a place on
-# the same horse, QQP a quinella and a quinella place on the same pair. The
-# selections are identical and only the settlement differs, so they cost twice
-# the lines.
-#
-# The arithmetic is checkable against a real statement. 2026-09-06 ref 3597 is
-# a quinella-quinella place, banker with two others, at $10: two lines, two
-# pools, $40 debited — which is what the statement says. Getting this wrong
-# under-quotes every combination ticket by half.
-_POOLS_PER_TICKET = {"WP": 2, "QQP": 2}
-
-
-def pools_per_ticket(bet_type: str) -> int:
-    """How many pools one line of this ticket is struck into."""
-    return _POOLS_PER_TICKET.get(bet_type.upper(), 1)
-
-
-def combination_count(bet_type: str, n_selected: int, *,
-                      has_banker: bool = False) -> int:
-    """Lines on a single-race ticket.
-
-    Design brief 07 §3.3 gives the table this must reproduce: four picks with no
-    banker is C(4,2) = 6, five is 10, six is 15; a banker plus four legs is 4.
-    A banker appears in every combination, so it multiplies rather than
-    combines.
-    """
-    per_line = _PICKS_PER_LINE.get(bet_type.upper())
-    if per_line is None:
-        raise ValueError(f"not a single-race bet type: {bet_type!r}")
-    if n_selected < 0:
-        raise ValueError("selection count cannot be negative")
-    pools = pools_per_ticket(bet_type)
-    if per_line == 1:
-        return n_selected * pools
-    if has_banker:
-        # The banker is the anchor; each remaining selection forms one line
-        # with it. n_selected counts the legs, not the banker.
-        return n_selected * pools
-    return (comb(n_selected, 2) if n_selected >= 2 else 0) * pools
-
-
-def formulas(n_races: int) -> list[dict[str, Any]]:
-    """Every valid All-Up formula for this many legs, generated not memorised.
-
-    Design brief 07 §4 replaces HKJC's dropdown of codes with one question —
-    *how many of my legs must win* — because the combination count is simply
-    C(n, r) and a generated picker cannot produce an invalid formula.
-    """
-    if n_races < 2:
-        return []
-    out = []
-    for legs in range(n_races, 1, -1):
-        combos = comb(n_races, legs)
-        out.append({"legs": legs, "combinations": combos,
-                    "label": f"{legs}x{combos}"})
-    return out
-
 
 def entry_card(date: str, race_no: int, *,
                conn: Connection | None = None) -> dict[str, Any]:
@@ -128,7 +71,7 @@ def entry_card(date: str, race_no: int, *,
         if not card.get("runners"):
             return {**card, "runners": [], "place_probabilities": None}
 
-        probs = market_q.place_probabilities(date, race_no, conn=conn)
+        probs = pools_q.place_probabilities(date, race_no, conn=conn)
         by_no = {r["horse_no"]: r for r in probs.get("runners", [])}
 
         rows = []
@@ -157,7 +100,12 @@ def entry_card(date: str, race_no: int, *,
                                else r.get("place_odds")),
                 "win_pct": r.get("win_pct"),
                 "place_pct": p["place_pct"] if p else None,
-                "linear_pct": p["linear_pct"] if p else None,
+                # Which of the two answered, and by how much they differ. The
+                # comparison used to be against the 3× rule of thumb, which was
+                # worth showing while the place pool was not captured and there
+                # was nothing better to disagree with. There is now.
+                "place_source": p["place_source"] if p else None,
+                "model_pct": p["model_pct"] if p else None,
                 "gap_points": p["gap_points"] if p else None,
                 "scratched": market_open and r.get("win_odds") is None,
                 "blackbook": r.get("blackbook"),
@@ -242,7 +190,15 @@ def raceday_total(date: str, *, account: str | None = None,
 
 
 def _banker_panel(card: dict, banker_no: int | None) -> dict[str, Any] | None:
-    """The banker's place chance, and the rule of thumb it corrects."""
+    """The banker's place chance, from the pool that pays it.
+
+    The place pool prices this question directly and is captured on every
+    race now, so it is the figure; Harville-Henery comes back beside it as the
+    check. Where the two disagree the pool wins — it is several hundred
+    thousand dollars of opinion against ten lines of arithmetic — but the size
+    of the disagreement is worth seeing, because it is the only reading on the
+    model that does not have to wait for a result.
+    """
     if banker_no is None:
         return None
     row = next((r for r in card["runners"] if r["horse_no"] == banker_no), None)
@@ -255,8 +211,12 @@ def _banker_panel(card: dict, banker_no: int | None) -> dict[str, Any] | None:
         "horse_no": banker_no, "horse_name": row["horse_name"],
         "win_odds": row["win_odds"], "place_odds": row["place_odds"],
         "win_pct": row["win_pct"], "place_pct": row["place_pct"],
-        "linear_pct": row["linear_pct"], "gap_points": row["gap_points"],
-        "overstated": (row["gap_points"] or 0) > 0,
+        "place_source": row["place_source"], "model_pct": row["model_pct"],
+        "gap_points": row["gap_points"],
+        # Signed from the MODEL's point of view: positive means Harville is
+        # under the market, negative means it is over — which is the direction
+        # it errs on a short-priced favourite.
+        "model_overstates": (row["gap_points"] or 0) < 0,
     }
 
 
@@ -313,7 +273,8 @@ def _flags(card: dict, *, bet_type: str, selections: list[int],
 def evaluate(date: str, *, bet_type: str, race_no: int | None = None,
              selections: list[int] | None = None, banker: int | None = None,
              unit_stake: float = 0.0, legs: list[dict] | None = None,
-             legs_required: int | None = None, account: str | None = None,
+             legs_required: int | None = None, formula: str | None = None,
+             account: str | None = None,
              conn: Connection | None = None) -> dict[str, Any]:
     """Price a ticket and say everything worth knowing before it is confirmed.
 
@@ -333,7 +294,7 @@ def evaluate(date: str, *, bet_type: str, race_no: int | None = None,
 
         if kind == "ALLUP":
             return _evaluate_allup(date, legs or [], legs_required,
-                                   unit_stake, day, cfg, conn)
+                                   unit_stake, day, cfg, conn, formula)
 
         if race_no is None:
             raise ValueError("a single-race bet needs a race number")
@@ -346,9 +307,15 @@ def evaluate(date: str, *, bet_type: str, race_no: int | None = None,
 
         combos = combination_count(kind, len(picks), has_banker=banker is not None)
         total = round(combos * float(unit_stake or 0), 2)
-        pairs = (market_q.ranked_pairs(date, race_no, conn=conn)
-                 if kind in ("QIN", "QPL") else [])
-        chosen = {tuple(sorted(c)) for c in _lines(kind, picks, banker)}
+        # Ranked in the pool the ticket is actually struck into: QPL pays for
+        # both in the first three, QIN for the first two, and a QQP is both.
+        # Ranking a quinella-place ticket by a quinella number was the old
+        # shape of this and it recommended a different set of pairs.
+        pairs = (pools_q.ranked_pairs(date, race_no,
+                                      pool="QIN" if kind == "QIN" else "QPL",
+                                      conn=conn)
+                 if kind in ("QIN", "QPL", "QQP") else [])
+        chosen = {tuple(sorted(c)) for c in lines_for(kind, picks, banker)}
         for p in pairs:
             p["in_ticket"] = tuple(sorted(p["horse_nos"])) in chosen
 
@@ -366,8 +333,8 @@ def evaluate(date: str, *, bet_type: str, race_no: int | None = None,
             "selections": picks, "banker": banker,
             "combinations": combos, "unit_stake": round(float(unit_stake or 0), 2),
             "total_outlay": total,
-            "combination_formula": _formula_text(kind, len(picks), banker),
-            "lines": [list(line) for line in _lines(kind, picks, banker)],
+            "combination_formula": formula_text(kind, len(picks), banker),
+            "lines": [list(line) for line in lines_for(kind, picks, banker)],
             "banker_panel": _banker_panel(card, banker),
             "concentration": card.get("concentration"),
             "pairs": pairs,
@@ -384,54 +351,91 @@ def evaluate(date: str, *, bet_type: str, race_no: int | None = None,
             conn.close()
 
 
-def _lines(kind: str, picks: list[int], banker: int | None) -> list[tuple[int, ...]]:
-    """The actual combinations a ticket buys, so the count can be checked."""
-    if kind in ("WIN", "PLACE"):
-        base = ([banker] if banker is not None else []) + picks
-        return [(p,) for p in base]
-    if banker is not None:
-        return [(banker, p) for p in picks]
-    return [tuple(c) for c in combinations(picks, 2)]
+def _leg_lines(leg: dict) -> tuple[dict[str, Any], int]:
+    """One leg, normalised, and how many combinations it holds.
 
-
-def _formula_text(kind: str, n: int, banker: int | None) -> str | None:
-    if kind in ("WIN", "PLACE"):
-        return None
+    A leg is a whole ticket in its own race — a QQP banker with four others is
+    eight combinations, not one — and the chain multiplies those. Counting a
+    leg as one line is what under-quoted an all-up by a factor of eight.
+    """
+    kind = str(leg.get("bet_type") or "WIN").upper()
+    if kind not in SINGLE_RACE_TYPES:
+        kind = "WIN"
+    banker = leg.get("banker")
+    picks = sorted({int(x) for x in (leg.get("selections") or [])})
     if banker is not None:
-        return f"banker + {n} leg{'s' if n != 1 else ''}"
-    return f"C({n},2)" if n >= 2 else None
+        banker = int(banker)
+        picks = [p for p in picks if p != banker]
+    return ({"race_no": leg.get("race_no"), "bet_type": kind,
+             "selections": picks, "banker": banker,
+             "combinations": combination_count(kind, len(picks),
+                                               has_banker=banker is not None)},
+            combination_count(kind, len(picks), has_banker=banker is not None))
 
 
 def _evaluate_allup(date: str, legs: list[dict], legs_required: int | None,
                     unit_stake: float, day: dict, cfg: dict,
-                    conn: Connection) -> dict[str, Any]:
-    """An All-Up spans races, so its count is C(n, r) over the legs, not a pool."""
-    priced = [l for l in legs if l.get("selections")]
+                    conn: Connection, formula: str | None = None
+                    ) -> dict[str, Any]:
+    """An All Up spans races, so it multiplies twice.
+
+    HKJC's formula code names which MULTIPLES the ticket buys — 4x11 is every
+    double, every treble and the quadruple — and each of those multiples costs
+    the product of its legs' own combination counts. Both halves matter and
+    the second one used to be missing: a 2X1 over a QQP banker-with-four and a
+    single place is eight lines, and was quoted as one.
+    """
+    shaped = [_leg_lines(l) for l in legs
+              if l.get("selections") or l.get("banker") is not None]
+    priced = [row for row, count in shaped if count]
+    per_leg = [count for _row, count in shaped if count]
     n = len(priced)
-    available = formulas(n)
-    required = legs_required if legs_required is not None else (n if n >= 2 else None)
-    match = next((f for f in available if f["legs"] == required), None)
-    combos = match["combinations"] if match else 0
+    available = allup_formulas(n)
+
+    match = allup_formula(n, formula)
+    if match is None and legs_required is not None and 2 <= n:
+        # The older shape of this question — "how many of my legs must win" —
+        # is exactly one multiple size, so it names a formula rather than
+        # replacing the idea of one.
+        match = next((f for f in available if f["sizes"] == [int(legs_required)]),
+                     None)
+    if match is None and formula is None and legs_required is None and n >= 2:
+        # Nothing chosen yet: every leg must win, which is the shortest ticket
+        # on the list and the one people mean by "an all-up".
+        match = next((f for f in available if f["sizes"] == [n]), None)
+
+    combos = allup_lines(match["sizes"], per_leg) if match else 0
     total = round(combos * float(unit_stake or 0), 2)
 
     reason = None
     if n < 2:
         reason = "an all-up needs at least two legs"
+    elif n > MAX_ALLUP_LEGS:
+        reason = f"HKJC sells at most {MAX_ALLUP_LEGS} legs; this has {n}"
     elif match is None:
-        reason = f"{required} of {n} is not a valid formula"
+        reason = (f"{formula or legs_required} is not one of the "
+                  f"{len(available)} formulas HKJC offers over {n} legs")
     elif not unit_stake:
         reason = "no stake"
 
     return {
         "race_date": date, "race_no": None, "bet_type": "ALLUP",
-        "legs": [{"race_no": l.get("race_no"), "bet_type": l.get("bet_type"),
-                  "selections": sorted(set(l.get("selections") or [])),
-                  "banker": l.get("banker")} for l in priced],
-        "legs_required": required, "formulas": available,
-        "combinations": combos, "unit_stake": round(float(unit_stake or 0), 2),
+        "legs": priced,
+        "legs_required": match["sizes"][0] if match else legs_required,
+        "formulas": available,
+        "formula": match["code"] if match else None,
+        "formula_sizes": match["sizes"] if match else None,
+        "formula_breakdown": match["breakdown"] if match else None,
+        "combinations": combos,
+        # What the formula alone costs, before the legs multiply it. Shown
+        # beside the real number so a ticket that has quietly become eight
+        # times its formula is visible as that rather than as a big total.
+        "formula_combinations": match["combinations"] if match else 0,
+        "leg_combinations": per_leg,
+        "unit_stake": round(float(unit_stake or 0), 2),
         "total_outlay": total,
-        "combination_formula": (f"C({n},{required})" if match else None),
-        "all_up_formula": match["label"] if match else None,
+        "combination_formula": (match["label"] if match else None),
+        "all_up_formula": match["code"] if match else None,
         "raceday": day,
         "flags": [f for f in (
             {"flag": "raceday_ceiling", "title": "RACEDAY CEILING",

@@ -12,6 +12,8 @@ bare "ok" anywhere in here.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, Body, HTTPException
 from fastapi.responses import JSONResponse
 
@@ -161,4 +163,91 @@ def rebuild_et_job(window_months: int = 24) -> JSONResponse:
         "sec_per_length": report.sec_per_length,
         "errors": report.errors,
     }
+    return JSONResponse(payload, status_code=200 if not report.errors else 500)
+
+
+# ── importing what was bet ──────────────────────────────────────────────────
+# Two files say what was staked and they are not interchangeable. The HKJC
+# statement is the bookie's record: it exists only after the meeting, covers
+# one account, and settles. The bet sheet is the spreadsheet the betting is
+# planned in: it exists before the meeting, covers both accounts, and is where
+# an all-up is worked out. One button takes either, because from the user's
+# side there is one question — "put this file in the ledger" — and being made
+# to say which kind of file it is would be the interface asking a question it
+# can answer itself.
+
+def _looks_like_a_sheet(name: str, text: str) -> bool:
+    """A bet sheet, rather than an HKJC statement.
+
+    Decided on the CONTENT first. A spreadsheet exported to CSV always carries
+    its header row, and "Bet no" appears in no HKJC statement; the extension is
+    only the tie-break, because a .txt export of the same sheet is still a
+    sheet and a statement saved as .csv is still a statement.
+    """
+    head = "\n".join(text.splitlines()[:5]).lower()
+    if "bet no" in head and "bet type" in head:
+        return True
+    if "account records" in head or "betting account no" in head:
+        return False
+    return name.lower().endswith(".csv")
+
+
+@router.post("/api/jobs/import-statement")
+def import_bets_job(body: dict = Body(...)) -> JSONResponse:
+    """Read a statement or a bet sheet and add its bets to the ledger.
+
+    Reports counts rather than succeeding silently — a bet missing from the
+    ledger reads as a bet never placed, and the Blackbook would then call that
+    run a missed chance.
+    """
+    from hkrd.jobs import import_betsheet, import_statement
+
+    account = body.get("account") or import_statement.DEFAULT_ACCOUNT
+    name = str(body.get("name") or "upload")
+    text = body.get("text")
+
+    if text is not None:
+        # Uploaded from the browser. The dashboard runs on a machine in
+        # Singapore and the file is downloaded or exported on whichever device
+        # the owner is holding, so a server-side path is a route only the
+        # server can use. Both files are a few kilobytes and travel in the
+        # request.
+        if not str(text).strip():
+            raise HTTPException(400, "the uploaded file is empty")
+        sheet = _looks_like_a_sheet(name, str(text))
+        report = (import_betsheet.run_text(str(text), name=name, account=account)
+                  if sheet else
+                  import_statement.run_text(str(text), name=name,
+                                            account=account))
+    else:
+        src = Path(body.get("path", "")).expanduser()
+        if not src.exists():
+            raise HTTPException(404, f"not found: {src}")
+        # A directory is read by whichever importer the files in it are for;
+        # each globs its own extension, so a mixed folder is one call each and
+        # neither reads the other's files.
+        sheet = not src.is_dir() and _looks_like_a_sheet(
+            src.name, src.read_text(encoding="utf-8-sig", errors="replace"))
+        report = (import_betsheet.run(src, account=account) if sheet
+                  else import_statement.run(src, account=account))
+
+    if isinstance(report, import_betsheet.SheetImportReport):
+        payload = {
+            "kind": "bet sheet", "files": report.files,
+            "bets": report.tickets, "new_bets": report.new_tickets,
+            "selections": report.selections, "cash_movements": 0,
+            # Named separately because they mean different things: a horse the
+            # card has never heard of is a name to fix, a stake that disagrees
+            # with the structure is a ticket one of the two has wrong, and both
+            # were imported rather than dropped.
+            "unparsed": report.unmatched + report.disagreements + report.skipped,
+            "errors": report.errors,
+        }
+    else:
+        payload = {
+            "kind": "statement", "files": report.files, "bets": report.bets,
+            "new_bets": report.new_bets, "selections": report.selections,
+            "cash_movements": report.cash_movements,
+            "unparsed": report.unparsed, "errors": report.errors,
+        }
     return JSONResponse(payload, status_code=200 if not report.errors else 500)

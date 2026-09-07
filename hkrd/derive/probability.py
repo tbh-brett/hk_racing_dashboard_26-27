@@ -22,8 +22,10 @@ from itertools import permutations
 
 import numpy as np
 
-__all__ = ["devig", "place_probability", "pair_probability", "exacta_probability",
-           "actual_over_expected", "HENERY_LAMBDA", "ProbabilityError"]
+__all__ = ["devig", "devig_to", "place_probability", "pair_probability",
+           "exacta_probability", "market_place_probability",
+           "market_pair_probability", "pair_hits", "actual_over_expected",
+           "HENERY_LAMBDA", "ProbabilityError"]
 
 # Fitted on HK data; the literature's usual range is 0.76-0.88.
 HENERY_LAMBDA = 0.81
@@ -151,6 +153,87 @@ def exacta_probability(
                 continue
             out[(i, j)] = float(p[i] * damped[j] / denom)
     return out
+
+
+# ── the market's own answer, where it offers one ────────────────────────────
+#
+# Everything above INFERS a probability from the win pool, because that is all
+# the old dashboard captured. Since the move to the JSON endpoint the capture
+# also carries PLA, QIN and QPL, and those pools price the same questions
+# directly: the place pool IS a place probability, the quinella-place pool IS a
+# "both in the first three" probability, each with a few hundred thousand
+# dollars of opinion behind it.
+#
+# So the transforms above stop being the answer and become the benchmark. Where
+# a pool is captured, its own price is used; where it is not — a market that
+# has not opened, or the seasons of archive that hold win odds only — Harville
+# fills in, and every figure says which of the two it is. The gap between them
+# is worth watching in its own right: it is the only check on the model that
+# does not have to wait for a result.
+
+
+def devig_to(odds: Sequence[float | None], target: float) -> np.ndarray:
+    """Reciprocals of one pool's prices, normalised to sum to `target`.
+
+    `target` is how many of the pool's outcomes come true in a race: 1 for win
+    and for quinella, 3 for the place pool in a field of seven or more (three
+    horses place), and C(3,2) = 3 for quinella place (three of the pairs among
+    the first three horses collect). Getting it wrong scales every probability
+    in the pool by a constant, which is invisible in a ranking and wrong
+    everywhere a figure is read as a percentage.
+
+    A missing price is not a zero probability — it is a runner or a
+    combination this pool did not quote — so it comes back as NaN rather than
+    contributing to the normalisation.
+    """
+    raw = np.array([1.0 / o if o and o > 0 else np.nan for o in odds],
+                   dtype=float)
+    total = np.nansum(raw)
+    if not np.isfinite(total) or total <= 0:
+        raise ProbabilityError("no positive prices in the pool")
+    return raw * (target / total)
+
+
+def market_place_probability(place_odds: Sequence[float | None], *,
+                             places: int = 3) -> np.ndarray:
+    """P(top `places`) straight from the place pool, one entry per runner.
+
+    Never derived from the win price. There is no fixed relationship between
+    the two — it depends on how concentrated the market is, and the familiar
+    "a third of the win odds" rule is structurally invalid.
+
+    Clipped at 1.0. Proportional de-vigging assumes the takeout is spread
+    evenly across the pool, and in a place pool it is not: the short prices
+    carry less of it, so a heavy odds-on favourite can normalise past certainty.
+    Clipping costs a fraction of a point on exactly those runners and keeps
+    every figure readable as a percentage.
+    """
+    return np.clip(devig_to(place_odds, float(places)), 0.0, 1.0)
+
+
+def pair_hits(places: int) -> int:
+    """How many of a race's PAIRS collect in the quinella-place pool.
+
+    Three horses place, so three of the pairs among them are in the first
+    three: (1,2), (1,3) and (2,3). In a small field paying two places only the
+    one pair collects, which is the quinella — and HKJC runs no quinella place
+    pool at all below seven declared starters.
+    """
+    return 3 if places >= 3 else 1
+
+
+def market_pair_probability(pair_odds: dict[tuple[int, int], float | None], *,
+                            hits: int = 3) -> dict[tuple[int, int], float]:
+    """P(this pair collects) from a pair pool's own prices.
+
+    `hits` is 1 for the quinella (one pair wins) and 3 for quinella place. The
+    keys come back unchanged, and a pair the pool did not quote is absent
+    rather than zero.
+    """
+    keys = list(pair_odds)
+    probs = np.clip(devig_to([pair_odds[k] for k in keys], float(hits)),
+                    0.0, 1.0)
+    return {k: float(v) for k, v in zip(keys, probs) if np.isfinite(v)}
 
 
 # ──────────────────────────────────────────────────────────────────────────

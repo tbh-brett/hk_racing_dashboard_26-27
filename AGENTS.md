@@ -67,9 +67,22 @@ If a task seems to need a violation, stop and say so rather than working around 
 
 ## Numerical rules
 
+- **Read the pool that pays the bet, and fall back to the model only where there is no
+  pool.** The capture carries WIN, PLA, QIN and QPL since the move to the JSON endpoint, and
+  the place pool IS a place probability while the quinella-place pool IS a "both in the
+  first three" probability. `query/pools.py` de-vigs each to how many of its outcomes come
+  true — 1 for win and quinella, 3 for place and quinella place — and every figure it
+  returns says whether it came from a pool or from the model. Ranking a quinella-place
+  ticket by a number derived from the WIN market recommends a different set of pairs.
+- **Harville-Henery is the benchmark now, not the answer.** It is still correct and still
+  used wherever no pool was captured — an unopened market, a field too small for HKJC to run
+  a QPL pool, and the seasons of archive that hold win odds only. Where both exist they
+  agree to ~2.6 points a runner and disagree most on the favourite (2026-09-06 R1: model
+  62.4%, pool 54.2%). That gap is the only reading on the model that does not have to wait
+  for a result.
 - **Never convert win probability to place probability by linear scaling.** `p / sum(p) * 3`
-  is not a valid transform and overstates the favourite's place chance by ~34 points. Use
-  Harville with the Henery discount (`derive/probability.py`).
+  is not a valid transform and overstates the favourite's place chance by ~34 points. It is
+  gone from the screen entirely; the comparison shown beside the pool is the model.
 - **A par time is a property of a race, not a runner.** Every horse in a race gets the same
   par. If a change produces more than one par per race, the change is wrong.
 - **A faster time must always produce a better figure** within the same race. Any rating
@@ -97,6 +110,18 @@ If a task seems to need a violation, stop and say so rather than working around 
 - **Every odds-dependent output must use the latest snapshot, never the morning's.** Market
   concentration moves from a mean of 0.539 in the morning to 0.637 at post time, and 60% of
   races land in a different band — always making a race look weaker than it is.
+- **A ticket multiplies twice, and the second one is easy to miss.** Within a race, WP and
+  QQP are one selection struck into two pools and cost twice the lines. Across races, an All
+  Up formula names WHICH multiples it buys — 4x11 is every double, every treble and the
+  quadruple, and the 11 IS 6 + 4 + 1 — and each of those costs the PRODUCT of its legs' own
+  combination counts. A 2X1 over a QQP banker-with-four and a single place is eight lines,
+  not one. All of it is in `query/tickets.py`, checked against the account statement.
+- **A race is over when HKJC shuts the pool, not when the card said it would go off.** The
+  capture used to run for thirty minutes past the SCHEDULED off on every race — thousands of
+  rows a meeting recording a market that could no longer move, and still wrong for a delayed
+  start. `pmPools[].sellStatus` is the signal; the first capture that sees it stop selling
+  records the close in `market_close` and the race is never asked about again. The clock
+  stays as the backstop for a close nobody observed.
 
 ## Error handling
 

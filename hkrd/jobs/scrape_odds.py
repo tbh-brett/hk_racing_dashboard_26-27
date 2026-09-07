@@ -51,12 +51,16 @@ class OddsRun:
     pairs: int = 0
     skipped: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    closed: list[int] = field(default_factory=list)
 
     def line(self) -> str:
         if not self.attempted:
             return f"{self.race_date}: nothing to price"
         head = (f"{self.race_date} {self.venue}: {self.races} races · "
                 f"{self.win_place} win/place · {self.pairs} pair odds")
+        if self.closed:
+            head += (" · market shut on R"
+                     + ", R".join(str(n) for n in sorted(self.closed)))
         if self.skipped:
             head += f" · {len(self.skipped)} SKIPPED"
         if not self.races:
@@ -136,13 +140,57 @@ def _meeting_races(conn, date: str, *, now: dt.datetime | None = None
         return None, [], 0
 
     now = now or dt.datetime.now()
+    shut = closed_races(conn, date)
     live: list[int] = []
     for r in rows:
+        # Two reasons to stop, and the first is the one that is actually true.
+        # HKJC shutting the pool is the event; the clock is only a backstop for
+        # a race whose close was never observed -- a capture that was down at
+        # the moment it happened, or a card with no off time at all.
+        if r["race_no"] in shut:
+            continue
         off = (r["off_time"] or "").strip()
         if off and _is_settled(date, off, now):
             continue
         live.append(r["race_no"])
     return rows[0]["venue"], live, len(rows)
+
+
+def closed_races(conn, date: str) -> set[int]:
+    """Races whose betting HKJC has already shut, from the local record.
+
+    One indexed lookup per tick, so a meeting that finished at six o'clock
+    costs nothing at all for the rest of the evening rather than a request a
+    minute per race.
+    """
+    return {r["race_no"] for r in conn.execute(
+        "SELECT race_no FROM market_close WHERE race_date = ?", (date,))}
+
+
+def _shut(snap: dict[str, Any], to_off: float | None, *,
+          priced: bool) -> str | None:
+    """The status to record when this race's market has closed for good.
+
+    Returns None while it is still worth asking again. Three cases have to stay
+    apart, and conflating any two of them either loses the late money or fills
+    the table with rows about a race that is over:
+
+      selling                     the market is open. Keep capturing.
+      shut, never priced          a declared card before the market opens at
+                                  13:00 the day before racing. Not an ending.
+      shut before the off         a suspension, or a pool briefly withdrawn.
+                                  Not an ending either, and treating it as one
+                                  would drop the race for good over a blip.
+      shut at or after the off    the race has been run. Stop.
+    """
+    status = str(snap.get("sell_status") or "").strip()
+    if status.upper() == odds_ingest.SELLING:
+        return None
+    if not priced:
+        return None
+    if to_off is not None and to_off > 0:
+        return None
+    return status or "no status offered"
 
 
 def _schedule(conn, date: str, races: list[int], *, now: dt.datetime
@@ -295,6 +343,12 @@ def run(date: str | None = None, venue: str | None = None, *,
                                       detail=str(exc)[:300])
             return report
 
+        offs = {r["race_no"]: (r["off_time"] or "").strip()
+                for r in conn.execute(
+                    "SELECT race_no, off_time FROM races WHERE race_date = ?",
+                    (date,))}
+        already_priced = set(_last_captures(conn, date)[0])
+
         for snap in snaps:
             race_no = snap["race_no"]
             report.notes.extend(f"R{race_no}: {n}" for n in snap.get("notes", []))
@@ -302,11 +356,30 @@ def run(date: str | None = None, venue: str | None = None, *,
             parsed = odds_ingest.parse_snapshot(snap)
             win_place = odds_ingest.snapshot_rows(parsed)
             pairs = odds_ingest.pair_rows(parsed)
+
+            # Whether this race is over is decided BEFORE the empty-capture
+            # check below, because a shut pool is one of the ways a capture
+            # comes back empty — and that is the case this whole mechanism
+            # exists for. Deciding it afterwards would leave a finished race
+            # being asked about once a minute until the clock backstop.
+            shut = _shut(parsed, _minutes_to_off(date, offs.get(race_no, ""), now),
+                         priced=bool(win_place) or race_no in already_priced)
+            if shut is not None:
+                with transaction(conn):
+                    upsert.upsert_market_close(conn, [{
+                        "race_date": date, "race_no": race_no,
+                        "closed_at": now.isoformat(timespec="seconds"),
+                        "status": shut}])
+                report.closed.append(race_no)
+
             if not win_place:
                 # A declared card whose market has not opened is the normal
                 # state before 13:00 the day before racing, and its own note
-                # already says so. Only an unexplained empty race is a skip.
-                if not any("market not open" in n for n in snap.get("notes", [])):
+                # already says so. A race whose pool has just shut is the same
+                # thing at the other end. Only an unexplained empty race is a
+                # skip.
+                if shut is None and not any(
+                        "market not open" in n for n in snap.get("notes", [])):
                     report.skipped.append(f"R{race_no}: no priced runners")
                 continue
 
@@ -328,7 +401,8 @@ def run(date: str | None = None, venue: str | None = None, *,
         # silence indistinguishable from a run that never happened.
         with transaction(conn):
             job_log.record_source(
-                conn, "scrape_odds", ok=report.races > 0, detail=report.line())
+                conn, "scrape_odds",
+                ok=bool(report.races or report.closed), detail=report.line())
         return report
     finally:
         conn.close()
@@ -361,8 +435,10 @@ def main(argv: list[str] | None = None) -> int:
         for skip in report.skipped:
             print(f"  SKIPPED {skip}")
     # Nothing to price is not a failure -- most days have no meeting. Having
-    # something to price and storing none of it is.
-    if report.attempted and not report.races:
+    # something to price and storing none of it is, UNLESS what the run
+    # learned was that the races are over: recording a close is an outcome,
+    # not a miss.
+    if report.attempted and not report.races and not report.closed:
         return 1
     return 0
 

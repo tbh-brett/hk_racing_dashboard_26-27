@@ -394,7 +394,7 @@ export const PERIODS = [
 
 export function periodPicker(current, onPick, { label = 'OVER', window: win = null,
                                                 cls = '', seasons = null,
-                                                season = null,
+                                                season = null, note = null,
                                                 onSeason = null } = {}) {
   const bar = el('div', `period-pick ${cls}`.trim());
   bar.append(el('span', 'lab', label));
@@ -436,6 +436,10 @@ export function periodPicker(current, onPick, { label = 'OVER', window: win = nu
   // a figure copied off the page can be checked again later against the same
   // dates rather than against whatever the word means that month.
   if (win?.label) bar.append(el('span', 'bounds', win.label));
+  // Why the bounds are not the ones the header implies. A window that quietly
+  // measures a different day than the meeting on screen is worse than one that
+  // says so, because both look identical when the answer is "nothing".
+  if (note) bar.append(el('span', 'bounds-why', note));
   return bar;
 }
 

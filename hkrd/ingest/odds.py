@@ -46,7 +46,7 @@ from hkrd.ingest._client import FetchError, fetch_json, urls
 
 __all__ = ["OddsError", "fetch_race", "fetch_meeting", "meeting_id",
            "parse_snapshot", "snapshot_rows", "pair_rows", "pools_to_payloads",
-           "POOLS", "GRAPHQL_URL"]
+           "POOLS", "GRAPHQL_URL", "SELLING"]
 
 GRAPHQL_URL = urls.graphql
 
@@ -106,6 +106,9 @@ def parse_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
         "runners": payload.get("odds") or [],
         "qin": payload.get("qin_odds") or [],
         "qpl": payload.get("qpl_odds") or [],
+        # Empty for a legacy payload off disk, which predates the field. An
+        # unknown status must read as "no answer", never as "shut".
+        "sell_status": str(payload.get("sell_status") or "").strip(),
     }
 
 
@@ -220,6 +223,12 @@ _POOLS_QUERY = """query racing($date: String, $venueCode: String, $oddsTypes: [O
 # the system; QIN and QPL are what the coverage rule actually bets into.
 POOLS = ("WIN", "PLA", "QIN", "QPL")
 
+# HKJC's own word for "betting is open on this pool". Every other value, and
+# the absence of the field, means it is not selling — which before the off is a
+# market that has not opened, and after it is a race that has been run. The
+# capture uses the difference to stop; see `jobs/scrape_odds._shut`.
+SELLING = "START_SELL"
+
 # HKJC does not operate a quinella place pool on a field of fewer than seven
 # declared starters. Measured on both meetings open when this was written:
 # 2026-09-05 S1 race 2 (six runners) and 2026-09-06 ST race 3 (six runners)
@@ -327,6 +336,12 @@ def pools_to_payloads(meeting: dict[str, Any], *, date: str, venue: str,
             "scraped_at": captured_at, "date": date, "venue": venue,
             "race_no": race_no, "url": GRAPHQL_URL,
             "last_update": "", "race_info": "",
+            # What HKJC says about the WIN pool: START_SELL while betting is
+            # open, something else once it has shut. This is the only signal
+            # available that knows about a delayed start, and it is what stops
+            # the capture rather than a fixed number of minutes past a
+            # SCHEDULED off time that the race did not necessarily keep to.
+            "sell_status": "",
             "odds": [], "qin_odds": [], "qpl_odds": [], "notes": [],
         })
         seen_types.setdefault(race_no, set()).add(kind)
@@ -360,6 +375,11 @@ def pools_to_payloads(meeting: dict[str, Any], *, date: str, venue: str,
 
         if kind == "WIN":
             field_size[race_no] = len(pool.get("oddsNodes") or [])
+            # `sellStatus` where it is offered, `status` where it is not. Both
+            # were observed: an unopened meeting answers DEFINED / STOP_SELL,
+            # an open one START_SELL / START_SELL.
+            snap["sell_status"] = str(pool.get("sellStatus")
+                                      or pool.get("status") or "").strip()
 
     for race_no, snap in by_race.items():
         snap["odds"].sort(key=lambda r: int(r["no"]))

@@ -42,7 +42,7 @@ def place(date: str, *, bet_type: str, account: str,
           race_no: int | None = None, selections: list[int] | None = None,
           banker: int | None = None, unit_stake: float = 0.0,
           legs: list[dict] | None = None, legs_required: int | None = None,
-          acknowledged: list[str] | None = None,
+          formula: str | None = None, acknowledged: list[str] | None = None,
           blackbook_entry_id: str | None = None,
           notes: str | None = None, db: str | None = None) -> PlacedBet:
     """Write one bet. Returns the ticket as stored, with what it was flagged for.
@@ -62,7 +62,8 @@ def place(date: str, *, bet_type: str, account: str,
         ticket = prebet.evaluate(
             date, bet_type=bet_type, race_no=race_no, selections=selections,
             banker=banker, unit_stake=unit_stake, legs=legs,
-            legs_required=legs_required, account=account, conn=conn)
+            legs_required=legs_required, formula=formula, account=account,
+            conn=conn)
         if not ticket["placeable"]:
             raise ValueError(ticket["reason"] or "ticket is not placeable")
 

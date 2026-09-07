@@ -102,6 +102,20 @@ _FIELD_CLAUSES: dict[str, str] = {
         " AND f.race_no = r.race_no) <= ?"),
 }
 
+# A race nobody has run yet is not a run. The card for the next meeting is
+# scraped days ahead, so without this the grid fills with rows that have a
+# horse and a draw and nothing else — and the insight panel beside it, which
+# has always required `place IS NOT NULL`, counted none of them. One of the two
+# was wrong about what this page is for, and it was the grid.
+#
+# The test is on the RACE, not the runner: a scratching or a horse that did not
+# finish has no placing in a race that was certainly run, and its absence is
+# information worth seeing. A results parse that came back empty — 6 Sep was
+# scraped before the meeting and wrote a card's worth of blank results — leaves
+# no placing anywhere in the race, and drops out whole.
+_RACE_WAS_RUN = ("EXISTS (SELECT 1 FROM runners f WHERE f.race_date = r.race_date"
+                 " AND f.race_no = r.race_no AND f.place IS NOT NULL)")
+
 _UPPER = {"horse", "venue", "course"}
 
 
@@ -187,12 +201,17 @@ def search_runs(*, source: str = "race", limit: int = 500,
             return _search_trials(conn, filters, limit)
 
         where, params = _where(filters)
-        sort = {"recent": "r.race_date DESC, r.race_no DESC, r.horse_no",
+        # Within a race, finishing order. The winner reads first and the last
+        # horse last, which is the order the race happened in and the order
+        # every other results surface uses; horse number is a stable
+        # tie-break for a dead heat and for the unplaced tail.
+        finish = "r.place IS NULL, r.place, r.horse_no"
+        sort = {"recent": f"r.race_date DESC, r.race_no DESC, {finish}",
                 "figure": "e.figure IS NULL, e.figure DESC",
                 "odds": "r.win_odds IS NULL, r.win_odds",
                 "place": "r.place IS NULL, r.place"}.get(order, "r.race_date DESC")
         rows = conn.execute(
-            f"{_LINE_SQL} WHERE {where} ORDER BY {sort} LIMIT ?",
+            f"{_LINE_SQL} WHERE {where} AND {_RACE_WAS_RUN} ORDER BY {sort} LIMIT ?",
             [*params, limit]).fetchall()
         lines = [_to_line(r) for r in rows]
         # The trip tags the grid can filter on but, until now, could not show.
@@ -254,7 +273,8 @@ def _search_trials(conn: Connection, filters: dict[str, Any],
                    AND f.trial_no = t.trial_no) AS field_size
         FROM trials t
         WHERE {' AND '.join(clauses)}
-        ORDER BY t.trial_date DESC, t.trial_no DESC LIMIT ?
+        ORDER BY t.trial_date DESC, t.trial_no DESC,
+                 t.place IS NULL, t.place LIMIT ?
     """, [*params, limit]).fetchall()
 
     from hkrd.store.coerce import parse_finish_time, parse_running_positions, \
@@ -359,7 +379,7 @@ def insight(*, source: str = "race", conn: Connection | None = None,
             conn.close()
 
 
-def filter_options(*, top: int = 14,
+def filter_options(*, top: int = 400,
                    conn: Connection | None = None) -> dict[str, list[Any]]:
     """The values each chip group offers, read from the archive itself.
 
@@ -368,9 +388,17 @@ def filter_options(*, top: int = 14,
     they go stale the first time a jockey leaves, and a chip for a value the
     archive does not contain is a filter that always returns nothing.
 
-    Jockeys and trainers are capped at the busiest `top`, because the full list
-    is hundreds long and a chip grid that needs scrolling is a dropdown wearing
-    a costume. The free-text box beside them reaches the rest.
+    Jockeys and trainers used to be capped at the busiest fourteen, with a
+    free-text box beside them for the rest. That was a filter that silently did
+    not offer most of its own values: the archive holds 70 jockeys and 67
+    trainers, so four out of five names were reachable only by typing them
+    exactly. Both lists now come back whole, busiest first, and the panel
+    scrolls — 137 names is a list, not a wall, and a chip that is there is a
+    filter you can see.
+
+    `top` still caps them, at a number chosen to be past the real cardinality
+    rather than inside it, so a season that doubles the riding roster is a
+    scrolling list and not a truncated one.
     """
     own = conn is None
     conn = conn or get_conn()

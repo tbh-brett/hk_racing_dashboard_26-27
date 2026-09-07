@@ -78,31 +78,46 @@ def test_win_is_one_line_per_selection():
     assert prebet.combination_count("WIN", 3) == 3
 
 
-def test_all_up_formulas_are_generated_not_memorised():
-    """Design brief 07 §4's table: 5 races gives 5x1, 4x5, 3x10, 2x10."""
-    got = [(f["legs"], f["combinations"]) for f in prebet.formulas(5)]
-    assert got == [(5, 1), (4, 5), (3, 10), (2, 10)]
+def test_all_up_formulas_reproduce_hkjcs_published_table():
+    """HKJC's own All Up Combinations table, generated rather than typed in.
+
+    The four-leg row of it, which the owner supplied as a screenshot: 4x1,
+    4x4, 4x5, 4x6, 4x10, 4x11, 4x14, 4x15 and nothing else. 4x11 is "6
+    doubles, 4 trebles and 1 quadruple", which is where the code's number
+    comes from — it IS the line count.
+    """
+    got = [f["code"] for f in prebet.allup_formulas(4)]
+    assert got == ["4x1", "4x4", "4x5", "4x6", "4x10", "4x11", "4x14", "4x15"]
+
+    eleven = next(f for f in prebet.allup_formulas(4) if f["code"] == "4x11")
+    assert eleven["label"] == "6 doubles + 4 trebles + 1 quadruple"
+    assert eleven["combinations"] == 11
+
+    five = [f["code"] for f in prebet.allup_formulas(5)]
+    assert five == ["5x1", "5x5", "5x6", "5x10", "5x15", "5x16", "5x20",
+                    "5x25", "5x26", "5x30", "5x31"]
 
 
 def test_a_single_race_cannot_form_a_chain():
-    assert prebet.formulas(1) == []
+    assert prebet.allup_formulas(1) == []
 
 
 # ─── the place transform ──────────────────────────────────────────────────────
 
-def test_place_percentage_is_harville_not_the_three_times_rule(db):
-    """The rule of thumb overstates a short banker, and the gap is reported.
+def test_place_percentage_comes_from_the_place_pool_with_the_model_beside_it(db):
+    """The pool prices the question; Harville-Henery is the check on it.
 
-    This is the 34-point finding made visible rather than silently corrected:
-    the design shows both numbers side by side so the rule the user would
-    otherwise reach for can be seen failing.
+    Both figures come back on every runner and the row says which one was
+    used, because a number sourced two ways and labelled once is how two
+    surfaces end up disagreeing with nothing to tell them apart.
     """
     card = prebet.entry_card(DATE, 3)
     fav = next(r for r in card["runners"] if r["horse_no"] == 1)
     assert fav["place_pct"] is not None
-    assert fav["linear_pct"] > fav["place_pct"]
+    assert fav["place_source"] == "place pool"
+    assert fav["model_pct"] is not None
     assert fav["gap_points"] == pytest.approx(
-        fav["linear_pct"] - fav["place_pct"], abs=0.11)
+        fav["place_pct"] - fav["model_pct"], abs=0.11)
 
 
 def test_place_odds_are_scraped_never_derived(db):

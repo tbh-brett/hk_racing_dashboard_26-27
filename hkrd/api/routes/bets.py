@@ -79,6 +79,23 @@ def bets_reconciliation(account: str | None = None, period: str | None = None,
                                window=_window(period, since, until, anchor, season))
 
 
+@router.get("/api/bets/anchor")
+def bets_anchor(account: str | None = None,
+                on_or_before: str | None = None) -> dict:
+    """The day the Bets page should measure its windows back from.
+
+    Not the same question as "which meeting am I looking at". The header points
+    at the next race day, and a DAY window over a meeting nobody has bet into
+    yet is an empty analysis that reads as a broken one — which is what it was
+    read as. The page asks for this once and puts the answer in the period
+    label, so the fallback is visible rather than silent.
+    """
+    found = bets_q.latest_bet_date(account=account, on_or_before=on_or_before)
+    return {"anchor": found, "account": account,
+            "on_or_before": on_or_before,
+            "fell_back": bool(found and on_or_before and found != on_or_before)}
+
+
 @router.get("/api/seasons")
 def seasons() -> dict:
     """Every season the archive holds, plus the one currently open.
@@ -147,6 +164,7 @@ def bets_prebet(body: dict = Body(...)) -> dict:
             legs=body.get("legs") or [],
             legs_required=(int(body["legs_required"])
                            if body.get("legs_required") is not None else None),
+            formula=body.get("formula"),
             account=body.get("account"))
     except KeyError as exc:
         raise HTTPException(422, f"missing field: {exc.args[0]}") from exc
@@ -178,6 +196,7 @@ def place_bet(body: dict = Body(...)) -> dict:
             legs=body.get("legs") or [],
             legs_required=(int(body["legs_required"])
                            if body.get("legs_required") is not None else None),
+            formula=body.get("formula"),
             acknowledged=body.get("acknowledged") or [],
             blackbook_entry_id=body.get("blackbook_entry_id"),
             notes=body.get("notes"))

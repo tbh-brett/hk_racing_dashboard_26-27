@@ -56,6 +56,7 @@ const state = {
   // is one chip away and nothing is deleted — the record is worth keeping,
   // it just is not the question in September.
   account: null, period: 'season', season: null, seasons: [], window: null,
+  anchorFellBack: false, anchor: null,
 };
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
@@ -73,6 +74,14 @@ function renderScope() {
     loadLedger();
   }, {
     window: state.window,
+    // Which day the window is measured back from, when it is not the meeting
+    // in the header. A DAY window over a meeting nobody has bet into is an
+    // empty analysis that reads as a broken one, so the ledger anchors on its
+    // own last day — and says that it did.
+    note: state.anchorFellBack
+      ? `measured to ${state.anchor} · the last day bet on, `
+        + 'not the meeting in the header'
+      : null,
     seasons: state.seasons,
     season: state.season,
     onSeason: (yr) => { state.season = yr; loadLedger(); },
@@ -95,24 +104,30 @@ function renderViewToggle() {
   }), importButton());
 }
 
-/* IMPORT A STATEMENT, from the browser.
+/* IMPORT WHAT WAS BET, from the browser.
+ *
+ * Two files, one button. The HKJC statement (.txt) is the bookie's record and
+ * exists only after the meeting; the bet sheet (.csv) is the spreadsheet the
+ * betting is planned in, covers both accounts, and is where an all-up is
+ * worked out. The server tells them apart from their own first lines, so the
+ * interface does not ask a question it can answer itself.
  *
  * The file is read here and its TEXT is posted, because the server is in
  * Singapore and the download is on whatever device is to hand — the older
  * route took a server-side path, which only the server could satisfy.
  *
- * What it reports is what it WROTE, and what it could not read. A statement
- * that silently dropped a bet leaves a ledger that reads as a bet never
- * placed, and the Blackbook then calls that run a missed chance. */
+ * What it reports is what it WROTE, and what it could not read. A file that
+ * silently dropped a bet leaves a ledger that reads as a bet never placed, and
+ * the Blackbook then calls that run a missed chance. */
 function importButton() {
   const wrap = el('span', 'import-wrap');
   const input = el('input');
   input.type = 'file';
-  input.accept = '.txt,text/plain';
+  input.accept = '.txt,.csv,text/plain,text/csv';
   input.hidden = true;
 
-  const btn = el('button', 'import-btn', 'IMPORT STATEMENT');
-  btn.title = 'the .txt account statement downloaded from HKJC';
+  const btn = el('button', 'import-btn', 'IMPORT BETS');
+  btn.title = 'the .txt account statement from HKJC, or the .csv bet sheet';
   btn.addEventListener('click', () => input.click());
 
   const out = el('span', 'import-out');
@@ -124,8 +139,11 @@ function importButton() {
     out.textContent = `reading ${file.name}…`;
     try {
       const text = await file.text();
-      const r = await api.importStatementText(text, file.name);
-      const bits = [`${r.new_bets} new of ${r.bets} bets`,
+      // Whichever account the ledger is filtered to owns the import; with
+      // BOTH selected the server's default applies and says so in the result.
+      const r = await api.importStatementText(text, file.name, state.account);
+      const bits = [`${r.kind ?? 'file'}`,
+                    `${r.new_bets} new of ${r.bets} bets`,
                     `${r.selections} selections`];
       if (r.cash_movements) bits.push(`${r.cash_movements} cash`);
       out.textContent = bits.join(' · ');
@@ -731,18 +749,48 @@ async function boot() {
   await loadLedger();
 }
 
+/** The day this page measures back from.
+ *
+ *  Everywhere else on the site the header's meeting is the right anchor, and
+ *  here it is not. The header points at the NEXT race day, so on the Tuesday
+ *  after a Sunday meeting "DAY" resolved to a meeting nobody had bet into and
+ *  every panel correctly reported nothing — which reads exactly like an
+ *  analysis that has not been updated, and was read as one.
+ *
+ *  So the ledger anchors on the last day it has a bet for, at or before the
+ *  meeting on screen: picking an April card still means April. The window
+ *  label carries the resolved date, so the fallback is visible rather than
+ *  silent.
+ */
+async function ledgerAnchor() {
+  const q = new URLSearchParams();
+  if (state.account) q.set('account', state.account);
+  if (context.date) q.set('on_or_before', context.date);
+  try {
+    const r = await api.betsAnchor(`?${q.toString()}`);
+    state.anchorFellBack = Boolean(r.fell_back);
+    state.anchor = r.anchor ?? context.date ?? null;
+    return state.anchor;
+  } catch {
+    // The anchor is a convenience, never a gate. A failed lookup falls back
+    // to the meeting on screen, which is what every other page uses.
+    state.anchorFellBack = false;
+    state.anchor = context.date ?? null;
+    return state.anchor;
+  }
+}
+
 /** Everything the ledger, analysis and reconciliation views read.
  *
  *  One call for all three, with the same account and the same window, so they
  *  cannot disagree about what they are counting.
  */
 async function loadLedger() {
+  const anchor = await ledgerAnchor();
   const q = new URLSearchParams({ period: state.period });
   if (state.account) q.set('account', state.account);
   if (state.season !== null) q.set('season', String(state.season));
-  // Anchored on the meeting in the header, not on today: "this week" while
-  // looking at an April meeting means that April week.
-  if (context.date) q.set('anchor', context.date);
+  if (anchor) q.set('anchor', anchor);
   const qs = q.toString();
   const [ledger, analysis, recon] = await Promise.all([
     api.bets(`?limit=2000&${qs}`),

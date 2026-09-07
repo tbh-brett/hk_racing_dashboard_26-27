@@ -28,7 +28,7 @@ from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["ledger", "bets_for_race", "bets_for_horse", "backed_and_missed",
            "backed_and_missed_by_tag", "backed_by_account",
-           "summary"]
+           "latest_bet_date", "summary"]
 
 # What a missed run is priced at, so the two sides of the comparison are
 # commensurable. A round number, stated on the page, never silently applied.
@@ -37,6 +37,40 @@ NOTIONAL_STAKE = 100.0
 
 def _rows(conn: Connection, sql: str, params: Any = ()) -> list[dict]:
     return [dict(r) for r in conn.execute(sql, params)]
+
+
+def latest_bet_date(*, account: str | None = None,
+                    on_or_before: str | None = None,
+                    conn: Connection | None = None) -> str | None:
+    """The most recent meeting this ledger has a bet on. None if it has none.
+
+    The Bets page anchors its window on the meeting in the header, which is the
+    right default everywhere else on the site and the wrong one here: the
+    header points at the NEXT race day, and on the Tuesday after a Sunday
+    meeting that makes "DAY" an empty day. The analysis was correct and said
+    nothing, which reads exactly like an analysis that has not been updated.
+
+    `on_or_before` keeps the meeting choice meaningful — looking at an April
+    card anchors on the last bet up to April, not on last week's — while the
+    common case, a header pointing at a meeting not yet bet into, falls back to
+    the last day there is something to show.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        sql = "SELECT max(race_date) d FROM bets WHERE race_date IS NOT NULL"
+        params: list[Any] = []
+        if account:
+            sql += " AND lower(account) = ?"
+            params.append(account.lower())
+        if on_or_before:
+            sql += " AND race_date <= ?"
+            params.append(on_or_before)
+        row = conn.execute(sql, params).fetchone()
+        return row["d"] if row and row["d"] else None
+    finally:
+        if own:
+            conn.close()
 
 
 def ledger(*, date: str | None = None, account: str | None = None,
