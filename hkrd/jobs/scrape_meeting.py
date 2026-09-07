@@ -50,6 +50,7 @@ class ScrapeReport:
     lane_tags: int = 0
     dividends: int = 0
     vet_records: int = 0
+    projected: int = 0
     errors: list[str] = field(default_factory=list)
     # A source that is absent is not a scrape that failed. The card is not
     # published for every meeting this package can reach, and dividends and
@@ -76,7 +77,8 @@ class ScrapeReport:
                  f"  comments           {self.comments:>6}",
                  f"  lane tags          {self.lane_tags:>6}",
                  f"  dividends          {self.dividends:>6}",
-                 f"  vet records        {self.vet_records:>6}"]
+                 f"  vet records        {self.vet_records:>6}",
+                 f"  speed map          {self.projected:>6}"]
         if self.warnings:
             lines.append(f"  not available      {len(self.warnings):>6}")
             lines += [f"    {w}" for w in self.warnings[:6]]
@@ -137,6 +139,20 @@ def scrape_meeting(date: str, venue: str, *, post_race: bool = False,
             report.warnings.append(f"vet: {e}")
         report.warnings.append(
             f"results: not published yet — {date} has not been run")
+        # THE SPEED MAP, built here rather than on a schedule of its own.
+        #
+        # It was a separate cron line at 07:20, 12:20 and 18:20, so a card
+        # scraped at any other hour had no projection until the next one came
+        # round — and a card scraped after 18:20 had none until the following
+        # morning. On 2026-09-07 the Wednesday HV card was in the database with
+        # 93 runners and the page read "404 no projection stored for
+        # 2026-09-09".
+        #
+        # A projection is a property of a declared card, so it is made when the
+        # card is. Every path that stores one gets it: the nightly, the card
+        # button on the strip, a run by hand.
+        if report.declared:
+            report.projected = _project_card(db, date, report)
         _log_sources(db, report, post_race=post_race, pre_race=True)
         return report
 
@@ -198,6 +214,17 @@ def scrape_meeting(date: str, venue: str, *, post_race: bool = False,
             try:
                 with transaction(conn):
                     stored = _store_race(conn, date, race)
+                    # The stewards' report comes off the SAME page as the
+                    # result. Until now the only comments a live meeting had
+                    # were the corunning endpoint's, which for 2026-09-06
+                    # answered "No Comments on Running information for this
+                    # horse." for all 119 runners -- so runner_tags, which
+                    # derives entirely from this text, had nothing to read.
+                    report.comments += upsert.upsert_comments(conn, [
+                        {"race_date": date, "race_no": race.get("race_no"),
+                         "horse_no": i["horse_no"],
+                         "comment_text": i["comment"], "source": "incident"}
+                        for i in race.get("incidents") or []])
             except StoreError as e:
                 # The other nine races are still worth having, and this one
                 # names itself. Letting it raise is what turned one odd row
@@ -323,6 +350,25 @@ def _still_to_run(date: str, db: Path | None, *,
     # reason: a delayed start is real, and a result is not published the
     # instant the field crosses the line.
     return to_off > -market_q.SETTLED_AFTER_MINUTES
+
+
+def _project_card(db, date: str, report: ScrapeReport) -> int:
+    """Build the speed map for a card that has just landed.
+
+    A projection that fails must not take the card scrape down with it — the
+    declared field, the ratings and the gear are the reason this job ran, and
+    they are already stored by the time this is called. So the failure is
+    recorded and the scrape still succeeds.
+    """
+    from hkrd.jobs import project_card
+
+    try:
+        out = project_card.project(date, db)
+    except Exception as exc:                    # noqa: BLE001 - recorded below
+        report.warnings.append(f"speed map: {type(exc).__name__}: {exc}")
+        return 0
+    report.warnings.extend(f"speed map: {e}" for e in out.errors)
+    return out.projected
 
 
 def _log_sources(db, report: ScrapeReport, *, post_race: bool,

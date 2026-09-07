@@ -26,7 +26,8 @@ from hkrd.ingest._client import FetchError, fetch_html, urls
 
 __all__ = ["ResultsError", "parse_race_header", "parse_results_table",
            "parse_sectional_table", "parse_sectional_page",
-           "fetch_sectionals", "fetch_race", "fetch_meeting"]
+           "parse_incident_report", "fetch_sectionals",
+           "fetch_race", "fetch_meeting"]
 
 
 class ResultsError(ValueError):
@@ -217,6 +218,63 @@ def parse_sectional_table(html: str) -> dict[str, dict[str, Any]]:
     return out
 
 
+# ── the stewards' incident report ────────────────────────────────────────────
+#
+# It is a table ON THE RESULTS PAGE — `Pla. | Horse No. | Horse | Incident` —
+# and nothing scraped it. `runner_comments` has carried a `source` column with
+# 'incident' since the beginning and `query/race` PREFERS it over the objective
+# comments-on-running text, but the only thing that ever wrote one was
+# `jobs/import_legacy_reports`, run once over the archive.
+#
+# So live meetings had only the corunning endpoint, which for 2026-09-06
+# answered "No Comments on Running information for this horse." for all 119
+# runners while the incident report on the page beside it read "Approaching the
+# 900 Metres, when racing keenly, was steadied when crowded between EMERGING
+# STAR ... a substantial amount of blood in the horse's trachea". Every tag in
+# `runner_tags` derives from this text, so the card had none.
+_INCIDENT_HEAD = ("pla", "horse no", "incident")
+
+
+def parse_incident_report(html: str, *, source: str | None = None
+                          ) -> list[dict[str, Any]]:
+    """The stewards' account of each runner, keyed by horse number.
+
+    Returns [] when the page carries no incident table. A race can genuinely
+    have no report — it is published with the result and occasionally lags it —
+    and the caller walks races, so that must be an empty answer rather than an
+    exception.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    for table in soup.find_all("table"):
+        rows = table.find_all("tr")
+        if not rows:
+            continue
+        head = [" ".join(c.get_text(" ", strip=True).split()).lower()
+                for c in rows[0].find_all(["th", "td"])]
+        joined = " | ".join(head)
+        if not all(want in joined for want in _INCIDENT_HEAD):
+            continue
+        # By HEADER, never by position: the column order has changed on this
+        # site before and a parser confident about positions it never verified
+        # put a trainer's name in the horse column for three days.
+        idx = {name: i for i, name in enumerate(head)}
+        no_at = next(i for name, i in idx.items() if "horse no" in name)
+        inc_at = next(i for name, i in idx.items() if "incident" in name)
+        out: list[dict[str, Any]] = []
+        for tr in rows[1:]:
+            cells = [c.get_text(" ", strip=True) for c in tr.find_all("td")]
+            if len(cells) <= max(no_at, inc_at):
+                continue
+            horse_no = cells[no_at].strip()
+            text = " ".join(cells[inc_at].split()).strip()
+            if not horse_no.isdigit() or not text:
+                continue
+            out.append({"horse_no": horse_no, "comment": text})
+        if out:
+            return out
+    return []
+
+
 # ── the sectional page ───────────────────────────────────────────────────────
 #
 # Sectionals used to be a table INSIDE the results page, and `parse_sectional_
@@ -313,7 +371,11 @@ def fetch_race(date: str, venue: str, race_no: int, *, session=None) -> dict[str
         if extra:
             r.update(extra)
     return {"race_date": date, "race_no": race_no, "venue": venue,
-            **header, "runners": runners}
+            **header, "runners": runners,
+            # The stewards' report, from the same page. Kept beside the runners
+            # rather than merged into them: it is a different fact with a
+            # different source, and `runner_comments` stores it as one.
+            "incidents": parse_incident_report(html, source=source)}
 
 
 def fetch_meeting(date: str, venue: str, *, max_races: int = 11,

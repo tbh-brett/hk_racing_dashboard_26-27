@@ -114,9 +114,13 @@
 }
 
 /* ── how quickly it gets away ─────────────────────────────────────────────
- * Amber, and amber only. This bar is early speed and nothing else: it does not
- * know about the gate, and folding the gate in would make the ladder argue
- * with its own y-axis.
+ * The bar is early speed and nothing else: it does not know about the gate,
+ * and folding the gate in would make the ladder argue with its own y-axis.
+ *
+ * It used to be amber for every runner, which meant the colour carried nothing
+ * and the length carried everything. Four steps now, by rank inside THIS race,
+ * so the quick beginners and the ones that will be behind early are separable
+ * at a glance rather than by reading fourteen bar lengths.
  */
 
 .away { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -131,9 +135,13 @@
 
 .away-fill {
   height: 100%;
-  background: var(--edge);
+  background: var(--away-steady);
   min-width: 1px;
 }
+.away-fill.fast   { background: var(--away-fast); }
+.away-fill.quick  { background: var(--away-quick); }
+.away-fill.steady { background: var(--away-steady); }
+.away-fill.slow   { background: var(--away-slow); }
 
 .away-rank {
   font: 500 10px/1 'IBM Plex Mono', monospace;

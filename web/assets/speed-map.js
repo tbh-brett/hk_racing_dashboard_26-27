@@ -81,13 +81,19 @@ function awayBar(runner) {
   }
   const share = 1 - runner.esz_rank;
   const track = el('div', 'away-track');
-  const fill = el('div', 'away-fill');
+  // Four steps by rank inside this race. `esz_rank` is 0 for the quickest, so
+  // the top quarter of the field is `fast` and the bottom quarter `slow`.
+  const band = share >= 0.75 ? 'fast'
+    : share >= 0.5 ? 'quick'
+      : share >= 0.25 ? 'steady' : 'slow';
+  const fill = el('div', `away-fill ${band}`);
   fill.style.width = `${(share * 100).toFixed(1)}%`;
   track.append(fill);
   wrap.append(track);
   const pct = el('span', 'away-rank', `${Math.round(share * 100)}`);
   pct.title = `quicker away than ${Math.round(share * 100)}% of this field, `
             + 'across its own recent form';
+  wrap.dataset.away = band;
   wrap.append(pct);
   return wrap;
 }

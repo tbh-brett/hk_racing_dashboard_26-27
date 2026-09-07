@@ -302,8 +302,12 @@ def test_the_run_the_thesis_came_from_is_not_a_test_of_it(booked):
 
     dates = [r["race_date"] for r in entry["runs"]]
     assert "2026-04-01" not in dates                 # the source run
-    assert dates == ["2026-07-01", "2026-06-01", "2026-05-01"]
-    assert entry["runs_since"] == 3
+    # 2026-03-01 is here because the booking is dated to it and a run on the
+    # day of the booking now counts — a horse is routinely booked off a trial
+    # for an engagement it runs that day. What this test is about is unchanged:
+    # the SOURCE run is excluded by name, not by falling on a date.
+    assert dates == ["2026-07-01", "2026-06-01", "2026-05-01", "2026-03-01"]
+    assert entry["runs_since"] == 4
     # Shown, not discarded — the reasoning has to be visible without leaving.
     assert entry["source_run"]["race_date"] == "2026-04-01"
     assert entry["source_run"]["place"] == 2
@@ -648,3 +652,51 @@ def test_an_entry_past_its_expiry_reads_expired(tmp_path):
     expired = {e["horse_name"] for e in bb.list_entries(status="expired", conn=conn)}
     assert expired == {"LAPSED"}
     conn.close()
+
+
+def test_a_run_on_the_day_it_was_booked_counts(db):
+    """A horse is very often booked off a trial for an engagement it runs THAT
+    DAY. I EXCELLE and POSITIVE SMILE were both booked on 2026-09-06 from 25
+    August trials, both ran on 2026-09-06, both lost — and both showed "0 runs ·
+    NO RUNS" afterwards. The tracker silently not tracking is the one thing it
+    cannot do.
+
+    The rest of this module already calls same-day "booked before the race"
+    (`b.added_date <= r.race_date`), so `>` here disagreed with it.
+    """
+    conn = get_conn(db)
+    conn.execute(
+        "INSERT INTO blackbook (id, horse_name, status, confidence, "
+        "added_date, source_date, source_race_no, reasoning) VALUES "
+        "('bb-same', 'FAST ONE', 'active', 'high', '2026-05-01', "
+        " '2026-03-01', 1, 'trial win')")
+    conn.commit()
+    entry = bb.entry_detail("bb-same", conn=conn)
+    conn.close()
+
+    # Booked on 2026-05-01 off a run in March: the 1 May run is a test of the
+    # thesis, not its source, and it used to be dropped for sharing a date.
+    assert "2026-05-01" in [r["race_date"] for r in entry["runs"]]
+    assert entry["runs_since"] == 3
+
+
+def test_the_run_the_entry_was_written_off_is_still_not_evidence(db):
+    """`>` was doing two jobs. The one worth keeping — not counting the run
+    that CREATED the thesis as a test of it — is done by naming that run, so
+    letting same-day runs through does not bring it back.
+
+    Every same-day case in the archive is exactly this: booked on 2026-04-08
+    off race 1 on 2026-04-08.
+    """
+    conn = get_conn(db)
+    conn.execute(
+        "INSERT INTO blackbook (id, horse_name, status, confidence, "
+        "added_date, source_date, source_race_no, reasoning) VALUES "
+        "('bb-anchor', 'FAST ONE', 'active', 'high', '2026-05-01', "
+        " '2026-05-01', 1, 'booked off this run')")
+    conn.commit()
+    entry = bb.entry_detail("bb-anchor", conn=conn)
+    conn.close()
+
+    assert "2026-05-01" not in [r["race_date"] for r in entry["runs"]]
+    assert entry["runs_since"] == 2       # only June and July

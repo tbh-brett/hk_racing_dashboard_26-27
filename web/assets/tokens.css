@@ -198,6 +198,20 @@
   --style-closer:        #4fb3e0;
   --style-closer-ground: #12283a;
 
+  /* ── how quickly a horse gets away, on the speed map's AWAY bar ─────────
+   * Its own four steps rather than the style badge's, because the bar is a
+   * CONTINUOUS rank inside one race and the badge is a four-way ordinal for a
+   * horse across its career — a horse can be the quickest away in a weak
+   * field and still be a Closer by habit.
+   * Fast end takes the Leader hue so the bar and the badge agree where they
+   * mean the same thing; the slow end is red at the owner's request, which is
+   * why the Closer badge (blue) and a slow AWAY bar (red) do not match.
+   */
+  --away-fast:      #ff8a5c;
+  --away-quick:     #e8c04a;
+  --away-steady:    #9aa7b8;
+  --away-slow:      #e0637f;
+
   /* ── type ──────────────────────────────────────────────────────────── */
   --font: 'IBM Plex Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;

@@ -43,13 +43,25 @@ _PLACES_SQL = """
     CASE WHEN r.place <= (CASE WHEN f.field_size >= 7 THEN 3 ELSE 2 END)
          THEN 1 ELSE 0 END"""
 
-# Every run of a booked horse after the day it was booked. `f` carries the field
-# size because the place rule depends on it, and the race's book — the sum of
-# 1/odds over the whole field — because an implied probability has to be
+# Every run of a booked horse from the day it was booked onward. `f` carries the
+# field size because the place rule depends on it, and the race's book — the sum
+# of 1/odds over the whole field — because an implied probability has to be
 # de-vigged against the race it came from, not against 1.0.
+#
+# `>=`, not `>`. A horse is very often booked off a trial for an engagement it
+# runs THAT DAY: I EXCELLE and POSITIVE SMILE were both booked on 2026-09-06 off
+# 25 August trials and both ran on 2026-09-06, and both showed "0 runs · NO
+# RUNS" afterwards — the tracker's whole purpose, silently not tracking. The
+# rest of this file already treats same-day as booked before the race
+# (`b.added_date <= r.race_date` is what `booked_before_race` means), so `>`
+# here disagreed with it.
+#
+# What `>` was ALSO doing is excluded properly by the clause below: the run the
+# entry is anchored to is named by (source_date, source_race_no) and dropped by
+# name, not by being on or before a date.
 _RUNS_SINCE_FROM = """
     FROM blackbook b
-    JOIN runners r ON r.horse_name = b.horse_name AND r.race_date > b.added_date
+    JOIN runners r ON r.horse_name = b.horse_name AND r.race_date >= b.added_date
                   -- The run the entry is ANCHORED to is not a test of it. In
                   -- 71 of the 193 legacy entries with a source date the source
                   -- run falls after the booking date -- the entry was written
@@ -415,7 +427,7 @@ def book_summary(*, today: str | None = None,
             SELECT count(*) FROM (
               SELECT b.id FROM blackbook b
               JOIN runners r ON r.horse_name = b.horse_name
-                            AND r.race_date > b.added_date
+                            AND r.race_date >= b.added_date
               WHERE b.status = 'active' AND r.place IS NOT NULL
               GROUP BY b.id HAVING count(*) >= 4)""").fetchone()[0]
 

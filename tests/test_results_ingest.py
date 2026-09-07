@@ -170,3 +170,39 @@ def test_the_results_page_is_still_preferred_when_it_has_them(monkeypatch):
     monkeypatch.setattr(results, "fetch_sectionals", must_not_run)
     got = results.fetch_race("2026-06-27", "ST", 1)
     assert got["runners"][0]["section_times"] == "24.00; 22.00"
+
+
+# ─── the stewards' incident report ────────────────────────────────────────────
+
+def _results_fixture() -> str:
+    """A real 2026-09-06 ST race 1 page, which carries the incident table.
+     beside it predates that table and is kept as the
+    older shape."""
+    from pathlib import Path
+    return (Path(__file__).parent / "fixtures" / "results_incident.html"
+            ).read_text(encoding="utf-8")
+
+
+def test_the_incident_report_is_read_off_the_results_page():
+    """`runner_comments` has carried a 'incident' source since the beginning and
+    `query/race` PREFERS it over the objective comments-on-running text — but
+    the only thing that ever wrote one was the one-off legacy import.
+
+    So a live meeting had only the corunning endpoint, which for 2026-09-06
+    answered "No Comments on Running information for this horse." for all 119
+    runners while the incident report on the same page read "Approaching the
+    900 Metres, when racing keenly, was steadied when crowded...". Every tag in
+    `runner_tags` derives from this text, so the card had none.
+    """
+    from hkrd.ingest import results
+
+    got = results.parse_incident_report(_results_fixture())
+    assert got, "the fixture carries an incident table"
+    assert all(r["horse_no"].isdigit() and r["comment"] for r in got)
+
+
+def test_a_page_with_no_incident_table_is_empty_not_an_error():
+    """A race can genuinely have no report, and the caller walks races."""
+    from hkrd.ingest import results
+
+    assert results.parse_incident_report("<html><body>none</body></html>") == []
