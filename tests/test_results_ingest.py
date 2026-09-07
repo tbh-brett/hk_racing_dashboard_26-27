@@ -93,3 +93,80 @@ def test_one_column_wrong_in_every_row_is_a_layout_change_not_a_quirk():
     assert shifted != html, "fixture header changed; update this test"
     with pytest.raises(results.ResultsError, match="in every row"):
         results.parse_results_table(shifted, source="2026-07-15 HV R1")
+
+
+# ─── sectionals moved out of the results page ─────────────────────────────────
+
+def _sectional_fixture() -> str:
+    from pathlib import Path
+    return (Path(__file__).parent / "fixtures" / "sectional_race.html"
+            ).read_text(encoding="utf-8")
+
+
+def test_sectionals_come_off_the_dedicated_page():
+    """They used to be a table inside the results page and `parse_sectional_
+    table` read it. HKJC stopped putting them there: 151 of 151 runners had
+    section times on 2026-06-27 and 152 of 153 on 2026-07-12, then 0 of 107 on
+    2026-07-15 and 0 of 120 on 2026-09-06. Nothing raised — the header the
+    parser looks for was simply not in the page, so it returned {} and every
+    meeting since mid-July has had no sectionals at all.
+    """
+    from hkrd.ingest import results
+
+    got = results.parse_sectional_page(_sectional_fixture())
+    assert len(got) == 14
+    # Keyed by SADDLECLOTH number, not finishing order: the winner of
+    # 2026-09-06 ST R1 was number 13.
+    assert got["13"]["section_times"] == "24.13; 22.33; 22.13"
+
+
+def test_a_section_time_is_the_time_not_the_margin():
+    """The cell reads "7 3 22.33 11.15 11.18" — position, margin behind the
+    leader, the section time, then the 100m splits inside it. Reading it
+    positionally would take the margin, and margins are lengths (`2-3/4`, `N`,
+    `SH`) that sometimes look like small numbers."""
+    from hkrd.ingest import results
+
+    got = results.parse_sectional_page(_sectional_fixture())
+    for entry in got.values():
+        for part in entry["section_times"].split(";"):
+            # A section of a Hong Kong race is 20-25 seconds. A margin is not.
+            assert 15.0 < float(part) < 40.0
+
+
+def test_the_winners_sections_sum_to_the_winning_time():
+    """The check that says the right column was read. 2026-09-06 ST R1 was won
+    in 1:08.59 and its winner's three sections are 24.13, 22.33 and 22.13."""
+    from hkrd.ingest import results
+
+    got = results.parse_sectional_page(_sectional_fixture())
+    total = sum(float(p) for p in got["13"]["section_times"].split(";"))
+    assert total == pytest.approx(68.59, abs=0.01)
+
+
+def test_a_page_with_no_sectional_table_is_empty_not_an_error():
+    """HKJC serves the site chrome for a race past the end of the card. The
+    caller walks races, so that has to be an empty answer."""
+    from hkrd.ingest import results
+
+    assert results.parse_sectional_page("<html><body>nothing</body></html>") == {}
+
+
+def test_the_results_page_is_still_preferred_when_it_has_them(monkeypatch):
+    """One extra request per race is worth paying only where it is needed. A
+    meeting whose results page still carries the table must not fetch twice."""
+    from hkrd.ingest import results
+
+    monkeypatch.setattr(results, "parse_results_table",
+                        lambda html, source=None: [{"horse_no": "1"}])
+    monkeypatch.setattr(results, "parse_race_header", lambda html: {})
+    monkeypatch.setattr(results, "fetch_html", lambda *a, **k: "<html></html>")
+    monkeypatch.setattr(results, "parse_sectional_table",
+                        lambda html: {"1": {"section_times": "24.00; 22.00"}})
+
+    def must_not_run(*a, **k):
+        raise AssertionError("fetched the sectional page when it was not needed")
+
+    monkeypatch.setattr(results, "fetch_sectionals", must_not_run)
+    got = results.fetch_race("2026-06-27", "ST", 1)
+    assert got["runners"][0]["section_times"] == "24.00; 22.00"

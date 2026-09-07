@@ -19,7 +19,8 @@ Every source, what fetches it, what runs that, and when.
 | Source | Module | Job that runs it | Schedule |
 |---|---|---|---|
 | Race card | `ingest/racecard.py` | `jobs/scrape_meeting` | 5×/day via `nightly` |
-| Results + sectionals | `ingest/results.py` | `jobs/scrape_meeting` | 5×/day via `nightly` |
+| Results | `ingest/results.py` | `jobs/scrape_meeting` | 5×/day via `nightly` |
+| Sectionals | `ingest/results.py` (own page) | `jobs/scrape_meeting` | with the results |
 | Dividends | `ingest/dividends.py` | `jobs/scrape_meeting` (post-race) | 5×/day via `nightly` |
 | Vet records | `ingest/vet.py` | `jobs/scrape_meeting` (post-race) | 5×/day via `nightly` |
 | Comments on running | `ingest/corunning.py` | `jobs/scrape_corunning` | with the meeting |

@@ -448,3 +448,74 @@ against R2's 10 GB free tier. Cutting it to 7 days is ~2.8 GB and still
 generous for what that replica is for, which is "the machine died, restore the
 latest" rather than archaeology. The volume is the primary copy and it now has
 room.
+
+
+## A Saturday meeting is scraped on Saturday
+
+**2026-09-07.** 2026-09-06 ST ran on the Saturday. By Monday morning every
+page still showed the meeting before it, and four faults had to line up for
+that — each of which would have been survivable alone.
+
+**The results were not fetched on the day.** `date >= _today()` called the
+meeting "not published yet" at 19:00, 22:45 and 23:45, hours after a card
+whose last race went off at 17:55. The guard it enforces is real: asked about
+a meeting that has not run, HKJC serves a page rather than answering 404, and
+`_store_race` stamps the date we asked for onto whatever came back. But the
+defence against that is `_is_same_meeting`, which compares the runners that
+came back against the field the card declared and is independent of any clock.
+The date rule is now a race-clock rule using the same settling allowance the
+odds capture uses, so the post-race scrape runs on the evening of the meeting.
+
+**Then it crashed.** Race 5 carried a fifteenth row: STAR FIGURE, place `WV`,
+no saddlecloth number — a horse withdrawn before the start never carried one —
+and it was not on the declared card either, so there was no number to recover.
+`runners` is keyed on (race_date, race_no, horse_no); it went in as NULL and
+raised `NOT NULL constraint failed`.
+
+**And the crash took the meeting with it**, because all ten races were stored
+in one transaction. Race 5 rolled back races 1 to 4 and the card finished the
+night with 0 of 120 results. One transaction per race now.
+
+**And the derive would have failed anyway.** Race 7's INVINCIBLE SHIELD was
+withdrawn at the start (`WV-A`), so its running positions came back as `---`
+and `parse_running_positions` raised — taking pace, ET, SARR and tags down for
+the whole archive over one horse that did not run. A run of dashes is HKJC's
+"not applicable", which the gear parser three functions below already knew.
+
+## Sectionals moved and nothing said so
+
+**2026-09-07.** Section times used to be a table inside the results page, and
+`parse_sectional_table` read it from there. HKJC stopped putting them there.
+Coverage: 151 of 151 runners on 2026-06-27, 152 of 153 on 2026-07-12 — then
+**0 of 107 on 2026-07-15 and 0 of 120 on 2026-09-06**. Nothing raised and
+nothing was logged. The parser looked for a header saying "sectional", did not
+find one, and returned `{}`; every meeting for two months had no sectionals and
+the only trace was a column quietly full of nulls.
+
+They are still published, at `displaysectionaltime`, which wants the date the
+other way round — `racedate=06/09/2026` where the results page wants
+`racedate=2026/09/06`. Same site, same meeting, two formats.
+
+A section time is the first time-shaped token in its cell. The cell reads
+`7 3 22.33 11.15 11.18`: position, margin behind the leader, the section time,
+then the 100m splits inside it. Reading it positionally would take the margin,
+and margins are lengths — `2-3/4`, `N`, `SH` — that sometimes look like small
+numbers. The check that says the right column was read is that the winner's
+sections sum to the winning time: 24.13 + 22.33 + 22.13 = 68.59, and R1 was won
+in 1:08.59. That is a test.
+
+The results page is still tried first, so a meeting whose page still carries
+the table costs no extra request.
+
+## A card that is gone is not a card that failed
+
+**2026-09-07.** HKJC takes the race card down once a meeting has been run. So
+every post-race scrape warned about the racecard, that warning logged
+`scrape_meeting:card` with `ok=0`, and the freshness strip showed `Card —` for
+a meeting whose full field had been stored days earlier — a success displayed
+permanently as a failure, which is the rule this project is built on read
+backwards.
+
+Nothing is claimed either way now when the card is gone and nothing was
+declared. That leaves the last run which DID fetch a card standing, and "when
+did the card last land" is what the strip is asking.

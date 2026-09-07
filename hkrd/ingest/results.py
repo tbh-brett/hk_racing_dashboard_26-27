@@ -22,10 +22,11 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
-from hkrd.ingest._client import fetch_html, urls
+from hkrd.ingest._client import FetchError, fetch_html, urls
 
 __all__ = ["ResultsError", "parse_race_header", "parse_results_table",
-           "parse_sectional_table", "fetch_race", "fetch_meeting"]
+           "parse_sectional_table", "parse_sectional_page",
+           "fetch_sectionals", "fetch_race", "fetch_meeting"]
 
 
 class ResultsError(ValueError):
@@ -216,6 +217,75 @@ def parse_sectional_table(html: str) -> dict[str, dict[str, Any]]:
     return out
 
 
+# ── the sectional page ───────────────────────────────────────────────────────
+#
+# Sectionals used to be a table INSIDE the results page, and `parse_sectional_
+# table` reads that. HKJC stopped putting them there: coverage runs 151 of 151
+# on 2026-06-27 and 152 of 153 on 2026-07-12, then 0 of 107 on 2026-07-15 and
+# 0 of 120 on 2026-09-06. Nothing failed — the table simply was not in the page
+# any more, the parser found no header saying "sectional", and returned {}.
+# Every meeting since mid-July has had no section times at all.
+#
+# They are still published, at their own endpoint, which wants the date the
+# other way round: `displaysectionaltime?racedate=06/09/2026` is DD/MM/YYYY
+# where `localresults?racedate=2026/09/06` is YYYY/MM/DD. Same site, same
+# meeting, two formats.
+#
+# A section time is the FIRST time-shaped token in its cell. The cell reads
+# "7 3 22.33 11.15 11.18": position, margin behind the leader, the section
+# time, and then the 100m splits inside it. Margins are lengths — `2-3/4`, `N`,
+# `SH`, `HD` — and never look like a time, which is what makes taking the first
+# `nn.nn` safe rather than positional.
+_SECTION_TIME = re.compile(r"^\d{1,3}\.\d{2}$")
+
+
+def parse_sectional_page(html: str, *, source: str | None = None
+                         ) -> dict[str, dict[str, Any]]:
+    """Per-runner section times from the dedicated page, keyed by horse number.
+
+    Returns {} when the page carries no sectional table — which is what HKJC
+    serves for a race past the end of the card. The caller walks races and
+    needs that to be an empty answer rather than an exception.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    for table in soup.find_all("table"):
+        rows = table.find_all("tr")
+        if not rows:
+            continue
+        head = " ".join(c.get_text(" ", strip=True)
+                        for c in rows[0].find_all(["th", "td"])).lower()
+        if "finishing order" not in head or "horse no" not in head:
+            continue
+        out: dict[str, dict[str, Any]] = {}
+        for tr in rows[1:]:
+            cells = [c.get_text(" ", strip=True) for c in tr.find_all("td")]
+            # place | horse no | horse (code) | 1st sec .. nth sec | time
+            if len(cells) < 5 or not cells[0].strip().isdigit():
+                continue
+            times = []
+            for cell in cells[3:-1]:
+                got = next((tok for tok in cell.split()
+                            if _SECTION_TIME.match(tok)), None)
+                if got:
+                    times.append(got)
+            if times:
+                out[cells[1].strip()] = {"section_times": "; ".join(times)}
+        if out:
+            return out
+    return {}
+
+
+def fetch_sectionals(date: str, race_no: int, *,
+                     session=None) -> dict[str, dict[str, Any]]:
+    """One race's section times, from the endpoint that still publishes them."""
+    day, month, year = date.split("-")[::-1]
+    html = fetch_html(urls.sectional,
+                      {"racedate": f"{day}/{month}/{year}", "RaceNo": str(race_no)},
+                      session=session)
+    return parse_sectional_page(
+        html, source=f"{urls.sectional} {date} R{race_no}")
+
+
 # ── fetching ─────────────────────────────────────────────────────────────────
 
 def fetch_race(date: str, venue: str, race_no: int, *, session=None) -> dict[str, Any]:
@@ -226,7 +296,18 @@ def fetch_race(date: str, venue: str, race_no: int, *, session=None) -> dict[str
 
     header = parse_race_header(html)
     runners = parse_results_table(html, source=source)
+    # The results page first, because where it still carries the table this
+    # costs nothing. Only when it does not — every meeting since mid-July — is
+    # the dedicated page fetched, which is one extra request per race.
     sections = parse_sectional_table(html)
+    if not sections:
+        try:
+            sections = fetch_sectionals(date, race_no, session=session)
+        except FetchError:
+            # A race whose sectionals cannot be reached still has its result,
+            # its dividends and its finishing time. Losing all of that over a
+            # second page would be the trade the wrong way round.
+            sections = {}
     for r in runners:
         extra = sections.get(str(r.get("horse_no", "")).strip())
         if extra:

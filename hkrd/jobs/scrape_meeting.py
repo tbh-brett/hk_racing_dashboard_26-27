@@ -340,10 +340,20 @@ def _log_sources(db, report: ScrapeReport, *, post_race: bool,
     """
     failed = {w.split(":", 1)[0] for w in report.warnings}
     failed |= {e.split(":", 1)[0] for e in report.errors}
-    entries = [
-        ("card", "racecard" not in failed and report.declared >= 0,
-         f"{report.declared} declared"),
-    ]
+    entries = []
+    # A card that is GONE is not a card that failed. HKJC takes the race card
+    # down once a meeting has been run — it answers "No information." — so a
+    # post-race scrape warns about the racecard every time, and the strip
+    # showed `Card —` for a meeting whose full field had been stored days
+    # earlier. Nothing is claimed either way in that case, which leaves the
+    # last run that DID fetch a card standing, and that is the true answer to
+    # "when did the card last land".
+    card_gone = any(w.startswith("racecard:") and "no such page" in w
+                    for w in report.warnings)
+    if not (card_gone and report.declared == 0):
+        entries.append(
+            ("card", "racecard" not in failed and report.declared >= 0,
+             f"{report.declared} declared"))
     # Nothing that only exists AFTER a race is claimed either way before the
     # race. There is no success or failure to record when the meeting has not
     # been run — and a strip that marks three sources failed every race
