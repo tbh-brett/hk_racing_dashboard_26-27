@@ -125,6 +125,33 @@ WITH field AS (
   FROM runners GROUP BY race_date, race_no
 )"""
 
+# The derived tables, by the alias the clauses above use for them. `e` is
+# always joined because the insight always averages an ET figure; the other two
+# are joined only when a filter actually mentions them, which on an unfiltered
+# slice is 42,000 index lookups not done.
+_DERIVED = {
+    "e": "LEFT JOIN runner_et e   USING (race_date, race_no, horse_no)",
+    "p": "LEFT JOIN runner_pace p USING (race_date, race_no, horse_no)",
+    "s": "LEFT JOIN runner_sarr s USING (race_date, race_no, horse_no)",
+}
+
+# Indented to sit under the FROM clause the joins are spliced into, so a query
+# printed while debugging reads as SQL rather than as one long line.
+_JOIN_SEP = "\n            "
+
+
+def _joins(where: str, *, always: str = "e") -> str:
+    """The derived-table joins this WHERE actually needs.
+
+    Decided by reading the fragment for the alias rather than from a second
+    list of which filter uses which table — a list like that is one filter away
+    from being wrong, and being wrong means a hard SQL error at read time on
+    exactly the filter nobody tested.
+    """
+    keep = [k for k in ("e", "p", "s") if k in always or (k + ".") in where]
+    return _JOIN_SEP.join(_DERIVED[k] for k in keep)
+
+
 _UPPER = {"horse", "venue", "course"}
 
 
@@ -345,9 +372,7 @@ def insight(*, source: str = "race", conn: Connection | None = None,
             JOIN races a ON a.race_date = r.race_date AND a.race_no = r.race_no
             JOIN field fld ON fld.race_date = r.race_date
                           AND fld.race_no = r.race_no
-            LEFT JOIN runner_et e   USING (race_date, race_no, horse_no)
-            LEFT JOIN runner_pace p USING (race_date, race_no, horse_no)
-            LEFT JOIN runner_sarr s USING (race_date, race_no, horse_no)
+            {_joins(where)}
             WHERE {where} AND r.place IS NOT NULL
         """, params).fetchone()
 
@@ -361,9 +386,7 @@ def insight(*, source: str = "race", conn: Connection | None = None,
             JOIN races a ON a.race_date = r.race_date AND a.race_no = r.race_no
             JOIN field fld ON fld.race_date = r.race_date
                           AND fld.race_no = r.race_no
-            LEFT JOIN runner_et e   USING (race_date, race_no, horse_no)
-            LEFT JOIN runner_pace p USING (race_date, race_no, horse_no)
-            LEFT JOIN runner_sarr s USING (race_date, race_no, horse_no)
+            {_joins(where, always="ep")}
             WHERE {where} AND r.place IS NOT NULL AND p.pace_style IS NOT NULL
             GROUP BY p.pace_style ORDER BY count(*) DESC
         """, params)]

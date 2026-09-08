@@ -119,3 +119,67 @@ def test_a_connection_really_gets_them(tmp_path) -> None:
         assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
     finally:
         conn.close()
+
+
+def test_only_the_derived_tables_a_filter_uses_are_joined(tmp_path) -> None:
+    """Three LEFT JOINs over 21,493 runners is 64,000 index lookups, and on an
+    unfiltered slice two of them are for tables nothing reads.
+
+    Which to join is decided by reading the WHERE fragment for the alias, not
+    from a second list of which filter uses which table — a list like that is
+    one filter away from being wrong, and being wrong is a hard SQL error at
+    read time on exactly the filter nobody tested. So this drives EVERY filter
+    that touches a derived table and asserts each one answers.
+    """
+    from hkrd.store import upsert
+    from hkrd.store.connect import get_conn, init_db, transaction
+
+    conn = get_conn(tmp_path / "j.db")
+    init_db(conn)
+    with transaction(conn):
+        upsert.upsert_races(conn, [
+            {"race_date": "2026-05-01", "race_no": 1, "venue": "ST",
+             "course": "A", "surface": "Turf", "going": "G", "distance": 1200,
+             "race_class": "4"}])
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-05-01", "race_no": 1, "horse_no": i,
+             "horse_name": f"H{i}", "place": str(i), "win_odds": 2.0 + i,
+             "draw": i} for i in range(1, 9)])
+        conn.executemany(
+            "INSERT INTO runner_pace (race_date, race_no, horse_no, "
+            "pace_style, early_dev, derive_version) VALUES (?,?,?,?,?,'t')",
+            [("2026-05-01", 1, i, "Closer" if i > 4 else "Leader", 0.1)
+             for i in range(1, 9)])
+        conn.executemany(
+            "INSERT INTO runner_et (race_date, race_no, horse_no, figure, "
+            "derive_version) VALUES (?,?,?,?,'t')",
+            [("2026-05-01", 1, i, 100.0 + i) for i in range(1, 9)])
+        conn.executemany(
+            "INSERT INTO runner_sarr (race_date, race_no, horse_no, sarr, "
+            "sarr_rank, derive_version) VALUES (?,?,?,?,?,'t')",
+            [("2026-05-01", 1, i, 1.0, i) for i in range(1, 9)])
+    try:
+        # One per alias, plus the combinations, plus none at all.
+        for filters in ({},
+                        {"pace_style": "Closer"},
+                        {"race_pace": "Neutral"},
+                        {"sarr_rank_max": 3},
+                        {"et_min": 102},
+                        {"pace_style": "Closer", "sarr_rank_max": 8},
+                        {"venue": "ST", "et_max": 200, "pace_style": "Leader"}):
+            got = lookup.insight(conn=conn, **filters)
+            assert got["runs"] >= 0
+            assert "by_style" in got
+    finally:
+        conn.close()
+
+
+def test_the_join_picker_reads_the_clause_it_is_given() -> None:
+    from hkrd.query.lookup import _joins
+    assert "runner_pace" not in _joins("1 = 1")
+    assert "runner_sarr" not in _joins("1 = 1")
+    assert "runner_et" in _joins("1 = 1"), "the insight always averages a figure"
+    assert "runner_pace" in _joins("1 = 1 AND p.pace_style = ?")
+    assert "runner_sarr" in _joins("1 = 1 AND s.sarr_rank <= ?")
+    # The by-style query groups on pace whether or not a filter mentions it.
+    assert "runner_pace" in _joins("1 = 1", always="ep")
