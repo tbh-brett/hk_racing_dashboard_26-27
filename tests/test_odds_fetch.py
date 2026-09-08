@@ -597,10 +597,15 @@ def test_a_race_close_to_its_off_is_due_every_minute(db, hk_endpoint):
     assert report.pairs == 0             # one minute is inside the pair floor
 
 
-def test_the_day_before_is_priced_once_todays_races_are_done(db, hk_endpoint):
-    """HKJC opens a market at 13:00 the DAY BEFORE racing. Without this the
-    first race-day tick at noon finds a price that has already been moving for
-    23 hours, and race 1 goes off at 12:30."""
+def test_an_unattended_tick_never_reaches_forward_to_tomorrow(db, hk_endpoint):
+    """Capture on a race day starts at midnight, not at noon the day before.
+
+    It used to reach forward, to catch the market HKJC opens around midday the
+    day before. Measured on 2026-09-09, that market's first hour is not a
+    market: the 12:01 capture was 86 rows of 999.0 across eight races and the
+    13:01 one had real prices. The owner's call is to start the clock at
+    midnight, where the money in the pool is real.
+    """
     import datetime as dt
 
     conn = get_conn(db)
@@ -612,8 +617,22 @@ def test_the_day_before_is_priced_once_todays_races_are_done(db, hk_endpoint):
 
     report = scrape_odds.run(db=str(db), today=dt.date(2026, 9, 4),
                              now=dt.datetime(2026, 9, 4, 14, 0))
-    assert report.race_date == DATE      # tomorrow, priced today
-    assert report.races == 3
+    assert report.race_date == "2026-09-04"     # today, which has no meeting
+    assert report.races == 0
+    assert "nothing to price" in report.line()
+    assert any("no meeting stored" in n for n in report.notes)
+
+    # And from midnight on the day itself, everything.
+    at_midnight = scrape_odds.run(db=str(db), today=dt.date(2026, 9, 5),
+                                  now=dt.datetime(2026, 9, 5, 0, 1))
+    assert at_midnight.race_date == DATE
+    assert at_midnight.races == 3
+
+    # Asked for by name it still captures any meeting, so the day before is a
+    # command away rather than gone.
+    named = scrape_odds.run(DATE, HK_VENUE, db=str(db),
+                            now=dt.datetime(2026, 9, 4, 14, 0))
+    assert named.races == 3
 
 
 def test_with_no_meeting_on_either_day_the_report_names_today(db):

@@ -10,6 +10,10 @@ because every layer worked.
   · `dividends` PLACE — what a $10 place ticket on a run actually paid. A
     placed run at 4.5 and a placed run at 60 are not the same result, and FIN
     alone hides that.
+  · the PLACE STARTING PRICE. `runners` has a win_odds column, written by the
+    results scrape, and no place one — so a place price existed nowhere except
+    `odds_snapshots` and only Race Day ever merged it in. Every other surface
+    printed a dash for a number that had been captured all along.
 
 These tests assert the values REACH the caller, which is the step that was
 missing. Whether they render is the conformance test's job.
@@ -104,3 +108,54 @@ def test_history_carries_the_dividend_too(db) -> None:
     on that path as well — the two used to be separate SELECTs."""
     form = race_q.get_horse_form("HORSE 1", limit=3, conn=db)
     assert form and form[0].place_dividend == 18.5
+
+# ─── the place starting price ─────────────────────────────────────────────────
+
+def test_a_run_carries_the_place_price_it_was_backed_at(db) -> None:
+    """The last capture IS the starting price, now that the capture stops when
+    HKJC shuts the pool rather than half an hour past the scheduled off.
+
+    `runners.win_odds` is the win SP and there is no column beside it, so this
+    is the only route a place price has to the Form Guide, Lookup and Results.
+    """
+    conn = db
+    with transaction(conn):
+        upsert.upsert_odds_snapshots(conn, [
+            {"race_date": DATE, "race_no": 1, "horse_no": 1,
+             "captured_at": f"{DATE}T13:00:00", "win_odds": 4.0,
+             "place_odds": 1.9},
+            {"race_date": DATE, "race_no": 1, "horse_no": 1,
+             "captured_at": f"{DATE}T13:29:00", "win_odds": 3.4,
+             "place_odds": 1.6},
+        ])
+    runners = {r.horse_no: r for r in race_q.get_race(DATE, 1, conn=conn).runners}
+    assert runners[1].place_odds == 1.6, "the LAST capture, not the first"
+    assert runners[2].place_odds is None, "a race with no capture has no price"
+
+
+def test_the_placeholder_never_becomes_a_place_starting_price(db) -> None:
+    """999.0 is what an open pool nobody has bet into quotes. Carried into the
+    starting price it would say a horse was 999 to place."""
+    conn = db
+    with transaction(conn):
+        upsert.upsert_odds_snapshots(conn, [
+            {"race_date": DATE, "race_no": 1, "horse_no": 3,
+             "captured_at": f"{DATE}T13:00:00", "win_odds": 8.0,
+             "place_odds": 2.4},
+            {"race_date": DATE, "race_no": 1, "horse_no": 3,
+             "captured_at": f"{DATE}T13:29:00", "win_odds": 999.0,
+             "place_odds": 999.0},
+        ])
+    runners = {r.horse_no: r for r in race_q.get_race(DATE, 1, conn=conn).runners}
+    assert runners[3].place_odds == 2.4
+
+def test_a_trial_carries_a_race_time_in_race_time_notation(db) -> None:
+    """A trial is 1000-1200m and comes in around seventy seconds, so the raw
+    float rendered as "69.53" beside race times written "1:09.53" — the same
+    measurement in two notations on one screen. Formatted by the server, from
+    the same function every race time on the site goes through."""
+    got = trials_q.batch("2026-05-20", 1, conn=db)["runners"]
+    timed = [r for r in got if r["finish_time"] is not None]
+    assert timed, "the fixture has to time at least one trial runner"
+    for r in timed:
+        assert ":" in r["finish_time_display"]

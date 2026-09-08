@@ -64,6 +64,23 @@ If a task seems to need a violation, stop and say so rather than working around 
 - **Never delete odds snapshots.** Odds movement is the most informative signal in the
   dataset and cannot be reconstructed. `prune_old_snapshots` must not be ported. Only 17
   meetings of a full season survived it.
+- **999.0 is not a price.** HKJC's tote board has four digits and no way to say "nothing",
+  so an open pool nobody has bet into quotes 999.0 on every runner. Stored as a price it
+  becomes the FIRST price of the race, which is the one every movement figure is measured
+  from, and the whole card reads as firming 98%. `ingest.odds.NO_PRICE` drops it on write
+  and `market._priced` drops it on read, because nothing may delete the rows already
+  written. Measured: the 2026-09-09 capture at 12:01 the day before racing was 86 rows of
+  it across eight races; not one of the 8,716 rows on a raced day is 999.0.
+- **HKJC publishes the gear change; do not reconstruct it.** The suffix is the fact — `B1`
+  is blinkers first time, `B2` second time, `B-` removed, bare `B` no change. 737 `TT1`,
+  584 `B1` and 651 `B-` sat in the archive being rendered as literal text. `derive/gear.py`
+  reads it. Only two things need the record instead: RE-INSTATED (worn before, off last
+  start, back on — HKJC writes a plain `B`) and the barrier-trial schooling step.
+- **A NULL gear column is "this scrape did not carry gear", never "no gear".** The results
+  write erased it for April to July 2026 and July has 0 of 641 runs on record. Diffed
+  against a blank, every piece on every horse reads as newly applied — which is what a
+  first cut of the gear panel did on a real card. `query/gear` reports `comparable: false`
+  rather than a change it cannot support.
 
 ## Numerical rules
 
@@ -107,6 +124,16 @@ If a task seems to need a violation, stop and say so rather than working around 
   dividend regardless of when the bet was struck.
 - **Therefore early-price value is not capturable.** Odds movement is a sizing input and an
   operational signal, never a timing edge. Do not build selection rules on drift.
+- **One movement figure is two different measurements.** The money arrives in the last five
+  to ten minutes; the rest of the window is twenty hours of nothing, and averaging them
+  together throws away the only part worth watching. On 2026-09-06 R9 runner 4 moved +1.6%
+  over the whole day and +21.6% inside the final ten minutes, so the single figure said
+  FLAT about a horse being let go. `query/movement.split_move` returns both — `change_pct`
+  for sizing, `rush_pct` for attention — and neither is a reason to back anything.
+- **The place starting price is the last capture, not a column.** `runners` has `win_odds`
+  and nothing beside it, so a place price lives only in `odds_snapshots`. It reaches every
+  surface through `_LINE_SQL` now that the capture stops when HKJC shuts the pool, which
+  makes the last row the settled price rather than one from half an hour before.
 - **Every odds-dependent output must use the latest snapshot, never the morning's.** Market
   concentration moves from a mean of 0.539 in the morning to 0.637 at post time, and 60% of
   races land in a different band — always making a race look weaker than it is.

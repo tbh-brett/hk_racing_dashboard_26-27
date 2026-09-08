@@ -257,6 +257,36 @@ table.card td { padding: 6px 8px; }
 .mv-shortened { color: var(--win); }
 .mv-drifted { color: var(--loss); }
 .mv-flat, .mv-none { color: var(--text-faint); }
+/* The last ten minutes on their own. Smaller than the whole-window figure
+   beside it, because it is the second reading of the same market and not a
+   second market — but it is the reading the money is in. */
+.mv .rush {
+  font-size: 10px; letter-spacing: .02em; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* GEAR. Sized and spaced like `.trip`, which sits beside it on the same row:
+   they are both one-line facts about the runner and must read as one family. */
+.gear-chip {
+  font-size: 10px; padding: 0 3px; white-space: nowrap;
+  border: 1px solid var(--line-2); color: var(--text-dim);
+}
+/* First time is the state design note 03 §3 calls "one of the more reliable
+   public signals bettors watch for", so it is the one that takes the accent. */
+.gear-chip.g-first { color: var(--edge); border-color: var(--edge-ground); }
+.gear-chip.g-second { color: var(--text-2); }
+.gear-chip.g-off { color: var(--loss); border-color: var(--loss-dim); }
+.gear-chip.g-back { color: var(--book); border-color: var(--book-ground); }
+/* Schooled in a barrier trial and wearing it today — the preparation and the
+   commitment landing together. */
+.gear-chip.trial-applied {
+  color: var(--edge); border-color: var(--edge); font-weight: 600;
+}
+/* Schooled and NOT wearing it. A stable preparing something it has not
+   committed to: a reason to keep watching, never a reason to back. */
+.gear-chip.trial-withheld {
+  color: var(--book); border-color: var(--book-ground); border-style: dashed;
+}
 .edge-cell { display: flex; align-items: center; gap: 6px; justify-content: center; }
 .edge-cell .v { font-size: var(--fs); font-weight: 600; }
 .edge-track { width: 30px; height: 8px; background: var(--line); display: flex; }
@@ -412,6 +442,12 @@ table.card td { padding: 6px 8px; }
 }
 #detail .met-row .rec { margin-left: auto; color: var(--text); font-weight: 600; }
 #detail .met-row .k { color: var(--text-faint); }
+/* Which way the weight went, from THIS horse's side. The swing is the gap
+   between the pair, so one number is a help to one of them and a hindrance to
+   the other; unsigned it left the arithmetic to the reader. */
+#detail .met-row .k.swing-better { color: var(--win); }
+#detail .met-row .k.swing-worse { color: var(--loss); }
+#detail .met-row .k.swing-level { color: var(--text-faint); }
 
 
 /* WHO the weight change favours, said in words. The gap either side of the

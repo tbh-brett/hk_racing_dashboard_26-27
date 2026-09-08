@@ -24,6 +24,7 @@ from hkrd.store.connect import Connection, get_conn
 __all__ = ["concentration", "band", "price_movement", "odds_coverage",
            "latest_prices", "live_prices", "snapshot_age_hours",
            "STALE_AFTER_HOURS", "MIN_WINDOW_MINUTES", "warm",
+           "late_move", "LATE_MINUTES", "NO_PRICE",
            "changes_since", "MOVE_THRESHOLD", "CADENCE_MINUTES",
            "PAIR_CADENCE_MINUTES", "SETTLED_AFTER_MINUTES",
            "SETTLED_INTERVAL_MINUTES", "interval_for",
@@ -44,6 +45,20 @@ _HKT = timezone(timedelta(hours=8))
 # movement from them claims the market held steady, which is a different
 # and unsupported statement.
 MIN_WINDOW_MINUTES = 20.0
+
+# HKJC quotes 999.0 on an open pool nobody has bet into yet. `ingest/odds`
+# stores it as None now, but nothing ever deletes from `odds_snapshots`, so the
+# rows written before that fix are still there and are still the EARLIEST
+# capture of their race — which is the one every movement figure is measured
+# from. Filtered on read as well as on write; see `ingest.odds.NO_PRICE`.
+NO_PRICE = 999.0
+
+# The window the money actually arrives in. The owner's own reading of it:
+# "all the late money almost will not show until the final 5-0 minutes before
+# the race actually starts, odds movement across the board is not as
+# substantial beforehand." A single first-to-last percentage averages that
+# window together with twenty hours of nothing, so the two are reported apart.
+LATE_MINUTES = 10.0
 
 # ── how fast this market moves, by distance from the off ─────────────────────
 #
@@ -266,12 +281,21 @@ def latest_prices(date: str, race_no: int, *, at: str = "latest",
             "SELECT horse_no, win_odds, place_odds FROM odds_snapshots "
             "WHERE race_date = ? AND race_no = ? AND captured_at = ? "
             "ORDER BY horse_no", (date, race_no, captured)).fetchall()
-        return [{"horse_no": r["horse_no"], "win_odds": r["win_odds"],
-                 "place_odds": r["place_odds"], "captured_at": captured}
+        return [{"horse_no": r["horse_no"], "win_odds": _priced(r["win_odds"]),
+                 "place_odds": _priced(r["place_odds"]), "captured_at": captured}
                 for r in rows]
     finally:
         if own:
             conn.close()
+
+
+def _priced(value: float | None) -> float | None:
+    """A stored price, or None where the row is HKJC's placeholder.
+
+    Applied on read because the rows are already written and this table is the
+    one nothing is ever permitted to delete from.
+    """
+    return None if value is None or value >= NO_PRICE else value
 
 
 def live_prices(date: str, race_no: int, *,
@@ -343,9 +367,14 @@ def price_movement(date: str, race_no: int, *,
     own = conn is None
     conn = conn or get_conn()
     try:
+        # The first capture that carried a REAL price, not the first capture.
+        # A pool quoting 999.0 on every runner is open and unbet, and taking it
+        # as the opening price reports the whole field firming 98%.
         bounds = conn.execute(
             "SELECT min(captured_at) f, max(captured_at) l FROM odds_snapshots "
-            "WHERE race_date = ? AND race_no = ?", (date, race_no)).fetchone()
+            "WHERE race_date = ? AND race_no = ? "
+            "  AND win_odds IS NOT NULL AND win_odds < ?",
+            (date, race_no, NO_PRICE)).fetchone()
         if not bounds or not bounds["f"] or bounds["f"] == bounds["l"]:
             return []
         rows = conn.execute(
@@ -355,8 +384,10 @@ def price_movement(date: str, race_no: int, *,
             " AND a.horse_no = b.horse_no "
             "WHERE a.race_date = ? AND a.race_no = ? "
             "  AND a.captured_at = ? AND b.captured_at = ? "
-            "  AND a.win_odds IS NOT NULL AND b.win_odds IS NOT NULL",
-            (date, race_no, bounds["f"], bounds["l"])).fetchall()
+            "  AND a.win_odds IS NOT NULL AND b.win_odds IS NOT NULL "
+            "  AND a.win_odds < ? AND b.win_odds < ?",
+            (date, race_no, bounds["f"], bounds["l"],
+             NO_PRICE, NO_PRICE)).fetchall()
         # How much time the two captures actually span. Without this a pair of
         # snapshots taken 77 seconds apart reports 0% movement on every runner,
         # which reads as "the market did not move" when it means "nothing was

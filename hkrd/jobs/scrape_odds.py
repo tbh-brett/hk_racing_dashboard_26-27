@@ -268,29 +268,27 @@ def run(date: str | None = None, venue: str | None = None, *,
         explicit = date is not None
         now = now or dt.datetime.now()
         if not explicit:
-            # Today's meeting, or -- once today's races are all settled, or if
-            # there is no meeting today at all -- tomorrow's. HKJC opens a
-            # market at 13:00 the day before racing, so by the time the first
-            # race-day tick runs at noon the price has already been moving for
-            # 23 hours. Race 1 goes off at 12:30. Without this the whole
-            # overnight market is lost, and it is the one thing in this
-            # database that cannot be reconstructed afterwards.
+            # TODAY'S MEETING, and only today's. An unattended tick never
+            # reaches forward to tomorrow's card, so capture on a race day
+            # begins at midnight and not at noon the day before.
             #
-            # Today first, always: its money is the perishable half.
+            # It used to reach forward, to catch the market HKJC opens around
+            # midday the day before racing. Measured on 2026-09-09: the 12:01
+            # capture was 86 rows of 999.0 across eight races — an open pool
+            # nobody had bet into — and the 13:01 one had real prices. So the
+            # day-before window is a thin market whose first hour is not a
+            # market at all, and its only effect on the card was to make the
+            # movement strip read −98% on every runner, because 999.0 was the
+            # price everything was measured from.
+            #
+            # `ingest.odds.NO_PRICE` fixes that symptom on its own. This is the
+            # owner's call on top of it: start the clock at midnight, where the
+            # money in the pool is real. `--date` still captures any meeting on
+            # demand, so the day before is a command away rather than gone.
             base = today or dt.date.today()
             date = base.isoformat()
             known_venue, live_races, stored = _meeting_races(
                 conn, date, now=now)
-            if not live_races:
-                ahead = (base + dt.timedelta(days=1)).isoformat()
-                venue_a, races_a, stored_a = _meeting_races(
-                    conn, ahead, now=now)
-                # Only move on if tomorrow actually has something. With no
-                # meeting on either day the report must name TODAY, or the
-                # commonest line in the log is about a date nobody asked about.
-                if races_a:
-                    date, known_venue = ahead, venue_a
-                    live_races, stored = races_a, stored_a
         else:
             known_venue, live_races, stored = _meeting_races(
                 conn, date, now=now)
