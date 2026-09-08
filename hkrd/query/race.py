@@ -39,7 +39,21 @@ SELECT r.race_date, r.race_no, r.horse_no, r.horse_name, r.draw, r.jockey,
        (SELECT d.dividend_per_10 FROM dividends d
          WHERE d.race_date = r.race_date AND d.race_no = r.race_no
            AND d.pool = 'PLACE'
-           AND trim(d.combination) = cast(r.horse_no AS TEXT)) AS place_dividend
+           AND trim(d.combination) = cast(r.horse_no AS TEXT)) AS place_dividend,
+       -- THE PLACE STARTING PRICE. `runners` has a win_odds column, written
+       -- by the results scrape, and no place one — so a place price existed
+       -- nowhere outside `odds_snapshots` and only Race Day ever merged it in.
+       -- Every other surface printed a dash for a number that was captured.
+       --
+       -- The last capture IS the starting price now that the capture stops
+       -- when HKJC shuts the pool rather than half an hour after the scheduled
+       -- off. The placeholder 999.0 is excluded here as everywhere: an open
+       -- pool nobody has bet into is not a price.
+       (SELECT o.place_odds FROM odds_snapshots o
+         WHERE o.race_date = r.race_date AND o.race_no = r.race_no
+           AND o.horse_no = r.horse_no
+           AND o.place_odds IS NOT NULL AND o.place_odds < 999
+         ORDER BY o.captured_at DESC LIMIT 1) AS place_sp
 FROM runners r
 JOIN races a       ON a.race_date = r.race_date AND a.race_no = r.race_no
 LEFT JOIN runner_et e   USING (race_date, race_no, horse_no)
@@ -224,6 +238,7 @@ def _to_line(row, tags: tuple[str, ...] = (), lane_notes: tuple[str, ...] = (),
         tags=tags, lane_notes=lane_notes,
         running_comment=comments[0], incident_comment=comments[1],
         win_odds=row["win_odds"],
+        place_odds=row["place_sp"],
         place_dividend=row["place_dividend"],
     )
 

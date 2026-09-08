@@ -526,6 +526,69 @@ function sortRunners(runners) {
   });
 }
 
+/* GEAR, and what is happening to it.
+ *
+ * HKJC suffixes the code with the change — B1 is blinkers first time, B- is
+ * blinkers off, B2 is second time — and the dashboard rendered the literal
+ * text "B1" in a column on another page and nowhere said what the 1 meant.
+ * The archive has 584 B1, 651 B- and 366 B2 in it.
+ *
+ * Two things the suffix cannot say are added by the server: RE-INSTATED (worn
+ * before, off last start, back on — HKJC writes a plain B, identical to a
+ * horse that has worn them for two seasons), and the BARRIER-TRIAL step. A
+ * horse schooled in blinkers and not wearing them today is a stable preparing
+ * something it has not committed to; that is a reason to keep watching, never
+ * a reason to back, and the chip says so rather than scoring it.
+ *
+ * Only the notable states get a chip. A tongue tie worn every start for two
+ * years is on the card and in the flyout; a chip that fires on everyone stops
+ * being read, which is the same rule the vet badge follows. */
+function gearChips(r) {
+  const g = r.gear_change;
+  if (!g) return [];
+  const out = [];
+  (g.pieces ?? []).filter((p) => p.notable).forEach((p) => {
+    const label = p.state === 'first' ? `${p.code} 1ST`
+      : p.state === 'second' ? `${p.code} 2ND`
+        : p.state === 'off' ? `${p.code} OFF`
+          : `${p.code} BACK`;
+    const chip = el('span', `gear-chip g-${p.reinstated ? 'back' : p.state}`,
+      label);
+    chip.title = p.detail;
+    out.push(chip);
+  });
+  // The schooling step, and only where it says something. `carried` is a horse
+  // that trialled in gear it already wears, which is not news.
+  (g.trial_gear ?? []).forEach((t) => {
+    if (t.signal === 'carried') return;
+    const chip = el('span', `gear-chip trial-${t.signal}`,
+      t.signal === 'applied' ? `${t.code} AFTER TRIAL` : `TRIALLED ${t.code}`);
+    chip.title = t.detail;
+    out.push(chip);
+  });
+  // A month of the archive has no gear column at all — the results write
+  // erased it for April to July 2026, and July has 0 of 641 runs on record —
+  // so "nothing changed" and "we cannot tell what changed" are different
+  // answers. That caveat is stated ONCE in the card footer rather than as a
+  // chip per runner: it currently applies to most of the field, and a chip
+  // that fires on everyone stops being read. See `gearCaveat`.
+  return out;
+}
+
+/** How many runners have no gear on their previous run.
+ *
+ *  Everything above reads HKJC's own suffix, which is a fact about TODAY'S
+ *  card and is unaffected. Only the two derived states — re-instated, and gear
+ *  quietly dropped without a `-` — need the previous run, and for these
+ *  runners there is nothing to compare against. */
+function gearCaveat(runners) {
+  const blind = runners.filter(
+    (r) => r.gear_change && r.gear_change.declared && !r.gear_change.comparable);
+  if (!blind.length) return null;
+  return `${blind.length} OF ${runners.length} HAVE NO GEAR ON THEIR PREVIOUS `
+    + 'RUN — APR–JUL 2026 WAS NOT RECORDED, SO A CHANGE CANNOT BE SHOWN FOR THEM';
+}
+
 function movementCell(r) {
   const m = r.movement;
   const td = el('td', 'c-right');
@@ -545,6 +608,22 @@ function movementCell(r) {
     box.append(el('span', `arrow ${cls}`,
       m.direction === 'shortened' ? '▼' : m.direction === 'drifted' ? '▲' : '·'));
     box.append(el('span', `pct ${cls}`, `${Math.abs(m.change_pct).toFixed(0)}%`));
+  }
+
+  // THE LAST TEN MINUTES, on their own. A single first-to-last percentage
+  // averages the window the money actually arrives in together with twenty
+  // hours of nothing: on 2026-09-06 R9, #4 moved +1.6% over the whole day and
+  // +21.6% inside the final ten minutes, so the one number on this row said
+  // FLAT about a horse that was being let go. Settlement is tote, so this is
+  // never a timing edge — it is what to look at, and how hard to back it.
+  if (m && m.rush_pct !== null && m.rush_pct !== undefined
+      && m.rush_direction !== 'flat') {
+    const cls = `mv-${m.rush_direction}`;
+    const rush = el('span', `rush ${cls}`,
+      `${m.rush_pct > 0 ? '+' : '−'}${Math.abs(m.rush_pct).toFixed(0)}% late`);
+    rush.title = `${num(m.rush_from, 1)} → ${num(m.late, 1)} inside the last `
+      + `${m.rush_minutes} minutes`;
+    box.append(rush);
   }
 
   // The shape of the money, in the row -- the artboard draws it inside this
@@ -660,6 +739,7 @@ function cardRow(r, index) {
     openVet(chip, r, vet);
     box.append(chip);
   }
+  gearChips(r).forEach((c) => box.append(c));
   name.append(box);
   tr.append(name);
 
@@ -796,7 +876,27 @@ function renderDetail() {
       const rec = String(p.record ?? '').split('-');
       row.append(el('span', 'rec',
         mine ? p.record : `${rec[1] ?? ''}-${rec[0] ?? ''}`));
-      if (p.swing != null) row.append(el('span', 'k', `${p.swing}lb`));
+      // WHICH WAY THE WEIGHT WENT, from this horse's side. The swing is the
+      // gap BETWEEN the pair, so the same "5lb" is a help to one of them and a
+      // hindrance to the other, and printing it unsigned left the reader doing
+      // that arithmetic under time pressure on the one figure the pair is
+      // sorted by. Green is better off than when they last met, red is worse.
+      if (p.swing != null) {
+        const helped = p.favours_no === r.horse_no;
+        const level = p.favours_no == null || !p.favours_lb ? 'level'
+          : helped ? 'better' : 'worse';
+        const k = el('span', `k swing-${level}`,
+          level === 'level' ? 'level'
+            : `${helped ? '−' : '+'}${p.favours_lb}lb`);
+        k.title = level === 'level'
+          ? 'the weight gap between them is unchanged since they last met'
+          : helped
+            ? `${p.favours_lb}lb better off with ${mine ? p.b_name : p.a_name} `
+              + 'than when they last met'
+            : `${p.favours_lb}lb worse off with ${mine ? p.b_name : p.a_name} `
+              + 'than when they last met';
+        row.append(k);
+      }
       sec.append(row);
     });
     host.append(sec);
@@ -958,6 +1058,8 @@ function renderFoot() {
   bits.push(c?.place_ratio_range
     ? `PLACE ODDS ARE SCRAPED — WIN/PLACE RATIO RUNS ${c.place_ratio_range} ON THIS CARD`
     : 'PLACE ODDS ARE SCRAPED, NEVER DERIVED FROM WIN');
+  const blind = gearCaveat(state.card?.runners ?? []);
+  if (blind) bits.push(blind);
   bits.push('STYLE SORTS LEADER → ON-PACE → MIDFIELD → CLOSER');
   bits.push('MODEL AUC .727 · MARKET AUC .785');
   foot.replaceChildren(...bits.map((b) => el('span', null, b)));

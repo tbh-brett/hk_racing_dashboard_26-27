@@ -29,6 +29,7 @@ from __future__ import annotations
 from typing import Any
 
 from hkrd.derive.trial_quality import BANDS, rate
+from hkrd.query.types import format_race_time
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["recent_batches", "batch", "for_horses", "standouts",
@@ -77,7 +78,13 @@ def _runner(row, field_size: int, best: float | None) -> dict[str, Any]:
     return {
         "trial_date": row["trial_date"], "trial_no": row["trial_no"],
         "horse_name": row["horse_name"], "place": row["place"],
-        "finish_time": row["finish_time"], "margin": margin,
+        "finish_time": row["finish_time"],
+        # m:ss.xx, from the same function every race time on the site uses. A
+        # trial is 1000-1200m and comes in around seventy seconds, so the bare
+        # float read as "69.53" beside race times written "1:09.53" — the same
+        # measurement in two notations on one screen.
+        "finish_time_display": format_race_time(row["finish_time"]),
+        "margin": margin,
         "venue": row["venue"], "surface": row["surface"],
         "gear": row["gear"], "comment": row["comment_text"],
         # Scraped since the first trials run, stored on every row, and dropped
