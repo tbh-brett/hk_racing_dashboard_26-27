@@ -382,9 +382,33 @@ function trialBand(runner) {
     row.append(el('span', 'v', `${t.venue} ${t.surface}`));
     row.append(el('span', 'p',
       t.place === null ? DASH : `${t.place}/${t.field_size}`));
+    // m:ss.xx, from the server's own formatter — the same one every race time
+    // on the site goes through. A bare 69.53 beside a race written 1:09.53 is
+    // the same measurement in two notations on one screen.
+    row.append(el('span', 't', t.finish_time_display ?? DASH));
     if (t.margin !== null && t.margin !== undefined) {
       row.append(el('span', 'm', `${num(t.margin, 1)}L`));
     }
+
+    // WHO SAT ON IT, and whether it is the same person today. A trial ridden
+    // by the jockey booked for the race is a stable that has already had its
+    // rider feel the horse over the trip; a different one is a work rider on a
+    // schooling exercise. Compared case- and space-insensitively because the
+    // trials feed writes "K C LEUNG" where the card writes "K C Leung".
+    const same = sameRider(t.jockey, runner.jockey);
+    const jky = el('span', `j${same ? ' match' : ''}`, t.jockey ?? DASH);
+    if (same) {
+      jky.append(el('span', 'plus', '+'));
+      jky.title = `${t.jockey} trialled it and rides it today`;
+    }
+    row.append(jky);
+
+    // What it WORE. The reason this is here rather than only on the Trials
+    // page: a horse schooled in blinkers is being prepared for blinkers, and
+    // the run that matters is the race it turns up in next.
+    const worn = el('span', 'g', t.gear || DASH);
+    if (t.gear) worn.title = `trialled in ${t.gear}`;
+    row.append(worn);
     const txt = el('span', 'c', t.comment ?? '');
     // The reasons, so a mark nobody can check is not a mark anyone acts on.
     txt.title = `${t.quality_band}${t.quality_reasons.length
@@ -413,6 +437,18 @@ function trialBand(runner) {
     band.append(row);
   });
   return band;
+}
+
+/** Two rider names for the same person, written by two different feeds.
+ *
+ *  The trials scrape writes "K C LEUNG" and the racecard writes "K C Leung";
+ *  compared raw, a jockey who trialled the horse and rides it today reads as
+ *  two different people, which is the one comparison this cell exists to make.
+ */
+function sameRider(a, b) {
+  const norm = (v) => String(v ?? '').toUpperCase().replace(/[^A-Z]/g, '');
+  const x = norm(a);
+  return Boolean(x) && x === norm(b);
 }
 
 function swingTier(lb) {

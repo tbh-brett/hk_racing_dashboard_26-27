@@ -86,12 +86,22 @@
 # something. It silences ONLY the idle tick: a zero with something attempted,
 # and every skip, still speak.
 #
-# No hour restriction either, and that is deliberate rather than lazy. HKJC
-# opens a market at 13:00 the day BEFORE racing, so a 12:00-23:59 window would
-# capture Saturday evening, stop at midnight, and resume at noon on Sunday —
-# thirteen hours of silence ending thirty minutes before race 1. The job looks
-# at today's meeting first and falls through to tomorrow's, so the overnight
-# market is recorded rather than lost.
+# No hour restriction either, and that is deliberate rather than lazy: the job
+# is the thing that knows whether a minute is worth a capture, and a window
+# here would be a second schedule to keep in step with the ladder.
+#
+# WHAT CHANGED. It used to look at today's meeting and then fall through to
+# TOMORROW'S, to catch the market HKJC opens around midday the day before
+# racing. Measured on 2026-09-09, that market's first hour is not a market:
+# the 12:01 capture was 86 rows of 999.0 — an open pool nobody had bet into —
+# across all eight races, and the 13:01 one had real prices. Stored as a price,
+# 999.0 becomes the price every movement figure is measured FROM, and the whole
+# card read as firming 98%.
+#
+# `ingest.odds.NO_PRICE` fixes that on its own. On top of it the job no longer
+# reaches forward at all, so capture on a race day starts at MIDNIGHT rather
+# than at noon the day before — which is where the money in the pool is real.
+# `--date` still captures any meeting on demand.
 #
 # ARMED. It was commented out for as long as the capture needed a browser: the
 # image carries no Chromium, so the line would have failed every quarter hour —
@@ -101,7 +111,11 @@
 # image does not already have, so a meeting costs one request and under a
 # second.
 #
-# SIZE. Measured, not estimated: ~63,000 rows and ~6.7 MB per meeting, so
-# ~0.6 GB a season, against a 1 GB volume that nothing ever deletes from.
-# Extend the volume before the second season — see docs/deploy.md.
+# SIZE. Measured on the machine, not estimated: `odds_pairs` and its index are
+# 6 MB for 59,821 rows, so a densely captured meeting is ~4.5 MB and a season
+# is ~375 MB — against a 5 GB volume that nothing ever deletes from, currently
+# 1% full with the whole archive on it. Two changes cut into that: capture now
+# stops when HKJC shuts the pool rather than thirty minutes past the scheduled
+# off (3,600 win/place and 8,238 pair rows on 6 Sep alone), and it no longer
+# runs the day before at all.
 * * * * *   python -m hkrd.jobs.scrape_odds --db /data/hkrd.db --quiet

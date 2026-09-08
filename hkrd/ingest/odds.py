@@ -46,7 +46,7 @@ from hkrd.ingest._client import FetchError, fetch_json, urls
 
 __all__ = ["OddsError", "fetch_race", "fetch_meeting", "meeting_id",
            "parse_snapshot", "snapshot_rows", "pair_rows", "pools_to_payloads",
-           "POOLS", "GRAPHQL_URL", "SELLING"]
+           "POOLS", "GRAPHQL_URL", "SELLING", "NO_PRICE"]
 
 GRAPHQL_URL = urls.graphql
 
@@ -57,16 +57,32 @@ class OddsError(ValueError):
     """A snapshot could not be read. Names what was wrong."""
 
 
+# HKJC's "no meaningful price" number. The tote board has four digits and no
+# way to say "nothing", so an open pool with no money in it quotes 999.0 on
+# every runner. It is not a 999-1 chance: on 2026-09-09 the first capture, at
+# 12:01 the day before racing, was 86 rows of 999.0 across eight races, and the
+# 13:01 capture had real prices on all of them. Not one of the 8,716 rows
+# captured on a raced day is 999.0.
+#
+# Stored as a price it is poison, because it becomes the FIRST price: every
+# runner then reads as a 98% firmer on the movement strip, which is what the
+# whole card showed. Stored as None it is what it is — the pool was open and
+# had not been bet into yet.
+NO_PRICE = 999.0
+
+
 def _odds(value: Any) -> float | None:
     """A price, or None where none was offered.
 
     Scratched runners and pre-market races show '---', 'SCR' or blank; those
-    are real answers and must not become zero.
+    are real answers and must not become zero. So is 999.0 — see NO_PRICE.
     """
     s = str(value or "").strip()
     if not s or not _NUMERIC.match(s):
         return None
     v = float(s)
+    if v >= NO_PRICE:
+        return None
     return v if v > 0 else None
 
 

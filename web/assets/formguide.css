@@ -220,6 +220,21 @@
 .trial-band .trial-line .d { color: var(--text-2); }
 .trial-band .trial-line .v, .trial-band .trial-line .p,
 .trial-band .trial-line .m { color: var(--text-dim); }
+/* m:ss.xx, tabular so a column of trial times reads as a column. */
+.trial-band .trial-line .t {
+  font-family: var(--font-mono); color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+/* Who sat on it. A rider who trialled the horse and rides it today is the one
+   comparison this cell exists to make, so the match is the only state that
+   takes a colour. */
+.trial-band .trial-line .j { color: var(--text-muted); }
+.trial-band .trial-line .j.match { color: var(--win); }
+.trial-band .trial-line .j .plus { margin-left: 2px; font-weight: 600; }
+/* What it wore. Blinkers in a trial are a stable preparing for blinkers. */
+.trial-band .trial-line .g {
+  font-family: var(--font-mono); color: var(--book); font-size: var(--fs-xs);
+}
 .trial-band .trial-line .c {
   color: var(--text-muted); min-width: 0; overflow: hidden;
   text-overflow: ellipsis;

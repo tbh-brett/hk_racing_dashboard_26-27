@@ -22,7 +22,8 @@ from typing import Any
 
 from hkrd.derive.probability import devig
 from hkrd.query import (blackbook as bb_q, formguide as fg_q,
-                        market as market_q, vet as vet_q)
+                        gear as gear_q, market as market_q,
+                        movement as movement_q, vet as vet_q)
 from hkrd.query.race import get_horse_form, get_race, vet_form
 from hkrd.query.types import RaceLine
 from hkrd.store.connect import Connection, get_conn
@@ -130,8 +131,13 @@ def build_card(date: str, race_no: int, *,
         conc = market_q.concentration(date, race_no, conn=conn)
         booked = {b["horse_name"]: b
                   for b in bb_q.for_race(date, race_no, conn=conn)}
+        # `split_move`, not `price_movement`: same three fields the card
+        # already reads, plus the last ten minutes on their own. A horse that
+        # sat all day and was let go 22% in the run-in reads as FLAT on a
+        # single first-to-last figure — 2026-09-06 R9 #4 is exactly that, and
+        # it is the window the whole cadence ladder exists to sample.
         moves = {m["horse_no"]: m
-                 for m in market_q.price_movement(date, race_no, conn=conn)}
+                 for m in movement_q.split_move(date, race_no, conn=conn)}
         # Scraped since the first build and never read back until now.
         vet = vet_q.for_race(date, race_no, conn=conn)
 
@@ -162,6 +168,15 @@ def build_card(date: str, race_no: int, *,
         # whether a horse has been found wrong. One query for the card.
         vet_recent = vet_form(
             [r.horse_name for r in race.runners], before=date, runs=6, conn=conn)
+
+        # What HKJC already said about the gear, and what the record adds. The
+        # suffix — B1 first time, B- off — has been in every card since the
+        # first scrape and no page read it; re-instatement and the barrier-trial
+        # schooling step need the archive and nothing was asking it.
+        gear = gear_q.for_horses(
+            [r.horse_name for r in race.runners],
+            {r.horse_name: r.gear for r in race.runners},
+            before=date, conn=conn)
 
         runners: list[dict[str, Any]] = []
         for r in race.runners:
@@ -195,6 +210,7 @@ def build_card(date: str, race_no: int, *,
                 "trainer_prev": last.trainer if trainer_changed else None,
                 "market_rank": m_rank,
                 "movement": moves.get(r.horse_no),
+                "gear_change": gear.get(r.horse_name),
                 "vet": vet.get(r.horse_name, []),
                 "vet_form": vet_recent.get(r.horse_name, []),
                 # Negative means the model likes it more than the market does.
