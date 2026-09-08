@@ -25,7 +25,9 @@ Every source, what fetches it, what runs that, and when.
 | Vet records | `ingest/vet.py` | `jobs/scrape_meeting` (post-race) | 5×/day via `nightly` |
 | Comments on running | `ingest/corunning.py` | `jobs/scrape_corunning` | with the meeting |
 | Barrier trials | `ingest/trials.py` | `jobs/scrape_trials` | 12:00 and 20:00 |
-| Live odds | `ingest/odds.py` | `jobs/scrape_odds` | every minute; the job decides |
+| Live odds (win, place, QIN, QPL) | `ingest/odds.py` | `jobs/scrape_odds` | every minute; the job decides |
+| Doubles | `ingest/doubles.py` | `jobs/scrape_odds` | on the pair cadence |
+| Pool turnover | `ingest/turnover.py` | `jobs/scrape_odds` | on the pair cadence |
 | Account statements | `ingest/statement.py` | `jobs/import_statement` | by hand — see below |
 
 `ops/crontab` is the schedule; `docs/deploy.md` explains each line.
@@ -48,10 +50,45 @@ why the deploy image (which carries no browser) could not run it and the cron
 line spent a season commented out.
 
 The endpoint whitelists queries: a syntactically valid one it has not seen is
-refused with `WHITELIST_ERROR`. The two queries in `ingest/odds.py` are
-reproduced from the site's bundle character for character, including fields
-nothing reads. Editing one to drop an unused field does not make it smaller, it
-makes it fail.
+refused with `WHITELIST_ERROR`. The queries in `ingest/odds.py` and
+`ingest/turnover.py` are reproduced from the site's bundle character for
+character, including fields nothing reads. Editing one to drop an unused field
+does not make it smaller, it makes it fail.
+
+Two error shapes, and they mean different things:
+
+| Reply | Means |
+|---|---|
+| HTTP 400, "doesn't match the schema" | the field does not exist |
+| HTTP 200, `WHITELIST_ERROR` | the field exists; this query text is not one the site sends |
+
+Schema validation runs first, which makes the pair a usable probe for field
+names without introspection — that is how `pmPools.investment` was found to be
+HKJC's word for turnover.
+
+### The three pools and what is different about each
+
+**Win, place, QIN, QPL** — `odds.POOLS`, one request, every pool naming exactly
+one race.
+
+**Doubles** — a separate call, because `pools_to_payloads` requires every pool
+to name one race and raises otherwise, which is right for the pools it serves
+and the opposite of what a double is. Two traps, both silent if assumed:
+
+* the combination separator is `/`, not `,` (`"02/04"`, not `"02,04"`). HKJC's
+  own bundle says so: `"DBL" === o && (v = e.combString.split("/"))`.
+  `odds._combination` splits on a comma and returns nothing for every node, so
+  reusing it reports a quiet pool rather than an error.
+* the pair is **ordered**. `odds.pair_rows` sorts a quinella smallest-first;
+  doing that to a double collapses two different bets at two different prices.
+
+**Turnover** — HKJC calls it `investment`, and it is not on the odds query, so
+it is a second request with its own whitelisted text. `null` is not `0`: a pool
+that has not opened reports null, one that is open and untouched reports 0, and
+a series that conflates them shows the whole pool arriving the instant a card
+opens. A cross-race pool is filed under the first race of its leg, which is
+where HKJC's own turnover page shows it; race 0 holds the meeting total and is
+not a race.
 
 ---
 

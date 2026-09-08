@@ -16,7 +16,8 @@ from hkrd.query import (blackbook as bb_q, formguide as fg_q,
                         health as health_q, market as market_q, model,
                         race as race_q, raceday as raceday_q,
                         vet as vet_q, freshness as fresh_q,
-                        pace as pace_q, speedmap as speedmap_q)
+                        pace as pace_q, speedmap as speedmap_q,
+                        pools as pools_q, money as money_q)
 
 WEB = Path(__file__).resolve().parent.parent.parent / "web"
 
@@ -102,6 +103,41 @@ def changes(date: str, since: str | None = None) -> dict:
     nothing to diff, and the answer says so rather than inventing a baseline.
     """
     return market_q.changes_since(date, since)
+
+
+@app.get("/api/money/{date}")
+def meeting_money(date: str) -> dict:
+    """Money across the card, race by race.
+
+    Context for reading a price move, never an ordering of races by interest:
+    the biggest win pool on a card is usually an odds-on favourite in a small
+    field.
+    """
+    return money_q.meeting_money(date)
+
+
+@app.get("/api/money/{date}/{race_no}")
+def race_money(date: str, race_no: int) -> dict:
+    """Dollars on each runner, and what every pool on the race holds.
+
+    The prices say how the money is divided. This says how much there is, which
+    is the difference between "drifted 20%" and "$210,000 left this horse".
+    """
+    return {"race_date": date, "race_no": race_no,
+            "flow": money_q.money_flow(date, race_no),
+            "turnover": money_q.pool_turnover(date, race_no)}
+
+
+@app.get("/api/doubles/{date}/{leg_no}")
+def doubles(date: str, leg_no: int) -> dict:
+    """What the doubles pool implies about the leg's SECOND race.
+
+    Money bet into this arrives before that race's own win pool matures, so
+    early in a card it is a read on a race the win market has barely looked at.
+    Compare `implied_pct` against a de-vigged win share, not `implied_odds`
+    against a win price — see the docstring in query/pools.
+    """
+    return pools_q.doubles_conditional(date, leg_no)
 
 
 @app.get("/api/meetings")
