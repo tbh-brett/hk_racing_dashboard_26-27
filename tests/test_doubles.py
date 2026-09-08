@@ -109,3 +109,26 @@ def test_the_write_is_idempotent(tmp_path):
     upsert.upsert_odds_doubles(conn, rows)
     assert conn.execute("SELECT count(*) FROM odds_doubles").fetchone()[0] == 2
     conn.close()
+
+
+def test_the_separator_is_confirmed_against_a_selling_pool():
+    """The one claim on this path that could only be read off the site's own
+    bundle, now read off a live reply.
+
+    `"DBL" === o && (v = e.combString.split("/"))` was the whole evidence when
+    `ingest/doubles` was written, because no double pool was selling. On
+    2026-09-08 the 2026-09-09 Happy Valley leg 1 pool was START_SELL with 120
+    nodes, and every combString was of the form `01/01` — 936 rows across all
+    seven legs parsed, none dropped.
+
+    Kept as a fixture-shaped assertion rather than a live call: a test that
+    reaches HKJC fails when the network does, and the fact it is pinning is
+    about the FORMAT, which does not change with the meeting.
+    """
+    from hkrd.ingest import doubles as dbl
+    assert dbl.COMB_SEPARATOR == "/"
+    assert dbl._combination("01/01") == [1, 1]
+    assert dbl._combination("12/07") == [12, 7]
+    # A comma is what a quinella uses, and splitting a double on one yields
+    # nothing at all rather than erroring — which is why this is pinned.
+    assert dbl._combination("02,04") == []

@@ -260,6 +260,13 @@ table.card td { padding: 6px 8px; }
 /* The last ten minutes on their own. Smaller than the whole-window figure
    beside it, because it is the second reading of the same market and not a
    second market — but it is the reading the money is in. */
+/* How much money is on this runner, beside how its price moved. A ratio and an
+   amount are different facts and the column has always been called both. */
+.mv .cash {
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
 .mv .rush {
   font-size: 10px; letter-spacing: .02em; white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -441,6 +448,49 @@ table.card td { padding: 6px 8px; }
   white-space: nowrap;
 }
 #detail .met-row .rec { margin-left: auto; color: var(--text); font-weight: 600; }
+/* What each pool holds. Beside concentration, which says how the money is
+   DIVIDED — the two are independent, and a strongly concentrated race can be a
+   $90,000 market. */
+.pool-box {
+  display: flex; align-items: baseline; gap: 10px; margin-left: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.pool-box > .k {
+  font-size: var(--fs-xs); letter-spacing: .08em; color: var(--text-muted);
+}
+.pool-box .pool { display: inline-flex; align-items: baseline; gap: 4px; }
+.pool-box .pool .p { font-size: 9px; letter-spacing: .06em; color: var(--text-faint); }
+.pool-box .pool .v { font-family: var(--font-mono); color: var(--text-2); }
+/* The two pair pools added — the market one QQP ticket actually competes in,
+   and usually the bigger half of the race. */
+.pool-box .pool.qqp .p { color: var(--edge); }
+.pool-box .pool.qqp .v { color: var(--edge); }
+
+/* The flyout's money panel. */
+#detail .money-grid { display: flex; flex-direction: column; gap: 2px; }
+#detail .money-row {
+  display: grid; grid-template-columns: 62px 44px 44px 1fr; gap: 6px;
+  align-items: baseline; font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+#detail .money-row.pair { grid-template-columns: 62px 44px 44px 1fr; }
+#detail .money-row .p { color: var(--text-dim); font-size: var(--fs-xs);
+  letter-spacing: .04em; }
+#detail .money-row .o { font-family: var(--font-mono); color: var(--text-muted);
+  text-align: right; }
+#detail .money-row .pc { font-family: var(--font-mono); color: var(--text-2);
+  text-align: right; }
+#detail .money-row .v { font-family: var(--font-mono); color: var(--text);
+  text-align: right; }
+#detail .money-sub {
+  margin-top: 6px; font-size: var(--fs-xs); letter-spacing: .06em;
+  color: var(--text-muted);
+}
+#detail .money-note {
+  margin-top: 4px; font-size: var(--fs-xs); color: var(--text-dim);
+  line-height: 1.5;
+}
+
 #detail .met-row .k { color: var(--text-faint); }
 /* Which way the weight went, from THIS horse's side. The swing is the gap
    between the pair, so one number is a help to one of them and a hindrance to

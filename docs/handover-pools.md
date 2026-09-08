@@ -34,7 +34,23 @@ Merged with `main` at `13400d6` and green: **1243 passed, 2 skipped**.
 
 ---
 
+> **STATUS, 2026-09-08.** Reviewed, verified, merged into `main` and deployed.
+> The separator in §2 is **confirmed against a live selling pool** — see below.
+> Four things were added on top of the branch and are described in the merge
+> commit: money per runner in every pool, money per PAIR (which is what a QQP
+> ticket is struck into), a merged-pool guard so a race total does not
+> double-count, and the dashboard surfaces that were missing entirely. The
+> superseded branch in §6 has **not** been deleted — that is the owner's call,
+> not an agent's.
+
 ## 2. The one thing that is NOT verified, and how to verify it
+
+> **VERIFIED 2026-09-08 14:58.** `MTG_20260909_0001DBL1` was `START_SELL` with
+> 120 nodes and every `combString` was of the form `01/01`. `fetch_doubles`
+> returned **936 rows across all seven legs** with none dropped, so the happy
+> path is confirmed and not only the failure path. The format is now pinned by
+> a test rather than by a live call, because a test that reaches HKJC fails
+> when the network does and the fact being pinned is about the format.
 
 **A double's combination separator is `/`, not `,`** — `"02/04"` where a
 quinella is `"02,04"`.

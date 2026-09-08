@@ -145,10 +145,13 @@ def investment_rows(meeting: dict[str, Any], *, date: str, venue: str,
     return out
 
 
-def fetch_turnover(date: str, venue: str, *, session=None
-                   ) -> list[dict[str, Any]]:
+def fetch_turnover(date: str, venue: str, *, session=None,
+                   expect_id: str | None = None) -> list[dict[str, Any]]:
     """One meeting's pool turnover, in one request."""
-    expect = meeting_id(date, venue, session=session)
+    # The caller has usually just resolved this for the price capture in the
+    # same tick, and the probe is a whole extra request. Passed in where it is
+    # known; looked up where it is not, so this stays usable on its own.
+    expect = expect_id or meeting_id(date, venue, session=session)
     if expect is None:
         raise OddsError(
             f"HKJC lists no meeting for {date} {venue}. It answers this query "

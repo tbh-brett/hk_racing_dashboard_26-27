@@ -422,9 +422,17 @@ def run(date: str | None = None, venue: str | None = None, *,
         # grid that fails is a lost read on a second pool, while the win and
         # place prices for this moment are the half that cannot be
         # reconstructed.
+        # The meeting id, resolved ONCE for both fetches below rather than
+        # probed for by each of them: they would otherwise spend a request
+        # apiece re-asking a question this tick has already answered. Only
+        # looked up when something is actually going to use it, so a tick with
+        # both switched off still costs nothing extra.
+        known_id = (odds_ingest.meeting_id(date, venue, session=session)
+                    if due_pairs and (doubles or turnover) else None)
         if due_pairs and doubles:
             try:
-                rows = doubles_ingest.fetch_doubles(date, venue, session=session)
+                rows = doubles_ingest.fetch_doubles(date, venue, session=session,
+                                                    expect_id=known_id)
             except odds_ingest.OddsError as exc:
                 report.notes.append(f"doubles: {exc}")
             else:
@@ -433,7 +441,9 @@ def run(date: str | None = None, venue: str | None = None, *,
                 report.legs = len({r["leg_no"] for r in rows})
         if due_pairs and turnover:
             try:
-                rows = turnover_ingest.fetch_turnover(date, venue, session=session)
+                rows = turnover_ingest.fetch_turnover(date, venue,
+                                                      session=session,
+                                                      expect_id=known_id)
             except odds_ingest.OddsError as exc:
                 report.notes.append(f"turnover: {exc}")
             else:

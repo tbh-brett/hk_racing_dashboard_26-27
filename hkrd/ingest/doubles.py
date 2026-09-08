@@ -144,7 +144,8 @@ def double_rows(meeting: dict[str, Any], *, date: str, venue: str,
 
 
 def fetch_doubles(date: str, venue: str, legs: Sequence[int] | None = None, *,
-                  session=None) -> list[dict[str, Any]]:
+                  session=None, expect_id: str | None = None
+                  ) -> list[dict[str, Any]]:
     """One meeting's doubles, in one request.
 
     A separate call from `odds.fetch_meeting` rather than another entry in its
@@ -152,7 +153,10 @@ def fetch_doubles(date: str, venue: str, legs: Sequence[int] | None = None, *,
     race and raises otherwise, which is the right rule for the pools it serves
     and the opposite of what a double is.
     """
-    expect = meeting_id(date, venue, session=session)
+    # The caller has usually just resolved this for the price capture in the
+    # same tick, and the probe is a whole extra request. Passed in where it is
+    # known; looked up where it is not, so this stays usable on its own.
+    expect = expect_id or meeting_id(date, venue, session=session)
     if expect is None:
         raise OddsError(
             f"HKJC lists no meeting for {date} {venue}. It answers this query "
