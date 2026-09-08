@@ -81,8 +81,11 @@ def pool_turnover(date: str, race_no: int, *, at: str = "latest",
             "WHERE race_date = ? AND race_no = ?", (date, race_no)).fetchone()[0]
             if at == "latest" else at)
         if not captured:
+            # The SAME shape as the answer below, `race_total` included. A
+            # caller that has to know which branch it got is a caller that will
+            # one day read the wrong one.
             return {"race_date": date, "race_no": race_no, "captured_at": None,
-                    "pools": {}, "open": [],
+                    "pools": {}, "open": [], "race_total": None,
                     "note": "no turnover captured for this race"}
 
         now = {r["pool"]: (r["turnover"], r["merged_into"]) for r in conn.execute(

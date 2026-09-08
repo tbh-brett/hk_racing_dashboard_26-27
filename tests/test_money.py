@@ -280,3 +280,25 @@ def test_a_merged_pool_is_not_counted_twice(db):
     # Both figures are still shown — each is correct about its own pool.
     assert got["pools"]["QTT"]["turnover"] == 28_006
     assert got["race_total"] == 128_006, "the naive sum would be 156,012"
+
+
+def test_every_answer_has_the_same_shape(db):
+    """A race with no turnover captured yet answers with the same keys as one
+    that has some.
+
+    Both of these have been a KeyError in a caller: `runner_money` on a card
+    with no prices, and `pool_turnover` on a meeting the capture has not
+    reached. A caller that has to know which branch it got is a caller that
+    will one day read the wrong one.
+    """
+    empty = money.pool_turnover(DATE, 9, conn=db)
+    full = money.pool_turnover(DATE, 1, conn=db)
+    _turnover(db, [{"race_date": DATE, "race_no": 1, "pool": "WIN",
+                    "captured_at": CAP, "turnover": 1_000}])
+    full = money.pool_turnover(DATE, 1, conn=db)
+    assert set(empty) - {"note"} == set(full) - {"note"}
+    assert empty["race_total"] is None
+
+    thin = money.runner_money(DATE, 9, conn=db)
+    fat = money.runner_money(DATE, 1, conn=db)
+    assert set(thin) - {"note"} == set(fat) - {"note"}
