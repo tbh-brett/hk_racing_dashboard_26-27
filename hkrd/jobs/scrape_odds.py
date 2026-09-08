@@ -32,7 +32,9 @@ import datetime as dt
 from dataclasses import dataclass, field
 from typing import Any
 
+from hkrd.ingest import doubles as doubles_ingest
 from hkrd.ingest import odds as odds_ingest
+from hkrd.ingest import turnover as turnover_ingest
 from hkrd.query import market as market_q
 from hkrd.store import job_log, upsert
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
@@ -49,6 +51,9 @@ class OddsRun:
     attempted: int = 0
     win_place: int = 0
     pairs: int = 0
+    doubles: int = 0
+    legs: int = 0
+    turnover: int = 0
     skipped: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     closed: list[int] = field(default_factory=list)
@@ -58,6 +63,13 @@ class OddsRun:
             return f"{self.race_date}: nothing to price"
         head = (f"{self.race_date} {self.venue}: {self.races} races · "
                 f"{self.win_place} win/place · {self.pairs} pair odds")
+        # Reported separately rather than folded into one total. A run that
+        # captured every price and no turnover is a specific, fixable failure,
+        # and one number would hide it behind a plausible figure.
+        if self.turnover:
+            head += f" · {self.turnover} turnover"
+        if self.legs:
+            head += f" · {self.legs} legs/{self.doubles} doubles"
         if self.closed:
             head += (" · market shut on R"
                      + ", R".join(str(n) for n in sorted(self.closed)))
@@ -236,8 +248,15 @@ def _is_settled(date: str, off_time: str, now: dt.datetime) -> bool:
 def run(date: str | None = None, venue: str | None = None, *,
         races: list[int] | None = None, db: str | None = None,
         today: dt.date | None = None, now: dt.datetime | None = None,
-        session=None) -> OddsRun:
-    """Fetch and store one meeting's odds. Returns the counts it wrote."""
+        session=None, doubles: bool = True, turnover: bool = True) -> OddsRun:
+    """Fetch and store one meeting's odds, doubles and pool turnover.
+
+    `doubles` and `turnover` are two further requests to the same endpoint, on
+    the pair cadence: they are only asked for on a tick that was already
+    reaching HKJC for a pair price, so an idle minute stays free. Both default
+    on -- turnover is the denominator every money figure needs, and neither can
+    be reconstructed after the meeting.
+    """
     conn = get_conn(db) if db else get_conn(db_path())
     try:
         init_db(conn)
@@ -394,13 +413,51 @@ def run(date: str | None = None, venue: str | None = None, *,
                     report.pairs += upsert.upsert_odds_pairs(conn, pairs)
             report.races += 1
 
+        # Doubles and pool turnover, once for the meeting rather than once per
+        # race, and only on a tick that was already due a pair capture -- they
+        # move on the same slow cadence and this adds no request to a tick that
+        # would otherwise have stayed local.
+        #
+        # After the prices are committed, and never allowed to raise: a doubles
+        # grid that fails is a lost read on a second pool, while the win and
+        # place prices for this moment are the half that cannot be
+        # reconstructed.
+        # The meeting id, resolved ONCE for both fetches below rather than
+        # probed for by each of them: they would otherwise spend a request
+        # apiece re-asking a question this tick has already answered. Only
+        # looked up when something is actually going to use it, so a tick with
+        # both switched off still costs nothing extra.
+        known_id = (odds_ingest.meeting_id(date, venue, session=session)
+                    if due_pairs and (doubles or turnover) else None)
+        if due_pairs and doubles:
+            try:
+                rows = doubles_ingest.fetch_doubles(date, venue, session=session,
+                                                    expect_id=known_id)
+            except odds_ingest.OddsError as exc:
+                report.notes.append(f"doubles: {exc}")
+            else:
+                with transaction(conn):
+                    report.doubles += upsert.upsert_odds_doubles(conn, rows)
+                report.legs = len({r["leg_no"] for r in rows})
+        if due_pairs and turnover:
+            try:
+                rows = turnover_ingest.fetch_turnover(date, venue,
+                                                      session=session,
+                                                      expect_id=known_id)
+            except odds_ingest.OddsError as exc:
+                report.notes.append(f"turnover: {exc}")
+            else:
+                with transaction(conn):
+                    report.turnover += upsert.upsert_pool_turnover(conn, rows)
+
         # Recorded so the freshness strip can say when odds last landed, and
         # so a run that stored nothing is visible as such rather than as
         # silence indistinguishable from a run that never happened.
         with transaction(conn):
             job_log.record_source(
                 conn, "scrape_odds",
-                ok=bool(report.races or report.closed), detail=report.line())
+                ok=bool(report.races or report.closed or report.turnover),
+                detail=report.line())
         return report
     finally:
         conn.close()
@@ -418,9 +475,14 @@ def main(argv: list[str] | None = None) -> int:
                          "the every-minute cron line: without it the log is "
                          "~1,400 lines a day of 'nothing to price' and the "
                          "runs that DID capture something are buried in them.")
+    ap.add_argument("--no-doubles", action="store_true",
+                    help="skip the doubles pool (one extra request per due tick)")
+    ap.add_argument("--no-turnover", action="store_true",
+                    help="skip pool turnover (one extra request per due tick)")
     args = ap.parse_args(argv)
 
-    report = run(args.date, args.venue, races=args.races, db=args.db)
+    report = run(args.date, args.venue, races=args.races, db=args.db,
+                 doubles=not args.no_doubles, turnover=not args.no_turnover)
     # Quiet covers exactly one case: a tick that attempted nothing and has
     # nothing to complain about. A zero WITH something attempted still speaks,
     # and so does every skip -- silent success and silent failure must never

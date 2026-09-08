@@ -23,9 +23,17 @@ from typing import Any
 from hkrd.derive.probability import devig
 from hkrd.query import (blackbook as bb_q, formguide as fg_q,
                         gear as gear_q, market as market_q,
-                        movement as movement_q, vet as vet_q)
+                        money as money_q, movement as movement_q,
+                        vet as vet_q)
 from hkrd.query.race import get_horse_form, get_race, vet_form
 from hkrd.query.types import RaceLine
+
+# How many pairs the card carries, ranked by the money on them. All 91 of a
+# 14-runner field would be ~10 KB on a 36 KB card for a tail nobody reads; the
+# panel says it is showing the top of a ranking rather than every pair, so a
+# runner missing from it reads as "not where the money is" rather than as
+# missing data.
+PAIR_MONEY_SHOWN = 24
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["build_card", "meeting_blackbook", "meeting_summary",
@@ -178,6 +186,22 @@ def build_card(date: str, race_no: int, *,
             {r.horse_name: r.gear for r in race.runners},
             before=date, conn=conn)
 
+        # HOW MUCH MONEY, not just how it is divided. The column on this card
+        # has been labelled MOVE · MONEY since the first build and the money
+        # half of it was a sparkline of the PRICE — a ratio, which says nothing
+        # about scale. A tenth of a $9,000 pool and a tenth of a $430,000 pool
+        # are the same number describing amounts fifty times apart.
+        #
+        # The pair pools are here because they are where this book actually
+        # bets and because they are the bigger market: 2026-09-09 HV race 1 held
+        # $251,403 in quinella place and $202,395 in quinella against $174,539
+        # in win. A win-only reading of "where the money is" misses more than
+        # half of it.
+        cash = money_q.runner_money(date, race_no, conn=conn)
+        by_no = {r["horse_no"]: r for r in cash["runners"]}
+        pairs = money_q.pair_money(date, race_no, top=PAIR_MONEY_SHOWN,
+                                   conn=conn)
+
         runners: list[dict[str, Any]] = []
         for r in race.runners:
             prior = get_horse_form(r.horse_name, limit=1, before=date, conn=conn)
@@ -211,6 +235,7 @@ def build_card(date: str, race_no: int, *,
                 "market_rank": m_rank,
                 "movement": moves.get(r.horse_no),
                 "gear_change": gear.get(r.horse_name),
+                "money": (by_no.get(r.horse_no) or {}).get("pools"),
                 "vet": vet.get(r.horse_name, []),
                 "vet_form": vet_recent.get(r.horse_name, []),
                 # Negative means the model likes it more than the market does.
@@ -241,6 +266,13 @@ def build_card(date: str, race_no: int, *,
             "overround": overround,
             "place_ratio_range": _place_ratio_range(race.runners),
             "head_to_head": _pairs_meeting_again(conn, date, race.runners),
+            # What each pool on this race holds, and the pairs the money is
+            # actually on. Race-level rather than per-runner because a pool
+            # size is a fact about the race.
+            "pool_money": {"pools": {**cash["pools"], **pairs["pools"]},
+                           "captured_at": cash["turnover_captured_at"],
+                           "pairs": pairs["pairs"],
+                           "pairs_priced": pairs["priced"]},
             "blackbook": [
                 {**{k: v for k, v in b.items() if k != "tag_csv"},
                  "tags": sorted((b["tag_csv"] or "").split(","))

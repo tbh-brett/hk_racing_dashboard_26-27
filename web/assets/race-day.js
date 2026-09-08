@@ -470,6 +470,56 @@ function renderRaceBar() {
     box.append(t);
   }
   bar.append(box);
+  poolBox(bar, c);
+}
+
+/* WHAT EACH POOL HOLDS.
+ *
+ * Concentration says how the money is DIVIDED and this says how much of it
+ * there is, and the two are independent: a strongly concentrated race can be
+ * a $90,000 market and a weak one a $4,000,000 market.
+ *
+ * The pair pools are here and not hidden behind the win pool because they are
+ * usually the bigger market — 2026-09-09 HV race 1 held $251k in quinella
+ * place and $202k in quinella against $175k in win — and because they are the
+ * pools a QQP ticket is actually struck into.
+ *
+ * NOT AN ORDERING OF RACES BY INTEREST. The biggest win pool on a card is
+ * usually an odds-on favourite in a small field: 2026-09-06 race 3 held
+ * $4,288,122 because KA YING RISING was 1.0 in a field of six. Following that
+ * money means backing an odds-on shot into a 17.5% takeout. */
+function poolBox(bar, c) {
+  const money = c.pool_money;
+  const pools = money?.pools ?? {};
+  const named = ['WIN', 'PLA', 'QIN', 'QPL'].filter((p) => pools[p] != null);
+  if (!named.length) return;
+
+  const box = el('div', 'pool-box');
+  box.append(el('span', 'k', 'POOLS'));
+  named.forEach((p) => {
+    const cell = el('span', 'pool');
+    cell.append(el('span', 'p', p === 'PLA' ? 'PLACE' : p));
+    cell.append(el('span', 'v', dollars(pools[p])));
+    cell.title = `${p} pool holds $${Math.round(pools[p]).toLocaleString()}`;
+    box.append(cell);
+  });
+  // The pair pools added, because that is the market a QQP competes in and
+  // neither half of it alone is that number.
+  if (pools.QIN != null && pools.QPL != null) {
+    const qqp = el('span', 'pool qqp');
+    qqp.append(el('span', 'p', 'QQP'));
+    qqp.append(el('span', 'v', dollars(pools.QIN + pools.QPL)));
+    qqp.title = 'quinella + quinella place — the two pools one QQP ticket is '
+      + 'struck into, added';
+    box.append(qqp);
+  }
+  if (money?.captured_at) {
+    const t = el('span', 'priced-at',
+      `AT ${String(money.captured_at).slice(11, 16)}`);
+    t.title = `pool turnover captured ${money.captured_at}`;
+    box.append(t);
+  }
+  bar.append(box);
 }
 
 /* ── card ────────────────────────────────────────────────────────────────── */
@@ -630,8 +680,33 @@ function movementCell(r) {
   // cell rather than as a column of its own.
   const spark = sparkline(r);
   if (spark) box.append(spark);
+
+  // AND HOW MUCH OF IT. This column has said MOVE · MONEY since the first
+  // build and the money half was a sparkline of the PRICE, which is a ratio
+  // and says nothing about scale: a tenth of a $9,000 pool and a tenth of a
+  // $430,000 pool are the same number describing amounts fifty times apart.
+  const win = r.money?.WIN;
+  if (win?.dollars != null) {
+    const cash = el('span', 'cash', dollars(win.dollars));
+    cash.title = `${win.share_pct}% of the win pool`
+      + (r.money.PLA?.dollars != null
+        ? `
+${dollars(r.money.PLA.dollars)} of the place pool `
+          + `(${r.money.PLA.share_pct}%)` : '');
+    box.append(cash);
+  }
   td.append(box);
   return td;
+}
+
+/** $12.9k, $1.2M — a pool figure is read at a glance, not counted. */
+function dollars(v) {
+  if (v == null) return DASH;
+  const n = Number(v);
+  if (Math.abs(n) >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
+  if (Math.abs(n) >= 1e4) return `$${Math.round(n / 1e3)}k`;
+  if (Math.abs(n) >= 1e3) return `$${(n / 1e3).toFixed(1)}k`;
+  return `$${Math.round(n)}`;
 }
 
 function sparkline(r) {
@@ -902,6 +977,8 @@ function renderDetail() {
     host.append(sec);
   }
 
+  moneySection(host, r);
+
   const form = el('section');
   form.append(el('h6', null, 'LAST SIX'));
   const tbl = el('table');
@@ -1005,6 +1082,88 @@ function renderDetail() {
 
 /** One past run, as the panel shows it. Split out because the panel draws it
  *  from cache and the fetch draws it on arrival, and two copies would drift. */
+/* WHERE THE MONEY IS, for this runner.
+ *
+ * Two readings the win price cannot give on its own. First, the same horse's
+ * share of the WIN pool against its share of the PLACE pool: they are separate
+ * markets with separate money, and a horse holding a tenth of one and a
+ * twentieth of the other is being backed to do two different things. On
+ * 2026-09-09 HV race 1, runner 6 held 9.5% of the win pool and 11.9% of the
+ * place pool — the biggest place share on the race, fifth-favourite to win.
+ *
+ * Second, the PAIRS. A QQP ticket is struck into the quinella and the quinella
+ * place together, and those two pools held $454,000 on that race against the
+ * win pool's $175,000 — so a win-only reading of "where the money is" misses
+ * more than half of it. Runner 6 was in four of the six best-backed pairs and
+ * appears nowhere near the top of the win market.
+ *
+ * NOT A TIP. The pool is a denominator. Following it means backing whatever is
+ * shortest into a 17.5% takeout, and nothing here ranks a runner by the money
+ * on it — the card is still sorted by price. */
+function moneySection(host, r) {
+  const money = r.money;
+  const pool = state.card?.pool_money;
+  if (!money && !pool?.pairs?.length) return;
+
+  const sec = el('section');
+  sec.append(el('h6', null, 'MONEY ON THIS RUNNER'));
+
+  if (money) {
+    const grid = el('div', 'money-grid');
+    [['WIN', money.WIN], ['PLACE', money.PLA]].forEach(([label, m]) => {
+      if (!m) return;
+      const row = el('div', 'money-row');
+      row.append(el('span', 'p', label));
+      row.append(el('span', 'o', m.odds == null ? DASH : num(m.odds, 1)));
+      row.append(el('span', 'pc', `${m.share_pct}%`));
+      row.append(el('span', 'v', m.dollars == null ? DASH : dollars(m.dollars)));
+      grid.append(row);
+    });
+    if (grid.childElementCount) sec.append(grid);
+    // The gap between the two shares, said rather than left to be read off two
+    // percentages: it is the whole point of showing them together.
+    const w = money.WIN?.share_pct;
+    const p = money.PLA?.share_pct;
+    if (w != null && p != null && Math.abs(p - w) >= 1.5) {
+      sec.append(el('div', 'money-note', p > w
+        ? `Backed to PLACE more than to win — ${(p - w).toFixed(1)} points more `
+          + 'of the place pool than of the win pool.'
+        : `Backed to WIN more than to place — ${(w - p).toFixed(1)} points more `
+          + 'of the win pool than of the place pool.'));
+    }
+  }
+
+  // The pairs, filtered to the ones this runner is in. Ranked by the money on
+  // them across both pair pools, which is what a QQP ticket competes with.
+  const mine = (pool?.pairs ?? []).filter(
+    (x) => x.horse_nos.includes(r.horse_no));
+  if (pool?.pairs?.length) {
+    sec.append(el('div', 'money-sub',
+      `BEST-BACKED PAIRS · TOP ${pool.pairs.length} OF ${pool.pairs_priced}`));
+    if (!mine.length) {
+      sec.append(el('div', 'money-note',
+        'Not in any of them — the pair money is elsewhere in this race.'));
+    }
+    mine.slice(0, 5).forEach((x) => {
+      const other = x.horse_nos.find((n) => n !== r.horse_no) ?? r.horse_no;
+      const row = el('div', 'money-row pair');
+      row.append(el('span', 'p', `with ${other}`));
+      const qin = x.pools?.QIN;
+      const qpl = x.pools?.QPL;
+      row.append(el('span', 'o', qin?.odds == null ? DASH : num(qin.odds, 1)));
+      row.append(el('span', 'o', qpl?.odds == null ? DASH : num(qpl.odds, 1)));
+      row.append(el('span', 'v',
+        x.combined == null ? DASH : dollars(x.combined)));
+      row.title = `QIN ${qin?.odds ?? '—'} · QPL ${qpl?.odds ?? '—'} — `
+        + 'combined is the two pools added, which is what one QQP ticket is '
+        + 'struck into';
+      sec.append(row);
+    });
+  }
+  host.append(sec);
+}
+
+
 function formRow(f) {
   const tr = el('tr');
   tr.append(el('td', null, f.race_date?.slice(5) ?? DASH));

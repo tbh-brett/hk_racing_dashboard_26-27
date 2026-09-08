@@ -130,6 +130,27 @@ If a task seems to need a violation, stop and say so rather than working around 
   over the whole day and +21.6% inside the final ten minutes, so the single figure said
   FLAT about a horse being let go. `query/movement.split_move` returns both — `change_pct`
   for sizing, `rush_pct` for attention — and neither is a reason to back anything.
+- **Turnover is a denominator, never a tip.** `pool x de-vigged share` is the actual number
+  of dollars rather than an estimate — in a pari-mutuel pool the dividend is
+  `pool x (1 - takeout) / stake`, so the share IS the money share, in the win pool, the
+  place pool (split into three equal parts, so the identity survives) and both pair pools.
+  **Money share normalises to 1**; normalising to 3 gives a place probability, which is a
+  different quantity. Raw turnover tracks field size and favourite shortness: 2026-09-06
+  race 3 held $4,288,122 because KA YING RISING was 1.0 in a field of six, and following
+  that money means backing an odds-on shot into a 17.5% takeout.
+- **The pair pools are usually bigger than the win pool.** 2026-09-09 HV race 1, the day
+  before racing: QPL $251,403, QIN $202,395, WIN $174,539, PLA $145,593. Any reading of
+  "where the money is" that stops at the win pool misses more than half of it, and the half
+  it misses is the half a QQP ticket is struck into.
+- **A merged pool is one pool reported twice.** HKJC merges Quartet into First 4 and reports
+  the same money under both ids with `mergedPoolId` naming the survivor. Summing every pool
+  on 2026-09-09 HV race 1 overstates it by $28,006. `money.pool_turnover` marks the
+  duplicate `counted_elsewhere` and returns a `race_total` that counts it once.
+- **A double's combination separator is `/`, not `,`** — `"02/04"` where a quinella is
+  `"02,04"`, and `odds._combination` returns nothing at all rather than erroring on one.
+  Confirmed against a live selling pool on 2026-09-08: 936 rows across seven legs, none
+  dropped. A double is also ORDERED — first-leg 3 with second-leg 7 is a different bet at a
+  different price from 7 then 3 — so it must never be sorted the way a quinella pair is.
 - **The place starting price is the last capture, not a column.** `runners` has `win_odds`
   and nothing beside it, so a place price lives only in `odds_snapshots`. It reaches every
   surface through `_LINE_SQL` now that the capture stops when HKJC shuts the pool, which

@@ -42,7 +42,7 @@ from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["place_probabilities", "ranked_pairs", "pair_probabilities",
            "latest_pair_odds", "places_paid", "PLACE_PAYING_FIELD",
-           "PAIR_POOLS"]
+           "PAIR_POOLS", "doubles_conditional"]
 
 # HKJC pays three places in fields of seven or more, two below that, and runs
 # no quinella place pool at all under seven. One definition, because the
@@ -213,6 +213,96 @@ def ranked_pairs(date: str, race_no: int, *, top: int = 5, pool: str = "QPL",
                  "odds": quoted.get((a, b)),
                  "pool": found["source"]}
                 for i, ((a, b), prob) in enumerate(ordered)]
+    finally:
+        if own:
+            conn.close()
+
+
+def doubles_conditional(date: str, leg_no: int, *,
+                        conn: Connection | None = None) -> dict[str, Any]:
+    """What the doubles pool implies about the leg's SECOND race.
+
+    A double is the two legs multiplied, so dividing out the first leg's own
+    win price leaves what the pool is effectively offering on the second-leg
+    runner. Averaged over the first-leg field — weighted by each first-leg
+    runner's share of the money, so a 2.7 favourite counts for more than a 62/1
+    outsider — that is an estimate of the second race's win market built
+    entirely from money bet into a different pool.
+
+    WHY IT IS WORTH HAVING. It is the only forward-looking figure here. Doubles
+    money on a second leg arrives hours before that race's own win pool
+    matures, so early in a card this is a read on a race the win market has
+    barely looked at, and where the two disagree, one of them is stale.
+
+    COMPARE `implied_pct`, NOT `implied_odds`. A double is one pool and one
+    takeout; backing the two legs separately pays the product of two prices
+    that have each been taken out of. So `double / first-leg price` comes in
+    systematically SHORT of the second leg's own win price, and reading the two
+    side by side would show a phantom overlay on every runner in the race.
+    `implied_pct` is normalised across the second-leg field, which is the
+    like-for-like quantity to hold against a de-vigged win share.
+
+    Untested against a result: nothing captured this pool before now, so there
+    is no archive to measure it on. The arithmetic is checked; the edge is not.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        captured = conn.execute(
+            "SELECT max(captured_at) FROM odds_doubles "
+            "WHERE race_date = ? AND leg_no = ?", (date, leg_no)).fetchone()[0]
+        legs = conn.execute(
+            "SELECT race_first, race_second FROM odds_doubles "
+            "WHERE race_date = ? AND leg_no = ? LIMIT 1",
+            (date, leg_no)).fetchone()
+        first_race = legs["race_first"] if legs else None
+        second_race = legs["race_second"] if legs else None
+        blank = {"race_date": date, "leg_no": leg_no,
+                 "race_first": first_race, "race_second": second_race,
+                 "captured_at": captured, "runners": []}
+        if not captured:
+            return {**blank, "note": "no doubles captured for this leg"}
+
+        prices = latest_prices(date, first_race, conn=conn)
+        first_odds = {p["horse_no"]: p["win_odds"] for p in prices
+                      if p["win_odds"]}
+        if len(first_odds) < 2:
+            return {**blank, "note": (
+                f"race {first_race} has no win prices to divide out")}
+
+        nos = sorted(first_odds)
+        weight = dict(zip(nos, devig([first_odds[n] for n in nos])))
+
+        rows = conn.execute(
+            "SELECT horse_first, horse_second, odds FROM odds_doubles "
+            "WHERE race_date = ? AND leg_no = ? AND captured_at = ? "
+            "  AND odds IS NOT NULL", (date, leg_no, captured)).fetchall()
+
+        num: dict[int, float] = {}
+        den: dict[int, float] = {}
+        for r in rows:
+            w = weight.get(r["horse_first"])
+            leg1 = first_odds.get(r["horse_first"])
+            if w is None or not leg1:
+                continue
+            implied = r["odds"] / leg1
+            if implied <= 0:
+                continue
+            num[r["horse_second"]] = num.get(r["horse_second"], 0.0) + w * (1.0 / implied)
+            den[r["horse_second"]] = den.get(r["horse_second"], 0.0) + w
+        if not num:
+            return {**blank, "note": "no combinations priced against a live first leg"}
+
+        raw = {h: num[h] / den[h] for h in num if den[h]}
+        total = sum(raw.values())
+        runners = [{
+            "horse_no": h,
+            # The raw reading, kept because it is what sits next to a price on
+            # the page. The docstring says which of the two is comparable.
+            "implied_odds": round(1.0 / v, 1) if v else None,
+            "implied_pct": round(100 * v / total, 1) if total else None,
+        } for h, v in sorted(raw.items(), key=lambda kv: -kv[1])]
+        return {**blank, "runners": runners, "combinations": len(rows)}
     finally:
         if own:
             conn.close()

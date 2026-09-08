@@ -92,6 +92,61 @@ CREATE TABLE IF NOT EXISTS odds_pairs (
   PRIMARY KEY (race_date, race_no, pool, horse_a, horse_b, captured_at)
 );
 
+-- Doubles: one bet spanning two consecutive races. Leg N couples race N with
+-- race N+1, so a card of R races offers R-1 legs.
+--
+-- horse_first and horse_second are ORDERED and must never be sorted the way
+-- odds_pairs sorts horse_a/horse_b. A quinella pair is unordered -- 3 with 7
+-- is the same bet as 7 with 3 -- so storing it one way round removes a
+-- contradiction. A double is the opposite: first-leg 3 with second-leg 7 is a
+-- different bet, at a different price, from 7 then 3, and normalising it would
+-- collapse two prices into whichever was written last.
+--
+-- race_first and race_second are stored rather than derived from leg_no. HKJC
+-- publishes them in `leg { races }` and the +1 is only true until a card loses
+-- a race.
+CREATE TABLE IF NOT EXISTS odds_doubles (
+  race_date    TEXT    NOT NULL,
+  leg_no       INTEGER NOT NULL,
+  race_first   INTEGER,               -- as HKJC publishes them, not derived
+  race_second  INTEGER,
+  horse_first  INTEGER NOT NULL,      -- runner in the first leg
+  horse_second INTEGER NOT NULL,      -- runner in the second leg
+  captured_at  TEXT    NOT NULL,
+  odds         REAL,
+  PRIMARY KEY (race_date, leg_no, horse_first, horse_second, captured_at)
+);
+
+-- How much money is in each pool, per race, over time. HKJC calls it
+-- `investment`.
+--
+-- Odds are a RATIO and say nothing about scale: 4.0 in a $91,000 double leg
+-- and 4.0 in a $4,300,000 win pool are the same number describing amounts
+-- forty times apart. This is the denominator that turns a price into an
+-- amount, and a 20% drift into "$210,000 arrived".
+--
+-- Long format, one row per pool, so HKJC adding a pool needs no migration --
+-- the same reason runner_sarr_component is long rather than one column per
+-- component.
+--
+-- NULL turnover is not zero. A pool that has not opened reports null and a
+-- pool that is open and untouched reports 0, and a series that conflates them
+-- shows money arriving the instant a card opens.
+--
+-- A cross-race pool (DBL, TBL, DT, TT, SixUP) is filed under the FIRST race of
+-- its leg, which is where HKJC's own turnover page shows it. race_no 0 is not
+-- a race: it holds the meeting-wide total, which would double-count if it were
+-- given a real race number.
+CREATE TABLE IF NOT EXISTS odds_pool_turnover (
+  race_date   TEXT    NOT NULL,
+  race_no     INTEGER NOT NULL,     -- 0 = the meeting total, not a race
+  pool        TEXT    NOT NULL,     -- WIN PLA QIN QPL DBL ... | MEETING_TOTAL
+  captured_at TEXT    NOT NULL,
+  turnover    REAL,                 -- NULL = pool not open, 0 = open and empty
+  merged_into TEXT,                 -- mergedPoolId, where money is reported once
+  PRIMARY KEY (race_date, race_no, pool, captured_at)
+);
+
 -- When HKJC actually shut the betting on a race, as opposed to when the card
 -- said it would go off. The two are not the same and the difference is not
 -- small: a delayed start moves the real close by minutes, and the capture
@@ -473,3 +528,5 @@ CREATE TABLE IF NOT EXISTS runner_projection (
 CREATE INDEX IF NOT EXISTS ix_runners_horse ON runners(horse_name, race_date);
 CREATE INDEX IF NOT EXISTS ix_runners_date  ON runners(race_date);
 CREATE INDEX IF NOT EXISTS ix_snap_race     ON odds_snapshots(race_date, race_no, captured_at);
+CREATE INDEX IF NOT EXISTS ix_dbl_leg       ON odds_doubles(race_date, leg_no, captured_at);
+CREATE INDEX IF NOT EXISTS ix_turnover_race ON odds_pool_turnover(race_date, race_no, captured_at);
