@@ -42,7 +42,7 @@ from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["place_probabilities", "ranked_pairs", "pair_probabilities",
            "latest_pair_odds", "places_paid", "PLACE_PAYING_FIELD",
-           "PAIR_POOLS", "doubles_conditional"]
+           "PAIR_POOLS", "doubles_conditional", "doubles_after_leg"]
 
 # HKJC pays three places in fields of seven or more, two below that, and runs
 # no quinella place pool at all under seven. One definition, because the
@@ -303,6 +303,119 @@ def doubles_conditional(date: str, leg_no: int, *,
             "implied_pct": round(100 * v / total, 1) if total else None,
         } for h, v in sorted(raw.items(), key=lambda kv: -kv[1])]
         return {**blank, "runners": runners, "combinations": len(rows)}
+    finally:
+        if own:
+            conn.close()
+
+
+def doubles_after_leg(date: str, leg_no: int, *,
+                      conn: Connection | None = None) -> dict[str, Any]:
+    """The second leg's market, as the doubles pool left it when betting shut.
+
+    THE PROPERTY THIS USES. A double's betting closes when its FIRST race goes
+    off — you cannot back leg 3 of a double once race 3 has run — so from that
+    moment the grid is frozen. Once the first race is decided, only the row
+    belonging to its winner can still pay, and that row is a complete book on
+    the second race: one price per runner in it.
+
+    AND THE FIRST LEG DIVIDES OUT EXACTLY. The price of (winner, X) is the two
+    legs multiplied, so across X it is `P(winner) x P(X)` with `P(winner)`
+    constant. Normalising the reciprocals removes the constant, so no estimate
+    of the first leg is needed and none is made — unlike `doubles_conditional`,
+    which has to weight over a first-leg field that has not run yet. This is
+    arithmetic on a settled fact.
+
+    WHY IT IS WORTH LOOKING AT. It is an independent read on the race you are
+    about to bet, formed from different money, and FROZEN at the previous
+    race's off — typically half an hour earlier. The second leg's own win pool
+    has kept taking money since. Where the two disagree, one of them has heard
+    something the other has not, and the frozen one cannot have heard it.
+
+    Nothing here says which is right. The doubles pool is smaller and its
+    opinion is older; both facts are on the answer.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        head = conn.execute(
+            "SELECT race_first, race_second, max(captured_at) at "
+            "FROM odds_doubles WHERE race_date = ? AND leg_no = ?",
+            (date, leg_no)).fetchone()
+        first_race = head["race_first"] if head else None
+        second_race = head["race_second"] if head else None
+        blank = {"race_date": date, "leg_no": leg_no,
+                 "race_first": first_race, "race_second": second_race,
+                 "settled": False, "winners": [], "runners": [],
+                 "captured_at": head["at"] if head else None}
+        if not head or not head["at"]:
+            return {**blank, "note": "no doubles captured for this leg"}
+
+        winners = [r["horse_no"] for r in conn.execute(
+            "SELECT horse_no FROM runners "
+            "WHERE race_date = ? AND race_no = ? AND place = 1",
+            (date, first_race))]
+        if not winners:
+            return {**blank, "note": (
+                f"race {first_race} has not been decided — until it is, the "
+                f"whole grid is still live and `doubles_conditional` is the "
+                f"reading that applies")}
+
+        rows = conn.execute(
+            "SELECT horse_first, horse_second, odds FROM odds_doubles "
+            "WHERE race_date = ? AND leg_no = ? AND captured_at = ? "
+            "  AND odds IS NOT NULL", (date, leg_no, head["at"])).fetchall()
+        # A dead heat pays both first legs, so both rows are real books on the
+        # same race. Averaged with equal weight rather than one picked: HKJC
+        # settles a dead-heated leg on both, and choosing one would be a claim
+        # about which half of a shared result to believe.
+        live = [r for r in rows if r["horse_first"] in winners]
+        if not live:
+            return {**blank, "settled": True, "winners": winners,
+                    "note": "no priced combination on the winning first leg"}
+
+        raw: dict[int, list[float]] = {}
+        for r in live:
+            if r["odds"] > 0:
+                raw.setdefault(r["horse_second"], []).append(1.0 / r["odds"])
+        implied = {h: sum(v) / len(v) for h, v in raw.items() if v}
+        total = sum(implied.values())
+        if not total:
+            return {**blank, "settled": True, "winners": winners,
+                    "note": "no positive prices on the winning first leg"}
+
+        # The second leg's OWN market, for the comparison this exists to make.
+        live_prices = {p["horse_no"]: p["win_odds"]
+                       for p in latest_prices(date, second_race, conn=conn)
+                       if p["win_odds"]}
+        win_share: dict[int, float] = {}
+        if len(live_prices) >= 2:
+            nos = sorted(live_prices)
+            win_share = dict(zip(nos, devig([live_prices[n] for n in nos])))
+
+        runners = []
+        for horse_no, value in sorted(implied.items(), key=lambda kv: -kv[1]):
+            pct = 100 * value / total
+            now = win_share.get(horse_no)
+            runners.append({
+                "horse_no": horse_no,
+                # Normalised across the second-leg field, which is the
+                # like-for-like quantity to hold against a de-vigged win share.
+                # The raw price is not: a double carries one takeout where two
+                # win bets carry two.
+                "implied_pct": round(pct, 1),
+                "win_pct": round(100 * now, 1) if now is not None else None,
+                "win_odds": live_prices.get(horse_no),
+                # Positive means the doubles crowd liked it MORE than the win
+                # market does now — which is to say the win market has let it
+                # go since the previous race went off.
+                "gap_points": (round(pct - 100 * now, 1)
+                               if now is not None else None),
+            })
+        return {**blank, "settled": True, "winners": winners,
+                "combinations": len(live), "runners": runners,
+                "note": ("frozen when race "
+                         f"{first_race} went off; the second leg's own market "
+                         f"has kept taking money since")}
     finally:
         if own:
             conn.close()

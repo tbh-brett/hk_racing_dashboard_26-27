@@ -374,3 +374,138 @@ def pair_money(date: str, race_no: int, *, top: int = 10,
     finally:
         if own:
             conn.close()
+
+
+# ── the figure turnover exists for ───────────────────────────────────────────
+#
+# A price move says the RATIO changed. It cannot say whether that happened
+# because money came for this horse or because money left the others, and those
+# are different events: a runner can shorten from 9.0 to 7.5 without a dollar
+# being bet on it, purely because the favourite was backed.
+#
+# Money arriving is the version of that with the ambiguity taken out. Dollars
+# now, minus dollars at the first capture that had both a price and a pool —
+# and because the pool only grows, a runner losing dollars is arithmetically
+# impossible, so a NEGATIVE figure here is not a horse being laid, it is money
+# arriving on it more slowly than the race filled up. Both are reported: the
+# amount, and the share of everything new that went to this runner.
+
+
+def money_arrived(date: str, race_no: int, *, pool: str = "WIN",
+                  conn: Connection | None = None) -> dict[str, Any]:
+    """How many dollars have come for each runner since the market opened.
+
+    The pool at two moments times each runner's share at those same two
+    moments. Both halves have to move together — using today's pool with the
+    morning's share, or the reverse, invents money that never arrived.
+
+    Returns nothing rather than a guess where either end is missing. One
+    capture is a size; two are a rate, and this is the rate.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        column = RUNNER_POOLS.get(pool.upper())
+        if column is None:
+            raise ValueError(f"not a per-runner pool: {pool!r}")
+
+        bounds = conn.execute(
+            "SELECT min(captured_at) f, max(captured_at) l "
+            "FROM odds_pool_turnover WHERE race_date = ? AND race_no = ? "
+            "  AND pool = ? AND turnover IS NOT NULL",
+            (date, race_no, pool.upper())).fetchone()
+        if not bounds or not bounds["f"] or bounds["f"] == bounds["l"]:
+            return {"race_date": date, "race_no": race_no, "pool": pool,
+                    "observed": False, "runners": [], "opened": None,
+                    "latest": None, "pool_then": None, "pool_now": None,
+                    "arrived": None,
+                    "note": ("one turnover capture is a size, not a rate — "
+                             "two are needed to say what arrived")}
+
+        amounts = {r["captured_at"]: r["turnover"] for r in conn.execute(
+            "SELECT captured_at, turnover FROM odds_pool_turnover "
+            "WHERE race_date = ? AND race_no = ? AND pool = ? "
+            "  AND captured_at IN (?, ?)",
+            (date, race_no, pool.upper(), bounds["f"], bounds["l"]))}
+        then_pool, now_pool = amounts.get(bounds["f"]), amounts.get(bounds["l"])
+
+        # The price capture nearest each turnover capture, on its own clock.
+        # The two are separate requests a second or two apart, so pairing them
+        # by exact timestamp would find nothing.
+        then_prices = _prices_at(conn, date, race_no, bounds["f"], column)
+        now_prices = _prices_at(conn, date, race_no, bounds["l"], column)
+        if not then_prices or not now_prices or not then_pool or not now_pool:
+            return {"race_date": date, "race_no": race_no, "pool": pool,
+                    "observed": False, "runners": [], "opened": bounds["f"],
+                    "latest": bounds["l"], "pool_then": then_pool,
+                    "pool_now": now_pool, "arrived": None,
+                    "note": "no priced capture to pair with the turnover"}
+
+        total_new = now_pool - then_pool
+        rows = []
+        for horse_no, now_share in now_prices.items():
+            was = then_prices.get(horse_no)
+            now_dollars = now_pool * now_share
+            then_dollars = then_pool * was if was is not None else None
+            gained = (now_dollars - then_dollars
+                      if then_dollars is not None else None)
+            rows.append({
+                "horse_no": horse_no,
+                "dollars": round(now_dollars),
+                "dollars_then": (round(then_dollars)
+                                 if then_dollars is not None else None),
+                "arrived": round(gained) if gained is not None else None,
+                # What share of everything NEW went to this runner, which is
+                # the like-for-like figure across runners of very different
+                # sizes. Only where the race actually took money in between.
+                "of_new_pct": (round(100 * gained / total_new, 1)
+                               if gained is not None and total_new > 0 else None),
+                "share_pct": round(100 * now_share, 1),
+                "share_then_pct": (round(100 * was, 1)
+                                   if was is not None else None),
+            })
+        return {
+            "race_date": date, "race_no": race_no, "pool": pool.upper(),
+            "observed": True, "opened": bounds["f"], "latest": bounds["l"],
+            "pool_then": then_pool, "pool_now": now_pool,
+            "arrived": round(total_new),
+            "runners": sorted(rows, key=lambda r: -(r["arrived"] or 0)),
+        }
+    finally:
+        if own:
+            conn.close()
+
+
+def _prices_at(conn: Connection, date: str, race_no: int, near: str,
+               column: str) -> dict[int, float]:
+    """Each runner's share of one pool, at the capture nearest `near`.
+
+    Nearest rather than exact: turnover and prices are two requests a second or
+    two apart, so an exact join finds nothing. Nearest AT OR BEFORE, so a share
+    is never read from money that had not arrived when the pool was measured.
+    """
+    captured = conn.execute(
+        "SELECT max(captured_at) FROM odds_snapshots "
+        "WHERE race_date = ? AND race_no = ? AND captured_at <= ? "
+        f"  AND {column} IS NOT NULL AND {column} < 999",
+        (date, race_no, near)).fetchone()[0]
+    if not captured:
+        # Nothing at or before it — the first turnover capture can land a
+        # moment ahead of the first price. Take the earliest price instead of
+        # reporting the runner as unpriced.
+        captured = conn.execute(
+            "SELECT min(captured_at) FROM odds_snapshots "
+            "WHERE race_date = ? AND race_no = ? "
+            f"  AND {column} IS NOT NULL AND {column} < 999",
+            (date, race_no)).fetchone()[0]
+    if not captured:
+        return {}
+    rows = conn.execute(
+        f"SELECT horse_no, {column} AS price FROM odds_snapshots "
+        "WHERE race_date = ? AND race_no = ? AND captured_at = ? "
+        f"  AND {column} IS NOT NULL AND {column} < 999",
+        (date, race_no, captured)).fetchall()
+    if len(rows) < 2:
+        return {}
+    shares = devig_to([r["price"] for r in rows], MONEY_SHARE)
+    return {r["horse_no"]: float(s) for r, s in zip(rows, shares)}

@@ -491,6 +491,39 @@ table.card td { padding: 6px 8px; }
   line-height: 1.5;
 }
 
+/* The previous race's double, frozen. A band rather than a panel: it is a fact
+   about the whole race, and it exists only during a live meeting. */
+.band-dbl .dbl-rail {
+  display: flex; gap: 10px; overflow-x: auto; padding: 6px 14px 8px;
+}
+.dbl-card {
+  display: grid; grid-template-columns: 22px 1fr auto; gap: 2px 6px;
+  align-items: baseline; flex: none; min-width: 190px;
+  border: 1px solid var(--line-2); padding: 5px 8px;
+  font-variant-numeric: tabular-nums;
+}
+.dbl-card .no { font-family: var(--font-mono); color: var(--text-dim); }
+.dbl-card .nm { grid-column: 2 / 4; color: var(--text); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.dbl-card .v, .dbl-card .v2 {
+  grid-column: 1 / 2; font-family: var(--font-mono); text-align: right;
+}
+.dbl-card .k { grid-column: 2 / 3; font-size: 9px; letter-spacing: .06em;
+  color: var(--text-faint); }
+.dbl-card .g {
+  grid-column: 3 / 4; grid-row: 2 / 4; align-self: center;
+  font-family: var(--font-mono); font-size: var(--fs-md); font-weight: 600;
+}
+/* The double rated it higher than the live market does now — the market has
+   let it go since the previous race went off. */
+.dbl-card.over { border-color: var(--edge-ground); }
+.dbl-card.over .g { color: var(--edge); }
+.dbl-card.under .g { color: var(--cool); }
+.band-dbl .dbl-note {
+  padding: 0 14px 8px; font-size: var(--fs-xs); color: var(--text-faint);
+  line-height: 1.5;
+}
+
 #detail .met-row .k { color: var(--text-faint); }
 /* Which way the weight went, from THIS horse's side. The swing is the gap
    between the pair, so one number is a help to one of them and a hindrance to

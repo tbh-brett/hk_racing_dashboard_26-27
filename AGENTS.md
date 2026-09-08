@@ -146,6 +146,18 @@ If a task seems to need a violation, stop and say so rather than working around 
   the same money under both ids with `mergedPoolId` naming the survivor. Summing every pool
   on 2026-09-09 HV race 1 overstates it by $28,006. `money.pool_turnover` marks the
   duplicate `counted_elsewhere` and returns a `race_total` that counts it once.
+- **Money ARRIVING is the honest version of a price move.** A runner shortens when money
+  comes for it and also when money comes for everything else, and the odds cannot tell those
+  apart. `money.money_arrived` takes the pool at two moments times the share at those SAME
+  two moments — using today's pool with the morning's share invents money that never
+  arrived. Measured on 2026-09-09 HV race 1 between 15:01 and 17:29: $135,507 came in, and
+  runner 5 took the largest single share of it while its price DRIFTED.
+- **A double's betting shuts when its FIRST race goes off**, so from that moment the grid is
+  frozen — and once that race is decided, the winner's row is a complete settled book on the
+  second race, formed from different money and typically half an hour earlier. The first leg
+  divides out EXACTLY: the price of (winner, X) is the two legs multiplied, so across X the
+  first-leg probability is a constant and normalising removes it. No estimate of the first
+  leg is needed and none may be made. `pools.doubles_after_leg`.
 - **A double's combination separator is `/`, not `,`** — `"02/04"` where a quinella is
   `"02,04"`, and `odds._combination` returns nothing at all rather than erroring on one.
   Confirmed against a live selling pool on 2026-09-08: 936 rows across seven legs, none
@@ -196,6 +208,23 @@ If a task seems to need a violation, stop and say so rather than working around 
 
 - Nothing secret is committed — no password, account number, or bet log. Local config lives
   in `.env`, which is gitignored.
+
+## Performance
+
+- **Never compute a per-race constant per row.** Field size and the race's book are the same
+  for every runner in a race. As correlated subqueries in a SELECT list they were recomputed
+  per row per use — the Lookup insight panel ran ~43,000 scans to answer a question about
+  21,493 rows and took 650 ms, against 20 ms for identical arithmetic grouped once into a
+  CTE. SQLite cannot notice that a correlated subquery is constant within a group.
+- **Responses are gzipped.** These payloads are JSON with the same field names on every row,
+  which is the best case there is: a race card is 7.3x smaller, a 500-row Lookup answer 7.9x,
+  the trials feed 15.6x. The machine is in Singapore and the dashboard is read in Hong Kong,
+  so bytes on the wire are most of how fast it feels.
+- **The page cache is sized for the database, not for SQLite's default.** 2 MB against a
+  38 MB archive meant a query touching a fifth of it re-read most of it every time; it is
+  64 MB with a 256 MB mmap ceiling, on a machine with 1 GB. See `store/connect`.
+- **Measure before changing anything.** The card was assumed to be the slow page and is
+  28 ms; the slow things were a panel nobody suspected and the absence of compression.
 
 ## File size
 

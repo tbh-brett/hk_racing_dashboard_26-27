@@ -132,3 +132,129 @@ def test_the_separator_is_confirmed_against_a_selling_pool():
     # A comma is what a quinella uses, and splitting a double on one yields
     # nothing at all rather than erroring — which is why this is pinned.
     assert dbl._combination("02,04") == []
+
+
+# ─── after the first leg has run ──────────────────────────────────────────────
+
+def test_the_winners_row_is_a_settled_book_on_the_second_race(tmp_path):
+    """Betting on a double shuts when its FIRST race goes off, so from that
+    moment the grid is frozen — and once the first race is decided, only the
+    winner's row can still pay.
+
+    That row is a complete book on the second race, and the first leg divides
+    out EXACTLY: the price of (winner, X) is the two legs multiplied, so across
+    X the first-leg probability is a constant and normalising removes it. No
+    estimate of the first leg is needed and none is made, which is the
+    difference between this and the pre-race reading.
+    """
+    from hkrd.query import pools
+    from hkrd.store import upsert
+    from hkrd.store.connect import get_conn, init_db, transaction
+
+    conn = get_conn(tmp_path / "d.db")
+    init_db(conn)
+    at = "2026-09-09T13:00:00"
+    with transaction(conn):
+        upsert.upsert_races(conn, [
+            {"race_date": "2026-09-09", "race_no": n, "venue": "HV",
+             "course": "A", "surface": "Turf", "going": "G", "distance": 1200}
+            for n in (1, 2)])
+        # Race 1 is decided: horse 3 won, 1 was second, 2 was third.
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-09-09", "race_no": 1, "horse_no": n,
+             "horse_name": "FIRST {}".format(n), "place": str(place)}
+            for n, place in ((3, 1), (1, 2), (2, 3))])
+        # The frozen grid. The winner's row prices race 2 at 4 / 8 / 8, which
+        # is 50% / 25% / 25% once normalised. The losing rows are scaled by a
+        # different first leg and must not touch the answer.
+        upsert.upsert_odds_doubles(conn, [
+            {"race_date": "2026-09-09", "leg_no": 1, "race_first": 1,
+             "race_second": 2, "horse_first": f, "horse_second": s,
+             "captured_at": at, "odds": o}
+            for f, s, o in ((3, 1, 4.0), (3, 2, 8.0), (3, 3, 8.0),
+                            (1, 1, 40.0), (1, 2, 80.0), (1, 3, 80.0))])
+        # Race 2's own market has moved on since: it now likes horse 2.
+        upsert.upsert_odds_snapshots(conn, [
+            {"race_date": "2026-09-09", "race_no": 2, "horse_no": n,
+             "captured_at": "2026-09-09T13:25:00", "win_odds": o,
+             "place_odds": None}
+            for n, o in ((1, 4.0), (2, 2.0), (3, 8.0))])
+    try:
+        got = pools.doubles_after_leg("2026-09-09", 1, conn=conn)
+        assert got["settled"] is True and got["winners"] == [3]
+        assert got["combinations"] == 3, "only the winner's row is still live"
+        rows = {r["horse_no"]: r for r in got["runners"]}
+        assert rows[1]["implied_pct"] == pytest.approx(50.0, abs=0.1)
+        assert rows[2]["implied_pct"] == pytest.approx(25.0, abs=0.1)
+        # And the disagreement with the live market is the point of it. Race
+        # 2's own prices de-vig to 28.6 / 57.1 / 14.3, so the frozen double
+        # rated horse 1 twenty-one points higher than the market does now, and
+        # horse 2 thirty-two points lower.
+        assert rows[2]["win_pct"] == pytest.approx(57.1, abs=0.1)
+        assert rows[2]["gap_points"] == pytest.approx(-32.1, abs=0.2)
+        assert rows[1]["win_pct"] == pytest.approx(28.6, abs=0.1)
+        assert rows[1]["gap_points"] == pytest.approx(21.4, abs=0.2)
+    finally:
+        conn.close()
+
+
+def test_a_losing_first_leg_cannot_touch_the_answer(tmp_path):
+    """Its row is priced by a different first leg, so including it would mix
+    two scales and the normalisation would launder the mistake into something
+    plausible."""
+    from hkrd.query import pools
+    from hkrd.store import upsert
+    from hkrd.store.connect import get_conn, init_db, transaction
+
+    conn = get_conn(tmp_path / "d3.db")
+    init_db(conn)
+    with transaction(conn):
+        upsert.upsert_races(conn, [
+            {"race_date": "2026-09-09", "race_no": n, "venue": "HV"}
+            for n in (1, 2)])
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-09-09", "race_no": 1, "horse_no": n,
+             "horse_name": "FIRST {}".format(n),
+             "place": str(1 if n == 1 else n)} for n in (1, 2)])
+        upsert.upsert_odds_doubles(conn, [
+            {"race_date": "2026-09-09", "leg_no": 1, "race_first": 1,
+             "race_second": 2, "horse_first": f, "horse_second": s,
+             "captured_at": "2026-09-09T13:00:00", "odds": o}
+            # The winner's row is even money across the two; the loser's row
+            # is wildly lopsided and must be ignored entirely.
+            for f, s, o in ((1, 1, 6.0), (1, 2, 6.0),
+                            (2, 1, 2.0), (2, 2, 200.0))])
+    try:
+        got = pools.doubles_after_leg("2026-09-09", 1, conn=conn)
+        assert got["combinations"] == 2
+        assert [r["implied_pct"] for r in got["runners"]] == [50.0, 50.0]
+    finally:
+        conn.close()
+
+
+def test_before_the_first_leg_runs_there_is_nothing_frozen_to_read(tmp_path):
+    """The whole grid is still live, and the reading that applies is the one
+    that weights over the first-leg field."""
+    from hkrd.query import pools
+    from hkrd.store import upsert
+    from hkrd.store.connect import get_conn, init_db, transaction
+
+    conn = get_conn(tmp_path / "d2.db")
+    init_db(conn)
+    with transaction(conn):
+        upsert.upsert_races(conn, [
+            {"race_date": "2026-09-09", "race_no": n, "venue": "HV"}
+            for n in (1, 2)])
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-09-09", "race_no": 1, "horse_no": n,
+             "horse_name": "FIRST {}".format(n)} for n in (1, 2)])
+        upsert.upsert_odds_doubles(conn, [
+            {"race_date": "2026-09-09", "leg_no": 1, "race_first": 1,
+             "race_second": 2, "horse_first": 1, "horse_second": 1,
+             "captured_at": "2026-09-09T12:00:00", "odds": 10.0}])
+    try:
+        got = pools.doubles_after_leg("2026-09-09", 1, conn=conn)
+        assert got["settled"] is False and got["runners"] == []
+        assert "has not been decided" in got["note"]
+    finally:
+        conn.close()

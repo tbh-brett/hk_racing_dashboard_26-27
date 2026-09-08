@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 __all__ = ["get_conn", "transaction", "init_db", "db_path", "Connection",
-           "StoreError"]
+           "StoreError", "CACHE_KIB", "MMAP_BYTES"]
 
 # Layers above store/ need to name a connection in a type hint without
 # importing the driver. They depend on this alias, so the driver stays
@@ -27,6 +27,19 @@ Connection = sqlite3.Connection
 StoreError = sqlite3.Error
 
 _SCHEMA = Path(__file__).with_name("schema.sql")
+
+# How much of the database to keep in memory. Measured rather than picked: the
+# file is 38 MB (9,475 pages of 4 KB) and SQLite's default cache is 2 MB, so a
+# query touching a fifth of the archive re-read most of it from disk every
+# time. The Lookup page's insight panel was the worst of it. The machine has
+# 1 GB and holds numpy, scipy and pandas resident; 64 MB is comfortably inside
+# what is left and comfortably outside the size of the data.
+CACHE_KIB = 64_000
+
+# 256 MB of address space for the memory map, which is a ceiling and not an
+# allocation — SQLite maps up to the size of the file. Room for the archive to
+# grow several times over before this stops covering it.
+MMAP_BYTES = 268_435_456
 
 
 def db_path() -> Path:
@@ -44,6 +57,17 @@ def get_conn(path: str | Path | None = None) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA synchronous = NORMAL")   # WAL makes FULL unnecessary
     conn.execute("PRAGMA busy_timeout = 30000")   # wait out the scraper, don't fail
+    # 64 MB of page cache, against a default of 2 MB and a database of 38 MB.
+    # SQLite's default is sized for a machine that might be running a hundred
+    # of these; this one runs one, on 1 GB, and the whole archive is smaller
+    # than the cache. The negative form is KIBIBYTES rather than pages, so it
+    # does not silently change meaning if the page size ever does.
+    conn.execute(f"PRAGMA cache_size = -{CACHE_KIB}")
+    # Read the file through the page cache the OS already has, instead of
+    # copying every page into the process on the way past. The whole database
+    # fits, so this is the difference between a read costing a memcpy and a
+    # read costing a syscall.
+    conn.execute(f"PRAGMA mmap_size = {MMAP_BYTES}")
     return conn
 
 

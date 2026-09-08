@@ -302,3 +302,78 @@ def test_every_answer_has_the_same_shape(db):
     thin = money.runner_money(DATE, 9, conn=db)
     fat = money.runner_money(DATE, 1, conn=db)
     assert set(thin) - {"note"} == set(fat) - {"note"}
+
+
+# ─── what a price move cannot say ─────────────────────────────────────────────
+
+def test_money_arriving_separates_a_drift_from_being_abandoned(db):
+    """A runner shortens when money arrives on it, and also when money arrives
+    on everything else. The price cannot tell those apart; the pool can.
+
+    Measured on 2026-09-09 HV race 1 between 15:01 and 17:29: $135,507 came
+    into the win pool, runner 5 took the largest single share of it — $16,689 —
+    and its price DRIFTED, because the rest of the field took more. This is
+    that case, built.
+    """
+    with transaction(db):
+        upsert.upsert_odds_snapshots(db, [
+            # Opening: 5 and 6 are both 2.0, half the pool each.
+            {"race_date": DATE, "race_no": 2, "horse_no": 5,
+             "captured_at": CAP, "win_odds": 2.0, "place_odds": None},
+            {"race_date": DATE, "race_no": 2, "horse_no": 6,
+             "captured_at": CAP, "win_odds": 2.0, "place_odds": None},
+            # Later: 5 has drifted to 3.0 — but the pool has tripled.
+            {"race_date": DATE, "race_no": 2, "horse_no": 5,
+             "captured_at": LATER, "win_odds": 3.0, "place_odds": None},
+            {"race_date": DATE, "race_no": 2, "horse_no": 6,
+             "captured_at": LATER, "win_odds": 1.5, "place_odds": None}])
+        upsert.upsert_pool_turnover(db, [
+            {"race_date": DATE, "race_no": 2, "pool": "WIN",
+             "captured_at": CAP, "turnover": 100_000},
+            {"race_date": DATE, "race_no": 2, "pool": "WIN",
+             "captured_at": LATER, "turnover": 300_000}])
+
+    got = money.money_arrived(DATE, 2, conn=db)
+    assert got["observed"] is True and got["arrived"] == 200_000
+    rows = {r["horse_no"]: r for r in got["runners"]}
+    # 5 drifted from 2.0 to 3.0 and its share fell from 50% to 33%...
+    assert rows[5]["share_then_pct"] == 50.0
+    assert rows[5]["share_pct"] == pytest.approx(33.3, abs=0.2)
+    # ...and $50,000 still arrived on it. It was outpaced, not abandoned.
+    assert rows[5]["dollars_then"] == 50_000
+    assert rows[5]["arrived"] == 50_000
+    assert rows[5]["of_new_pct"] == 25.0
+    assert rows[6]["of_new_pct"] == 75.0
+
+
+def test_one_capture_is_a_size_and_two_are_a_rate(db):
+    """A single turnover reading cannot say what arrived, and saying so is
+    different from reporting zero."""
+    _turnover(db, [{"race_date": DATE, "race_no": 1, "pool": "WIN",
+                    "captured_at": CAP, "turnover": 100_000}])
+    got = money.money_arrived(DATE, 1, conn=db)
+    assert got["observed"] is False and got["arrived"] is None
+    assert "not a rate" in got["note"]
+
+
+def test_the_pool_and_the_share_are_read_at_the_same_moment(db):
+    """Today's pool with the morning's share invents money that never arrived.
+
+    Turnover and prices are separate requests a second or two apart, so the
+    pairing is nearest-at-or-before rather than exact — an exact join finds
+    nothing at all.
+    """
+    with transaction(db):
+        upsert.upsert_odds_snapshots(db, [
+            {"race_date": DATE, "race_no": 2, "horse_no": n,
+             "captured_at": "2026-09-09T16:59:30", "win_odds": 4.0,
+             "place_odds": None} for n in (5, 6)])
+        upsert.upsert_pool_turnover(db, [
+            {"race_date": DATE, "race_no": 2, "pool": "WIN",
+             "captured_at": CAP, "turnover": 100_000},
+            {"race_date": DATE, "race_no": 2, "pool": "WIN",
+             "captured_at": LATER, "turnover": 200_000}])
+    got = money.money_arrived(DATE, 2, conn=db)
+    assert got["observed"] is True
+    # The 16:59:30 price is the one at or before the 17:00 turnover.
+    assert all(r["share_then_pct"] == 50.0 for r in got["runners"])

@@ -276,6 +276,79 @@ function gateNote(then, now) {
   return `${then}→${now} ${d > 0 ? `+${d} W` : `${MINUS}${-d} IN`}`;
 }
 
+/* WHAT THE DOUBLE SAID, before it stopped being able to say anything.
+ *
+ * Betting on a double closes when its FIRST race goes off. From that moment
+ * the grid is frozen, and once the first race is decided only the winner's row
+ * can still pay — one price per runner in THIS race, formed from different
+ * money and typically half an hour before this race's own market matured.
+ *
+ * The first leg divides out exactly. A double is the two legs multiplied, so
+ * across the winner's row the first-leg probability is a constant and
+ * normalising removes it; no estimate of the first leg is needed and none is
+ * made. That is the difference between this and the pre-race reading, which
+ * has to weight over a field that has not run.
+ *
+ * Sorted by DISAGREEMENT, because agreement is not news. A runner the frozen
+ * book rated higher than the live market does now is one the market has let go
+ * since — and the frozen book cannot have heard whatever did that. Which of
+ * the two is right is not something this says. */
+function renderDoublesBand() {
+  const host = $('band-doubles');
+  const d = state.card?.doubles;
+  host.replaceChildren();
+  host.hidden = !(d && d.settled && d.runners?.length);
+  if (host.hidden) return;
+
+  const row = el('div', 'band-row');
+  const tag = el('div', 'band-tag');
+  tag.append(el('span', 'dot'));
+  tag.append(document.createTextNode('DOUBLE SAYS'));
+  tag.append(el('span', 'n', `R${d.race_first}→R${d.race_second}`));
+  tag.append(el('span', 'sub',
+    `FROZEN WHEN R${d.race_first} WENT OFF · ${d.combinations} PRICES`));
+  row.append(tag);
+  row.append(el('div', 'band-body'));
+  host.append(row);
+
+  // The biggest gaps either way, not the whole field: a book that agrees with
+  // the market on eleven of fourteen runners is saying nothing about those
+  // eleven, and printing them buries the three.
+  const gaps = d.runners.filter((r) => r.gap_points != null)
+    .sort((a, b) => Math.abs(b.gap_points) - Math.abs(a.gap_points))
+    .slice(0, 6);
+  if (!gaps.length) {
+    host.append(el('div', 'dbl-note',
+      `No live win market on R${d.race_second} to compare against yet.`));
+    return;
+  }
+  const rail = el('div', 'dbl-rail');
+  gaps.forEach((r) => {
+    const card = el('div', `dbl-card ${r.gap_points > 0 ? 'over' : 'under'}`);
+    card.append(el('span', 'no', String(r.horse_no)));
+    const nm = state.card?.runners?.find((x) => x.horse_no === r.horse_no);
+    card.append(el('span', 'nm', nm?.horse_name ?? ''));
+    card.append(el('span', 'v', `${r.implied_pct}%`));
+    card.append(el('span', 'k', 'double'));
+    card.append(el('span', 'v2', r.win_pct == null ? DASH : `${r.win_pct}%`));
+    card.append(el('span', 'k', 'win now'));
+    card.append(el('span', 'g',
+      `${r.gap_points > 0 ? '+' : MINUS}${Math.abs(r.gap_points).toFixed(1)}`));
+    card.title = r.gap_points > 0
+      ? `the double rated it ${r.gap_points.toFixed(1)} points higher than the `
+        + 'win market does now — the market has let it go since the previous '
+        + 'race went off'
+      : `the win market rates it ${Math.abs(r.gap_points).toFixed(1)} points `
+        + 'higher than the frozen double did';
+    rail.append(card);
+  });
+  host.append(rail);
+  host.append(el('div', 'dbl-note',
+    'Shares are normalised across the field on both sides — a double carries '
+    + 'one takeout where two win bets carry two, so the raw prices are not '
+    + 'comparable and these are.'));
+}
+
 function renderH2HBand() {
   const host = $('band-h2h');
   const pairs = state.card?.head_to_head ?? [];
@@ -1120,6 +1193,33 @@ function moneySection(host, r) {
       grid.append(row);
     });
     if (grid.childElementCount) sec.append(grid);
+
+    // AND WHO THE NEW MONEY CAME FOR. A price move says the ratio changed and
+    // cannot say why: a runner shortens when money arrives on it and also when
+    // money arrives on everything else. Measured on 2026-09-09 HV race 1
+    // between 15:01 and 17:29, $135,507 came into the win pool and runner 5
+    // took the largest single share of it — $16,689 — while its price DRIFTED,
+    // because the rest of the field took more. Invisible in the odds.
+    const flow = r.money_flow;
+    if (flow?.arrived != null && flow.of_new_pct != null) {
+      const row = el('div', 'money-row');
+      row.append(el('span', 'p', 'ARRIVED'));
+      row.append(el('span', 'o', ''));
+      row.append(el('span', 'pc', `${flow.of_new_pct}%`));
+      row.append(el('span', 'v', dollars(flow.arrived)));
+      row.title = 'of all the money that came into the win pool since it '
+        + 'opened, this is the share that came for this runner';
+      sec.append(row);
+      const moved = flow.share_pct - (flow.share_then_pct ?? flow.share_pct);
+      if (Math.abs(moved) >= 0.4) {
+        sec.append(el('div', 'money-note', moved < 0
+          ? `Its share fell from ${flow.share_then_pct}% to ${flow.share_pct}% `
+            + `— ${dollars(flow.arrived)} still arrived on it; the rest of the `
+            + 'field simply took more.'
+          : `Its share rose from ${flow.share_then_pct}% to ${flow.share_pct}% `
+            + '— the new money came here faster than it went to the field.'));
+      }
+    }
     // The gap between the two shares, said rather than left to be read off two
     // percentages: it is the whole point of showing them together.
     const w = money.WIN?.share_pct;
@@ -1231,6 +1331,7 @@ function render() {
   renderStrip();
   renderBlackbookBand();
   renderH2HBand();
+  renderDoublesBand();
   renderRaceBar();
   renderHead();
   const rows = sortRunners(state.card?.runners ?? []);

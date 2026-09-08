@@ -24,7 +24,7 @@ from hkrd.derive.probability import devig
 from hkrd.query import (blackbook as bb_q, formguide as fg_q,
                         gear as gear_q, market as market_q,
                         money as money_q, movement as movement_q,
-                        vet as vet_q)
+                        pools as pools_q, vet as vet_q)
 from hkrd.query.race import get_horse_form, get_race, vet_form
 from hkrd.query.types import RaceLine
 
@@ -201,6 +201,15 @@ def build_card(date: str, race_no: int, *,
         by_no = {r["horse_no"]: r for r in cash["runners"]}
         pairs = money_q.pair_money(date, race_no, top=PAIR_MONEY_SHOWN,
                                    conn=conn)
+        # WHO THE NEW MONEY CAME FOR. A price move says the ratio changed and
+        # cannot say why: a runner shortens when money arrives on it and also
+        # when money arrives on everything else. Measured on 2026-09-09 HV race
+        # 1 between 15:01 and 17:29, $135,507 came into the win pool and runner
+        # 5 took the largest single share of it — $16,689 — while its price
+        # DRIFTED, because the rest of the field took more. That distinction is
+        # invisible in the odds.
+        flow = {r["horse_no"]: r for r in
+                money_q.money_arrived(date, race_no, conn=conn)["runners"]}
 
         runners: list[dict[str, Any]] = []
         for r in race.runners:
@@ -236,6 +245,7 @@ def build_card(date: str, race_no: int, *,
                 "movement": moves.get(r.horse_no),
                 "gear_change": gear.get(r.horse_name),
                 "money": (by_no.get(r.horse_no) or {}).get("pools"),
+                "money_flow": flow.get(r.horse_no),
                 "vet": vet.get(r.horse_name, []),
                 "vet_form": vet_recent.get(r.horse_name, []),
                 # Negative means the model likes it more than the market does.
@@ -273,6 +283,14 @@ def build_card(date: str, race_no: int, *,
                            "captured_at": cash["turnover_captured_at"],
                            "pairs": pairs["pairs"],
                            "pairs_priced": pairs["priced"]},
+            # THE PREVIOUS RACE'S DOUBLE, once that race has been decided.
+            # Betting on a double shuts when its FIRST race goes off, so from
+            # that moment the grid is frozen — and the winner's row in it is a
+            # complete, settled book on THIS race, formed from different money
+            # and half an hour earlier than anything in this race's own pool.
+            # The first leg divides out exactly, so no estimate of it is made.
+            "doubles": (pools_q.doubles_after_leg(date, race_no - 1, conn=conn)
+                        if race_no > 1 else None),
             "blackbook": [
                 {**{k: v for k, v in b.items() if k != "tag_csv"},
                  "tags": sorted((b["tag_csv"] or "").split(","))

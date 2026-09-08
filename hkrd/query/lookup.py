@@ -116,6 +116,15 @@ _FIELD_CLAUSES: dict[str, str] = {
 _RACE_WAS_RUN = ("EXISTS (SELECT 1 FROM runners f WHERE f.race_date = r.race_date"
                  " AND f.race_no = r.race_no AND f.place IS NOT NULL)")
 
+# Field size and the race's book, once per race. Both are constant within a
+# race and both were being recomputed per row — see `insight`.
+_FIELD_CTE = """
+WITH field AS (
+  SELECT race_date, race_no, count(*) AS field_size,
+         sum(CASE WHEN win_odds > 0 THEN 1.0 / win_odds END) AS book
+  FROM runners GROUP BY race_date, race_no
+)"""
+
 _UPPER = {"horse", "venue", "course"}
 
 
@@ -309,14 +318,20 @@ def insight(*, source: str = "race", conn: Connection | None = None,
     conn = conn or get_conn()
     try:
         where, params = _where(filters)
-        placed = ("r.place <= (CASE WHEN (SELECT count(*) FROM runners f "
-                  " WHERE f.race_date = r.race_date AND f.race_no = r.race_no) >= 7"
-                  " THEN 3 ELSE 2 END)")
-        book = ("(SELECT sum(1.0 / f.win_odds) FROM runners f "
-                " WHERE f.race_date = r.race_date AND f.race_no = r.race_no "
-                "   AND f.win_odds > 0)")
+        # ONE PASS OVER THE FIELD, not one per row per use.
+        #
+        # These two were correlated subqueries in the SELECT list, and `book`
+        # appeared in it twice — so an unfiltered insight ran ~43,000 scans of
+        # a race's runners to answer a question about 21,493 rows, and the
+        # panel took 650 ms. Grouped once into a CTE and joined, it is a single
+        # pass, and it is the same arithmetic: SQLite is not able to notice
+        # that a correlated subquery is constant within a race, and there is no
+        # reason to make it try.
+        placed = "r.place <= (CASE WHEN fld.field_size >= 7 THEN 3 ELSE 2 END)"
+        book = "fld.book"
 
         row = conn.execute(f"""
+            {_FIELD_CTE}
             SELECT count(*) runs,
                    sum(CASE WHEN r.place = 1 THEN 1 ELSE 0 END) wins,
                    sum(CASE WHEN {placed} THEN 1 ELSE 0 END) places,
@@ -328,6 +343,8 @@ def insight(*, source: str = "race", conn: Connection | None = None,
                    count(DISTINCT r.race_date || r.race_no) races
             FROM runners r
             JOIN races a ON a.race_date = r.race_date AND a.race_no = r.race_no
+            JOIN field fld ON fld.race_date = r.race_date
+                          AND fld.race_no = r.race_no
             LEFT JOIN runner_et e   USING (race_date, race_no, horse_no)
             LEFT JOIN runner_pace p USING (race_date, race_no, horse_no)
             LEFT JOIN runner_sarr s USING (race_date, race_no, horse_no)
@@ -336,11 +353,14 @@ def insight(*, source: str = "race", conn: Connection | None = None,
 
         runs = row["runs"] or 0
         by_style = [dict(r) for r in conn.execute(f"""
+            {_FIELD_CTE}
             SELECT p.pace_style style, count(*) runs,
                    sum(CASE WHEN r.place = 1 THEN 1 ELSE 0 END) wins,
                    sum(CASE WHEN {placed} THEN 1 ELSE 0 END) places
             FROM runners r
             JOIN races a ON a.race_date = r.race_date AND a.race_no = r.race_no
+            JOIN field fld ON fld.race_date = r.race_date
+                          AND fld.race_no = r.race_no
             LEFT JOIN runner_et e   USING (race_date, race_no, horse_no)
             LEFT JOIN runner_pace p USING (race_date, race_no, horse_no)
             LEFT JOIN runner_sarr s USING (race_date, race_no, horse_no)
