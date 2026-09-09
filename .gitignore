@@ -13,6 +13,12 @@ __pycache__/
 # Data stores. The old repo committed these and its .git reached 229 MB.
 # The database is rebuildable from scrape; it does not belong in git.
 *.db
+# SQLite's sidecars do not match `*.db` and have been committed by accident —
+# a WAL is 3 MB of the same data the rule above exists to keep out, and the
+# reason that rule exists is that the old repo's .git reached 229 MB.
+*.db-wal
+*.db-shm
+*.db-journal
 *.sqlite
 *.sqlite3
 *.xlsx
