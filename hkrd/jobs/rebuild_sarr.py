@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from hkrd.derive import draw as draw_d
+from hkrd.derive import draw as draw_d, tags as tags_d
 from hkrd.model import sarr
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
@@ -53,6 +53,29 @@ ORDER BY r.race_date, r.race_no, r.horse_no
 """
 
 
+# Which prior runs were compromised, in one vocabulary, from the two records
+# that hold the fact. Neither alone is enough: the tags cover the archive but
+# only see what the stewards wrote about the run, and the vet page names the
+# finding but is scraped per meeting. `record_date` is when the finding was
+# made, which is the day of the run it belongs to, so the join lands it on that
+# run -- and the flag is therefore known from that day on, which is what keeps
+# the walk-forward rule intact. `passed_date` is deliberately not read: it is a
+# fact about a later day, and a run must be scored on what was knowable then.
+VET_SQL = """
+SELECT race_date, race_no, horse_no, category FROM (
+    SELECT t.race_date, t.race_no, t.horse_no, t.tag AS category
+      FROM runner_tags t
+     WHERE t.tag IN (%s)
+    UNION ALL
+    SELECT r.race_date, r.race_no, r.horse_no, v.category
+      FROM vet_records v
+      JOIN runners r ON r.horse_name = v.horse_name
+                    AND r.race_date  = v.record_date
+     WHERE v.category IS NOT NULL
+)
+"""
+
+
 @dataclass
 class SarrReport:
     runs_loaded: int = 0
@@ -62,6 +85,8 @@ class SarrReport:
     skipped_no_history: int = 0
     skipped_no_distance: int = 0
     scored_without_draw: int = 0
+    vet_flagged_runs: int = 0
+    profiles_with_vet_run: int = 0
     errors: list[str] = field(default_factory=list)
 
     def render(self) -> str:
@@ -73,11 +98,43 @@ class SarrReport:
             f"  skipped, no prior history {self.skipped_no_history:>7,}",
             f"  skipped, no distance      {self.skipped_no_distance:>7,}",
             f"  scored, but no gate       {self.scored_without_draw:>7,}",
+            f"  prior runs vet-flagged    {self.vet_flagged_runs:>7,}",
+            f"  profiles using one        {self.profiles_with_vet_run:>7,}",
         ]
         if self.errors:
             lines.append(f"  ERRORS             {len(self.errors):>7,}")
             lines += [f"    {e}" for e in self.errors[:10]]
         return "\n".join(lines)
+
+
+def _vet_flags(conn, runs: pd.DataFrame) -> pd.Series:
+    """One category per run that carried a veterinary finding, else None.
+
+    Where both records name the same run they are reconciled by taking the
+    FIRST match, which is arbitrary and allowed to be: the trust factor is one
+    number for every category today, so the choice cannot change a score. It
+    will matter on the day the categories separate, and the fit that separates
+    them is the thing that gets to decide how.
+    """
+    vet_tags = sorted(tags_d.VET_TAGS)
+    flags = pd.read_sql(VET_SQL % ",".join("?" * len(vet_tags)),
+                        conn, params=vet_tags)
+    if flags.empty:
+        return pd.Series([None] * len(runs), index=runs.index, dtype=object)
+    flags["category"] = flags["category"].map(
+        lambda c: tags_d.VET_CATEGORY.get(c, c))
+    lookup = (flags.drop_duplicates(subset=["race_date", "race_no", "horse_no"])
+                   .set_index(["race_date", "race_no", "horse_no"])["category"])
+    keys = pd.MultiIndex.from_arrays(
+        [runs["race_date"], runs["race_no"], runs["horse_no"]])
+    got = lookup.reindex(keys).to_numpy()
+    # reindex fills misses with NaN, and NaN is TRUTHY. Left alone it reaches
+    # `vet_trust` as the string "NAN", misses the table, and takes the
+    # unrecognised-category branch -- which would discount every clean run in
+    # the archive to 0.21 while every counter and every log line still read
+    # normally. None is the only value that means "no finding".
+    return pd.Series([None if pd.isna(c) else c for c in got],
+                     index=runs.index, dtype=object)
 
 
 def rebuild(db: Path | None = None, *, min_prior: int = 2,
@@ -93,6 +150,8 @@ def rebuild(db: Path | None = None, *, min_prior: int = 2,
             return report
 
         runs = sarr.annotate_runs(raw)
+        runs["vet_category"] = _vet_flags(conn, runs)
+        report.vet_flagged_runs = int(runs["vet_category"].notna().sum())
         targets = (pd.read_sql(CARD_SQL, conn, params=(date,))
                    if date else runs)
 
@@ -150,6 +209,8 @@ def rebuild(db: Path | None = None, *, min_prior: int = 2,
                 if profile is None:
                     report.skipped_no_history += 1
                     continue
+                if any(r.get("vet_category") for r in prior[:sarr.MAX_PRIOR_RUNS]):
+                    report.profiles_with_vet_run += 1
                 ds = (0.0 if dtable is None else draw_d.draw_score(
                     rec["draw"], field_size, rec["venue"], rec["distance"], dtable))
                 if dtable is not None and pd.isna(rec["draw"]):

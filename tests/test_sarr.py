@@ -211,3 +211,110 @@ def test_empty_database_reports_rather_than_crashing(tmp_path):
     conn.close()
     report = rebuild_sarr.rebuild(db)
     assert report.rows_written == 0 and report.errors
+
+
+# ── a run a vet found something on is weaker evidence ────────────────────────
+
+def test_a_clean_run_keeps_full_trust():
+    """The default has to be 1.0 or every profile in the archive quietly
+    shrinks. `None` is the only value that means "nothing was found"."""
+    assert sarr.vet_trust(None) == 1.0
+    assert sarr.vet_trust("") == 1.0
+
+
+def test_an_unknown_category_is_treated_as_a_finding_not_as_clean():
+    """HKJC's vocabulary grows without asking us. A word we have not seen
+    before describes an injury we have not seen before, and must not restore
+    full trust to the run it appears on."""
+    assert sarr.vet_trust("SOMETHING NEW") == sarr.VET_TRUST_POOLED
+    assert sarr.vet_trust("cardiac") == sarr.vet_trust("CARDIAC")
+
+
+def test_every_category_is_discounted():
+    assert all(0.0 < v < 1.0 for v in sarr.VET_TRUST.values())
+
+
+def test_a_flagged_run_moves_the_profile_less_than_a_clean_one():
+    """The whole mechanism in one assertion: same catastrophic run, once as
+    evidence and once as a finding, and the finding must weigh less."""
+    good = [{"fmrp": -1.0, "late_dev": 0.0, "early_dev": 0.0, "ssi": 0.0,
+             "style": "On-Pace", "rating": 60, "place": 1, "distance": 1200,
+             "venue": "HV", "surface": "Turf", "going": "G"} for _ in range(3)]
+    bad = dict(good[0], fmrp=3.4, place=12)
+    clean = sarr.build_profile([bad, *good], 1200, "HV", "Turf", "G")
+    flagged = sarr.build_profile([dict(bad, vet_category="CARDIAC"), *good],
+                                 1200, "HV", "Turf", "G")
+    assert flagged["fmrp"] < clean["fmrp"]
+    # ... and still worse than if the run had never happened, because the
+    # weight is a discount and not a delete.
+    assert flagged["fmrp"] > sarr.build_profile(good, 1200, "HV", "Turf", "G")["fmrp"]
+
+
+def test_a_flagged_run_is_kept_out_of_the_trajectory_line():
+    """A weighted mean dilutes a bad point; a regression lets it lever the
+    answer. TYCOON RESOURCES into 2026-09-09 was three wins and a cardiac
+    finding, and the slope through all four called it the most steeply
+    deteriorating horse in the race."""
+    runs = [{"fmrp": v, "late_dev": 0.0, "early_dev": 0.0, "ssi": 0.0,
+             "style": "On-Pace", "rating": 60, "place": 1, "distance": 1200,
+             "venue": "HV", "surface": "Turf", "going": "G"}
+            for v in (3.4, -0.65, -0.80, -1.17)]
+    through_all = sarr.build_profile(runs, 1200, "HV", "Turf", "G")["traj"]
+    runs[0]["vet_category"] = "CARDIAC"
+    flagged = sarr.build_profile(runs, 1200, "HV", "Turf", "G")["traj"]
+    without = sarr.build_profile(runs[1:], 1200, "HV", "Turf", "G")["traj"]
+
+    # The flagged point is not on the line at all -- exactly as if the run had
+    # not happened. That is stricter than "less steep" and is the property the
+    # term needs: a slope has no way to half-count a point.
+    assert flagged == pytest.approx(without)
+    # And it was doing most of the work before: the three clean runs do decline
+    # mildly, and the model still says so rather than calling the horse sound.
+    assert through_all < flagged < 0
+    assert abs(through_all) > 4 * abs(flagged)
+
+
+def test_vet_flags_are_none_not_nan_for_a_clean_run(tmp_path):
+    """NaN is truthy. Left in place it reaches `vet_trust` as the string "NAN",
+    misses the table and takes the unrecognised-category branch, discounting
+    every clean run in the archive to 0.21 while every counter and log line
+    still reads normally. This is the assertion that catches that."""
+    db = tmp_path / "t.db"
+    _seed(db)
+    conn = get_conn(db)
+    from hkrd.jobs.rebuild_sarr import RUNS_SQL, _vet_flags
+    import pandas as pd
+    runs = sarr.annotate_runs(pd.read_sql(RUNS_SQL, conn))
+    flags = _vet_flags(conn, runs)
+    conn.close()
+    assert flags.isna().all()
+    assert all(f is None for f in flags)
+    assert all(sarr.vet_trust(f) == 1.0 for f in flags)
+
+
+def test_a_vet_record_discounts_the_run_it_was_made_on(tmp_path):
+    """End to end through the job: the finding lives on a different HKJC page
+    from the run, joined on the date it was made."""
+    db = tmp_path / "t.db"
+    _seed(db)
+    conn = get_conn(db)
+    target = conn.execute("SELECT max(race_date) FROM races").fetchone()[0]
+    flagged = conn.execute(
+        "SELECT race_date FROM races WHERE race_date < ? "
+        "ORDER BY race_date DESC LIMIT 1", (target,)).fetchone()[0]
+    conn.close()
+    before = rebuild_sarr.rebuild(db)
+    assert before.vet_flagged_runs == 0 and before.profiles_with_vet_run == 0
+
+    conn = get_conn(db)
+    with transaction(conn):
+        upsert.upsert_vet_records(conn, [{
+            "race_date": target, "race_no": 1, "horse_no": 1,
+            "horse_name": "HORSE 0", "record_date": flagged,
+            "detail": "Heart irregularity noted after racing.",
+            "passed_date": None, "category": "CARDIAC"}])
+    conn.close()
+    after = rebuild_sarr.rebuild(db)
+    assert after.vet_flagged_runs == 1
+    assert after.profiles_with_vet_run > 0
+    assert after.rows_written == before.rows_written  # a discount, not a drop

@@ -31,6 +31,69 @@ MAX_PRIOR_RUNS = 15
 GOING_BAND_MIN_N = 3
 LAST_STYLE_BOOST = 3.0
 
+# How much of a run's evidence survives a veterinary finding made on it.
+#
+# Every other weight here scales a run by how much it RESEMBLES today's race --
+# how recent, how close in distance, same venue, same surface. This one scales
+# it by whether the run measured the horse at all. A horse found afterwards to
+# have been wrong did not run slowly; it stopped, and its time is a measurement
+# of the finding rather than of the animal.
+#
+# Fitted, not asserted, and fitted against the only question that matters for a
+# weight: how much does this run tell you about the NEXT one. Regressing a run's
+# fmrp on the horse's following fmrp over 9,431 consecutive pairs inside the
+# window where the tag scrape actually ran:
+#
+#   clean      n=9,157   slope +0.322 (se 0.013)
+#   flagged    n=  274   slope +0.069 (se 0.030)
+#   interaction term  -0.2532 (se 0.0320), t -7.90, p 2.7e-15
+#
+# so a flagged run carries about a fifth of the signal a clean one does.
+#
+# SEVERITY IS NOT SEPARABLE YET, and the table says so by holding one number.
+# Split by category the fits are CARDIAC 1.20 (n=19), RESPIRATORY 0.15 (n=192),
+# PHYSICAL 0.79 (n=41), PERFORMANCE 0.81 (n=21); every one of them sits within
+# 1.4 standard errors of the pooled figure and CARDIAC's 95% interval is
+# [-0.34, +2.74], which contains every value anyone might propose. Only
+# RESPIRATORY is measured tightly enough to matter and it does not differ from
+# the pool. Grading these by hand would be inventing four numbers to replace one
+# that was measured, so the keys exist and hold the pooled value until the
+# samples separate. `vet_records` gains a meeting every time a card is scraped;
+# CARDIAC needs roughly 150 pairs to resolve a difference of the size the point
+# estimate hints at, against 19 today.
+#
+# What it cannot see, and no version of it will: whether the horse was eased
+# once the rider felt something, or pushed to the line by a rider who felt
+# nothing. Those two produce very different times from the same injury, and the
+# record says only that a finding was made. The factor is an average over both.
+# Above this a run still anchors the trajectory line. At the pooled 0.21 every
+# flagged run is excluded, which is the intent; it is a threshold rather than a
+# literal `is None` so that a future category fitted near 1.0 keeps its place in
+# the slope without a second edit here.
+TRAJ_MIN_TRUST = 0.5
+
+VET_TRUST_POOLED = 0.21
+VET_TRUST: dict[str, float] = {
+    "BARRED": VET_TRUST_POOLED,
+    "CARDIAC": VET_TRUST_POOLED,
+    "RESPIRATORY": VET_TRUST_POOLED,
+    "PHYSICAL": VET_TRUST_POOLED,
+    "PERFORMANCE": VET_TRUST_POOLED,
+    "UNKNOWN": VET_TRUST_POOLED,
+}
+
+
+def vet_trust(category: str | None) -> float:
+    """Weight multiplier for a run carrying `category`; 1.0 for a clean run.
+
+    An unrecognised category is treated as a finding rather than as clean. The
+    vocabulary comes from HKJC and grows without asking us, and a new word for
+    an injury must not silently restore full trust to the run it describes.
+    """
+    if not category:
+        return 1.0
+    return VET_TRUST.get(str(category).strip().upper(), VET_TRUST_POOLED)
+
 # SECTION_LENGTHS and classify_style now come from derive/pace, which is the
 # canonical definition after decision A2. Verified identical to the copies
 # this module carried before they were removed -- same nine distances, same
@@ -169,6 +232,7 @@ def build_profile(runs: list[dict], today_dist, today_venue,
             w *= 0.60
         if run.get("surface") and today_surface and run["surface"] != today_surface:
             w *= 0.50
+        w *= vet_trust(run.get("vet_category"))
         weights.append(max(w, 0.01))
     weights = np.array(weights)
 
@@ -195,7 +259,17 @@ def build_profile(runs: list[dict], today_dist, today_venue,
     rating = next((r["rating"] for r in runs
                    if not pd.isna(r.get("rating", np.nan))), np.nan)
 
-    fr = [r.get("fmrp", np.nan) for r in runs[:5]]
+    # The trajectory reads the five most recent runs that MEASURED the horse.
+    # A slope is a line through points and one corrupted point rotates the whole
+    # line, which is worse than the weighted means: those dilute a bad run, a
+    # regression lets it lever the answer. TYCOON RESOURCES into 2026-09-09 is
+    # the case -- four runs, three wins and a cardiac finding on the fourth, and
+    # the slope through all four made it the most steeply DETERIORATING horse in
+    # the race. Dropping the flagged run and refitting on what is left says the
+    # opposite. Where that leaves fewer than three points the term is 0.0, which
+    # is what it already did for a horse with a short record.
+    fr = [r.get("fmrp", np.nan) for r in runs
+          if vet_trust(r.get("vet_category")) >= TRAJ_MIN_TRUST][:5]
     fr = [v for v in fr if not pd.isna(v)]
     slope = stats.linregress(np.arange(len(fr)), fr).slope if len(fr) >= 3 else 0.0
 

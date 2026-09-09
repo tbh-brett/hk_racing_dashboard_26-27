@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from typing import Any
 
 __all__ = ["DERIVE_VERSION", "Tag", "TAG_RULES", "NAMED_VET", "VET_TAGS",
-           "tag_comment", "tag_rows"]
+           "VET_CATEGORY", "tag_comment", "tag_rows"]
 
 DERIVE_VERSION = "tags-1.0"
 
@@ -114,6 +114,31 @@ VET_TAGS = frozenset({"bled", "roarer", "lame_fore", "lame_hind",
 
 NAMED_VET = frozenset({"bled", "roarer", "lame_fore", "lame_hind",
                        "arrhythmia", "mucus", "barred"})
+
+#: A tag, expressed in the vocabulary HKJC's own veterinary page uses.
+#:
+#: There are two independent records of the same fact and they do not overlap:
+#: the stewards' text, which these tags parse and which covers the archive, and
+#: the veterinary page in `vet_records`, which is scraped per meeting. Measured
+#: on the current database, 60 of the 100 vet-page findings that land on an
+#: archived run carry NO vet tag, because the stewards wrote about the run and
+#: not about the horse. TYCOON RESOURCES on 2026-07-01 is one of them: the
+#: comment says "dropped away quickly in home straight" and the cardiac finding
+#: is only on the vet page.
+#:
+#: So anything reading "was this run compromised" has to read both, and the two
+#: must answer in one vocabulary rather than two. This is that mapping; the vet
+#: page's own categories pass through unchanged.
+VET_CATEGORY: dict[str, str] = {
+    "arrhythmia": "CARDIAC",
+    "bled": "RESPIRATORY",
+    "roarer": "RESPIRATORY",
+    "mucus": "RESPIRATORY",
+    "lame_fore": "PHYSICAL",
+    "lame_hind": "PHYSICAL",
+    "barred": "BARRED",
+    "vet_finding": "UNKNOWN",
+}
 
 
 def tag_comment(text: str | None) -> tuple[Tag, ...]:
