@@ -27,7 +27,7 @@ from hkrd.ingest._client import FetchError, fetch_html, urls
 __all__ = ["ResultsError", "parse_race_header", "parse_results_table",
            "parse_sectional_table", "parse_sectional_page",
            "parse_incident_report", "fetch_sectionals",
-           "fetch_race", "fetch_meeting"]
+           "fetch_race", "fetch_meeting", "meeting_venue"]
 
 
 class ResultsError(ValueError):
@@ -49,7 +49,14 @@ _COLUMNS: dict[str, tuple[str, ...]] = {
     "trainer": ("trainer",),
     "actual_weight": ("act. wt", "actual wt", "act wt"),
     "declared_weight": ("declar", "decl. horse wt", "horse wt"),
-    "draw": ("draw",),
+    # HKJC's header is "Dr.", not "Draw", and has been on every results page
+    # in the archive. With only the long alias the column never mapped and the
+    # draw was dropped from EVERY results scrape -- unnoticed because the
+    # racecard supplies it too and covers 99.3% of the archive. It stops
+    # covering anything the moment you look at an older meeting: HKJC keeps
+    # results far longer than cards, so a backfilled season arrives with the
+    # draw column empty and the draw term silently switched off for it.
+    "draw": ("draw", "dr."),
     "lbw": ("lbw", "margin"),
     "running_position": ("running position", "position"),
     "finish_time": ("finish time", "time"),
@@ -376,6 +383,39 @@ def fetch_race(date: str, venue: str, race_no: int, *, session=None) -> dict[str
             # rather than merged into them: it is a different fact with a
             # different source, and `runner_comments` stores it as one.
             "incidents": parse_incident_report(html, source=source)}
+
+
+# Sha Tin or Happy Valley, as the page writes them.
+_VENUE_ON_PAGE = (("Sha Tin", "ST"), ("Happy Valley", "HV"))
+
+
+def meeting_venue(date: str, *, session=None) -> str | None:
+    """Which course raced on `date`, or None if nothing did.
+
+    ASKED WITHOUT A COURSE, HKJC ANSWERS WITH THE ONE THAT RACED. That is the
+    whole trick behind backfilling: the results page needs a `Racecourse` to
+    return a race, but omitting it makes the site pick the meeting that
+    actually happened and name the course in the body. So one request settles
+    both "did they race" and "where", instead of two probes per candidate day.
+
+    A day with no meeting returns the same "No information." page a wrong
+    course does, which is why this reads the venue out of the body rather than
+    trusting the status code -- HKJC serves 200 for both.
+
+    The date picker on the page is populated by JavaScript, so there is no
+    calendar to read and nothing here needs a browser to find one.
+    """
+    try:
+        html = fetch_html(urls.localresults,
+                          {"racedate": date, "RaceNo": "1"}, session=session)
+    except FetchError:
+        return None
+    if "No information" in html:
+        return None
+    for label, code in _VENUE_ON_PAGE:
+        if label in html:
+            return code
+    return None
 
 
 def fetch_meeting(date: str, venue: str, *, max_races: int = 11,
