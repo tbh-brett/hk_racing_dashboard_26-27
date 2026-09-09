@@ -306,7 +306,9 @@ function renderDoublesBand() {
   tag.append(document.createTextNode('DOUBLE SAYS'));
   tag.append(el('span', 'n', `R${d.race_first}→R${d.race_second}`));
   tag.append(el('span', 'sub',
-    `FROZEN WHEN R${d.race_first} WENT OFF · ${d.combinations} PRICES`));
+    `FROZEN ${d.froze_at ? String(d.froze_at).slice(11, 16) + ' ' : ''}`
+    + `WHEN R${d.race_first} WENT OFF · ${d.combinations} PRICES`
+    + (d.opened_at ? ` · OPEN FROM ${String(d.opened_at).slice(11, 16)}` : '')));
   row.append(tag);
   row.append(el('div', 'band-body'));
   host.append(row);
@@ -334,6 +336,17 @@ function renderDoublesBand() {
     card.append(el('span', 'k', 'win now'));
     card.append(el('span', 'g',
       `${r.gap_points > 0 ? '+' : MINUS}${Math.abs(r.gap_points).toFixed(1)}`));
+    // HOW THE DOUBLE ITSELF MOVED before it was cut off. The level says what
+    // the doubles crowd thought; this says which way they were going when the
+    // first race stopped them, and it is the only market on the page that can
+    // never revise itself afterwards.
+    if (r.moved_points != null && Math.abs(r.moved_points) >= 0.5) {
+      const m = el('span', `mv2 ${r.moved_points < 0 ? 'mv-shortened' : 'mv-drifted'}`,
+        `${r.moved_points > 0 ? '+' : MINUS}${Math.abs(r.moved_points).toFixed(1)} on the day`);
+      m.title = `the double had it at ${r.open_pct}% at 00:00 and `
+        + `${r.implied_pct}% when it froze`;
+      card.append(m);
+    }
     card.title = r.gap_points > 0
       ? `the double rated it ${r.gap_points.toFixed(1)} points higher than the `
         + 'win market does now — the market has let it go since the previous '
@@ -344,7 +357,9 @@ function renderDoublesBand() {
   });
   host.append(rail);
   host.append(el('div', 'dbl-note',
-    'Shares are normalised across the field on both sides — a double carries '
+    'A double stops accepting bets when its first race goes off, so this book '
+    + 'is final — it is the only market here that can never revise itself. '
+    + 'Shares are normalised across the field on both sides — a double carries '
     + 'one takeout where two win bets carry two, so the raw prices are not '
     + 'comparable and these are.'));
 }

@@ -37,7 +37,7 @@ from hkrd.derive.probability import (
     devig, market_pair_probability, market_place_probability, pair_hits,
     pair_probability, place_probability,
 )
-from hkrd.query.market import latest_prices
+from hkrd.query.market import day_start, latest_prices
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["place_probabilities", "ranked_pairs", "pair_probabilities",
@@ -308,6 +308,27 @@ def doubles_conditional(date: str, leg_no: int, *,
             conn.close()
 
 
+def _book_from(conn: Connection, date: str, leg_no: int, captured_at: str,
+               winners: list[int]) -> dict[int, float]:
+    """The winner's row at one capture, normalised into a book on the second leg.
+
+    A dead heat pays both first legs, so both rows are real books on the same
+    race and are averaged with equal weight. Choosing one would be a claim
+    about which half of a shared result to believe.
+    """
+    raw: dict[int, list[float]] = {}
+    for r in conn.execute(
+            "SELECT horse_first, horse_second, odds FROM odds_doubles "
+            "WHERE race_date = ? AND leg_no = ? AND captured_at = ? "
+            "  AND odds IS NOT NULL AND odds > 0",
+            (date, leg_no, captured_at)):
+        if r["horse_first"] in winners:
+            raw.setdefault(r["horse_second"], []).append(1.0 / r["odds"])
+    implied = {h: sum(v) / len(v) for h, v in raw.items() if v}
+    total = sum(implied.values())
+    return {h: v / total for h, v in implied.items()} if total else {}
+
+
 def doubles_after_leg(date: str, leg_no: int, *,
                       conn: Connection | None = None) -> dict[str, Any]:
     """The second leg's market, as the doubles pool left it when betting shut.
@@ -373,15 +394,24 @@ def doubles_after_leg(date: str, leg_no: int, *,
             return {**blank, "settled": True, "winners": winners,
                     "note": "no priced combination on the winning first leg"}
 
-        raw: dict[int, list[float]] = {}
-        for r in live:
-            if r["odds"] > 0:
-                raw.setdefault(r["horse_second"], []).append(1.0 / r["odds"])
-        implied = {h: sum(v) / len(v) for h, v in raw.items() if v}
-        total = sum(implied.values())
-        if not total:
+        book = _book_from(conn, date, leg_no, head["at"], winners)
+        if not book:
             return {**blank, "settled": True, "winners": winners,
                     "note": "no positive prices on the winning first leg"}
+
+        # WHERE THE DOUBLE STARTED THE DAY, so the frozen book can be read as
+        # a move rather than only as a level. The double stops accepting bets
+        # when the first race goes off, so this is the whole of its life: from
+        # midnight to the moment it was cut off. It cannot move again, which
+        # is what makes the comparison against a still-moving win market worth
+        # anything.
+        opened_at = conn.execute(
+            "SELECT min(captured_at) FROM odds_doubles "
+            "WHERE race_date = ? AND leg_no = ? AND captured_at >= ? "
+            "  AND odds IS NOT NULL",
+            (date, leg_no, day_start(date))).fetchone()[0]
+        opening = (_book_from(conn, date, leg_no, opened_at, winners)
+                   if opened_at and opened_at != head["at"] else {})
 
         # The second leg's OWN market, for the comparison this exists to make.
         live_prices = {p["horse_no"]: p["win_odds"]
@@ -393,8 +423,9 @@ def doubles_after_leg(date: str, leg_no: int, *,
             win_share = dict(zip(nos, devig([live_prices[n] for n in nos])))
 
         runners = []
-        for horse_no, value in sorted(implied.items(), key=lambda kv: -kv[1]):
-            pct = 100 * value / total
+        for horse_no, value in sorted(book.items(), key=lambda kv: -kv[1]):
+            pct = 100 * value
+            was = opening.get(horse_no)
             now = win_share.get(horse_no)
             runners.append({
                 "horse_no": horse_no,
@@ -410,9 +441,21 @@ def doubles_after_leg(date: str, leg_no: int, *,
                 # go since the previous race went off.
                 "gap_points": (round(pct - 100 * now, 1)
                                if now is not None else None),
+                # HOW THE DOUBLE ITSELF MOVED, over the whole of its life —
+                # midnight to the moment the first race shut it. A level says
+                # what the doubles crowd thought; this says which way they were
+                # going when they were stopped.
+                "open_pct": round(100 * was, 1) if was is not None else None,
+                "moved_points": (round(pct - 100 * was, 1)
+                                 if was is not None else None),
             })
         return {**blank, "settled": True, "winners": winners,
                 "combinations": len(live), "runners": runners,
+                # When it opened and when it stopped, because the second is
+                # the fact that makes this market different from every other
+                # one on the page.
+                "opened_at": opened_at,
+                "froze_at": head["at"],
                 "note": ("frozen when race "
                          f"{first_race} went off; the second leg's own market "
                          f"has kept taking money since")}
