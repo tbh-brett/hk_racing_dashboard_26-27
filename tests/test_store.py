@@ -293,3 +293,22 @@ def test_transaction_rolls_back_on_failure(conn):
             upsert.upsert_runners(conn, [{**RUNNERS[0], "horse_no": 11,
                                           "lengths_behind": "banana"}])
     assert _count(conn, "runners") == 0
+
+
+def test_an_amended_result_marker_is_not_a_margin():
+    """2022-01-09 ST race 2: the stewards reversed the placings on a protest.
+    METRO WARRIOR is placed first with "-SH" -- a short head behind the horse
+    that crossed the line first -- on a slower time than the horse below it.
+    That is not lengths behind the winner, and it is not zero.
+
+    Raising on it cost the entire meeting: eleven races and 130 runners
+    dropped over one cell, during the archive backfill."""
+    assert coerce.parse_lbw("-SH") is None
+    assert coerce.parse_lbw("-HD") is None
+    assert coerce.parse_lbw("-NK") is None
+    # the plain codes still carry their margin, and the winner marker still reads
+    assert coerce.parse_lbw("SH") == 0.10
+    assert coerce.parse_lbw("---") is None
+    # and something genuinely unreadable must still be loud
+    with pytest.raises(coerce.CoerceError):
+        coerce.parse_lbw("-WHAT")

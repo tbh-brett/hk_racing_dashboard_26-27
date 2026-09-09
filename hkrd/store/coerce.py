@@ -77,6 +77,26 @@ def parse_lbw(token: object) -> float | None:
     if upper in _MARGIN_CODES:
         return _MARGIN_CODES[upper]
 
+    # A DASH IN FRONT OF A MARGIN IS AN AMENDED RESULT, not a margin.
+    # 2022-01-09 ST race 2: METRO WARRIOR is placed FIRST with "-SH", a slower
+    # time than the horse below it (0:56.34 against 0:56.33) and a running
+    # position of 2 at the last call, while ALCARI in second carries the "---"
+    # that every other winner on the card carries. The stewards reversed the
+    # placings on a protest; HKJC amended the Pla. column and left the
+    # on-track markers alone, so the official winner's cell reads "a short head
+    # behind the horse that crossed first".
+    #
+    # That is not lengths-behind-the-winner, which is the only thing this
+    # column means, and it is not zero either. It is recorded as unknown the
+    # same way ML and DIST are -- a real margin with nowhere truthful to go --
+    # rather than invented as 0.10, which would put a beaten margin on a horse
+    # that officially won and break the invariant every reader of this column
+    # relies on. Raising instead cost the whole meeting: eleven races and 130
+    # runners were dropped over one cell, which is precisely the "a missing
+    # minor input must never void a whole result" rule.
+    if upper.startswith("-") and upper.lstrip("-") in _MARGIN_CODES:
+        return None
+
     if m := _MIXED.match(s):
         whole, num, den = (int(g) for g in m.groups())
         if den == 0:
