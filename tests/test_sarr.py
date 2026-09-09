@@ -318,3 +318,96 @@ def test_a_vet_record_discounts_the_run_it_was_made_on(tmp_path):
     assert after.vet_flagged_runs == 1
     assert after.profiles_with_vet_run > 0
     assert after.rows_written == before.rows_written  # a discount, not a drop
+
+
+def test_the_model_stamps_its_own_version(tmp_path):
+    """The job reads `sarr.DERIVE_VERSION` and falls back to a literal when the
+    module has none. With no constant here the fallback wrote "sarr-1.0"
+    whatever the model was doing, so rebuilding part of the archive under a
+    changed model produced rows indistinguishable from the rest."""
+    assert getattr(sarr, "DERIVE_VERSION", None), "the model must name its version"
+    db = tmp_path / "t.db"
+    _seed(db)
+    rebuild_sarr.rebuild(db)
+    conn = get_conn(db)
+    stamped = {r[0] for r in conn.execute(
+        "SELECT DISTINCT derive_version FROM runner_sarr")}
+    conn.close()
+    assert stamped == {sarr.DERIVE_VERSION}
+
+
+def test_a_scratched_runner_does_not_keep_its_rank(tmp_path):
+    """The write is an upsert, so a runner that used to score and no longer
+    does keeps its row -- and its RANK. That happens every meeting: the card is
+    scored the day before, a horse is scratched, and the results write leaves
+    it with no finish time, so it drops out of the source query and is never
+    rescored. 2026-09-06 race 7 carried ten rows for nine runners with a
+    non-runner third, pushing every real runner below it one place down."""
+    db = tmp_path / "t.db"
+    _seed(db)
+    rebuild_sarr.rebuild(db)
+    conn = get_conn(db)
+    date, race_no = conn.execute(
+        "SELECT race_date, race_no FROM runner_sarr ORDER BY race_date DESC "
+        "LIMIT 1").fetchone()
+    horse_no = conn.execute(
+        "SELECT horse_no FROM runner_sarr WHERE race_date = ? AND race_no = ? "
+        "ORDER BY sarr_rank LIMIT 1", (date, race_no)).fetchone()[0]
+    # scratched: declared, then never ran
+    with transaction(conn):
+        conn.execute("UPDATE runners SET finish_time = NULL, place = NULL "
+                     "WHERE race_date = ? AND race_no = ? AND horse_no = ?",
+                     (date, race_no, horse_no))
+    before = conn.execute("SELECT count(*) FROM runner_sarr WHERE race_date = ? "
+                          "AND race_no = ?", (date, race_no)).fetchone()[0]
+    conn.close()
+
+    report = rebuild_sarr.rebuild(db)
+    assert report.stale_rows_cleared >= 1
+    conn = get_conn(db)
+    rows = conn.execute("SELECT horse_no, sarr_rank FROM runner_sarr "
+                        "WHERE race_date = ? AND race_no = ? ORDER BY sarr_rank",
+                        (date, race_no)).fetchall()
+    orphan = conn.execute(
+        "SELECT count(*) FROM runner_sarr_component WHERE race_date = ? "
+        "AND race_no = ? AND horse_no = ?", (date, race_no, horse_no)).fetchone()[0]
+    conn.close()
+    assert horse_no not in {r[0] for r in rows}
+    assert orphan == 0
+    assert len(rows) == before - 1
+    # and the ranks close up rather than leaving a hole where it stood
+    assert [r[1] for r in rows] == list(range(1, len(rows) + 1))
+
+
+def test_a_full_rebuild_leaves_an_unrun_card_alone(tmp_path):
+    """The clear-out is scoped to races the pass actually scored. A card scored
+    the day before racing has no finish times at all, so an un-dated rebuild
+    must not treat every one of its runners as stale."""
+    db = tmp_path / "t.db"
+    _seed(db)
+    conn = get_conn(db)
+    last = conn.execute("SELECT max(race_date) FROM races").fetchone()[0]
+    card = (dt.date.fromisoformat(last) + dt.timedelta(days=7)).isoformat()
+    with transaction(conn):
+        upsert.upsert_races(conn, [{
+            "race_date": card, "race_no": 1, "venue": "ST", "course": "A",
+            "surface": "Turf", "going": "G", "distance": 1800, "race_class": "4"}])
+        upsert.upsert_runners(conn, [{
+            "race_date": card, "race_no": 1, "horse_no": h + 1,
+            "horse_name": f"HORSE {h}", "draw": h + 1, "rating": 60 + h}
+            for h in range(8)])
+    conn.close()
+
+    rebuild_sarr.rebuild(db, date=card)
+    conn = get_conn(db)
+    scored = conn.execute("SELECT count(*) FROM runner_sarr WHERE race_date = ?",
+                          (card,)).fetchone()[0]
+    conn.close()
+    assert scored > 0
+
+    rebuild_sarr.rebuild(db)          # the full pass must not touch the card
+    conn = get_conn(db)
+    still = conn.execute("SELECT count(*) FROM runner_sarr WHERE race_date = ?",
+                         (card,)).fetchone()[0]
+    conn.close()
+    assert still == scored

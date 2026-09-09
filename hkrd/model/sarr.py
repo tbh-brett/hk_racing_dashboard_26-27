@@ -26,6 +26,12 @@ from hkrd.derive.pace import SECTION_LENGTHS, classify_style
 from hkrd.store.coerce import parse_section_times
 from scipy import stats
 
+# Stamped onto every row so a mixed-version table is visible. The job already
+# reads this; until now the module did not define it, so the fallback wrote
+# "sarr-1.0" whatever the model did -- and rebuilding two meetings under a
+# changed model left rows that could not be told apart from the rest.
+DERIVE_VERSION = "sarr-1.1"
+
 RECENCY_LAMBDA = 0.85
 MAX_PRIOR_RUNS = 15
 GOING_BAND_MIN_N = 3

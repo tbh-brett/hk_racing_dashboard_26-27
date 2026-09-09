@@ -87,6 +87,7 @@ class SarrReport:
     scored_without_draw: int = 0
     vet_flagged_runs: int = 0
     profiles_with_vet_run: int = 0
+    stale_rows_cleared: int = 0
     errors: list[str] = field(default_factory=list)
 
     def render(self) -> str:
@@ -100,11 +101,48 @@ class SarrReport:
             f"  scored, but no gate       {self.scored_without_draw:>7,}",
             f"  prior runs vet-flagged    {self.vet_flagged_runs:>7,}",
             f"  profiles using one        {self.profiles_with_vet_run:>7,}",
+            f"  stale rows cleared        {self.stale_rows_cleared:>7,}",
         ]
         if self.errors:
             lines.append(f"  ERRORS             {len(self.errors):>7,}")
             lines += [f"    {e}" for e in self.errors[:10]]
         return "\n".join(lines)
+
+
+def _clear_stale(conn, scored_keys: set[tuple]) -> int:
+    """Drop rows for runners this pass did NOT score, in races it DID.
+
+    The write is an upsert, so a runner that used to score and no longer does
+    keeps its old row forever. That happens on every meeting: a card is scored
+    the day before, a horse is then scratched, and the results write leaves it
+    with no finish time -- so it drops out of RUNS_SQL and is never rescored,
+    while its row sits in the table holding a RANK. 2026-09-06 race 7 carried
+    ten rows for nine runners and INVINCIBLE SHIELD, which never left the
+    stalls, held third; every real runner below it read one place too low.
+
+    Scoped to races this pass scored, so an unrun card written by a
+    date-scoped rebuild is never touched by a full one.
+    """
+    conn.execute("CREATE TEMP TABLE IF NOT EXISTS _scored "
+                 "(race_date TEXT, race_no INTEGER, horse_no INTEGER)")
+    conn.execute("DELETE FROM _scored")
+    conn.executemany("INSERT INTO _scored VALUES (?, ?, ?)", sorted(scored_keys))
+    conn.execute("CREATE INDEX IF NOT EXISTS _scored_ix "
+                 "ON _scored (race_date, race_no, horse_no)")
+    where = ("""
+        WHERE EXISTS (SELECT 1 FROM _scored x
+                       WHERE x.race_date = %(t)s.race_date
+                         AND x.race_no   = %(t)s.race_no)
+          AND NOT EXISTS (SELECT 1 FROM _scored x
+                       WHERE x.race_date = %(t)s.race_date
+                         AND x.race_no   = %(t)s.race_no
+                         AND x.horse_no  = %(t)s.horse_no)""")
+    cleared = 0
+    for table in ("runner_sarr_component", "runner_sarr"):
+        cur = conn.execute(f"DELETE FROM {table} " + where % {"t": table})
+        if table == "runner_sarr":
+            cleared = cur.rowcount
+    return cleared
 
 
 def _vet_flags(conn, runs: pd.DataFrame) -> pd.Series:
@@ -258,6 +296,7 @@ def rebuild(db: Path | None = None, *, min_prior: int = 2,
                 "horse_no, component, contribution) VALUES (?, ?, ?, ?, ?) "
                 "ON CONFLICT (race_date, race_no, horse_no, component) "
                 "DO UPDATE SET contribution = excluded.contribution", kept)
+            report.stale_rows_cleared = _clear_stale(conn, scored_keys)
         report.rows_written = len(rows)
         report.component_rows = len(kept)
     finally:
