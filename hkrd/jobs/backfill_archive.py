@@ -32,6 +32,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -91,8 +92,16 @@ def _held(conn, date: str) -> bool:
 
 def meetings_in_range(first: str, last: str, *, db: Path | None = None,
                       report: BackfillReport | None = None,
-                      session=None) -> list[tuple[str, str]]:
-    """Every (date, venue) that raced in the range and is not already held."""
+                      session=None) -> Iterator[tuple[str, str]]:
+    """Yield each (date, venue) that raced in the range and is not held yet.
+
+    A GENERATOR, so probing and scraping interleave. Probing the whole range
+    first cost fifteen minutes before a single meeting was stored, gave no
+    sign of progress while it ran, and -- because a probe result lives only in
+    memory -- threw all of it away if the run was interrupted, so every restart
+    paid it again. Yielding means the first meeting lands about a minute in and
+    an interrupted run has already banked everything before the break.
+    """
     report = report or BackfillReport()
     session = session or get_session()
     conn = get_conn(db if db is not None else db_path())
@@ -100,10 +109,11 @@ def meetings_in_range(first: str, last: str, *, db: Path | None = None,
         init_db(conn)
         day = dt.date.fromisoformat(first)
         end = dt.date.fromisoformat(last)
-        found: list[tuple[str, str]] = []
         while day <= end:
             date = day.isoformat()
             day += dt.timedelta(days=1)
+            # Re-read per day rather than once: the caller is storing meetings
+            # into this same database as we go.
             if _held(conn, date):
                 report.already_held += 1
                 report.meetings_found += 1
@@ -118,8 +128,7 @@ def meetings_in_range(first: str, last: str, *, db: Path | None = None,
                 continue
             if venue:
                 report.meetings_found += 1
-                found.append((date, venue))
-        return found
+                yield date, venue
     finally:
         conn.close()
 
@@ -130,35 +139,39 @@ def backfill(first: str, last: str, *, db: Path | None = None,
     started = time.monotonic()
     report = BackfillReport(first=first, last=last)
     session = get_session()
-    todo = meetings_in_range(first, last, db=db, report=report, session=session)
-    if max_meetings is not None:
-        todo = todo[:max_meetings]
+    found = meetings_in_range(first, last, db=db, report=report, session=session)
 
-    if not dry_run:
-        for date, venue in todo:
-            try:
-                out = scrape_job.scrape_meeting(
-                    date, venue, post_race=True, db=db,
-                    max_races=max_races, session=session)
-            except Exception as e:                      # noqa: BLE001
-                # One unreachable meeting must not end a four-hour run. It is
-                # recorded by name and the next one is attempted; re-running
-                # picks up whatever failed, because a meeting with no results
-                # is never treated as held.
-                report.errors.append(f"{date} {venue}: {type(e).__name__}: {e}")
-                continue
-            report.meetings_scraped += 1
-            report.races += out.races
-            report.runners += out.runners
-            # The racecard is gone for old meetings -- HKJC keeps results far
-            # longer than cards -- so that warning is expected here and would
-            # drown everything else. Anything else is worth seeing.
-            report.warnings.extend(
-                f"{date} {venue}: {w}" for w in out.warnings
-                if not w.startswith("racecard:"))
-            if out.races == 0:
-                report.errors.append(f"{date} {venue}: probe said it raced, "
-                                     "results returned nothing")
+    for n, (date, venue) in enumerate(found, start=1):
+        if max_meetings is not None and n > max_meetings:
+            break
+        if dry_run:
+            continue
+        try:
+            out = scrape_job.scrape_meeting(
+                date, venue, post_race=True, db=db,
+                max_races=max_races, session=session)
+        except Exception as e:                          # noqa: BLE001
+            # One unreachable meeting must not end a four-hour run. It is
+            # recorded by name and the next one is attempted; re-running picks
+            # up whatever failed, because a meeting with no results is never
+            # treated as held.
+            report.errors.append(f"{date} {venue}: {type(e).__name__}: {e}")
+            continue
+        report.meetings_scraped += 1
+        report.races += out.races
+        report.runners += out.runners
+        # The racecard is gone for old meetings -- HKJC keeps results far
+        # longer than cards -- so that warning is expected here and would
+        # drown everything else. Anything else is worth seeing.
+        report.warnings.extend(
+            f"{date} {venue}: {w}" for w in out.warnings
+            if not w.startswith("racecard:"))
+        if out.races == 0:
+            report.errors.append(f"{date} {venue}: probe said it raced, "
+                                 "results returned nothing")
+        print(f"  {date} {venue}  {out.races:>2} races {out.runners:>4} runners"
+              f"   [{report.meetings_scraped} done,"
+              f" {(time.monotonic()-started)/60:.0f} min]", flush=True)
     report.seconds = time.monotonic() - started
     return report
 

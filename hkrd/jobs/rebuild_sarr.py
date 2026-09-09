@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -27,6 +28,15 @@ import pandas as pd
 from hkrd.derive import draw as draw_d, tags as tags_d
 from hkrd.model import sarr
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
+
+#: A variant, expressed as a change to the profile a runner is scored from.
+#: Takes (profile, the runner's row, its prior runs) and returns the profile to
+#: score. Candidate model changes live behind this until they have earned a
+#: place in `model/sarr`, so an experiment costs the shipped model nothing.
+ProfileAdjust = Callable[[dict, dict, list[dict]], dict]
+
+__all__ = ["SarrReport", "ProfileAdjust", "score_runners", "rebuild",
+           "RUNS_SQL", "CARD_SQL", "VET_SQL"]
 
 # SARR was written against the legacy column names; alias rather than edit the
 # model, so its backtested behaviour is untouched.
@@ -175,6 +185,110 @@ def _vet_flags(conn, runs: pd.DataFrame) -> pd.Series:
                      index=runs.index, dtype=object)
 
 
+def score_runners(runs: pd.DataFrame, targets: pd.DataFrame, *,
+                  min_prior: int = 2, report: SarrReport | None = None,
+                  adjust: ProfileAdjust | None = None
+                  ) -> tuple[list[tuple], list[tuple]]:
+    """Score every target walk-forward. The one place a SARR score is produced.
+
+    Lifted out of `rebuild` so an evaluation can score the archive under a
+    changed model WITHOUT a second copy of this loop. A copy is how the two
+    drift: the harness keeps the old draw-table caching, or the old skip rule,
+    and then reports a difference that is really the difference between two
+    loops. `model/evaluate` calls this, and a test asserts it reproduces
+    `runner_sarr` row for row.
+
+    `adjust` receives each profile with the runner's row and its prior runs and
+    returns a profile to score instead. That is the seam a variant is expressed
+    through, so a candidate change costs nothing in the shipped model until it
+    has earned its way in.
+    """
+    report = report or SarrReport()
+    # Index each horse's runs by date once, rather than filtering the whole
+    # frame per runner -- 21,280 runners against a full scan is minutes.
+    by_horse: dict[str, list[dict]] = defaultdict(list)
+    for rec in runs.to_dict("records"):
+        by_horse[rec["horse_name"]].append(rec)
+    for recs in by_horse.values():
+        recs.sort(key=lambda r: (r["race_date"], r["race_no"]), reverse=True)
+
+    # One draw table per MEETING, fitted from runs strictly before it -- the
+    # same walk-forward rule the horse profiles already obey. Cached because
+    # a meeting's races all share it, and refitting per race would be the
+    # same answer computed eleven times.
+    draw_tables: dict[str, draw_d.DrawTable | None] = {}
+
+    def table_for(meeting_date: str) -> draw_d.DrawTable | None:
+        if meeting_date not in draw_tables:
+            hist = runs[runs["race_date"] < meeting_date]
+            try:
+                draw_tables[meeting_date] = draw_d.draw_table(hist)
+            except draw_d.DrawError:
+                # The first meetings in the archive have nothing before
+                # them. They score on the other eight terms, as they did
+                # before this term existed.
+                draw_tables[meeting_date] = None
+        return draw_tables[meeting_date]
+
+    rows: list[tuple] = []
+    component_rows: list[tuple] = []
+    for (race_date, race_no), race in targets.groupby(["race_date", "race_no"]):
+        med_rating = pd.to_numeric(race["rating"], errors="coerce").median()
+        dtable = table_for(race_date)
+        # The declared field, not the count that ends up scored: both axes
+        # of the draw score are normalised by it, so a horse dropped for
+        # thin history must not shrink the field its rivals are measured in.
+        field_size = len(race)
+        scored: list[tuple[int, float]] = []
+        for rec in race.to_dict("records"):
+            # SARR's distance term needs a distance. Five legacy races
+            # (55 runners) have none -- their venue column holds a course
+            # code rather than ST/HV, so the source rows are malformed.
+            # Skip and count them; do not invent a distance.
+            if pd.isna(rec["distance"]):
+                report.skipped_no_distance += 1
+                continue
+            prior = [r for r in by_horse[rec["horse_name"]]
+                     if (r["race_date"], r["race_no"]) < (race_date, race_no)]
+            if len(prior) < min_prior:
+                report.skipped_no_history += 1
+                continue
+            profile = sarr.build_profile(
+                prior, rec["distance"], rec["venue"], rec["surface"], rec["going"])
+            if profile is None:
+                report.skipped_no_history += 1
+                continue
+            if any(r.get("vet_category") for r in prior[:sarr.MAX_PRIOR_RUNS]):
+                report.profiles_with_vet_run += 1
+            if adjust is not None:
+                profile = adjust(profile, rec, prior)
+            ds = (0.0 if dtable is None else draw_d.draw_score(
+                rec["draw"], field_size, rec["venue"], rec["distance"], dtable))
+            if dtable is not None and pd.isna(rec["draw"]):
+                report.scored_without_draw += 1
+            parts = sarr.contributions(
+                profile, rec["distance"], rec["venue"], med_rating,
+                draw_score=ds)
+            value = sum(parts.values())
+            if value is None or pd.isna(value):
+                continue
+            scored.append((rec["horse_no"], float(value), len(prior)))
+            component_rows.extend(
+                (race_date, race_no, rec["horse_no"], k, float(v))
+                for k, v in parts.items())
+
+        if not scored:
+            continue
+        report.races_scored += 1
+        # Lower is better, so rank ascending.
+        for rank, (horse_no, value, n_prior) in enumerate(
+                sorted(scored, key=lambda s: s[1]), start=1):
+            rows.append((race_date, race_no, horse_no, value, rank, n_prior,
+                         sarr.DERIVE_VERSION if hasattr(sarr, "DERIVE_VERSION")
+                         else "sarr-1.0"))
+    return rows, component_rows
+
+
 def rebuild(db: Path | None = None, *, min_prior: int = 2,
             date: str | None = None) -> SarrReport:
     report = SarrReport()
@@ -192,88 +306,8 @@ def rebuild(db: Path | None = None, *, min_prior: int = 2,
         report.vet_flagged_runs = int(runs["vet_category"].notna().sum())
         targets = (pd.read_sql(CARD_SQL, conn, params=(date,))
                    if date else runs)
-
-        # Index each horse's runs by date once, rather than filtering the whole
-        # frame per runner -- 21,280 runners against a full scan is minutes.
-        by_horse: dict[str, list[dict]] = defaultdict(list)
-        for rec in runs.to_dict("records"):
-            by_horse[rec["horse_name"]].append(rec)
-        for recs in by_horse.values():
-            recs.sort(key=lambda r: (r["race_date"], r["race_no"]), reverse=True)
-
-        # One draw table per MEETING, fitted from runs strictly before it -- the
-        # same walk-forward rule the horse profiles already obey. Cached because
-        # a meeting's races all share it, and refitting per race would be the
-        # same answer computed eleven times.
-        draw_tables: dict[str, draw_d.DrawTable | None] = {}
-
-        def table_for(meeting_date: str) -> draw_d.DrawTable | None:
-            if meeting_date not in draw_tables:
-                hist = runs[runs["race_date"] < meeting_date]
-                try:
-                    draw_tables[meeting_date] = draw_d.draw_table(hist)
-                except draw_d.DrawError:
-                    # The first meetings in the archive have nothing before
-                    # them. They score on the other eight terms, as they did
-                    # before this term existed.
-                    draw_tables[meeting_date] = None
-            return draw_tables[meeting_date]
-
-        rows: list[tuple] = []
-        component_rows: list[tuple] = []
-        for (race_date, race_no), race in targets.groupby(["race_date", "race_no"]):
-            med_rating = pd.to_numeric(race["rating"], errors="coerce").median()
-            dtable = table_for(race_date)
-            # The declared field, not the count that ends up scored: both axes
-            # of the draw score are normalised by it, so a horse dropped for
-            # thin history must not shrink the field its rivals are measured in.
-            field_size = len(race)
-            scored: list[tuple[int, float]] = []
-            for rec in race.to_dict("records"):
-                # SARR's distance term needs a distance. Five legacy races
-                # (55 runners) have none -- their venue column holds a course
-                # code rather than ST/HV, so the source rows are malformed.
-                # Skip and count them; do not invent a distance.
-                if pd.isna(rec["distance"]):
-                    report.skipped_no_distance += 1
-                    continue
-                prior = [r for r in by_horse[rec["horse_name"]]
-                         if (r["race_date"], r["race_no"]) < (race_date, race_no)]
-                if len(prior) < min_prior:
-                    report.skipped_no_history += 1
-                    continue
-                profile = sarr.build_profile(
-                    prior, rec["distance"], rec["venue"], rec["surface"], rec["going"])
-                if profile is None:
-                    report.skipped_no_history += 1
-                    continue
-                if any(r.get("vet_category") for r in prior[:sarr.MAX_PRIOR_RUNS]):
-                    report.profiles_with_vet_run += 1
-                ds = (0.0 if dtable is None else draw_d.draw_score(
-                    rec["draw"], field_size, rec["venue"], rec["distance"], dtable))
-                if dtable is not None and pd.isna(rec["draw"]):
-                    report.scored_without_draw += 1
-                parts = sarr.contributions(
-                    profile, rec["distance"], rec["venue"], med_rating,
-                    draw_score=ds)
-                value = sum(parts.values())
-                if value is None or pd.isna(value):
-                    continue
-                scored.append((rec["horse_no"], float(value), len(prior)))
-                component_rows.extend(
-                    (race_date, race_no, rec["horse_no"], k, float(v))
-                    for k, v in parts.items())
-
-            if not scored:
-                continue
-            report.races_scored += 1
-            # Lower is better, so rank ascending.
-            for rank, (horse_no, value, n_prior) in enumerate(
-                    sorted(scored, key=lambda s: s[1]), start=1):
-                rows.append((race_date, race_no, horse_no, value, rank, n_prior,
-                             sarr.DERIVE_VERSION if hasattr(sarr, "DERIVE_VERSION")
-                             else "sarr-1.0"))
-
+        rows, component_rows = score_runners(
+            runs, targets, min_prior=min_prior, report=report)
         with transaction(conn):
             if date:
                 conn.execute("DELETE FROM runner_sarr_component WHERE race_date = ?",
