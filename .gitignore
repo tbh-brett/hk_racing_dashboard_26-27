@@ -13,6 +13,15 @@ __pycache__/
 # Data stores. The old repo committed these and its .git reached 229 MB.
 # The database is rebuildable from scrape; it does not belong in git.
 *.db
+# SQLite's sidecars. `*.db` does not match them -- the names are hkrd.db-wal and
+# hkrd.db-shm -- so both were tracked, on a PUBLIC repo, and a write-ahead log
+# is a rolling window of whatever was last written to the database. The three
+# commits that carry one hold racing pages and no ledger, but the mechanism
+# does not know the difference: import a betting statement, commit anything,
+# and the statement rides along in a 3 MB binary nobody reads a diff of.
+*.db-wal
+*.db-shm
+*.db-journal
 *.sqlite
 *.sqlite3
 *.xlsx
