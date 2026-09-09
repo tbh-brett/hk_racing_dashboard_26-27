@@ -206,3 +206,25 @@ def test_a_page_with_no_incident_table_is_empty_not_an_error():
     from hkrd.ingest import results
 
     assert results.parse_incident_report("<html><body>none</body></html>") == []
+
+def test_the_draw_column_is_read_from_the_results_page():
+    """HKJC's header is "Dr.", not "Draw". With only the long alias the column
+    never mapped, and the draw came from the racecard alone -- which HKJC stops
+    serving for older meetings, so a backfilled season arrived with no draw at
+    all and the draw term quietly switched off for it."""
+    html = """
+    <table>
+      <tr><th>Pla.</th><th>Horse No.</th><th>Horse</th><th>Jockey</th>
+          <th>Trainer</th><th>Act. Wt.</th><th>Declar. Horse Wt.</th>
+          <th>Dr.</th><th>LBW</th><th>Running Position</th>
+          <th>Finish Time</th><th>Win Odds</th></tr>
+      <tr><td>1</td><td>5</td><td>AMAZING FUN (H442)</td><td>Z Purton</td>
+          <td>C H Yip</td><td>128</td><td>1138</td><td>9</td><td>---</td>
+          <td>9 9 1</td><td>0:56.22</td><td>15</td></tr>
+    </table>"""
+    rows = results.parse_results_table(html, source="test")
+    assert rows[0]["draw"] == "9"
+    assert rows[0]["horse_name"] == "AMAZING FUN"
+    # and the long spelling must keep working
+    assert results.parse_results_table(
+        html.replace("<th>Dr.</th>", "<th>Draw</th>"), source="test")[0]["draw"] == "9"
