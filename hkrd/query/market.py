@@ -21,10 +21,11 @@ from typing import Any
 from hkrd.derive.probability import devig
 from hkrd.store.connect import Connection, get_conn
 
-__all__ = ["concentration", "band", "price_movement", "odds_coverage",
+__all__ = ["concentration", "band", "odds_coverage",
            "latest_prices", "live_prices", "snapshot_age_hours",
            "STALE_AFTER_HOURS", "MIN_WINDOW_MINUTES", "warm",
-           "late_move", "LATE_MINUTES", "NO_PRICE",
+           "late_move", "LATE_MINUTES", "NO_PRICE", "DAY_START",
+           "day_start", "opening_capture",
            "changes_since", "MOVE_THRESHOLD", "CADENCE_MINUTES",
            "PAIR_CADENCE_MINUTES", "SETTLED_AFTER_MINUTES",
            "SETTLED_INTERVAL_MINUTES", "interval_for",
@@ -52,6 +53,23 @@ MIN_WINDOW_MINUTES = 20.0
 # capture of their race — which is the one every movement figure is measured
 # from. Filtered on read as well as on write; see `ingest.odds.NO_PRICE`.
 NO_PRICE = 999.0
+
+# WHERE THE MARKET THIS DASHBOARD MEASURES BEGINS: midnight on the race day.
+#
+# HKJC opens a pool around midday the day BEFORE racing, and for the first
+# hours of it there is no money in it — the 2026-09-09 capture at 12:01 on the
+# 8th was 999.0 on every runner across eight races. Even once real prices
+# appear, the day-before market is a handful of bets: measured from it,
+# MACANESE MASTER read +309% into 9.0 on a card where its actual race-day move
+# was 7.0 to 9.0. The big number was almost entirely the first stranger to bet
+# on the race.
+#
+# So every figure that measures a CHANGE measures it from the first capture at
+# or after this. The rows before it are kept — nothing deletes from
+# `odds_snapshots` — and are still the opening price of the pool; they are just
+# not the baseline for "how has this moved today", which is the question the
+# card asks.
+DAY_START = "T00:00:00"
 
 # The window the money actually arrives in. The owner's own reading of it:
 # "all the late money almost will not show until the final 5-0 minutes before
@@ -289,6 +307,44 @@ def latest_prices(date: str, race_no: int, *, at: str = "latest",
             conn.close()
 
 
+def day_start(date: str) -> str:
+    """Midnight on the race day, as a comparable timestamp.
+
+    `captured_at` is stored as an ISO string and compared as one, so this is a
+    string too: a date and a time in the same format the captures carry.
+    """
+    return f"{date}{DAY_START}"
+
+
+def opening_capture(conn: Connection, date: str, race_no: int, *,
+                    column: str = "win_odds") -> str | None:
+    """The capture every change on this race is measured from.
+
+    The first REAL price at or after midnight on the race day. Two fallbacks,
+    in this order, and each of them is a different fact rather than a guess:
+
+      * no capture at or after midnight — an archived meeting whose only
+        captures are from the day before, which is most of what the legacy
+        import rescued. The earliest real price is then the only baseline
+        there is, and it is still an honest one for that race.
+      * no real price at all — nothing to measure, and the caller says so
+        rather than reporting a change from a price that never existed.
+    """
+    since = day_start(date)
+    for lower in (since, None):
+        sql = ("SELECT min(captured_at) FROM odds_snapshots "
+               "WHERE race_date = ? AND race_no = ? "
+               f"  AND {column} IS NOT NULL AND {column} < ?")
+        params: list[Any] = [date, race_no, NO_PRICE]
+        if lower is not None:
+            sql += " AND captured_at >= ?"
+            params.append(lower)
+        found = conn.execute(sql, params).fetchone()[0]
+        if found:
+            return found
+    return None
+
+
 def _priced(value: float | None) -> float | None:
     """A stored price, or None where the row is HKJC's placeholder.
 
@@ -354,62 +410,6 @@ def _window_minutes(first: str | None, last: str | None) -> float | None:
     except ValueError:
         return None
     return round((b - a).total_seconds() / 60.0, 1)
-
-
-def price_movement(date: str, race_no: int, *,
-                   conn: Connection | None = None) -> list[dict[str, Any]]:
-    """First captured price against the last, per runner.
-
-    Descriptive only. Settlement is tote, so the final dividend is what is
-    paid regardless of when the bet was struck -- drift is an operational
-    signal about when to look, never a selection rule.
-    """
-    own = conn is None
-    conn = conn or get_conn()
-    try:
-        # The first capture that carried a REAL price, not the first capture.
-        # A pool quoting 999.0 on every runner is open and unbet, and taking it
-        # as the opening price reports the whole field firming 98%.
-        bounds = conn.execute(
-            "SELECT min(captured_at) f, max(captured_at) l FROM odds_snapshots "
-            "WHERE race_date = ? AND race_no = ? "
-            "  AND win_odds IS NOT NULL AND win_odds < ?",
-            (date, race_no, NO_PRICE)).fetchone()
-        if not bounds or not bounds["f"] or bounds["f"] == bounds["l"]:
-            return []
-        rows = conn.execute(
-            "SELECT a.horse_no, a.win_odds early, b.win_odds late "
-            "FROM odds_snapshots a JOIN odds_snapshots b "
-            "  ON a.race_date = b.race_date AND a.race_no = b.race_no "
-            " AND a.horse_no = b.horse_no "
-            "WHERE a.race_date = ? AND a.race_no = ? "
-            "  AND a.captured_at = ? AND b.captured_at = ? "
-            "  AND a.win_odds IS NOT NULL AND b.win_odds IS NOT NULL "
-            "  AND a.win_odds < ? AND b.win_odds < ?",
-            (date, race_no, bounds["f"], bounds["l"],
-             NO_PRICE, NO_PRICE)).fetchall()
-        # How much time the two captures actually span. Without this a pair of
-        # snapshots taken 77 seconds apart reports 0% movement on every runner,
-        # which reads as "the market did not move" when it means "nothing was
-        # observed". The real archive is full of exactly that case.
-        window = _window_minutes(bounds["f"], bounds["l"])
-        # An unreadable timestamp means the window is unknown, not that it was
-        # wide. Treating unknown as observed would let a bad capture masquerade
-        # as evidence of a steady market.
-        observed = window is not None and window >= MIN_WINDOW_MINUTES
-
-        out = []
-        for r in rows:
-            change = (r["late"] - r["early"]) / r["early"]
-            out.append({"horse_no": r["horse_no"], "early": r["early"],
-                        "late": r["late"], "change_pct": round(100 * change, 1),
-                        "window_minutes": window, "observed": observed,
-                        "direction": "shortened" if change < -0.02
-                        else "drifted" if change > 0.02 else "flat"})
-        return sorted(out, key=lambda x: x["change_pct"])
-    finally:
-        if own:
-            conn.close()
 
 
 def odds_coverage(*, conn: Connection | None = None) -> dict[str, Any]:

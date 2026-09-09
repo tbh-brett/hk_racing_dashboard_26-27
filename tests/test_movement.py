@@ -87,7 +87,7 @@ def test_the_placeholder_is_not_a_price(db):
 
 def test_the_opening_price_is_the_first_real_one(db):
     """Otherwise every runner opens at 999 and the card reads −98% across."""
-    moves = {m["horse_no"]: m for m in market.price_movement(DATE, 1)}
+    moves = {m["horse_no"]: m for m in movement.price_movement(DATE, 1)}
     assert moves[1]["early"] == 9.0
     assert moves[1]["change_pct"] == pytest.approx(44.4, abs=0.1)
     assert all(abs(m["change_pct"]) < 100 for m in moves.values())

@@ -519,6 +519,11 @@ table.card td { padding: 6px 8px; }
 .dbl-card.over { border-color: var(--edge-ground); }
 .dbl-card.over .g { color: var(--edge); }
 .dbl-card.under .g { color: var(--cool); }
+/* How the double moved over its own life, under the level it ended at. */
+.dbl-card .mv2 {
+  grid-column: 1 / 4; font-size: 9px; letter-spacing: .02em;
+  font-variant-numeric: tabular-nums;
+}
 .band-dbl .dbl-note {
   padding: 0 14px 8px; font-size: var(--fs-xs); color: var(--text-faint);
   line-height: 1.5;

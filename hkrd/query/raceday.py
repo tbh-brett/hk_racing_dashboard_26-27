@@ -112,10 +112,26 @@ def _with_live_prices(conn: Connection, date: str, race_no: int,
 
 
 def _odds_series(conn: Connection, date: str, race_no: int) -> dict[int, list[float]]:
+    """The shape of the money, over the race day.
+
+    THE SAME BASELINE AS THE FIGURE BESIDE IT. This line and the percentage in
+    the same cell were reading different windows: the number was fixed to start
+    at midnight and the line was still drawn from the first capture ever taken,
+    so every runner's line opened with a near-vertical cliff and then flattened
+    — the shape of a pool being opened, drawn on top of the shape of a race
+    being bet on, at a scale that made the second invisible.
+    """
+    since = (market_q.opening_capture(conn, date, race_no)
+             or market_q.day_start(date))
     rows = conn.execute(
         "SELECT horse_no, win_odds FROM odds_snapshots "
-        "WHERE race_date = ? AND race_no = ? AND win_odds IS NOT NULL "
-        "ORDER BY horse_no, captured_at", (date, race_no)).fetchall()
+        "WHERE race_date = ? AND race_no = ? AND captured_at >= ? "
+        # And never the placeholder. `win_odds IS NOT NULL` let 999.0 through,
+        # so a line could open at the top of its own scale for a price HKJC
+        # was using to say it had none.
+        "  AND win_odds IS NOT NULL AND win_odds < ? "
+        "ORDER BY horse_no, captured_at",
+        (date, race_no, since, market_q.NO_PRICE)).fetchall()
     out: dict[int, list[float]] = {}
     for r in rows:
         out.setdefault(r["horse_no"], []).append(r["win_odds"])
@@ -343,7 +359,7 @@ def meeting_blackbook(date: str, *, conn: Connection | None = None
         live: dict[int, dict[int, dict]] = {}
         for race_no in sorted({e["race_no"] for e in entries}):
             moves[race_no] = {m["horse_no"]: m for m in
-                              market_q.price_movement(date, race_no, conn=conn)}
+                              movement_q.price_movement(date, race_no, conn=conn)}
             live[race_no] = market_q.live_prices(date, race_no, conn=conn)
 
         out = []

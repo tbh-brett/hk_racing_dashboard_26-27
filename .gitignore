@@ -13,12 +13,14 @@ __pycache__/
 # Data stores. The old repo committed these and its .git reached 229 MB.
 # The database is rebuildable from scrape; it does not belong in git.
 *.db
-# SQLite's sidecars. `*.db` does not match them -- the names are hkrd.db-wal and
-# hkrd.db-shm -- so both were tracked, on a PUBLIC repo, and a write-ahead log
-# is a rolling window of whatever was last written to the database. The three
-# commits that carry one hold racing pages and no ledger, but the mechanism
-# does not know the difference: import a betting statement, commit anything,
-# and the statement rides along in a 3 MB binary nobody reads a diff of.
+# SQLite's sidecars do not match `*.db` and have been committed by accident.
+# Two reasons, and the second is the one with teeth: a WAL is 3 MB of the same
+# data the rule above exists to keep out -- the old repo's .git reached 229 MB
+# -- and it is a rolling window of whatever was written LAST. This repository
+# is public. The mechanism cannot tell a betting statement from a race card:
+# import one, commit anything, and it rides along inside a binary nobody reads
+# a diff of. Audited when the files were untracked: three commits carry a WAL,
+# all racing pages, no ledger and no credentials.
 *.db-wal
 *.db-shm
 *.db-journal

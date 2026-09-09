@@ -18,7 +18,8 @@ from hkrd.query import (blackbook as bb_q, formguide as fg_q,
                         race as race_q, raceday as raceday_q,
                         vet as vet_q, freshness as fresh_q,
                         pace as pace_q, speedmap as speedmap_q,
-                        pools as pools_q, money as money_q)
+                        pools as pools_q, money as money_q,
+                        movement as movement_q)
 
 WEB = Path(__file__).resolve().parent.parent.parent / "web"
 
@@ -456,7 +457,7 @@ def concentration(date: str, race_no: int, at: str = "latest") -> dict:
 @app.get("/api/market/movement/{date}/{race_no}")
 def movement(date: str, race_no: int) -> dict:
     return {"race_date": date, "race_no": race_no,
-            "runners": market_q.price_movement(date, race_no)}
+            "runners": movement_q.price_movement(date, race_no)}
 
 
 @app.get("/api/market/coverage")
