@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from hkrd.query import market
+from hkrd.query import market, movement
 from hkrd.store import upsert
 from hkrd.store.connect import get_conn, init_db, transaction
 
@@ -88,7 +88,7 @@ def test_too_few_priced_runners_returns_none_not_a_wrong_number(db):
 
 def test_price_movement_reports_direction(db):
     conn = get_conn(db)
-    moves = market.price_movement("2026-07-15", 1, conn=conn)
+    moves = movement.price_movement("2026-07-15", 1, conn=conn)
     conn.close()
     by_horse = {m["horse_no"]: m for m in moves}
     assert by_horse[1]["direction"] == "shortened"   # 6.0 -> 2.5
@@ -97,7 +97,7 @@ def test_price_movement_reports_direction(db):
 
 def test_movement_needs_more_than_one_capture(db):
     conn = get_conn(db)
-    assert market.price_movement("2026-07-15", 2, conn=conn) == []
+    assert movement.price_movement("2026-07-15", 2, conn=conn) == []
     conn.close()
 
 
@@ -149,7 +149,7 @@ def test_captures_too_close_together_report_nothing_observed(tmp_path):
                  "captured_at": ts, "win_odds": 4.0},
                 {"race_date": "2026-07-15", "race_no": 1, "horse_no": 2,
                  "captured_at": ts, "win_odds": 6.0}])
-    moves = market.price_movement("2026-07-15", 1, conn=conn)
+    moves = movement.price_movement("2026-07-15", 1, conn=conn)
     conn.close()
     assert moves
     assert all(m["observed"] is False for m in moves)
@@ -158,7 +158,7 @@ def test_captures_too_close_together_report_nothing_observed(tmp_path):
 
 def test_a_real_window_reports_observed_movement(db):
     conn = get_conn(db)
-    moves = market.price_movement("2026-07-15", 1, conn=conn)
+    moves = movement.price_movement("2026-07-15", 1, conn=conn)
     conn.close()
     assert all(m["observed"] is True for m in moves)
     assert moves[0]["window_minutes"] > market.MIN_WINDOW_MINUTES

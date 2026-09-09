@@ -727,7 +727,18 @@ function movementCell(r) {
     box.append(n);
   } else {
     const cls = `mv-${m.direction}`;
-    box.append(el('span', 'prev', num(m.early, 1)));
+    const prev = el('span', 'prev', num(m.early, 1));
+    // WHAT IT IS MEASURED FROM, on the number itself. The baseline is midnight
+    // on the race day, not the first capture ever taken: HKJC opens a pool
+    // around midday the day before and an almost-empty tote quotes numbers
+    // that are real, finite and meaningless — MACANESE MASTER was 2.2 at 12:01
+    // on the eve of 2026-09-09 and 8.8 at midnight, and the card read +354%.
+    prev.title = m.early_at
+      ? `${num(m.early, 1)} at ${String(m.early_at).slice(11, 16)}`
+        + `${String(m.early_at).slice(0, 10) !== state.date ? ' the day before' : ''}`
+        + ` → ${num(m.late, 1)} now`
+      : 'the price this move is measured from';
+    box.append(prev);
     box.append(el('span', `arrow ${cls}`,
       m.direction === 'shortened' ? '▼' : m.direction === 'drifted' ? '▲' : '·'));
     box.append(el('span', `pct ${cls}`, `${Math.abs(m.change_pct).toFixed(0)}%`));
@@ -1317,6 +1328,11 @@ function renderFoot() {
   bits.push(c?.place_ratio_range
     ? `PLACE ODDS ARE SCRAPED — WIN/PLACE RATIO RUNS ${c.place_ratio_range} ON THIS CARD`
     : 'PLACE ODDS ARE SCRAPED, NEVER DERIVED FROM WIN');
+  // Said once, where every other standing fact about the card is said. A
+  // movement figure whose baseline is not visible is one that can be read
+  // wrong for a whole meeting before anyone notices — which is what happened.
+  bits.push('MOVE AND MONEY ARE MEASURED FROM 00:00 ON RACE DAY — '
+    + 'THE POOL OPENS THE DAY BEFORE AND TAKES ALMOST NOTHING UNTIL MORNING');
   const blind = gearCaveat(state.card?.runners ?? []);
   if (blind) bits.push(blind);
   bits.push('STYLE SORTS LEADER → ON-PACE → MIDFIELD → CLOSER');

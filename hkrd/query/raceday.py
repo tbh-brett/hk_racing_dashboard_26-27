@@ -343,7 +343,7 @@ def meeting_blackbook(date: str, *, conn: Connection | None = None
         live: dict[int, dict[int, dict]] = {}
         for race_no in sorted({e["race_no"] for e in entries}):
             moves[race_no] = {m["horse_no"]: m for m in
-                              market_q.price_movement(date, race_no, conn=conn)}
+                              movement_q.price_movement(date, race_no, conn=conn)}
             live[race_no] = market_q.live_prices(date, race_no, conn=conn)
 
         out = []

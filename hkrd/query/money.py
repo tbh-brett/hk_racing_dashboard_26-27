@@ -24,7 +24,7 @@ from __future__ import annotations
 from typing import Any
 
 from hkrd.derive.probability import devig_to
-from hkrd.query.market import latest_prices
+from hkrd.query.market import day_start, latest_prices
 from hkrd.query.pools import latest_pair_odds
 from hkrd.store.connect import Connection, get_conn
 
@@ -96,10 +96,22 @@ def pool_turnover(date: str, race_no: int, *, at: str = "latest",
         # first capture of the race. A card scraped the night before records
         # nulls for hours, and measuring growth from one of those would report
         # the whole pool as having arrived the instant it opened.
+        #
+        # And from MIDNIGHT on the race day, like every other change on this
+        # card: the pool opens the day before and takes almost nothing until
+        # the morning. `growth` is "how much has come in today", which is the
+        # question, rather than "how much has ever come in", which is just the
+        # size of the pool with an extra step.
         first = {r["pool"]: (r["at"], r["turnover"]) for r in conn.execute(
             "SELECT pool, min(captured_at) at, turnover FROM odds_pool_turnover "
             "WHERE race_date = ? AND race_no = ? AND turnover IS NOT NULL "
-            "GROUP BY pool", (date, race_no))}
+            "  AND captured_at >= ? GROUP BY pool",
+            (date, race_no, day_start(date)))}
+        if not first:
+            first = {r["pool"]: (r["at"], r["turnover"]) for r in conn.execute(
+                "SELECT pool, min(captured_at) at, turnover "
+                "FROM odds_pool_turnover WHERE race_date = ? AND race_no = ? "
+                "  AND turnover IS NOT NULL GROUP BY pool", (date, race_no))}
 
         # MERGED POOLS ARE ONE POOL REPORTED TWICE. HKJC merges Quartet into
         # First 4 and reports the same money under both ids, with
@@ -409,11 +421,24 @@ def money_arrived(date: str, race_no: int, *, pool: str = "WIN",
         if column is None:
             raise ValueError(f"not a per-runner pool: {pool!r}")
 
+        # From MIDNIGHT on the race day, for the same reason every other
+        # change on this card is: the pool opens the day before and takes
+        # almost nothing until the morning, so money measured from there is
+        # mostly the first stranger to bet on the race.
         bounds = conn.execute(
             "SELECT min(captured_at) f, max(captured_at) l "
             "FROM odds_pool_turnover WHERE race_date = ? AND race_no = ? "
-            "  AND pool = ? AND turnover IS NOT NULL",
-            (date, race_no, pool.upper())).fetchone()
+            "  AND pool = ? AND turnover IS NOT NULL AND captured_at >= ?",
+            (date, race_no, pool.upper(), day_start(date))).fetchone()
+        if not bounds or not bounds["f"]:
+            # No turnover at or after midnight — an archived meeting captured
+            # only the day before. Its whole series is the honest baseline
+            # there, and saying so beats reporting nothing.
+            bounds = conn.execute(
+                "SELECT min(captured_at) f, max(captured_at) l "
+                "FROM odds_pool_turnover WHERE race_date = ? AND race_no = ? "
+                "  AND pool = ? AND turnover IS NOT NULL",
+                (date, race_no, pool.upper())).fetchone()
         if not bounds or not bounds["f"] or bounds["f"] == bounds["l"]:
             return {"race_date": date, "race_no": race_no, "pool": pool,
                     "observed": False, "runners": [], "opened": None,

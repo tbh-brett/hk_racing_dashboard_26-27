@@ -64,7 +64,21 @@ If a task seems to need a violation, stop and say so rather than working around 
 - **Never delete odds snapshots.** Odds movement is the most informative signal in the
   dataset and cannot be reconstructed. `prune_old_snapshots` must not be ported. Only 17
   meetings of a full season survived it.
-- **999.0 is not a price.** HKJC's tote board has four digits and no way to say "nothing",
+- **Every change on a race card is measured from MIDNIGHT on the race day**, never from the
+  first capture ever taken. HKJC opens a pool around midday the day before, and for hours it
+  is nearly empty — an almost-empty tote quotes numbers that are real, finite, plausible and
+  meaningless, because one $10 bet in a pool holding a few hundred dollars prices a runner
+  at 2.2. On 2026-09-09 HV race 3 the card read MACANESE MASTER at **+354%** (2.2 → 10.0)
+  where its race-day move was **+13.6%** (8.8 → 10.0), and the old baseline pointed the
+  WRONG WAY on five of twelve runners. One definition, `market.day_start` /
+  `market.opening_capture`, read by `price_movement`, `split_move`, `money_arrived` and
+  `pool_turnover` — a page showing a runner firming while another shows it drifting is
+  exactly what a second baseline would produce. The earlier rows are never deleted; they are
+  the opening price of the pool and not the baseline for "how has this moved today".
+- **999.0 is not a price**, and it is a different fault from the one above: 999.0 is HKJC
+  saying "no price", 2.2 in an empty pool is HKJC saying "one person has bet". Only the
+  first is detectable by its value, which is why the second needs a clock and not a
+  threshold. HKJC's tote board has four digits and no way to say "nothing",
   so an open pool nobody has bet into quotes 999.0 on every runner. Stored as a price it
   becomes the FIRST price of the race, which is the one every movement figure is measured
   from, and the whole card reads as firming 98%. `ingest.odds.NO_PRICE` drops it on write
