@@ -228,3 +228,48 @@ def test_the_draw_column_is_read_from_the_results_page():
     # and the long spelling must keep working
     assert results.parse_results_table(
         html.replace("<th>Dr.</th>", "<th>Draw</th>"), source="test")[0]["draw"] == "9"
+
+
+def test_a_void_race_is_not_reported_as_a_broken_scraper():
+    """HKJC voids a race outright -- a false start, a failed barrier -- and
+    serves the card with every Pla. reading VOID and weight, LBW and time all
+    "---". 2025-11-15 ST race 8 is one, and the shape check called it
+    "columns look misaligned", which is the alarm that means HKJC CHANGED ITS
+    HTML. Those need different answers from a human, and a message that cannot
+    tell them apart trains you to dismiss the one that matters."""
+    html = """
+    <table>
+      <tr><th>Pla.</th><th>Horse No.</th><th>Horse</th><th>Jockey</th>
+          <th>Trainer</th><th>Act. Wt.</th><th>Declar. Horse Wt.</th>
+          <th>Dr.</th><th>LBW</th><th>Finish Time</th></tr>
+      <tr><td>VOID</td><td>1</td><td>ENDUED (K033)</td><td>H Bowman</td>
+          <td>J Size</td><td>---</td><td>---</td><td>12</td><td>---</td>
+          <td>---</td></tr>
+      <tr><td>VOID</td><td>2</td><td>EMBLAZON (K122)</td><td>C L Chau</td>
+          <td>W K Mo</td><td>---</td><td>---</td><td>9</td><td>---</td>
+          <td>---</td></tr>
+    </table>"""
+    with pytest.raises(results.VoidRace) as e:
+        results.parse_results_table(html, source="test")
+    assert "VOID" in str(e.value)
+    # still a ResultsError, so a caller watching for a scraper break sees it
+    assert isinstance(e.value, results.ResultsError)
+
+
+def test_a_genuinely_misaligned_table_is_still_reported_as_one():
+    """The void check must not swallow the fault it sits in front of."""
+    html = """
+    <table>
+      <tr><th>Pla.</th><th>Horse No.</th><th>Horse</th><th>Jockey</th>
+          <th>Trainer</th><th>Act. Wt.</th><th>Declar. Horse Wt.</th>
+          <th>Dr.</th><th>LBW</th><th>Finish Time</th></tr>
+      <tr><td>1</td><td>5</td><td>REAL HORSE (H442)</td><td>Z Purton</td>
+          <td>C H Yip</td><td>128</td><td>1138</td><td>9</td><td>---</td>
+          <td>---</td></tr>
+      <tr><td>2</td><td>6</td><td>OTHER HORSE (J312)</td><td>M L Yeung</td>
+          <td>W Y So</td><td>128</td><td>1170</td><td>5</td><td>3/4</td>
+          <td>---</td></tr>
+    </table>"""
+    with pytest.raises(results.ResultsError) as e:
+        results.parse_results_table(html, source="test")
+    assert not isinstance(e.value, results.VoidRace)

@@ -41,7 +41,11 @@ from hkrd.ingest._client import FetchError, get_session
 from hkrd.jobs import scrape_meeting as scrape_job
 from hkrd.store.connect import db_path, get_conn, init_db
 
-__all__ = ["BackfillReport", "meetings_in_range", "backfill"]
+# Hong Kong cards run 8 to 11 races; below this a stored meeting is far more
+# likely to be a partial write than a real card.
+_FULL_CARD = 8
+
+__all__ = ["BackfillReport", "meetings_in_range", "backfill", "_FULL_CARD"]
 
 
 @dataclass
@@ -85,9 +89,28 @@ def _held(conn, date: str) -> bool:
     -- that is what a meeting scraped before it was run looks like -- and
     skipping on the card alone would leave it permanently empty.
     """
-    return bool(conn.execute(
-        "SELECT 1 FROM runners WHERE race_date = ? AND finish_time IS NOT NULL "
-        "LIMIT 1", (date,)).fetchone())
+    row = conn.execute("""
+        SELECT count(*) n, coalesce(min(race_no), 0) lo, coalesce(max(race_no), 0) hi
+          FROM races
+         WHERE race_date = ?
+           AND EXISTS (SELECT 1 FROM runners r
+                        WHERE r.race_date = races.race_date
+                          AND r.race_no = races.race_no
+                          AND r.finish_time IS NOT NULL)
+    """, (date,)).fetchone()
+    n, lo, hi = row[0], row[1], row[2]
+    # Contiguous from race 1, and long enough to be a card. "Any result at all"
+    # was the first rule and it silently skipped a PARTIAL meeting: 2022-01-09
+    # stored race 1, hit an unparseable margin on race 2, and was recorded as a
+    # failure -- but the retry pass saw race 1's finishing times, called the
+    # date held and never went back. Ten races sat missing behind a run that
+    # reported success.
+    #
+    # A genuinely short card -- 2024-11-13 HV was abandoned after race 6 -- is
+    # re-scraped on each full run instead. That costs a couple of minutes and
+    # writes the same rows again; the other way round costs data nobody is
+    # told about.
+    return n >= _FULL_CARD and lo == 1 and hi == n
 
 
 def meetings_in_range(first: str, last: str, *, db: Path | None = None,

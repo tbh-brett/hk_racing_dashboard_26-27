@@ -411,3 +411,38 @@ def test_a_full_rebuild_leaves_an_unrun_card_alone(tmp_path):
                          (card,)).fetchone()[0]
     conn.close()
     assert still == scored
+
+
+def test_a_partial_meeting_is_not_mistaken_for_a_complete_one(tmp_path):
+    """`_held` decided resumption, and "any result at all" silently skipped a
+    PARTIAL meeting. 2022-01-09 stored race 1, hit an unparseable margin on
+    race 2 and was recorded as a failure -- then the retry saw race 1's
+    finishing times, called the date held and never went back. Ten races sat
+    missing behind a run that reported success."""
+    from hkrd.jobs.backfill_archive import _held, _FULL_CARD
+    db = tmp_path / "t.db"
+    _seed(db, meetings=1, runners=8)
+    conn = get_conn(db)
+    date = conn.execute("SELECT max(race_date) FROM races").fetchone()[0]
+    assert not _held(conn, date), "one race is not a card"
+
+    # a full, contiguous card
+    with transaction(conn):
+        upsert.upsert_races(conn, [
+            {"race_date": date, "race_no": n, "venue": "ST", "course": "A",
+             "surface": "Turf", "going": "G", "distance": 1200,
+             "race_class": "4"} for n in range(2, _FULL_CARD + 1)])
+        upsert.upsert_runners(conn, [
+            {"race_date": date, "race_no": n, "horse_no": 1,
+             "horse_name": f"RUNNER {n}", "place": "1", "finish_time": "1:09.5"}
+            for n in range(2, _FULL_CARD + 1)])
+    assert _held(conn, date)
+
+    # a card with a hole in the middle is not held either
+    with transaction(conn):
+        conn.execute("DELETE FROM runners WHERE race_date = ? AND race_no = 3",
+                     (date,))
+        conn.execute("DELETE FROM races WHERE race_date = ? AND race_no = 3",
+                     (date,))
+    assert not _held(conn, date)
+    conn.close()

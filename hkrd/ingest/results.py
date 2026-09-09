@@ -24,7 +24,7 @@ from bs4 import BeautifulSoup
 
 from hkrd.ingest._client import FetchError, fetch_html, urls
 
-__all__ = ["ResultsError", "parse_race_header", "parse_results_table",
+__all__ = ["ResultsError", "VoidRace", "parse_race_header", "parse_results_table",
            "parse_sectional_table", "parse_sectional_page",
            "parse_incident_report", "fetch_sectionals",
            "fetch_race", "fetch_meeting", "meeting_venue"]
@@ -32,6 +32,15 @@ __all__ = ["ResultsError", "parse_race_header", "parse_results_table",
 
 class ResultsError(ValueError):
     """A results page could not be read. Names the URL and the field."""
+
+
+class VoidRace(ResultsError):
+    """HKJC voided the race. There is no result, and that is not a fault.
+
+    A subclass so a caller that only wants to skip it can catch this, and one
+    that is watching for a scraper break still sees a ResultsError and is not
+    fooled into treating a layout change as routine.
+    """
 
 
 GOING_ABBREV = {
@@ -142,6 +151,23 @@ def _validate(rows: list[dict[str, Any]], source: str) -> None:
     """
     if not rows:
         return
+
+    # A VOID RACE IS NOT A MISALIGNED TABLE. HKJC voids a race outright -- a
+    # false start, a failed barrier -- and then serves the card with every
+    # Pla. reading VOID and weight, LBW and finish time all "---".
+    # 2025-11-15 ST race 8 is one, and the shape check below fired on it with
+    # "columns look misaligned - finish_time holds '---' in every row", which
+    # is the alarm that means HKJC CHANGED ITS HTML.
+    #
+    # Those two need different answers from a human, and a message that cannot
+    # tell them apart trains you to dismiss the one that matters: the next real
+    # layout change reads as "oh, another void race". Same shape of fault as
+    # 999.0 in the odds and "-SH" in the margins -- a real-world sentinel being
+    # read as a structural fault.
+    if rows and all(str(r.get("place", "")).strip().upper() == "VOID"
+                    for r in rows):
+        raise VoidRace(f"{source}: race declared VOID by HKJC, "
+                       f"{len(rows)} runners, no result to store")
 
     mostly_bad: list[str] = []
     never_right: list[str] = []
