@@ -10,11 +10,12 @@ from collections.abc import Sequence
 
 from hkrd.store.coerce import parse_running_positions, parse_section_times
 from hkrd.store.connect import Connection, get_conn
+from hkrd.derive.pace import STYLE_WINDOW, habitual_style
 from hkrd.derive.tags import VET_TAGS
 from hkrd.query.types import RaceLine, RunnerLine
 
 __all__ = ["get_race", "get_meeting", "get_horse_form", "list_meetings",
-           "list_horses", "tags_bulk", "vet_form"]
+           "list_horses", "tags_bulk", "vet_form", "habitual_styles"]
 
 # Derived tables are LEFT JOINed: a runner with no ET row still returns, with a
 # null figure. A missing derived value must never make a runner disappear.
@@ -358,6 +359,80 @@ def list_horses(*, limit: int = 400, query: str | None = None,
         sql += " GROUP BY horse_name ORDER BY last_run DESC, runs DESC LIMIT ?"
         params.append(limit)
         return [dict(r) for r in conn.execute(sql, params)]
+    finally:
+        if own:
+            conn.close()
+
+
+def habitual_styles(horse_names: Sequence[str], *, before: str | None = None,
+                    conn: Connection | None = None
+                    ) -> dict[str, dict[str, Any]]:
+    """How each of these horses RUNS, from its own record. One query for a card.
+
+    Not the last run's style. `runner_pace.pace_style` is one value per horse
+    per run and answers "where did it sit that day"; a card is asking "where
+    does it sit", which is a property of the horse and needs the record behind
+    it. Read off the last run alone, a Leader that was ridden quietly once
+    reads as a Midfield for the race everybody is about to bet into.
+
+    The rule is `derive.pace.habitual_style` — the same function SARR's profile
+    uses, so the badge on the card is the style the model scored the horse
+    with and the style the Speed Map draws its ladder from.
+
+    Every cell carries its evidence: `n` runs counted, the whole `counts`
+    tally, and `last` — the most recent classified run — so a page can say when
+    the horse's last start disagreed with its habit rather than quietly
+    averaging that away.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        names = [n.strip().upper() for n in horse_names if n]
+        if not names:
+            return {}
+        marks = ",".join("?" * len(names))
+        # Bounded by the names asked for, which the (horse_name, race_date)
+        # index answers directly. A card is a dozen horses with a few dozen
+        # runs each; reading the whole pace table to answer that would be a
+        # full scan per race.
+        sql = (f"SELECT r.horse_name, p.pace_style "
+               f"  FROM runners r "
+               f"  JOIN runner_pace p ON p.race_date = r.race_date "
+               f"                    AND p.race_no = r.race_no "
+               f"                    AND p.horse_no = r.horse_no "
+               f" WHERE r.horse_name IN ({marks}) AND p.pace_style IS NOT NULL")
+        params: list[Any] = list(names)
+        if before:
+            # STRICTLY before. Today's own run is the result, and a card that
+            # read it would be scoring the horse on the race it is previewing.
+            sql += " AND r.race_date < ?"
+            params.append(before)
+        sql += " ORDER BY r.horse_name, r.race_date DESC, r.race_no DESC"
+
+        seen: dict[str, list[str]] = {}
+        for row in conn.execute(sql, params):
+            bucket = seen.setdefault(row["horse_name"], [])
+            if len(bucket) < STYLE_WINDOW:
+                bucket.append(row["pace_style"])
+
+        out: dict[str, dict[str, Any]] = {}
+        for name in names:
+            styles = seen.get(name, [])
+            counts: dict[str, int] = {}
+            for st in styles:
+                counts[st] = counts.get(st, 0) + 1
+            out[name] = {
+                # None where the record says nothing. A horse with no
+                # classified run has no habitual style, and printing an
+                # invented one in the same ink as a measured one is the bare
+                # number this project keeps off the screen.
+                "style": habitual_style(styles),
+                "n": len(styles),
+                "counts": counts,
+                "last": styles[0] if styles else None,
+                "window": STYLE_WINDOW,
+            }
+        return out
     finally:
         if own:
             conn.close()

@@ -25,7 +25,8 @@ from hkrd.query import (blackbook as bb_q, formguide as fg_q,
                         gear as gear_q, market as market_q,
                         money as money_q, movement as movement_q,
                         pools as pools_q, vet as vet_q)
-from hkrd.query.race import get_horse_form, get_race, vet_form
+from hkrd.query.race import (get_horse_form, get_race, habitual_styles,
+                             vet_form)
 from hkrd.query.types import RaceLine
 
 # How many pairs the card carries, ranked by the money on them. All 91 of a
@@ -202,6 +203,18 @@ def build_card(date: str, race_no: int, *,
             {r.horse_name: r.gear for r in race.runners},
             before=date, conn=conn)
 
+        # HOW THE HORSE RUNS, not where it happened to sit last start. The
+        # STYLE column read `last_run.pace_style` — one observation, and the
+        # single worst estimator of the next one: a Leader ridden quietly once
+        # showed as a Midfield on the card everyone was about to bet into,
+        # while the Speed Map beside it drew the same horse on the lead,
+        # because `runner_projection.style` has always been the habitual one.
+        # One definition now, `derive.pace.habitual_style`, read here and by
+        # SARR's profile — so the card, the model and the map cannot give three
+        # answers about the same horse in the same race. One query for the card.
+        styles = habitual_styles([r.horse_name for r in race.runners],
+                                 before=date, conn=conn)
+
         # HOW MUCH MONEY, not just how it is divided. The column on this card
         # has been labelled MOVE · MONEY since the first build and the money
         # half of it was a sparkline of the PRICE — a ratio, which says nothing
@@ -257,6 +270,11 @@ def build_card(date: str, race_no: int, *,
                 "spark_points_n": len(series.get(r.horse_no, [])),
                 "trainer_changed": trainer_changed,
                 "trainer_prev": last.trainer if trainer_changed else None,
+                # The horse's settled style, with the tally it was read off.
+                # Never a bare badge: `n`, `counts` and the last classified run
+                # travel with it, so the page can show a habit and say when the
+                # most recent start disagreed with it.
+                "running_style": styles.get(r.horse_name),
                 "market_rank": m_rank,
                 "movement": moves.get(r.horse_no),
                 "gear_change": gear.get(r.horse_name),
