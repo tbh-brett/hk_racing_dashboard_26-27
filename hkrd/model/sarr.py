@@ -34,7 +34,6 @@ DERIVE_VERSION = "sarr-1.1"
 
 RECENCY_LAMBDA = 0.85
 MAX_PRIOR_RUNS = 15
-GOING_BAND_MIN_N = 3
 LAST_STYLE_BOOST = 3.0
 
 # How much of a run's evidence survives a veterinary finding made on it.
@@ -76,6 +75,36 @@ LAST_STYLE_BOOST = 3.0
 # flagged run is excluded, which is the intent; it is a threshold rather than a
 # literal `is None` so that a future category fitted near 1.0 keeps its place in
 # the slope without a second edit here.
+# What one grade of class is worth, in fmrp.
+#
+# fmrp is measured against the MEDIAN OF THE HORSE'S OWN RACE, which is what
+# makes it immune to how fast the track was -- and blind to how good the field
+# was. At 1200m, Class 1 winners run 68.34s and Class 5 winners 69.76s, 1.42
+# seconds and about nine lengths apart, and their fmrp is -0.78 against -0.84:
+# the weaker-grade winner scores BETTER. A handicap exists to take ability out
+# of finishing time, so relative time inside one measures "did you beat your
+# mark", not "how fast are you", and pooling a horse's runs across grades
+# treats those as the same measurement.
+#
+# The raw gap is 0.332 fmrp a grade, measured on race-median times with a fixed
+# effect per meeting (absorbing track speed and going) and per venue, surface
+# and distance -- 1,684 races, R2 0.9994. Almost none of that should be
+# corrected: HKJC has already moved the horse with its grade, so most of the
+# difference is gone before SARR sees it. Correcting the whole of it makes the
+# model significantly WORSE (-0.0141, p 0.047).
+#
+# 0.0788 is what predicts, obtained two independent ways that agree: the
+# coefficient on a weighted class gap with profile fmrp and place rate held
+# fixed (t 3.47, p 5.3e-04), and the interior optimum of an out-of-sample sweep
+# over 306 held-out races. So the handicap absorbs about three quarters of the
+# grade and this is the quarter it leaves behind.
+#
+# Measured on seven seasons, 5,650 races: +0.0015, t 3.19, p 0.0014. It
+# replicates on the 3,943 races that were never in the fitting window at the
+# same size (+0.0015, p 0.0038), and it is POSITIVE IN ALL SEVEN SEASONS, which
+# is the reason to trust a term this small -- each season alone is underpowered.
+CLASS_STEP = 0.0788
+
 TRAJ_MIN_TRUST = 0.5
 
 VET_TRUST_POOLED = 0.21
@@ -157,21 +186,6 @@ def parse_sections(s) -> list[float]:
 
 
 
-def going_band(g) -> str:
-    if g is None:
-        return "unknown"
-    g = str(g).strip().upper()
-    if g in ("SE", "SEALED", "WF", "WS", "AWT"):
-        return "awt"
-    if g in ("FM", "F", "HD", "GF"):
-        return "firm"
-    if g == "G":
-        return "good"
-    if g in ("GY", "Y", "S", "SOFT", "HEAVY", "H"):
-        return "soft"
-    return "unknown"
-
-
 def dist_weight(delta_m: float) -> float:
     d = abs(delta_m)
     if d == 0:
@@ -221,12 +235,47 @@ def annotate_runs(db: pd.DataFrame) -> pd.DataFrame:
     return d
 
 
+def class_grade(value) -> float | None:
+    """A race class as a number, or None for anything that is not one.
+
+    Griffin and Group races carry no grade on this scale and must not be
+    coerced onto it; they simply do not get the adjustment.
+    """
+    try:
+        return float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
 def build_profile(runs: list[dict], today_dist, today_venue,
-                  today_surface, today_going=None) -> dict | None:
-    """runs must be ordered MOST RECENT FIRST."""
+                  today_surface, *, today_class=None) -> dict | None:
+    """runs must be ordered MOST RECENT FIRST.
+
+    `today_class` is keyword-only on purpose. It took the position `today_going`
+    used to hold, and a caller still passing a going string positionally would
+    have had it read as a class, fail to parse, and silently switch the class
+    term off -- a no-op that looks like a working model.
+    """
     if not runs:
         return None
     runs = runs[:MAX_PRIOR_RUNS]
+
+    # Every fmrp is restated in TODAY'S grade before anything reads it, so the
+    # weighted mean and the trajectory line are both computed on figures that
+    # mean the same thing. Doing it here rather than to the aggregates is the
+    # same arithmetic -- both are linear in fmrp -- and it is the version that
+    # cannot disagree with itself. Only fmrp moves: the sectional deviations
+    # are already relative to the same field.
+    grade_today = class_grade(today_class)
+    if grade_today is not None:
+        restated = []
+        for r in runs:
+            g, f = class_grade(r.get("race_class")), r.get("fmrp")
+            if g is None or f is None or (isinstance(f, float) and np.isnan(f)):
+                restated.append(r)
+            else:
+                restated.append({**r, "fmrp": f + CLASS_STEP * (g - grade_today)})
+        runs = restated
 
     weights = []
     for i, run in enumerate(runs):
@@ -279,23 +328,23 @@ def build_profile(runs: list[dict], today_dist, today_venue,
     fr = [v for v in fr if not pd.isna(v)]
     slope = stats.linregress(np.arange(len(fr)), fr).slope if len(fr) >= 3 else 0.0
 
-    places = [r.get("place", 99) for r in runs]
-    place_rate = sum(1 for p in places if p <= 3) / max(len(places), 1)
-
-    place_rate_band = None
-    if today_going:
-        band = going_band(today_going)
-        if band != "unknown":
-            bp = [r.get("place", 99) for r in runs
-                  if going_band(r.get("going", "")) == band]
-            if len(bp) >= GOING_BAND_MIN_N:
-                place_rate_band = sum(1 for p in bp if p <= 3) / len(bp)
+    # THE PLACE RATE IS WEIGHTED LIKE EVERYTHING ELSE HERE. It was a flat count
+    # over up to fifteen runs -- the only term in this function that ignored
+    # recency, distance, venue and surface -- while carrying the SECOND largest
+    # realised influence of any term in the model. A win last start counted for
+    # exactly as much as a ninth place eight months earlier. HARMONY N BLESSED
+    # into 2026-09-09 won its previous start and still showed the weakest place
+    # rate in the race, 3 from 15; weighted, it is 0.38 and sixth of twelve
+    # rather than 0.20 and tenth. It moves both ways: KING MILES goes 0.40 to
+    # 0.24 because every one of its placings is old.
+    placed = np.array([1.0 if (r.get("place") or 99) <= 3 else 0.0 for r in runs])
+    place_rate = (float((weights * placed).sum() / weights.sum())
+                  if weights.sum() > 0 else 0.0)
 
     return {
         "fmrp": wmean("fmrp"), "lsa": wmean("late_dev"), "esz": wmean("early_dev"),
         "avg_ssi": wmean("ssi"), "style": style, "rating": rating,
-        "traj": slope, "place_rate": place_rate,
-        "place_rate_band": place_rate_band, "n_runs": len(runs),
+        "traj": slope, "place_rate": place_rate, "n_runs": len(runs),
     }
 
 
@@ -336,9 +385,15 @@ def contributions(profile: dict, distance, venue, med_rating,
         rat = med_rating
     f_rating = 0.0 if (pd.isna(rat) or pd.isna(med_rating)) else -(rat - med_rating) / 10.0
 
-    pr = profile.get("place_rate_band")
-    if pr is None:
-        pr = profile["place_rate"]
+    # The going-band place rate used to REPLACE the figure below whenever it
+    # was available, which made it a gate in front of the term rather than a
+    # refinement of it -- and it is why weighting the place rate measured as
+    # nothing on its own (-0.0002, p 0.74) while weighting it with the band
+    # gone is worth +0.0043 (p 0.0001). It also never fired live: HKJC
+    # publishes the going on the day, so an unrun card has none and the band
+    # was inert on the only surface anyone reads. It existed in the backtest
+    # and nowhere else, which is the worst place for a term to exist.
+    pr = profile["place_rate"]
 
     return {
         "fmrp": WEIGHTS["f_fmrp"] * nan0(profile["fmrp"]),

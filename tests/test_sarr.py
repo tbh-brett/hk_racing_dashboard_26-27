@@ -241,13 +241,13 @@ def test_a_flagged_run_moves_the_profile_less_than_a_clean_one():
              "style": "On-Pace", "rating": 60, "place": 1, "distance": 1200,
              "venue": "HV", "surface": "Turf", "going": "G"} for _ in range(3)]
     bad = dict(good[0], fmrp=3.4, place=12)
-    clean = sarr.build_profile([bad, *good], 1200, "HV", "Turf", "G")
+    clean = sarr.build_profile([bad, *good], 1200, "HV", "Turf")
     flagged = sarr.build_profile([dict(bad, vet_category="CARDIAC"), *good],
-                                 1200, "HV", "Turf", "G")
+                                 1200, "HV", "Turf")
     assert flagged["fmrp"] < clean["fmrp"]
     # ... and still worse than if the run had never happened, because the
     # weight is a discount and not a delete.
-    assert flagged["fmrp"] > sarr.build_profile(good, 1200, "HV", "Turf", "G")["fmrp"]
+    assert flagged["fmrp"] > sarr.build_profile(good, 1200, "HV", "Turf")["fmrp"]
 
 
 def test_a_flagged_run_is_kept_out_of_the_trajectory_line():
@@ -259,10 +259,10 @@ def test_a_flagged_run_is_kept_out_of_the_trajectory_line():
              "style": "On-Pace", "rating": 60, "place": 1, "distance": 1200,
              "venue": "HV", "surface": "Turf", "going": "G"}
             for v in (3.4, -0.65, -0.80, -1.17)]
-    through_all = sarr.build_profile(runs, 1200, "HV", "Turf", "G")["traj"]
+    through_all = sarr.build_profile(runs, 1200, "HV", "Turf")["traj"]
     runs[0]["vet_category"] = "CARDIAC"
-    flagged = sarr.build_profile(runs, 1200, "HV", "Turf", "G")["traj"]
-    without = sarr.build_profile(runs[1:], 1200, "HV", "Turf", "G")["traj"]
+    flagged = sarr.build_profile(runs, 1200, "HV", "Turf")["traj"]
+    without = sarr.build_profile(runs[1:], 1200, "HV", "Turf")["traj"]
 
     # The flagged point is not on the line at all -- exactly as if the run had
     # not happened. That is stricter than "less steep" and is the property the
@@ -446,3 +446,73 @@ def test_a_partial_meeting_is_not_mistaken_for_a_complete_one(tmp_path):
                      (date,))
     assert not _held(conn, date)
     conn.close()
+
+
+# ── class, and the place rate ────────────────────────────────────────────────
+
+def _run(fmrp, race_class="4", **kw):
+    return {"fmrp": fmrp, "late_dev": 0.0, "early_dev": 0.0, "ssi": 0.0,
+            "style": "On-Pace", "rating": 60, "place": 1, "distance": 1200,
+            "venue": "HV", "surface": "Turf", "race_class": race_class, **kw}
+
+
+def test_a_figure_earned_in_a_weaker_grade_is_worth_less():
+    """fmrp is measured against the horse's own race, so it cannot see how good
+    that field was: at 1200m a Class 5 winner scores BETTER than a Class 1 one
+    (-0.84 against -0.78) while running 1.42 seconds slower."""
+    weak = [_run(-1.0, "5") for _ in range(3)]
+    strong = [_run(-1.0, "2") for _ in range(3)]
+    into_c3 = lambda rs: sarr.build_profile(rs, 1200, "HV", "Turf", today_class="3")
+    assert into_c3(weak)["fmrp"] > into_c3(strong)["fmrp"]
+    # the size is the fitted step per grade, and it is signed the right way
+    assert into_c3(weak)["fmrp"] - into_c3(strong)["fmrp"] == pytest.approx(
+        3 * sarr.CLASS_STEP, abs=1e-9)
+
+
+def test_a_run_in_the_same_grade_is_untouched():
+    same = [_run(-1.0, "3") for _ in range(3)]
+    assert sarr.build_profile(same, 1200, "HV", "Turf", today_class="3")["fmrp"] \
+        == pytest.approx(-1.0)
+
+
+def test_a_race_with_no_grade_on_the_scale_is_left_alone():
+    """Griffin and Group races carry no class number and must not be coerced
+    onto the scale."""
+    assert sarr.class_grade("Griffin Race") is None
+    assert sarr.class_grade("Group 1") is None
+    assert sarr.class_grade(None) is None
+    assert sarr.class_grade("3") == 3.0
+    runs = [_run(-1.0, "Griffin Race") for _ in range(3)]
+    assert sarr.build_profile(runs, 1200, "HV", "Turf", today_class="3")["fmrp"] \
+        == pytest.approx(-1.0)
+    # and an unknown class TODAY switches the term off rather than guessing
+    graded = [_run(-1.0, "5") for _ in range(3)]
+    assert sarr.build_profile(graded, 1200, "HV", "Turf",
+                              today_class="Group 1")["fmrp"] == pytest.approx(-1.0)
+
+
+def test_the_place_rate_is_weighted_like_every_other_term():
+    """It was the only term in build_profile that ignored recency, while
+    carrying the second largest realised influence in the model. A win last
+    start counted for exactly as much as a ninth place eight months earlier."""
+    recent_win = [_run(0.0, place=1)] + [_run(0.0, place=9) for _ in range(9)]
+    old_win = [_run(0.0, place=9) for _ in range(9)] + [_run(0.0, place=1)]
+    a = sarr.build_profile(recent_win, 1200, "HV", "Turf")["place_rate"]
+    b = sarr.build_profile(old_win, 1200, "HV", "Turf")["place_rate"]
+    assert a > b, "a win last start must count for more than a win ten back"
+    # both still sit inside [0, 1] -- it is a rate, not a score
+    assert 0.0 <= b < a <= 1.0
+
+
+def test_the_going_band_no_longer_gates_the_place_rate():
+    """It REPLACED the place rate whenever it was available, so weighting the
+    rate measured as nothing while the band was in front of it. It also never
+    fired live -- HKJC publishes the going on the day, so an unrun card has
+    none -- which made it a term that existed in the backtest and nowhere
+    else."""
+    profile = sarr.build_profile([_run(0.0, place=1) for _ in range(4)],
+                                 1200, "HV", "Turf")
+    assert "place_rate_band" not in profile
+    parts = sarr.contributions(profile, 1200, "HV", 60.0)
+    assert parts["wpr"] == pytest.approx(
+        sarr.WEIGHTS["f_wpr"] * (-profile["place_rate"] * 5))

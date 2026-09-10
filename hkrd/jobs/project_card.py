@@ -46,7 +46,7 @@ HIST_SQL = """
 SELECT r.race_date, r.race_no, r.horse_no, r.horse_name, r.place,
        r.finish_time, r.draw, r.rating,
        r.section_times AS sectiontimes, r.running_positions,
-       a.distance, a.going, a.venue, a.surface
+       a.distance, a.going, a.venue, a.surface, a.race_class
 FROM runners r
 JOIN races a ON a.race_date = r.race_date AND a.race_no = r.race_no
 WHERE r.finish_time IS NOT NULL AND r.race_date < ?
@@ -59,7 +59,7 @@ ORDER BY r.race_date, r.race_no, r.horse_no
 # somebody will one day be tempted.
 CARD_SQL = """
 SELECT r.race_date, r.race_no, r.horse_no, r.horse_name, r.draw, r.rating,
-       a.distance, a.going, a.venue, a.surface
+       a.distance, a.going, a.venue, a.surface, a.race_class
 FROM runners r
 JOIN races a ON a.race_date = r.race_date AND a.race_no = r.race_no
 WHERE r.race_date = ?
@@ -142,8 +142,8 @@ def project(date: str, db: Path | None = None, *,
                     profiles.append(None)
                     continue
                 profiles.append(sarr.build_profile(
-                    prior, rec["distance"], rec["venue"],
-                    rec["surface"], rec["going"]))
+                    prior, rec["distance"], rec["venue"], rec["surface"],
+                    today_class=rec.get("race_class")))
 
             esz_values = [
                 (None if p is None or p.get("esz") is None

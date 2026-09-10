@@ -44,7 +44,7 @@ RUNS_SQL = """
 SELECT r.race_date, r.race_no, r.horse_no, r.horse_name, r.place,
        r.finish_time, r.draw, r.rating,
        r.section_times AS sectiontimes, r.running_positions,
-       a.distance, a.going, a.venue, a.surface
+       a.distance, a.going, a.venue, a.surface, a.race_class
 FROM runners r
 JOIN races a ON a.race_date = r.race_date AND a.race_no = r.race_no
 WHERE r.finish_time IS NOT NULL
@@ -55,7 +55,7 @@ CARD_SQL = """
 SELECT r.race_date, r.race_no, r.horse_no, r.horse_name, r.place,
        r.finish_time, r.draw, r.rating,
        r.section_times AS sectiontimes, r.running_positions,
-       a.distance, a.going, a.venue, a.surface
+       a.distance, a.going, a.venue, a.surface, a.race_class
 FROM runners r
 JOIN races a ON a.race_date = r.race_date AND a.race_no = r.race_no
 WHERE r.race_date = ?
@@ -254,7 +254,8 @@ def score_runners(runs: pd.DataFrame, targets: pd.DataFrame, *,
                 report.skipped_no_history += 1
                 continue
             profile = sarr.build_profile(
-                prior, rec["distance"], rec["venue"], rec["surface"], rec["going"])
+                prior, rec["distance"], rec["venue"], rec["surface"],
+                today_class=rec.get("race_class"))
             if profile is None:
                 report.skipped_no_history += 1
                 continue
