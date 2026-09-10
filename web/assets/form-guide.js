@@ -17,7 +17,7 @@ import { el, $, DASH, MINUS, renderNav, styleClass, styleOrdinal,
          tagLabel } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
-import { loadTags, renderReview } from './review.js';
+import { loadTags, renderReview, trialSubject } from './review.js';
 
 
 /* The trend tint's threshold, measured rather than chosen. Over 12,540 six-run
@@ -424,6 +424,25 @@ function trialBand(runner) {
       row.append(mine);
     }
 
+    // WRITTEN FROM HERE, not only read here. The reason a trial note earns its
+    // keep beside a race is the reason it should be writable beside one: the
+    // moment you decide the trial meant something is the moment the horse
+    // turns up in a field, and until now that meant leaving the form guide,
+    // finding the batch on the Trials page and coming back.
+    //
+    // The same control the run rows below carry, opening the same form from
+    // `review.js` — note first, blackbook behind one deliberate click. Only
+    // the SUBJECT differs: a trial has a batch number where a race has a race
+    // number, which is `trialSubject`'s whole job.
+    const marks = el('div', 'marks');
+    const note = el('button', `icon${t.note ? ' has' : ''}`, '✎');
+    note.title = t.note ? t.note.note : 'note on this trial';
+    note.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showTrialNote(e, runner, t);
+    });
+    marks.append(note);
+
     // The footage the mark is a summary of. A ++ nobody can watch is a score
     // taken on trust, which is the opposite of how every other figure here is
     // treated.
@@ -432,8 +451,10 @@ function trialBand(runner) {
     if (turl) {
       const play = externalLink(turl, '▶', 'icon play');
       play.title = `trial replay — ${t.trial_date} batch ${t.trial_no}`;
-      row.append(play);
+      play.addEventListener('click', (e) => e.stopPropagation());
+      marks.append(play);
     }
+    row.append(marks);
     band.append(row);
   });
   return band;
@@ -1054,6 +1075,40 @@ function showNote(event, runner, run) {
   placePopover(event);
 }
 
+/** The same form, opened on a TRIAL rather than a run.
+ *
+ *  One module and one form — `review.js` — so a note written here and a note
+ *  written on the Trials page cannot end up with different tag vocabularies or
+ *  different rules about what a promotion means. What changes is the subject:
+ *  a trial is addressed by its batch number, is stored in `trial_notes` rather
+ *  than `run_notes`, and promotes with `source_trial_no` so the book links
+ *  back to a trial instead of naming a race that was never run.
+ */
+function showTrialNote(event, runner, trial) {
+  renderReview($('popover'), {
+    horseName: runner.horse_name,
+    subject: trialSubject(trial),
+    existingNote: trial.note,
+    booked: state.guide?.blackbook?.[runner.horse_name],
+    // The band is rendered from `state.trials`, and the saved note is written
+    // back onto the same object the row was drawn from — re-fetching the whole
+    // card's trials to learn one sentence we already have would blank the band
+    // and redraw it for no new information.
+    onSaved: (saved) => {
+      trial.note = saved;
+      hidePopover();
+      render();
+    },
+    onPromoted: (entry) => {
+      state.guide.blackbook[runner.horse_name] = entry;
+      hidePopover();
+      render();
+    },
+    onClose: hidePopover,
+  });
+  placePopover(event);
+}
+
 
 /* ── render ──────────────────────────────────────────────────────────────── */
 
@@ -1066,7 +1121,7 @@ function renderFoot() {
   add('TRIP TROUBLE', 'trip');
   add('■ TRAINER CHANGE', 'violet');
   add('WEIGHT SWING', 'swing');
-  add('✎ RUN NOTE', 'book');
+  add('✎ NOTE — RUN OR TRIAL', 'book');
   add('TIMES m:ss.xx · SPLITS ss.xx');
   add('FIGURE 100 = PAR', 'right');
 }

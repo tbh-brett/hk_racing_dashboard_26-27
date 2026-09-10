@@ -640,7 +640,10 @@ function sortRunners(runners) {
       case 'no': return r.horse_no ?? 0;
       case 'name': return r.horse_name ?? '';
       // Never alphabetical: Closer, Leader, Midfield, On-Pace is meaningless.
-      case 'style': return STYLE_ORDER.indexOf(r.last_run?.pace_style ?? '') + 1 || 99;
+      // The habitual style, which is what the column shows — sorting on the
+      // last run while displaying the habit would put the rows in an order the
+      // badges beside them do not explain.
+      case 'style': return STYLE_ORDER.indexOf(r.running_style?.style ?? '') + 1 || 99;
       case 'draw': return r.draw ?? 99;
       case 'jockey': return r.jockey ?? '';
       case 'trainer': return r.trainer ?? '';
@@ -662,6 +665,55 @@ function sortRunners(runners) {
     const c = typeof x === 'string' ? x.localeCompare(y) : x - y;
     return c * state.sortDir;
   });
+}
+
+/* HOW THE HORSE RUNS — the habitual style, not the last run's.
+ *
+ * The column used to read `last_run.pace_style`, which is one observation. A
+ * Leader ridden quietly once showed here as a Midfield, and the Speed Map next
+ * door drew the same horse on the lead in the same race, because a projection
+ * has always used the habit. The server sends the habit now, from
+ * `derive.pace.habitual_style` — the same function SARR's own style term is
+ * scored on — with the tally it was read off.
+ *
+ * The badge is the answer and the tooltip is the evidence: how many classified
+ * runs, the count per style, and what the LAST one was. That last part is the
+ * one thing the habit throws away, and it is worth a glance — a Closer whose
+ * most recent run was on the lead is a horse whose stable has changed its
+ * mind, which is exactly the kind of thing a single-observation column got
+ * right by accident and a habit would hide. So it is marked rather than
+ * dropped: a dot on the badge, and the sentence on the hover.
+ */
+function styleCell(r) {
+  const s = r.running_style;
+  const badge = styleBadge(s?.style, { chip: false });
+  if (!s || !s.style) {
+    badge.title = 'no classified run on record — this horse has no habitual '
+      + 'style, and a badge invented from nothing would read like a measured one';
+    return badge;
+  }
+  const tally = STYLE_ORDER
+    .filter((k) => s.counts?.[k])
+    .map((k) => `${k} ${s.counts[k]}`)
+    .join(' · ');
+  const drifted = Boolean(s.last && s.last !== s.style);
+  badge.title = `${s.style} over ${s.n} classified run${s.n === 1 ? '' : 's'}`
+    + `${tally ? ` — ${tally}` : ''}`
+    + `${s.last ? ` · last start ${s.last}` : ''}`
+    + (drifted ? ' — its most recent run was not its habit' : '')
+    + '\nthe habit, weighted to the last run, not the last run alone';
+  if (drifted) {
+    // A dot, not a second badge. The habit is the answer; that the last start
+    // disagreed with it is a footnote on the same answer, and giving it a
+    // badge of its own would put two styles in one column again.
+    const mark = el('span', 'style-drift', '•');
+    mark.title = badge.title;
+    const box = el('span', 'style-cell');
+    box.append(badge);
+    box.append(mark);
+    return box;
+  }
+  return badge;
 }
 
 /* GEAR, and what is happening to it.
@@ -918,7 +970,7 @@ function cardRow(r, index) {
   tr.append(name);
 
   const st = el('td');
-  st.append(styleBadge(r.last_run?.pace_style, { chip: false }));
+  st.append(styleCell(r));
   tr.append(st);
 
   tr.append(el('td', 'c-num', drawText(r.draw)));
@@ -1350,7 +1402,9 @@ function renderFoot() {
     + 'THE POOL OPENS THE DAY BEFORE AND TAKES ALMOST NOTHING UNTIL MORNING');
   const blind = gearCaveat(state.card?.runners ?? []);
   if (blind) bits.push(blind);
-  bits.push('STYLE SORTS LEADER → ON-PACE → MIDFIELD → CLOSER');
+  bits.push('STYLE IS THE HABIT OVER THE LAST 15 CLASSIFIED RUNS, '
+    + 'WEIGHTED TO THE LATEST — NOT THE LAST RUN ALONE · '
+    + 'SORTS LEADER → ON-PACE → MIDFIELD → CLOSER');
   bits.push('MODEL AUC .727 · MARKET AUC .785');
   foot.replaceChildren(...bits.map((b) => el('span', null, b)));
   foot.append(el('span', 'keys', '↑↓ runner · 1–9 race · click header to sort'));

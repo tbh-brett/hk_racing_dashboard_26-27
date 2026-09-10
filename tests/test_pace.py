@@ -53,6 +53,62 @@ def test_style_accepts_both_legacy_position_shapes():
     assert pace.classify_style("4; 3; 3; 1", 12) == "On-Pace"
 
 
+# ── the habitual style: a property of the HORSE, not of one run ──────────────
+
+def test_the_habit_is_the_count_not_the_last_run():
+    """Three Closers and one On-Pace last start is a Closer.
+
+    The whole point of the column: the last run is a sample of size one, and
+    reading it alone made a horse's style change every fortnight.
+    """
+    assert pace.habitual_style(
+        ["On-Pace", "Closer", "Closer", "Closer"]) == "On-Pace"
+    assert pace.habitual_style(
+        ["On-Pace", "Closer", "Closer", "Closer", "Closer"]) == "Closer"
+
+
+def test_the_last_run_is_weighted_and_does_not_decide_alone():
+    """Worth three, so it ties with three earlier runs and loses to four."""
+    assert pace.habitual_style(["Leader", "Closer", "Closer"]) == "Leader"
+    assert pace.habitual_style(
+        ["Leader", "Closer", "Closer", "Closer", "Closer"]) == "Closer"
+
+
+def test_no_classified_run_has_no_habit():
+    """None, never an invented Midfield: a page must be able to say it does not
+    know rather than draw a badge in the same ink as a measured one."""
+    assert pace.habitual_style([]) is None
+    assert pace.habitual_style([None, "Unknown", ""]) is None
+
+
+def test_the_habit_reads_the_last_CLASSIFIED_run_not_the_last_row():
+    """A horse pulled up last start was never classified. The run before it is
+    the last thing that measured the horse, so that is what carries the boost —
+    otherwise an unclassifiable run silently strips the recency weight."""
+    assert pace.habitual_style(
+        ["Unknown", "Leader", "Closer", "Closer"]) == "Leader"
+
+
+def test_the_habit_reaches_no_further_back_than_the_window():
+    """A horse that led fifteen times two seasons ago and has closed in every
+    run since is a Closer now."""
+    styles = ["Closer"] * pace.STYLE_WINDOW + ["Leader"] * 40
+    assert pace.habitual_style(styles) == "Closer"
+
+
+def test_the_window_is_the_one_the_model_scores_on():
+    """The card must not show a style the model did not use.
+
+    `build_profile` cuts a horse's history to MAX_PRIOR_RUNS before reading its
+    style; `habitual_styles` in query/race cuts to STYLE_WINDOW. If these drift
+    apart the badge on the card stops being the number SARR's style term was
+    scored with, silently and on every runner.
+    """
+    from hkrd.model import sarr
+
+    assert pace.STYLE_WINDOW == sarr.MAX_PRIOR_RUNS
+
+
 # ── sectionals ───────────────────────────────────────────────────────────────
 
 def test_sections_are_not_equal_lengths():

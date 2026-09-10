@@ -16,10 +16,14 @@ from __future__ import annotations
 
 import pytest
 
+from pathlib import Path
+
 from hkrd.jobs import write_notes
 from hkrd.query import trials as tq
 from hkrd.store import upsert
 from hkrd.store.connect import get_conn, init_db, transaction
+
+ROOT = Path(__file__).resolve().parent.parent
 
 TRIAL, RACE = "2026-08-21", "2026-08-21"
 
@@ -112,6 +116,39 @@ def test_the_note_reaches_the_form_guide_s_trial_band(db) -> None:
     assert len(noted) == 1
     assert noted[0]["trial_no"] == 1
     assert noted[0]["note"]["note"] == "never asked"
+
+
+def test_the_form_guide_writes_the_note_where_it_reads_it() -> None:
+    """The band SHOWED a trial note and could not write one.
+
+    The reason a trial note earns its keep beside a race is the reason it has
+    to be writable beside one: the moment you decide the trial meant something
+    is the moment the horse turns up in a field, and getting there meant
+    leaving the form guide for the Trials page and coming back.
+
+    Asserted on the source rather than the DOM because there is no browser
+    here. What it checks is the wiring the feature is: the Form Guide opens
+    `review.js` on a TRIAL subject, which is what routes the note to
+    `trial_notes` and the promotion to `source_trial_no`. Calling it with a
+    run subject would file a note on a race that morning instead, silently.
+    """
+    src = (ROOT / "web" / "assets" / "form-guide.js").read_text(encoding="utf-8")
+    assert "trialSubject" in src, (
+        "the Form Guide's trial band does not open the review form on a trial")
+    # And through the one shared form, never a second copy. `test_smoke.py`
+    # guards the promotion call itself; this guards the note beside it.
+    assert "api.saveTrialNote" not in src, (
+        "the trial note is written from the page instead of through review.js")
+
+
+def test_the_two_notes_are_addressed_differently_by_the_same_form() -> None:
+    """One form, two subjects. A trial has a batch number where a race has a
+    race number and the two share a date, which is why they are separate
+    tables — so the subject, not a second form, is what tells them apart."""
+    src = (ROOT / "web" / "assets" / "review.js").read_text(encoding="utf-8")
+    assert "export function runSubject" in src
+    assert "export function trialSubject" in src
+    assert "source_trial_no" in src
 
 
 def test_a_trial_sourced_entry_is_marked_as_a_trial_not_a_race(db) -> None:

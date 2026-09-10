@@ -248,6 +248,13 @@ table.card td { padding: 6px 8px; }
   color: var(--alert); border-color: var(--alert); font-weight: 600;
   cursor: help;
 }
+/* THE HABITUAL STYLE, and the note that the last start disagreed with it.
+   The badge is the answer; the dot is a footnote on that answer, not a second
+   badge — two styles in one column is what this change exists to end. Faint,
+   because it is a "look again", never a signal in itself. */
+.style-cell { display: flex; align-items: baseline; gap: 4px; }
+.style-drift { color: var(--text-faint); font-size: 10px; cursor: help; }
+
 .odds-win { font-size: 16px; font-weight: 600; line-height: 1.05; }
 .odds-place { font-size: var(--fs-sm); color: var(--text-faint); line-height: 1.15; }
 .mv { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
