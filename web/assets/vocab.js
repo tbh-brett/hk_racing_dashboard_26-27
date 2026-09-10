@@ -79,6 +79,53 @@ export function styleBadge(style, opts) {
   return el('span', styleClass(style, opts), style ?? DASH);
 }
 
+/** HOW THE HORSE RUNS — the habitual style, with the tally it was read off.
+ *
+ *  Takes the server's `running_style` object, not a bare string: a card asking
+ *  "where does this horse sit" is asking about the horse, and answering it off
+ *  the last run alone made a Leader ridden quietly once read as a Midfield for
+ *  the race about to be bet into. `derive.pace.habitual_style` is the rule; it
+ *  is also the rule SARR's own style term is scored on, so the badge and the
+ *  model cannot disagree.
+ *
+ *  Here rather than on each page for the reason this module exists: the badge
+ *  is on Race Day, the Form Guide and the Bets entry card, and three copies is
+ *  how the plain-text fourth one came about.
+ *
+ *  The badge is the answer and the tooltip is the evidence. A horse whose most
+ *  recent start was NOT its habit takes a dot — that is the one thing a habit
+ *  throws away and it is worth a glance, and it is a footnote on the answer
+ *  rather than a second badge, because two styles in one column is the state
+ *  this replaced.
+ */
+export function habitualStyleBadge(running, opts) {
+  const badge = styleBadge(running?.style, opts);
+  if (!running || !running.style) {
+    badge.title = 'no classified run on record — this horse has no habitual '
+      + 'style, and a badge invented from nothing would read like a measured one';
+    return badge;
+  }
+  const tally = STYLE_ORDER
+    .filter((k) => running.counts?.[k])
+    .map((k) => `${k} ${running.counts[k]}`)
+    .join(' · ');
+  const drifted = Boolean(running.last && running.last !== running.style);
+  badge.title = `${running.style} over ${running.n} classified `
+    + `run${running.n === 1 ? '' : 's'}`
+    + `${tally ? ` — ${tally}` : ''}`
+    + `${running.last ? ` · last start ${running.last}` : ''}`
+    + (drifted ? ' — its most recent run was not its habit' : '')
+    + '\nthe habit, weighted to the last run, not the last run alone';
+  if (!drifted) return badge;
+
+  const mark = el('span', 'style-drift', '•');
+  mark.title = badge.title;
+  const box = el('span', 'style-cell');
+  box.append(badge);
+  box.append(mark);
+  return box;
+}
+
 /* ── trip trouble ─────────────────────────────────────────────────────────
  * Tags extracted from the stewards' commentary. Routine veterinary entries are
  * not trip trouble and must not render as though they were — a badge that

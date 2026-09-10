@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from collections.abc import Sequence
 from typing import Any
 
-from hkrd.query.race import get_horse_form, get_race
+from hkrd.query.race import get_horse_form, get_race, habitual_styles
 from hkrd.query.types import FormGuide, RunnerLine
 from hkrd.query import pace as pace_q
 from hkrd.store.connect import Connection, get_conn
@@ -41,6 +41,17 @@ def build_form_guide(date: str, race_no: int, *, history: int = 6,
                     get_horse_form(r.horse_name, limit=history, before=date, conn=conn))
                 for r in race.runners
             },
+            # HOW EACH HORSE RUNS. The card's STYLE column read the most recent
+            # run's style, which is one observation and the single worst
+            # estimator of the next -- and the six runs the page shows are not
+            # enough to correct it either, since a horse's habit is read off
+            # its record and a habit is not what six rows happen to contain.
+            #
+            # Computed here rather than decorated onto the payload in the
+            # router: the card is assembled in this function, and the habit is
+            # a fact about the runners on it. One query for the whole field.
+            styles=habitual_styles([r.horse_name for r in race.runners],
+                                   before=date, conn=conn),
         )
     finally:
         if own:

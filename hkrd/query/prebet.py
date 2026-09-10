@@ -90,8 +90,17 @@ def entry_card(date: str, race_no: int, *,
                 "horse_no": r["horse_no"], "horse_name": r["horse_name"],
                 "draw": r.get("draw"), "jockey": r.get("jockey"),
                 "trainer": r.get("trainer"),
-                "pace_style": r.get("pace_style"),
-                "style_ordinal": r.get("style_ordinal"),
+                # HOW THE HORSE RUNS. `pace_style` was read here, which on
+                # this page is TODAY'S run -- a column on an entry card for a
+                # race that has not been run, sourced from that race's own
+                # result. It is NULL until the race is over, so the STYLE
+                # column was a dash on every card this page exists to price,
+                # and the moment it stopped being a dash the bet was already
+                # struck. `running_style` is the habit `build_card` reads from
+                # `derive.pace.habitual_style` -- the same badge Race Day and
+                # the Form Guide show, available before the off because it is
+                # a fact about the horse rather than about this race.
+                "running_style": r.get("running_style"),
                 "win_odds": r.get("win_odds"),
                 # From the snapshot, not the runners row: the design puts win
                 # and place at equal weight here and both must be the same
