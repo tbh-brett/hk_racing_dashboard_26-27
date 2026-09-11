@@ -52,6 +52,9 @@ const state = {
   open: new Set(), openRuns: new Set(), focus: null,
   sort: null, sortDir: 1, fit: null, fitFor: null,
   notes: {}, h2h: {}, quality: {}, trials: {}, popover: null,
+  // One-shot: the ?horse= arrival opens that horse once. Re-opening it on
+  // every render would make the row impossible to collapse.
+  focusedFromUrl: false,
 };
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
@@ -1158,12 +1161,45 @@ function render() {
   }
   const rows = [];
   sortedRunners().forEach((r) => {
-    rows.push(horseRow(r));
+    const row = horseRow(r);
+    // Tagged so the ?horse= arrival can find it without re-deriving the sort.
+    row.dataset.horse = r.horse_name;
+    rows.push(row);
     if (state.open.has(r.horse_no)) rows.push(detailBlock(r));
   });
   host.replaceChildren(...(rows.length ? rows : [el('div', 'fit-sub', 'NO RUNNERS')]));
   renderAside();
   renderFoot();
+}
+
+/** Open and show the horse the search sent us to.
+ *
+ * The palette has always put `?horse=NAME` on the URL and this page has never
+ * read it, so arriving from a search meant landing on a card and hunting for
+ * the name by eye. It now opens that horse the way a click would and scrolls
+ * it into view.
+ *
+ * Runs once per arrival, not on every render: re-opening a horse the reader
+ * has since collapsed would make the row impossible to close.
+ */
+function focusSearchedHorse() {
+  if (state.focusedFromUrl) return;
+  const wanted = new URLSearchParams(window.location.search).get('horse');
+  if (!wanted || !state.guide) return;
+  const runner = (state.guide.race?.runners ?? []).find(
+    (r) => r.horse_name?.toUpperCase() === wanted.toUpperCase());
+  if (!runner) return;                 // not in this race; leave the card alone
+  state.focusedFromUrl = true;
+  state.open.add(runner.horse_no);
+  loadH2H(runner);
+  render();
+  const row = $('runners').querySelector(
+    `[data-horse="${CSS.escape(runner.horse_name)}"]`);
+  if (row) {
+    row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    row.classList.add('row-found');
+    setTimeout(() => row.classList.remove('row-found'), 2200);
+  }
 }
 
 /* ── interaction ─────────────────────────────────────────────────────────── */
@@ -1321,6 +1357,7 @@ async function loadRace() {
   state.notes = notes.notes ?? {};
   state.trials = trials.trials ?? {};
   render();
+  focusSearchedHorse();
 }
 
 /* Layer 1 owns the meeting; the page reacts to it. */

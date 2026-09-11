@@ -72,7 +72,11 @@ function build() {
   root.append(box);
   document.body.append(root);
 
-  input.addEventListener('input', () => { state.query = input.value; refresh(); });
+  input.addEventListener('input', () => {
+    state.query = input.value;
+    refresh();
+    searchHorses(state.query.trim());
+  });
   input.addEventListener('keydown', onKey);
   root.addEventListener('click', (e) => { if (e.target === root) close(); });
 }
@@ -122,17 +126,47 @@ function collect() {
       kind: 'HORSE',
       label: h.horse_name,
       hint: `${h.runs} runs · last ${h.last_run ?? '—'}`,
-      run: () => {
-        const url = new URL('form-guide.html', window.location.href);
-        url.searchParams.set('horse', h.horse_name);
-        if (context.date) url.searchParams.set('date', context.date);
-        window.location.href = url.toString();
-      },
+      run: () => goToHorse(h.horse_name),
     });
   });
 
   return items;
 }
+
+/** Open the horse where its news is.
+ *
+ * This used to build `form-guide.html?horse=NAME`, and the Form Guide never
+ * read that parameter -- so every horse landed on race 1 of the newest meeting
+ * and you went looking for it by eye. The rule lives on the server
+ * (`query.race.latest_appearance`) because it is a question about the data:
+ * the race on the newest card if it is declared, otherwise whichever of its
+ * last race or last trial came later.
+ *
+ * If the lookup fails the old behaviour is still better than nothing, so it
+ * falls back to the Form Guide rather than leaving the key press dead.
+ */
+async function goToHorse(name) {
+  let where = null;
+  try {
+    where = await api.horseWhere(name);
+  } catch {
+    where = null;
+  }
+  const url = where?.kind === 'trial'
+    ? new URL('trials.html', window.location.href)
+    : new URL('form-guide.html', window.location.href);
+  url.searchParams.set('horse', name);
+  if (where?.kind === 'race') {
+    url.searchParams.set('date', where.race_date);
+    url.searchParams.set('race', String(where.race_no));
+  } else if (where?.kind === 'trial') {
+    url.searchParams.set('trial_date', where.trial_date);
+  } else if (context.date) {
+    url.searchParams.set('date', context.date);
+  }
+  window.location.href = url.toString();
+}
+
 
 /* Order for an EMPTY query — what the palette shows the moment it opens.
  *
@@ -234,7 +268,9 @@ export function open(seed = '', { only = null } = {}) {
   input.select();
 
   // Horses are the long tail — fetched once, lazily, so opening the palette is
-  // instant and the list fills in behind the first keystroke.
+  // instant and the list fills in behind the first keystroke. This is the
+  // MOST RECENT 400, which is the right cold list and the wrong search index:
+  // see searchHorses.
   if (state.horses === null) {
     state.horses = [];
     api.horses(400).then((body) => {
@@ -242,6 +278,41 @@ export function open(seed = '', { only = null } = {}) {
       if (state.open) { state.items = collect(); refresh(); }
     }).catch(() => { /* the palette works without them */ });
   }
+}
+
+/* ── typing looks past the 400 ────────────────────────────────────────────── */
+
+/** Ask the server for horses matching what has been typed.
+ *
+ * The cold list is the 400 most recently run, and the archive holds 4,437
+ * horses — so nine out of ten names matched NOTHING, silently, and the palette
+ * looked like it had never heard of the horse. `/api/horses` has taken a `q`
+ * since it was written; the client never sent one.
+ *
+ * Debounced, because this fires on keystrokes, and guarded by `seq` so a slow
+ * answer for "go" cannot land after a fast one for "golden" and replace the
+ * better list with the staler one.
+ */
+let searchTimer = null;
+let searchSeq = 0;
+
+function searchHorses(q) {
+  clearTimeout(searchTimer);
+  if (q.length < 2) return;
+  const seq = (searchSeq += 1);
+  searchTimer = setTimeout(() => {
+    api.horses(40, q).then((body) => {
+      if (seq !== searchSeq || !state.open) return;
+      // Merged, not replaced: the cold list stays so clearing the box does not
+      // leave the palette emptier than it opened.
+      const seen = new Set((state.horses ?? []).map((h) => h.horse_name));
+      const extra = (body.horses ?? []).filter((h) => !seen.has(h.horse_name));
+      if (!extra.length) return;
+      state.horses = [...(state.horses ?? []), ...extra];
+      state.items = collect();
+      refresh();
+    }).catch(() => { /* typing still filters what is already loaded */ });
+  }, 140);
 }
 
 export function close() {

@@ -70,3 +70,13 @@ def trials_for_horses(horses: str, before: str | None = None,
     """
     names = [h.strip() for h in horses.split(",") if h.strip()]
     return {"trials": trials_q.for_horses(names, before=before, limit=limit)}
+
+
+@router.get("/api/trials/horse-search")
+def trials_horse_search(q: str | None = None, limit: int = 20) -> dict:
+    """Names for the Trials page typeahead, indexed over TRIALS.
+
+    Deliberately not `/api/horses`, which is built from `runners` and therefore
+    cannot see the 107 horses that have trialled and never raced.
+    """
+    return {"horses": trials_q.list_horses(limit=limit, query=q)}

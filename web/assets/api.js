@@ -72,6 +72,9 @@ export const api = {
   meeting: (date) => get(`/meeting/${date}`),
   horses: (limit = 400, q) => get(
     `/horses?limit=${limit}` + (q ? `&q=${encodeURIComponent(q)}` : '')),
+  // Where typing a horse's name should land: the race it runs in on the newest
+  // card, else whichever of its last race or last trial came later.
+  horseWhere: (name) => get(`/horse/${encodeURIComponent(name)}/where`),
   race: (date, no) => get(`/race/${date}/${no}`),
   horse: (name, limit = 6) => get(`/horse/${encodeURIComponent(name)}?limit=${limit}`),
   raceCard: (date, no) => get(`/raceday/${date}/${no}`),
@@ -139,9 +142,17 @@ export const api = {
     + (date ? `&date=${date}` : '')),
   trialStandouts: (days = 21) => get(`/trials/standouts?days=${days}`),
   trialCalibration: () => get('/trials/calibration'),
-  trialsForHorses: (horses, before) => get(
+  // Indexed over TRIALS, so a horse that has only ever trialled is findable.
+  trialHorseSearch: (q, limit = 20) => get(
+    `/trials/horse-search?limit=${limit}` + (q ? `&q=${encodeURIComponent(q)}` : '')),
+  // `limit` is per horse. The Form Guide's inline band wants the default two;
+  // the Trials page asking for one horse's whole record wants all of them, and
+  // silently dropped the argument before this parameter existed -- so a horse
+  // with three trials showed two and looked complete.
+  trialsForHorses: (horses, before, limit) => get(
     `/trials/horses?horses=${encodeURIComponent(horses.join(','))}`
-    + (before ? `&before=${before}` : '')),
+    + (before ? `&before=${before}` : '')
+    + (limit ? `&limit=${limit}` : '')),
   blackbookSummary: (today) => get(
     `/blackbook/summary${today ? `?today=${today}` : ''}`),
   setBlackbookStatus: (id, status) => post(

@@ -541,3 +541,13 @@
   color: var(--book); font-size: var(--fs-xs);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+
+/* The row the search sent you to. A brief tint, not a permanent state: it
+   answers "which one did I ask for" and then gets out of the way. */
+.row-found {
+  animation: row-found 2.2s ease-out;
+}
+@keyframes row-found {
+  0%, 45% { background: color-mix(in srgb, var(--edge) 22%, transparent); }
+  100%    { background: transparent; }
+}

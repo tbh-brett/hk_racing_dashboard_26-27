@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import pytest
 
+from hkrd.query import race as race_q
 from hkrd.query import raceday
 from hkrd.store import upsert
 from hkrd.store.connect import get_conn, init_db, transaction
@@ -404,3 +405,82 @@ def test_the_style_never_reads_todays_own_run(db):
                if r["horse_name"] == "HORSE 0")["running_style"]
     assert got["style"] == "Closer"
     assert "Midfield" not in got["counts"]
+
+
+# ── where a searched horse should land ───────────────────────────────────────
+
+def _seed_where(conn):
+    with transaction(conn):
+        upsert.upsert_races(conn, [
+            {"race_date": "2026-01-04", "race_no": 1, "venue": "ST", "course": "A",
+             "surface": "Turf", "going": "G", "distance": 1200, "race_class": "4"},
+            {"race_date": "2026-03-01", "race_no": 5, "venue": "ST", "course": "A",
+             "surface": "Turf", "going": "G", "distance": 1200, "race_class": "4"}])
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-01-04", "race_no": 1, "horse_no": 1,
+             "horse_name": "OLD RUNNER", "place": "1", "finish_time": "1:09.5"},
+            {"race_date": "2026-01-04", "race_no": 1, "horse_no": 2,
+             "horse_name": "TRIALLED SINCE", "place": "2", "finish_time": "1:09.7"},
+            {"race_date": "2026-03-01", "race_no": 5, "horse_no": 3,
+             "horse_name": "ON THE CARD", "place": None}])
+        upsert.upsert_trials(conn, [
+            {"trial_date": "2026-02-10", "trial_no": 3, "horse_name": "TRIALLED SINCE",
+             "place": "1", "finish_time": "1:00.0", "venue": "ST", "draw": "1"},
+            {"trial_date": "2026-02-11", "trial_no": 4, "horse_name": "ON THE CARD",
+             "place": "1", "finish_time": "1:00.0", "venue": "ST", "draw": "2"},
+            {"trial_date": "2025-12-01", "trial_no": 1, "horse_name": "NEVER RACED",
+             "place": "1", "finish_time": "1:00.0", "venue": "ST", "draw": "3"}])
+
+
+def test_a_horse_on_the_newest_card_goes_to_its_race(tmp_path):
+    """And to the RACE it is in, not race 1. The palette put ?horse= on the URL
+    and the Form Guide never read it, so every horse landed on race 1 of the
+    newest meeting and had to be found by eye.
+
+    This beats a more recent trial on purpose: ON THE CARD trialled on 11 Feb
+    and runs on 1 March, and the race is what you opened the search for."""
+    conn = get_conn(tmp_path / "t.db")
+    init_db(conn)
+    _seed_where(conn)
+    where = race_q.latest_appearance("ON THE CARD", conn=conn)
+    conn.close()
+    assert where["kind"] == "race"
+    assert where["on_latest_card"] is True
+    assert (where["race_date"], where["race_no"]) == ("2026-03-01", 5)
+
+
+def test_a_horse_off_the_card_goes_to_whichever_ran_last(tmp_path):
+    """TRIALLED SINCE raced on 4 Jan and trialled on 10 Feb, so the trial is
+    the news. OLD RUNNER has no trial at all and goes to its last race."""
+    conn = get_conn(tmp_path / "t.db")
+    init_db(conn)
+    _seed_where(conn)
+    trial = race_q.latest_appearance("TRIALLED SINCE", conn=conn)
+    run = race_q.latest_appearance("OLD RUNNER", conn=conn)
+    conn.close()
+    assert trial["kind"] == "trial"
+    assert (trial["trial_date"], trial["trial_no"]) == ("2026-02-10", 3)
+    assert trial["on_latest_card"] is False
+    assert run["kind"] == "race"
+    assert (run["race_date"], run["race_no"]) == ("2026-01-04", 1)
+
+
+def test_a_horse_that_has_only_trialled_still_has_somewhere_to_go(tmp_path):
+    conn = get_conn(tmp_path / "t.db")
+    init_db(conn)
+    _seed_where(conn)
+    where = race_q.latest_appearance("NEVER RACED", conn=conn)
+    conn.close()
+    assert where["kind"] == "trial"
+    assert where["trial_date"] == "2025-12-01"
+
+
+def test_an_unknown_name_says_so_rather_than_sending_you_nowhere(tmp_path):
+    """A destination that will be empty when it loads is worse than none: the
+    palette can keep the reader where they are instead."""
+    conn = get_conn(tmp_path / "t.db")
+    init_db(conn)
+    _seed_where(conn)
+    assert race_q.latest_appearance("NOBODY", conn=conn)["kind"] == "none"
+    assert race_q.latest_appearance("", conn=conn)["kind"] == "none"
+    conn.close()

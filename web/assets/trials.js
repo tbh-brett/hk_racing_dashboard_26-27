@@ -30,6 +30,7 @@ import { el, $, DASH, MINUS, renderNav, tripTagChips,
 import { context } from './context.js';
 import { renderReview, trialSubject, loadTags } from './review.js';
 import { install as installPalette } from './palette.js';
+import { attachHorseSearch } from './horse-search.js';
 
 
 const VIEWS = [['batches', 'BATCHES'], ['flagged', 'FLAGGED'],
@@ -62,6 +63,12 @@ const state = {
   // Keyed by horse + batch, because the same horse can appear in two mornings
   // and they are different rows with different notes.
   open: new Set(), form: {},
+  // ONE HORSE, ITS WHOLE TRIAL RECORD. The text search filters the batches that
+  // happen to be loaded -- twelve of them -- so a horse that trialled in March
+  // matched nothing and the page looked like it had no record of it. Picking a
+  // name from the typeahead asks the server for every trial that horse has
+  // ever run instead, and the batch list is replaced by those until cleared.
+  horse: null, horseTrials: [], horseLoading: false,
 };
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
@@ -504,6 +511,92 @@ function openRow(r, focus) {
   box?.focus();
 }
 
+/** Every trial this horse has run, newest first.
+ *
+ *  The batch list is replaced rather than filtered: the reader asked for one
+ *  horse, and leaving nine unrelated batches on screen underneath would make
+ *  the answer harder to find, not easier.
+ */
+function renderHorse() {
+  renderChips();
+  renderDayPicker();
+  const host = $('batches');
+  host.replaceChildren();
+
+  if (state.horseLoading) {
+    host.append(el('div', 'no-match', 'LOADING'));
+    $('match-count').textContent = '';
+    return;
+  }
+  const rows = state.horseTrials;
+  if (!rows.length) {
+    host.append(el('div', 'no-match', `${state.horse} HAS NO TRIAL ON RECORD.`));
+  } else {
+    // One box per trial rather than one box with a date column: every row here
+    // is a different morning, and the date belongs in the header where this
+    // page already puts it. Reuses runnerRow/runnerDetail exactly, so a trial
+    // reads the same whether you got to it by morning or by horse.
+    rows.forEach((r) => {
+      const box = el('div', 'batch');
+      const head = el('div', 'batch-head');
+      head.append(el('span', 'd', compactDate(r.trial_date)));
+      head.append(el('span', 'no', `T${r.trial_no}`));
+      head.append(el('span', null, `${r.venue ?? DASH} ${r.surface ?? ''}`.trim()));
+      if (r.going) head.append(el('span', 'going', r.going));
+      if (r.field_size) {
+        head.append(el('span', 'k', 'RUNNERS'));
+        head.append(el('span', null, String(r.field_size)));
+      }
+      const turl = trialReplayUrl(r.trial_date, r.trial_no, r.venue,
+                                  { archived: r.archived });
+      if (turl) {
+        const play = externalLink(turl, '▶ REPLAY', 'batch-replay');
+        play.title = `trial replay — ${r.trial_date} batch ${r.trial_no}`;
+        head.append(play);
+      }
+      box.append(head);
+      const cols = el('div', 'tr-head');
+      COLS.forEach(([label, cls]) => cols.append(el('div', cls || null, label)));
+      box.append(cols);
+      box.append(runnerRow(r));
+      if (state.open.has(rowKey(r))) box.append(runnerDetail(r));
+      host.append(box);
+    });
+  }
+  $('match-count').textContent = `${rows.length} trial${rows.length === 1 ? '' : 's'}`;
+  const active = $('active-filters');
+  active.replaceChildren(el('span', 'lab', 'SHOWING'));
+  const chip = el('button', 'chip on hs-chip', `${state.horse} ×`);
+  chip.title = 'show the recent trial mornings again';
+  chip.addEventListener('click', clearHorse);
+  active.append(chip);
+}
+
+async function showHorse(name) {
+  state.horse = name;
+  state.horseTrials = [];
+  state.horseLoading = true;
+  state.open.clear();
+  render();
+  try {
+    const body = await api.trialsForHorses([name], null, 200);
+    state.horseTrials = body.trials?.[name] ?? [];
+  } catch {
+    state.horseTrials = [];
+  }
+  state.horseLoading = false;
+  render();
+}
+
+function clearHorse() {
+  state.horse = null;
+  state.horseTrials = [];
+  const input = $('search');
+  if (input) { input.value = ''; $('clear-search').hidden = true; }
+  state.search = '';
+  render();
+}
+
 function renderBatches() {
   renderChips();
   renderDayPicker();
@@ -751,7 +844,7 @@ function render() {
   const filtersApply = state.view !== 'calibration';
   document.querySelector('.filter-bar').hidden = !filtersApply;
   document.querySelector('.chip-bar').hidden = !filtersApply;
-  if (state.view === 'batches') renderBatches();
+  if (state.view === 'batches') (state.horse ? renderHorse() : renderBatches());
   if (state.view === 'flagged') renderFlagged();
   if (state.view === 'calibration') renderCalibration();
 }
@@ -762,13 +855,31 @@ function wireSearch() {
   input.addEventListener('input', () => {
     state.search = input.value;
     clear.hidden = !input.value;
+    // Typing again leaves the one-horse view; the text filter is a different
+    // question from "show me this horse" and they must not stack.
+    if (state.horse) { state.horse = null; state.horseTrials = []; }
     render();
   });
   clear.addEventListener('click', () => {
     input.value = '';
     state.search = '';
     clear.hidden = true;
+    if (state.horse) { state.horse = null; state.horseTrials = []; }
     render();
+  });
+
+  // The names drop down as you type. Indexed over TRIALS, not runs, so the 107
+  // horses that have trialled and never raced are findable here -- on the page
+  // that is about trials, they are exactly the ones worth looking up.
+  attachHorseSearch(input, {
+    fetcher: (q) => api.trialHorseSearch(q, 12).then((b) => b.horses),
+    label: (h) => `${h.trials} · ${h.last_trial ?? DASH}`,
+    onPick: (h) => {
+      input.value = h.horse_name;
+      clear.hidden = false;
+      state.search = '';
+      showHorse(h.horse_name);
+    },
   });
 }
 
@@ -798,11 +909,21 @@ async function boot() {
   loadTags();
   // A trial morning is addressable, like the meeting is: ?day=2026-08-21
   // restores the view, so a note can link back to the trial it came from.
-  state.day = new URLSearchParams(window.location.search).get('day');
+  const params = new URLSearchParams(window.location.search);
+  state.day = params.get('day');
+  // Arriving from the command palette: the horse's newest run was a TRIAL, so
+  // it sent us here instead of to the Form Guide. Open its record straight
+  // away rather than showing the recent mornings and making it be found.
+  const wanted = params.get('horse');
   installPalette();
   await context.init();
   render();
   await load();
+  if (wanted) {
+    const input = $('search');
+    if (input) { input.value = wanted; $('clear-search').hidden = false; }
+    await showHorse(wanted.toUpperCase());
+  }
 }
 
 boot().catch((err) => {

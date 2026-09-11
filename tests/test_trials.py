@@ -307,3 +307,42 @@ def test_a_batch_is_identified_by_venue_as_well_as_number(tmp_path):
     # Each batch is timed against its OWN track, not the faster of the two.
     assert st["runners"][0]["margin"] == 0
     assert ch["runners"][0]["margin"] == 0
+
+
+# ── the trials horse index ───────────────────────────────────────────────────
+
+def test_the_trials_index_finds_a_horse_that_has_never_raced(tmp_path):
+    """Over `trials`, not `runners`. 107 horses in the archive have trialled
+    and never raced, and the palette's index is built from runs -- so a trials
+    page searching that index cannot find the horses it most exists for."""
+    db = tmp_path / "t.db"
+    conn = get_conn(db)
+    init_db(conn)
+    with transaction(conn):
+        upsert.upsert_trials(conn, [
+            {"trial_date": "2026-05-01", "trial_no": 1, "horse_name": "NEVER RACED",
+             "place": "1", "finish_time": "1:00.0", "venue": "ST", "draw": "1"},
+            {"trial_date": "2026-06-01", "trial_no": 2, "horse_name": "NEVER RACED",
+             "place": "2", "finish_time": "1:01.0", "venue": "ST", "draw": "2"},
+            {"trial_date": "2026-05-01", "trial_no": 1, "horse_name": "ALSO RAN",
+             "place": "2", "finish_time": "1:00.5", "venue": "ST", "draw": "3"}])
+    found = trials_q.list_horses(query="never", conn=conn)
+    conn.close()
+    assert [h["horse_name"] for h in found] == ["NEVER RACED"]
+    assert found[0]["trials"] == 2
+    assert found[0]["last_trial"] == "2026-06-01"
+
+
+def test_the_trials_index_orders_by_most_recent_trial(tmp_path):
+    db = tmp_path / "t.db"
+    conn = get_conn(db)
+    init_db(conn)
+    with transaction(conn):
+        upsert.upsert_trials(conn, [
+            {"trial_date": "2024-01-01", "trial_no": 1, "horse_name": "OLD ONE",
+             "place": "1", "finish_time": "1:00.0", "venue": "ST", "draw": "1"},
+            {"trial_date": "2026-06-01", "trial_no": 1, "horse_name": "RECENT ONE",
+             "place": "1", "finish_time": "1:00.0", "venue": "ST", "draw": "2"}])
+    found = [h["horse_name"] for h in trials_q.list_horses(conn=conn)]
+    conn.close()
+    assert found == ["RECENT ONE", "OLD ONE"]

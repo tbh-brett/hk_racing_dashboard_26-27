@@ -32,7 +32,7 @@ from hkrd.derive.trial_quality import BANDS, rate
 from hkrd.query.types import format_race_time
 from hkrd.store.connect import Connection, get_conn
 
-__all__ = ["recent_batches", "batch", "for_horses", "standouts",
+__all__ = ["recent_batches", "batch", "for_horses", "list_horses", "standouts",
            "calibration", "SECONDS_PER_LENGTH"]
 
 # What a length is worth in a trial. HKJC's published race margins imply about
@@ -415,6 +415,36 @@ def for_horses(names: list[str], *, before: str | None = None, limit: int = 2,
                 r["archived"] = bool(latest and str(r["trial_date"]) < str(latest))
                 bucket.append(r)
         return out
+    finally:
+        if own:
+            conn.close()
+
+
+def list_horses(*, limit: int = 20, query: str | None = None,
+                conn: Connection | None = None) -> list[dict[str, Any]]:
+    """The horse index behind the Trials page search.
+
+    Over `trials`, NOT over `runners`, and that is the whole point: 107 horses
+    in the archive have trialled and never raced, and the palette's index --
+    which is built from runs -- cannot see any of them. A trials page whose
+    search cannot find a horse that has only ever trialled is the wrong index.
+
+    Ordered by most recent trial, because the horse being looked up has usually
+    trialled lately, and matched with LIKE on both ends so "sixty" finds
+    "GOLDEN SIXTY".
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        sql = ("SELECT horse_name, count(*) trials, max(trial_date) last_trial "
+               "FROM trials WHERE horse_name IS NOT NULL AND horse_name != ''")
+        params: list[Any] = []
+        if query:
+            sql += " AND horse_name LIKE ?"
+            params.append(f"%{query.strip().upper()}%")
+        sql += " GROUP BY horse_name ORDER BY last_trial DESC, trials DESC LIMIT ?"
+        params.append(limit)
+        return [dict(r) for r in conn.execute(sql, params)]
     finally:
         if own:
             conn.close()

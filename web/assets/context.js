@@ -399,12 +399,27 @@ class MeetingContext {
     this.freshness = freshness;
 
     const url = MeetingContext._readUrl();
-    const known = (d) => meetings.some((m) => m.race_date === d);
-    this.date = (url.date && known(url.date)) ? url.date
-      : status?.latest_meeting ?? meetings[0]?.race_date ?? null;
+    // A DATE IN THE URL IS TRUSTED UNTIL THE SERVER SAYS OTHERWISE. This used
+    // to require the date to appear in `meetings`, which holds the 60 most
+    // recent — a reasonable guard when the archive was 178 meetings and a
+    // silent trapdoor now that it is 607. Nine dates in ten were thrown away
+    // and replaced with the latest meeting, so a link to an older race, or the
+    // command palette sending you to a horse's last run, landed on today's
+    // card instead and looked like the link was broken.
+    //
+    // The membership test is replaced by asking for the card: if it has races
+    // the date was real, and if it has none it was a typo or a meeting we do
+    // not hold, and falling back to the latest is still the right answer. That
+    // costs one extra request, and only in the case that was already wrong.
+    const fallback = status?.latest_meeting ?? meetings[0]?.race_date ?? null;
+    this.date = url.date ?? fallback;
 
     if (this.date) {
       await this._loadMeeting();
+      if (!this.races.length && this.date !== fallback) {
+        this.date = fallback;
+        if (this.date) await this._loadMeeting();
+      }
       this.race = this._validRace(url.race) ?? this.races[0]?.race_no ?? null;
     }
     this._writeUrl();

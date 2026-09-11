@@ -367,3 +367,49 @@
   border: 1px solid var(--line-2); background: var(--surface);
   padding: 8px 10px;
 }
+
+/* ── the horse typeahead ─────────────────────────────────────────────────── */
+
+/* The menu is positioned against this box. Scoped to this stylesheet rather
+   than added to the shared .filter-bar rule, so the other pages that use the
+   same bar are untouched. No offsets, so nothing moves. */
+.filter-bar .search { position: relative; }
+
+/* Anchored to the search box, which is why its wrapper is positioned. Sits
+   above everything: a menu that tucks under the chip bar below it is a menu
+   you cannot click. */
+.hs-menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 260px;
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--surface-2);
+  border: 1px solid var(--line-3);
+  border-radius: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
+}
+.hs-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 6px 10px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-2);
+  font: inherit;
+}
+.hs-row:hover,
+.hs-row[aria-selected="true"] { background: var(--surface); color: var(--text); }
+.hs-name { letter-spacing: .02em; white-space: nowrap; }
+.hs-hint {
+  color: var(--text-dim);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.hs-chip { cursor: pointer; }

@@ -15,7 +15,8 @@ from hkrd.derive.tags import VET_TAGS
 from hkrd.query.types import RaceLine, RunnerLine
 
 __all__ = ["get_race", "get_meeting", "get_horse_form", "list_meetings",
-           "list_horses", "tags_bulk", "vet_form", "habitual_styles"]
+           "list_horses", "latest_appearance", "tags_bulk", "vet_form",
+           "habitual_styles"]
 
 # Derived tables are LEFT JOINed: a runner with no ET row still returns, with a
 # null figure. A missing derived value must never make a runner disappear.
@@ -432,6 +433,72 @@ def habitual_styles(horse_names: Sequence[str], *, before: str | None = None,
                 "last": styles[0] if styles else None,
                 "window": STYLE_WINDOW,
             }
+        return out
+    finally:
+        if own:
+            conn.close()
+
+
+def latest_appearance(name: str, *, conn: Connection | None = None) -> dict:
+    """Where to send someone who just typed this horse's name.
+
+    The command palette used to hand `?horse=NAME` to the Form Guide, which
+    never read it -- so every horse landed on race 1 of the newest meeting and
+    you went hunting. The destination is a question about the data, so it is
+    answered here rather than guessed in JavaScript.
+
+    Three answers, in the order that makes the newest thing win:
+
+    1. DECLARED ON THE NEWEST CARD -- the race it is in. This beats a more
+       recent trial on purpose: if the horse runs on Saturday, Saturday is what
+       you opened the search for.
+    2. OTHERWISE, WHICHEVER RAN LAST -- its last race or its last trial. A horse
+       that raced on 1 July and trialled on 28 August is a horse whose news is
+       the trial; one that raced last week is not. Comparing the dates is the
+       only rule that gets both right, and "latest" is what was asked for.
+    3. NOTHING -- 107 horses in the archive have trialled but never raced, and
+       a name with neither says so rather than returning a page that will be
+       empty when it loads.
+
+    `race_no` comes back with the race so the Form Guide can open the right one
+    rather than the first.
+    """
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        horse = (name or "").strip().upper()
+        out: dict = {"horse_name": horse, "kind": "none", "on_latest_card": False}
+        if not horse:
+            return out
+
+        latest_card = conn.execute("SELECT max(race_date) FROM races").fetchone()[0]
+        if latest_card:
+            row = conn.execute(
+                "SELECT race_no FROM runners WHERE horse_name = ? AND race_date = ? "
+                "ORDER BY race_no LIMIT 1", (horse, latest_card)).fetchone()
+            if row:
+                return {**out, "kind": "race", "on_latest_card": True,
+                        "race_date": latest_card, "race_no": row["race_no"]}
+
+        run = conn.execute(
+            "SELECT race_date, race_no FROM runners WHERE horse_name = ? "
+            "ORDER BY race_date DESC, race_no DESC LIMIT 1", (horse,)).fetchone()
+        trial = conn.execute(
+            "SELECT trial_date, trial_no FROM trials WHERE horse_name = ? "
+            "ORDER BY trial_date DESC, trial_no DESC LIMIT 1", (horse,)).fetchone()
+
+        run_on = run["race_date"] if run else None
+        trial_on = trial["trial_date"] if trial else None
+        # A tie goes to the RACE. They cannot fall on the same day in practice
+        # -- HKJC does not trial on a race day at the same track -- but a tie
+        # resolved arbitrarily is a coin flip in the interface, and the race is
+        # the more informative of the two.
+        if run_on and (not trial_on or str(run_on) >= str(trial_on)):
+            return {**out, "kind": "race", "race_date": run_on,
+                    "race_no": run["race_no"]}
+        if trial_on:
+            return {**out, "kind": "trial", "trial_date": trial_on,
+                    "trial_no": trial["trial_no"]}
         return out
     finally:
         if own:

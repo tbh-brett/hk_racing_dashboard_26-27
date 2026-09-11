@@ -168,6 +168,17 @@ def horses(limit: int = 400, q: str | None = None) -> dict:
     return {"horses": race_q.list_horses(limit=limit, query=q)}
 
 
+@app.get("/api/horse/{name}/where")
+def horse_where(name: str) -> dict:
+    """Where typing this horse's name should take you.
+
+    The palette handed `?horse=NAME` to the Form Guide, which never read it, so
+    every horse landed on race 1 of the newest meeting. Answering it here keeps
+    the rule in one place -- the page it sends you to does not have to know it.
+    """
+    return race_q.latest_appearance(name)
+
+
 @app.get("/api/meeting/{date}")
 def meeting(date: str) -> dict:
     races = race_q.get_meeting(date)
