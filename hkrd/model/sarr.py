@@ -17,12 +17,12 @@ Lower SARR is better. Rank 1 = top-rated.
 from __future__ import annotations
 
 import math
-from collections import defaultdict
 
 import numpy as np
 import pandas as pd
 
-from hkrd.derive.pace import SECTION_LENGTHS, classify_style
+from hkrd.derive.pace import (SECTION_LENGTHS, classify_style,
+                              habitual_style)
 from hkrd.store.coerce import parse_section_times
 from scipy import stats
 
@@ -34,7 +34,10 @@ DERIVE_VERSION = "sarr-1.1"
 
 RECENCY_LAMBDA = 0.85
 MAX_PRIOR_RUNS = 15
-LAST_STYLE_BOOST = 3.0
+# LAST_STYLE_BOOST used to sit here. It is `derive.pace.LAST_STYLE_BOOST` now,
+# with the rule it weights: the habitual style is read by the Race Day card and
+# the Speed Map as well as by this model, and two copies of the rule would let
+# the page and the model answer "how does this horse run" differently.
 
 # How much of a run's evidence survives a veterinary finding made on it.
 #
@@ -298,18 +301,16 @@ def build_profile(runs: list[dict], today_dist, today_venue,
             return np.nan
         return np.average(vals[m], weights=weights[m])
 
-    styles = [r["style"] for r in runs if r.get("style", "Unknown") != "Unknown"]
-    if styles:
-        sc = defaultdict(float)
-        last_style = next((r["style"] for r in runs
-                           if r.get("style", "Unknown") != "Unknown"), None)
-        for s in styles:
-            sc[s] += 1.0
-        if last_style:
-            sc[last_style] += LAST_STYLE_BOOST - 1.0
-        style = max(sc, key=sc.get)
-    else:
-        style = "Midfield"
+    # The count with the last run weighted, from `derive/pace` -- the same
+    # function the Race Day card and the Speed Map read, so the style this term
+    # is scored on is the style the page shows. `runs` is already newest first
+    # and already cut to MAX_PRIOR_RUNS, which is STYLE_WINDOW.
+    #
+    # Midfield is the model's own fallback and stays here rather than moving
+    # into the shared function: a horse with no classified run needs a value
+    # for `get_style_fit` to multiply, but a PAGE must be able to say it does
+    # not know rather than draw an invented Midfield badge.
+    style = habitual_style(r.get("style") for r in runs) or "Midfield"
 
     rating = next((r["rating"] for r in runs
                    if not pd.isna(r.get("rating", np.nan))), np.nan)

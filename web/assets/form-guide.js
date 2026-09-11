@@ -11,13 +11,14 @@
  */
 import { api, num, signed } from './api.js';
 import { el, $, DASH, MINUS, renderNav, styleClass, styleOrdinal,
+         habitualStyleBadge,
          replayUrl, trialReplayUrl, externalLink, compactDate,
          tripTags, tripTagChips, ordinal, classCell, classLabel, eszCell,
          paceCell, positionsText, conditionLabel, drawText,
          tagLabel } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
-import { loadTags, renderReview } from './review.js';
+import { loadTags, renderReview, trialSubject } from './review.js';
 
 
 /* The trend tint's threshold, measured rather than chosen. Over 12,540 six-run
@@ -31,7 +32,12 @@ const TREND_THRESHOLD = 5.9;
 const COLS = [
   { key: 'no', label: 'NO', cls: 'c' },
   { key: 'name', label: 'HORSE' },
-  { key: 'style', label: 'STYLE' },
+  // The HABIT, not the last run — said on the header because the column is
+  // one word and the two readings look identical in it.
+  { key: 'style', label: 'STYLE',
+    hint: 'how the horse RUNS — the habit over its last 15 classified runs, '
+        + 'weighted to the latest, not the last run alone. Hover a badge for '
+        + 'the tally.' },
   { key: 'draw', label: 'DR', cls: 'c' },
   { key: 'jockey', label: 'JOCKEY' },
   { key: 'trainer', label: 'TRAINER' },
@@ -40,10 +46,6 @@ const COLS = [
   { key: 'seq', label: 'LAST 6 FIGURES · NEWEST LEFT · BAR = TREND' },
   { key: 'flags', label: 'FLAGS' },
 ];
-
-/* Positional, front to back. Never an alphabetical sort — "Closer" before
-   "Leader" would put the back of the field first. */
-const STYLE_ORD = { Leader: 0, 'On-Pace': 1, Midfield: 2, Closer: 3 };
 
 const state = {
   date: null, race: 1, races: [], guide: null, pace: null,
@@ -146,6 +148,7 @@ function renderHead() {
   $('fg-head').replaceChildren(...COLS.map((c) => {
     const b = el('button', c.cls ?? null);
     b.append(document.createTextNode(c.label));
+    if (c.hint) b.title = c.hint;
     if (state.sort === c.key) {
       b.setAttribute('aria-sort', state.sortDir > 0 ? 'ascending' : 'descending');
       b.append(el('span', 'ind', state.sortDir > 0 ? '▲' : '▼'));
@@ -166,12 +169,28 @@ function history(runner) {
   return state.guide?.history?.[runner.horse_name] ?? [];
 }
 
+/** How this horse RUNS — the habit, over its record.
+ *
+ *  Not `history(runner)[0].pace_style`, which is where the STYLE column used
+ *  to read from. That is one observation, and the six runs on screen cannot
+ *  correct it either: a habit is read off the whole record, and six rows are
+ *  whatever six rows happen to contain. The server computes it from the same
+ *  rule SARR's style term is scored on, so this page, Race Day, the Bets entry
+ *  card and the Speed Map all name the same thing.
+ */
+function runningStyle(runner) {
+  return state.guide?.running_styles?.[runner.horse_name] ?? null;
+}
+
 function sortValue(r, key) {
   const runs = history(r);
   switch (key) {
     case 'no': return r.horse_no;
     case 'name': return r.horse_name;
-    case 'style': return STYLE_ORD[runs[0]?.pace_style] ?? 9;
+    // The HABIT, and through the ordinal this file already imports rather
+    // than a second copy of the order beside it. Front of the field to the
+    // back; sorting these as strings puts Closer first, which is meaningless.
+    case 'style': return styleOrdinal(runningStyle(r)?.style);
     case 'draw': return r.draw ?? 99;
     case 'jockey': return r.jockey ?? '';
     case 'trainer': return r.trainer ?? '';
@@ -324,7 +343,7 @@ function horseRow(runner) {
   row.append(nameCell);
 
   const st = el('div');
-  st.append(el('span', styleClass(last?.pace_style), last?.pace_style ?? 'UNKNOWN'));
+  st.append(habitualStyleBadge(runningStyle(runner)));
   row.append(st);
 
   row.append(el('div', 'dr', drawText(runner.draw)));
@@ -424,6 +443,25 @@ function trialBand(runner) {
       row.append(mine);
     }
 
+    // WRITTEN FROM HERE, not only read here. The reason a trial note earns its
+    // keep beside a race is the reason it should be writable beside one: the
+    // moment you decide the trial meant something is the moment the horse
+    // turns up in a field, and until now that meant leaving the form guide,
+    // finding the batch on the Trials page and coming back.
+    //
+    // The same control the run rows below carry, opening the same form from
+    // `review.js` — note first, blackbook behind one deliberate click. Only
+    // the SUBJECT differs: a trial has a batch number where a race has a race
+    // number, which is `trialSubject`'s whole job.
+    const marks = el('div', 'marks');
+    const note = el('button', `icon${t.note ? ' has' : ''}`, '✎');
+    note.title = t.note ? t.note.note : 'note on this trial';
+    note.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showTrialNote(e, runner, t);
+    });
+    marks.append(note);
+
     // The footage the mark is a summary of. A ++ nobody can watch is a score
     // taken on trust, which is the opposite of how every other figure here is
     // treated.
@@ -432,8 +470,10 @@ function trialBand(runner) {
     if (turl) {
       const play = externalLink(turl, '▶', 'icon play');
       play.title = `trial replay — ${t.trial_date} batch ${t.trial_no}`;
-      row.append(play);
+      play.addEventListener('click', (e) => e.stopPropagation());
+      marks.append(play);
     }
+    row.append(marks);
     band.append(row);
   });
   return band;
@@ -1054,6 +1094,40 @@ function showNote(event, runner, run) {
   placePopover(event);
 }
 
+/** The same form, opened on a TRIAL rather than a run.
+ *
+ *  One module and one form — `review.js` — so a note written here and a note
+ *  written on the Trials page cannot end up with different tag vocabularies or
+ *  different rules about what a promotion means. What changes is the subject:
+ *  a trial is addressed by its batch number, is stored in `trial_notes` rather
+ *  than `run_notes`, and promotes with `source_trial_no` so the book links
+ *  back to a trial instead of naming a race that was never run.
+ */
+function showTrialNote(event, runner, trial) {
+  renderReview($('popover'), {
+    horseName: runner.horse_name,
+    subject: trialSubject(trial),
+    existingNote: trial.note,
+    booked: state.guide?.blackbook?.[runner.horse_name],
+    // The band is rendered from `state.trials`, and the saved note is written
+    // back onto the same object the row was drawn from — re-fetching the whole
+    // card's trials to learn one sentence we already have would blank the band
+    // and redraw it for no new information.
+    onSaved: (saved) => {
+      trial.note = saved;
+      hidePopover();
+      render();
+    },
+    onPromoted: (entry) => {
+      state.guide.blackbook[runner.horse_name] = entry;
+      hidePopover();
+      render();
+    },
+    onClose: hidePopover,
+  });
+  placePopover(event);
+}
+
 
 /* ── render ──────────────────────────────────────────────────────────────── */
 
@@ -1066,7 +1140,7 @@ function renderFoot() {
   add('TRIP TROUBLE', 'trip');
   add('■ TRAINER CHANGE', 'violet');
   add('WEIGHT SWING', 'swing');
-  add('✎ RUN NOTE', 'book');
+  add('✎ NOTE — RUN OR TRIAL', 'book');
   add('TIMES m:ss.xx · SPLITS ss.xx');
   add('FIGURE 100 = PAR', 'right');
 }

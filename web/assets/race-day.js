@@ -9,7 +9,7 @@
  * (AUC .785 against .727), which the footer states outright.
  */
 import { api, num } from './api.js';
-import { el, $, DASH, MINUS, renderNav, styleBadge, styleOrdinal,
+import { el, $, DASH, MINUS, renderNav, habitualStyleBadge, styleOrdinal,
          compactDate, ordinal, tagLabel, tripTagChips, drawText,
          isVetTag } from './vocab.js';
 import { context } from './context.js';
@@ -629,8 +629,6 @@ function renderHead() {
   }));
 }
 
-const STYLE_ORDER = ['Leader', 'On-Pace', 'Midfield', 'Closer'];
-
 function sortRunners(runners) {
   const rows = [...runners];
   if (!state.sort) return rows.sort((a, b) => (a.horse_no ?? 0) - (b.horse_no ?? 0));
@@ -640,7 +638,13 @@ function sortRunners(runners) {
       case 'no': return r.horse_no ?? 0;
       case 'name': return r.horse_name ?? '';
       // Never alphabetical: Closer, Leader, Midfield, On-Pace is meaningless.
-      case 'style': return STYLE_ORDER.indexOf(r.last_run?.pace_style ?? '') + 1 || 99;
+      // `styleOrdinal` is the one implementation, from vocab — this page kept a
+      // second copy of the order beside the copy it already imported.
+      //
+      // Sorted on the habitual style, which is what the column shows: sorting
+      // on the last run while displaying the habit would put the rows in an
+      // order the badges beside them do not explain.
+      case 'style': return styleOrdinal(r.running_style?.style);
       case 'draw': return r.draw ?? 99;
       case 'jockey': return r.jockey ?? '';
       case 'trainer': return r.trainer ?? '';
@@ -917,8 +921,15 @@ function cardRow(r, index) {
   name.append(box);
   tr.append(name);
 
+  // HOW THE HORSE RUNS — the habit, not the last run's style. This column read
+  // `last_run.pace_style`, one observation: a Leader ridden quietly once showed
+  // as a Midfield, while the Speed Map next door drew the same horse on the
+  // lead in the same race, because a projection has always used the habit.
+  // `vocab.habitualStyleBadge` is the shared element the Form Guide and the
+  // Bets entry card also draw — a copy here is how the style badge came to
+  // exist three times before.
   const st = el('td');
-  st.append(styleBadge(r.last_run?.pace_style, { chip: false }));
+  st.append(habitualStyleBadge(r.running_style, { chip: false }));
   tr.append(st);
 
   tr.append(el('td', 'c-num', drawText(r.draw)));
@@ -1350,7 +1361,9 @@ function renderFoot() {
     + 'THE POOL OPENS THE DAY BEFORE AND TAKES ALMOST NOTHING UNTIL MORNING');
   const blind = gearCaveat(state.card?.runners ?? []);
   if (blind) bits.push(blind);
-  bits.push('STYLE SORTS LEADER → ON-PACE → MIDFIELD → CLOSER');
+  bits.push('STYLE IS THE HABIT OVER THE LAST 15 CLASSIFIED RUNS, '
+    + 'WEIGHTED TO THE LATEST — NOT THE LAST RUN ALONE · '
+    + 'SORTS LEADER → ON-PACE → MIDFIELD → CLOSER');
   bits.push('MODEL AUC .727 · MARKET AUC .785');
   foot.replaceChildren(...bits.map((b) => el('span', null, b)));
   foot.append(el('span', 'keys', '↑↓ runner · 1–9 race · click header to sort'));

@@ -13,14 +13,15 @@ eleventh. They are independent axes and get separate columns.
 """
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from statistics import median
 from typing import Any
 
 from hkrd.store.coerce import parse_running_positions, parse_section_times
 
 __all__ = ["DERIVE_VERSION", "PaceError", "classify_style", "STYLE_ORDER",
-           "style_ordinal", "section_lengths", "per_400", "race_pace_rows"]
+           "style_ordinal", "section_lengths", "per_400", "race_pace_rows",
+           "habitual_style", "LAST_STYLE_BOOST", "STYLE_WINDOW"]
 
 DERIVE_VERSION = "pace-2.0"
 
@@ -72,6 +73,61 @@ def classify_style(positions: Sequence[int] | str | None, field_size: int) -> st
     if first >= max(8, int(field_size * 0.7)):
         return "Closer"
     return "Midfield"
+
+
+# ── habitual running style ───────────────────────────────────────────────────
+#
+# `classify_style` answers "where did this horse sit in THAT race". It is one
+# value per horse per run and it moves: a Closer that was ridden forward once
+# is still a Closer, and the last run is the single worst estimator of the next
+# one because it is a sample of size one. The card needs the other question --
+# "how does this horse RUN" -- and that is a property of the horse, read off
+# its record.
+#
+# One definition, used by the model and by every display. `model/sarr.py`
+# computed exactly this inline to weight its style-fit term, and the Speed Map
+# has been showing the result (`runner_projection.style`) since it was built,
+# while Race Day showed the last run's style instead -- two answers to one
+# question, on two pages, about the same horse in the same race.
+
+# What the most recent run is worth against the ones before it. Three, so a
+# style shown once last start ties with a style shown three times earlier and
+# loses to one shown four: recency counts, and does not decide on its own.
+LAST_STYLE_BOOST = 3.0
+
+# How far back the count reaches. The same window SARR's profile uses
+# (`model.sarr.MAX_PRIOR_RUNS`) -- the two must agree, or the style shown on
+# the card is not the style the model scored the horse with, and
+# `tests/test_pace.py` asserts they still do.
+STYLE_WINDOW = 15
+
+
+def habitual_style(styles: Iterable[str | None]) -> str | None:
+    """A horse's settled running style, from its runs NEWEST FIRST.
+
+    Not an average -- the four styles are ordinal positions, not a scale, and
+    the mean of a Leader and a Closer is a Midfield the horse has never been.
+    It is a count with the last run weighted, which is what "usually leads,
+    once got back" should produce.
+
+    Returns None where the record says nothing: a horse with no classified run
+    has no habitual style, and "Midfield" invented from no evidence is a claim
+    the page would print in the same ink as a measured one. Callers that need a
+    value for arithmetic supply their own default.
+    """
+    known = [s for s in styles if s and s != "Unknown"][:STYLE_WINDOW]
+    if not known:
+        return None
+    score: dict[str, float] = {}
+    for s in known:
+        score[s] = score.get(s, 0.0) + 1.0
+    # `known[0]` is the most recent classified run, which is not necessarily
+    # the most recent run: a horse pulled up last start was never classified,
+    # and its previous start is the last thing that measured it.
+    score[known[0]] += LAST_STYLE_BOOST - 1.0
+    # Ties go to the style seen most recently: `score` is in insertion order,
+    # which is the order the runs came in, and `max` keeps the first maximum.
+    return max(score, key=score.get)
 
 
 # ── sectionals ───────────────────────────────────────────────────────────────

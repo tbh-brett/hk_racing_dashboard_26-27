@@ -27,7 +27,7 @@
  * blocks. Going past one is a checkbox that gets recorded, not a wall.
  */
 import { api } from './api.js';
-import { el, DASH, drawText } from './vocab.js';
+import { el, DASH, drawText, habitualStyleBadge } from './vocab.js';
 
 const money = (v) => (v == null ? DASH : `$${Number(v).toLocaleString('en-HK',
   { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`);
@@ -169,13 +169,6 @@ const CARD_COLS = [
   ['model', 'v HARVILLE-HENERY'],
 ];
 
-function styleCell(r) {
-  const s = r.pace_style;
-  if (!s) return el('span', 'dim', DASH);
-  const key = s.toLowerCase().replace(/[^a-z]/g, '');
-  return el('span', `style-badge s-${key}`, s.toUpperCase());
-}
-
 function cardRow(r) {
   const row = el('div', `entry-crow${r.scratched ? ' scr' : ''}`);
   row.append(el('span', 'no', String(r.horse_no)));
@@ -220,7 +213,17 @@ function cardRow(r) {
   if (r.scratched) name.append(el('span', 'scr-tag', 'SCR'));
   row.append(name);
 
-  row.append(styleCell(r));
+  // THE STYLE COLUMN, which was a dash on every card this page prices. Two
+  // faults, one cell: it read `pace_style` — the style of TODAY'S run, off the
+  // race being priced, which is NULL until that race is over, so by the time
+  // the cell held a value the bet had been struck. And it painted
+  // `style-badge s-leader`, a class pair no stylesheet here defines, so on the
+  // archived card where it did resolve it rendered as colourless text.
+  //
+  // Both go with the shared badge: `running_style` is the habit, a fact about
+  // the horse and so available before the off, drawn as the same element Race
+  // Day and the Form Guide draw.
+  row.append(habitualStyleBadge(r.running_style));
   row.append(el('span', 'dr', drawText(r.draw)));
   row.append(el('span', 'jockey', r.jockey ?? DASH));
   row.append(el('span', 'win', r.win_odds == null ? DASH : r.win_odds.toFixed(1)));

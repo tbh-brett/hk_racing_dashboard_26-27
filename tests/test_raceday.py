@@ -311,3 +311,96 @@ def test_the_blackbook_band_carries_a_price_before_the_race(db):
     entry = next(e for e in band["entries"] if e["horse_name"] == "HORSE 0")
     assert entry["win_odds"] == pytest.approx(3.0)      # the 12:30 capture
     assert entry["place_odds"] == pytest.approx(1.5)
+
+
+# ── the STYLE column: how the horse RUNS, not where it sat last start ────────
+
+def _with_style_history(path):
+    """Six prior runs for HORSE 0: five Closers and a Leader last start.
+
+    Enough to make the two readings of "style" disagree, which is the whole
+    point — read off the last run the card called this horse a Leader while the
+    Speed Map beside it, which has always used the habit, drew it at the back.
+    """
+    conn = get_conn(path)
+    styles = ["Closer", "Closer", "Closer", "Closer", "Closer", "Leader"]
+    with transaction(conn):
+        for i, style in enumerate(styles):
+            date = f"2026-0{i + 1}-05"
+            upsert.upsert_races(conn, [
+                {"race_date": date, "race_no": 1, "venue": "HV", "course": "C",
+                 "surface": "Turf", "going": "G", "distance": 1650,
+                 "race_class": "4"}])
+            upsert.upsert_runners(conn, [
+                {"race_date": date, "race_no": 1, "horse_no": 1,
+                 "horse_name": "HORSE 0", "place": "3", "finish_time": 100.0,
+                 "lengths_behind": "1-1/4", "draw": 1, "actual_weight": 120,
+                 "win_odds": 5.0, "jockey": "J0", "trainer": "T0",
+                 "running_positions": "1 1 1"}])
+            conn.execute(
+                "INSERT INTO runner_pace (race_date, race_no, horse_no, "
+                "pace_style, derive_version) VALUES (?, 1, 1, ?, 't')",
+                (date, style))
+    return conn
+
+
+def test_the_style_column_is_the_habit_not_the_last_run(db):
+    """A Closer ridden forward once is still a Closer.
+
+    The column read `last_run.pace_style` — one observation, and the single
+    worst estimator of the next one. `runner_projection.style`, which the Speed
+    Map draws, has always been the habit, so the two pages gave two answers
+    about the same horse in the same race.
+    """
+    conn = _with_style_history(db)
+    card = raceday.build_card("2026-07-15", 1, conn=conn)
+    conn.close()
+
+    row = next(r for r in card["runners"] if r["horse_name"] == "HORSE 0")
+    assert row["last_run"]["pace_style"] == "Leader"       # what it did
+    assert row["running_style"]["style"] == "Closer"       # what it is
+
+
+def test_the_style_carries_the_tally_it_was_read_off(db):
+    """Never a bare badge: the count, the whole tally and the last classified
+    run travel with it, so a habit can be checked and a horse whose last start
+    disagreed with it can be marked rather than quietly averaged away."""
+    conn = _with_style_history(db)
+    card = raceday.build_card("2026-07-15", 1, conn=conn)
+    conn.close()
+
+    got = next(r for r in card["runners"]
+               if r["horse_name"] == "HORSE 0")["running_style"]
+    assert got["n"] == 6
+    assert got["counts"] == {"Closer": 5, "Leader": 1}
+    assert got["last"] == "Leader"
+
+
+def test_a_horse_with_no_classified_run_has_no_style(db):
+    """None, never an invented Midfield. A badge drawn from nothing renders in
+    the same ink as a measured one."""
+    conn = _with_style_history(db)
+    card = raceday.build_card("2026-07-15", 1, conn=conn)
+    conn.close()
+
+    got = next(r for r in card["runners"]
+               if r["horse_name"] == "HORSE 1")["running_style"]
+    assert got["style"] is None
+    assert got["n"] == 0
+
+
+def test_the_style_never_reads_todays_own_run(db):
+    """Today's run is the result. A card scoring a horse on the race it is
+    previewing is showing the answer."""
+    conn = _with_style_history(db)
+    conn.execute(
+        "INSERT INTO runner_pace (race_date, race_no, horse_no, pace_style, "
+        "derive_version) VALUES ('2026-07-15', 1, 1, 'Midfield', 't')")
+    conn.commit()
+    card = raceday.build_card("2026-07-15", 1, conn=conn)
+    conn.close()
+
+    got = next(r for r in card["runners"]
+               if r["horse_name"] == "HORSE 0")["running_style"]
+    assert got["style"] == "Closer"
+    assert "Midfield" not in got["counts"]

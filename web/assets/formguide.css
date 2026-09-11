@@ -239,6 +239,27 @@
   color: var(--text-muted); min-width: 0; overflow: hidden;
   text-overflow: ellipsis;
 }
+/* The controls, pinned right, the same shape and the same place as the run
+   rows below — a note written on a trial and a note written on a race are the
+   same action, so they must not look like two different ones. */
+.trial-band .trial-line .marks {
+  margin-left: auto; flex: none; display: flex; align-items: center; gap: 5px;
+  /* The line is baseline-aligned so the times and marks read as one row; a
+     bordered box has no useful baseline, so these centre instead. */
+  align-self: center;
+}
+.trial-band .trial-line .icon {
+  width: 16px; height: 15px; line-height: 14px; text-align: center;
+  font-size: var(--fs-xs); cursor: pointer; color: var(--text-faint);
+  border: 1px solid var(--line-3); background: transparent; padding: 0;
+}
+.trial-band .trial-line .icon:hover {
+  color: var(--book); border-color: var(--book-ground);
+}
+.trial-band .trial-line .icon.has {
+  color: var(--book); border-color: var(--book-ground);
+}
+
 /* The same five bands the Trials page uses, from the same rating. */
 .trial-band .q {
   width: 16px; flex: none; text-align: center; font-weight: 600;
