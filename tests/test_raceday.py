@@ -484,3 +484,77 @@ def test_an_unknown_name_says_so_rather_than_sending_you_nowhere(tmp_path):
     assert race_q.latest_appearance("NOBODY", conn=conn)["kind"] == "none"
     assert race_q.latest_appearance("", conn=conn)["kind"] == "none"
     conn.close()
+
+
+# ── what the winner won by ───────────────────────────────────────────────────
+
+def _seed_margins(conn):
+    with transaction(conn):
+        upsert.upsert_races(conn, [
+            {"race_date": "2026-02-01", "race_no": 1, "venue": "ST", "course": "A",
+             "surface": "Turf", "going": "G", "distance": 1200, "race_class": "4"},
+            {"race_date": "2026-02-08", "race_no": 1, "venue": "ST", "course": "A",
+             "surface": "Turf", "going": "G", "distance": 1200, "race_class": "4"}])
+        upsert.upsert_runners(conn, [
+            # a clear win, runner-up beaten a length and a quarter
+            {"race_date": "2026-02-01", "race_no": 1, "horse_no": 1,
+             "horse_name": "WINNER", "place": "1", "finish_time": "1:09.50",
+             "lengths_behind": "-"},
+            {"race_date": "2026-02-01", "race_no": 1, "horse_no": 2,
+             "horse_name": "SECOND", "place": "2", "finish_time": "1:09.70",
+             "lengths_behind": "1-1/4"},
+            {"race_date": "2026-02-01", "race_no": 1, "horse_no": 3,
+             "horse_name": "THIRD", "place": "3", "finish_time": "1:10.10",
+             "lengths_behind": "3"},
+            # a dead heat: two winners, no second placing at all
+            {"race_date": "2026-02-08", "race_no": 1, "horse_no": 1,
+             "horse_name": "JOINT A", "place": "1 DH", "finish_time": "1:09.50",
+             "lengths_behind": "-"},
+            {"race_date": "2026-02-08", "race_no": 1, "horse_no": 2,
+             "horse_name": "JOINT B", "place": "1 DH", "finish_time": "1:09.50",
+             "lengths_behind": "-"},
+            {"race_date": "2026-02-08", "race_no": 1, "horse_no": 3,
+             "horse_name": "BEATEN", "place": "3", "finish_time": "1:10.00",
+             "lengths_behind": "2-1/2"}])
+
+
+def test_a_winner_carries_what_it_won_by(tmp_path):
+    """A winner has no lengths-behind -- it is not behind anything -- so the
+    margin column was blank on exactly the runs worth reading it on, and "won"
+    said nothing about whether it was a nose or six lengths. The margin is the
+    RUNNER-UP's beaten lengths, the same fact from the other side."""
+    conn = get_conn(tmp_path / "t.db")
+    init_db(conn)
+    _seed_margins(conn)
+    runs = {r.horse_name: r for r in race_q.get_race("2026-02-01", 1, conn=conn).runners}
+    conn.close()
+    assert runs["WINNER"].lengths_behind is None
+    assert runs["WINNER"].win_margin == pytest.approx(1.25)
+    # and nobody else gets one: beaten lengths is the number to read there
+    assert runs["SECOND"].win_margin is None
+    assert runs["SECOND"].lengths_behind == pytest.approx(1.25)
+    assert runs["THIRD"].win_margin is None
+
+
+def test_a_dead_heat_won_by_nothing(tmp_path):
+    """Two winners and no second placing, so the subquery has nothing to find.
+    Zero is the answer by definition, not a missing value."""
+    conn = get_conn(tmp_path / "t.db")
+    init_db(conn)
+    _seed_margins(conn)
+    runs = {r.horse_name: r for r in race_q.get_race("2026-02-08", 1, conn=conn).runners}
+    conn.close()
+    assert runs["JOINT A"].win_margin == 0.0
+    assert runs["JOINT B"].win_margin == 0.0
+    assert runs["BEATEN"].win_margin is None
+
+
+def test_the_margin_survives_the_horse_form_query_too(tmp_path):
+    """`_to_line` is fed by more than one SELECT. A column one of them does not
+    carry must read as absent, not raise."""
+    conn = get_conn(tmp_path / "t.db")
+    init_db(conn)
+    _seed_margins(conn)
+    form = race_q.get_horse_form("WINNER", limit=5, conn=conn)
+    conn.close()
+    assert form[0].win_margin == pytest.approx(1.25)

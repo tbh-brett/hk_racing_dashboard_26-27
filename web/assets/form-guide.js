@@ -581,7 +581,7 @@ const RUN_HEAD = [
   ['RUN', 'c'], ['DATE · TRK CRS DIST GOING CL', ''], ['STYLE', ''],
   ['JOCKEY', ''], ['TRAINER', ''], ['WT', 'r'], ['DR', 'c'], ['ESZ', 'r'],
   ['POSITIONS', ''], ['FIN', 'r'],
-  ['FIGURE · MARGIN · TIME · PLACE DIV', ''],
+  ['FIGURE · MARGIN · TIME · SP', ''],
   ['PACE · GEAR · TRIP · BB · NOTE · VID', ''],
 ];
 
@@ -678,17 +678,35 @@ function runRow(runner, run, index) {
     ? '' : above ? 'above' : 'below';
   fg.append(el('span', `fig ${figCls}`, run.et_figure === null
     || run.et_figure === undefined ? DASH : run.et_figure.toFixed(0)));
-  fg.append(el('span', `len ${figCls}`, run.lengths_behind === null
-    || run.lengths_behind === undefined ? DASH : `${run.lengths_behind.toFixed(2)}L`));
+  // MARGIN, from whichever side the horse was on. A winner has no
+  // lengths-behind — it is not behind anything — so this was blank on exactly
+  // the runs worth reading it on, and "won" said nothing about whether it was
+  // a nose or six lengths. A win now shows what it won BY, marked with a +
+  // so it can never be misread as a beaten margin, and a dead heat says DH
+  // because a margin of zero is a different fact from a narrow win.
+  const beaten = run.lengths_behind;
+  const won = run.win_margin;
+  if (won !== null && won !== undefined) {
+    const cell = el('span', `len won ${figCls}`,
+      won === 0 ? 'DH' : `+${won.toFixed(2)}L`);
+    cell.title = won === 0
+      ? 'dead heat — no margin between the winners'
+      : `won by ${won.toFixed(2)} lengths from the runner-up`;
+    fg.append(cell);
+  } else {
+    fg.append(el('span', `len ${figCls}`,
+      beaten === null || beaten === undefined ? DASH : `${beaten.toFixed(2)}L`));
+  }
   fg.append(el('span', 't', run.finish_time_display ?? DASH));
-  // What a $10 place ticket on this run paid. A placed run at 4.5 and a placed
-  // run at 60 are not the same result, and FIN alone hides the difference —
-  // which is why the design puts the dividend on the line beside it. Blank,
-  // not a dash, when the horse did not place: there was no ticket to pay.
-  if (run.place_dividend !== null && run.place_dividend !== undefined) {
-    const div = el('span', 'plc-div', `$${run.place_dividend.toFixed(1)}`);
-    div.title = `place dividend, per $10 — ${run.race_date} race ${run.race_no}`;
-    fg.append(div);
+  // THE PRICE IT WENT OFF AT, which is the number that says how the market
+  // read the horse that day. It replaced the place dividend here: a dividend
+  // is what a ticket paid and only exists on a placed run, so the column was
+  // empty on most rows and told you about a bet nobody necessarily had on.
+  // The starting price is on every run and is the same fact for all of them.
+  if (run.win_odds !== null && run.win_odds !== undefined) {
+    const sp = el('span', 'sp', num(run.win_odds, 1));
+    sp.title = `starting price — ${run.race_date} race ${run.race_no}`;
+    fg.append(sp);
   }
   row.append(fg);
 

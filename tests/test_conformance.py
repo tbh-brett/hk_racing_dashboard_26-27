@@ -275,7 +275,7 @@ def test_the_run_row_columns_are_the_order_the_owner_set() -> None:
     assert labels == [
         "RUN", "DATE · TRK CRS DIST GOING CL", "STYLE", "JOCKEY", "TRAINER",
         "WT", "DR", "ESZ", "POSITIONS", "FIN",
-        "FIGURE · MARGIN · TIME · PLACE DIV",
+        "FIGURE · MARGIN · TIME · SP",
         "PACE · GEAR · TRIP · BB · NOTE · VID",
     ], "the run row's columns have moved; the owner set this order"
 

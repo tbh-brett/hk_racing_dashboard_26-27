@@ -75,6 +75,10 @@ export const api = {
   // Where typing a horse's name should land: the race it runs in on the newest
   // card, else whichever of its last race or last trial came later.
   horseWhere: (name) => get(`/horse/${encodeURIComponent(name)}/where`),
+  // The same answer for many names at once, so the palette can label the rows
+  // it is drawing without a request per row.
+  horsesWhere: (names) => get(
+    `/horses/where?horses=${encodeURIComponent(names.join(','))}`),
   race: (date, no) => get(`/race/${date}/${no}`),
   horse: (name, limit = 6) => get(`/horse/${encodeURIComponent(name)}?limit=${limit}`),
   raceCard: (date, no) => get(`/raceday/${date}/${no}`),

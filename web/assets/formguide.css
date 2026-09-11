@@ -369,10 +369,15 @@
 .run-row .fig-group { display: flex; align-items: baseline; gap: 8px; }
 .run-row .fig-group .fig { width: 34px; text-align: right; font-size: var(--fs); font-weight: 600; }
 .run-row .fig-group .len { width: 46px; text-align: right; }
-/* Neutral, not a result colour. The dividend is what the tote paid, a fact
-   about the run rather than a verdict on it — and adding a ninth hue for it
-   is the trade tokens.css spends its comments refusing. */
-.run-row .fig-group .plc-div {
+/* A WINNING margin reads down the same column as a beaten one, so the widths
+   must match or the figures either side of it stop lining up. The + carries
+   the meaning; the colour is the ET tint the rest of the group already uses,
+   because winning by a nose and winning by six are not both good runs. */
+.run-row .fig-group .len.won { white-space: nowrap; }
+/* Neutral, not a result colour. The starting price is a fact about the run
+   rather than a verdict on it — and adding a ninth hue for it is the trade
+   tokens.css spends its comments refusing. */
+.run-row .fig-group .sp {
   color: var(--text-2); font-size: var(--fs-xs); white-space: nowrap;
 }
 .run-row .fig-group .t { width: 54px; text-align: right; color: var(--text-muted); }

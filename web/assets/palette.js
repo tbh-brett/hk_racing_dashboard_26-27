@@ -125,13 +125,65 @@ function collect() {
     items.push({
       kind: 'HORSE',
       label: h.horse_name,
-      hint: `${h.runs} runs · last ${h.last_run ?? '—'}`,
+      // Where Enter will take you, once it is known. Until then the horse's
+      // own record, so the row is never empty while the answer is in flight.
+      hint: whereHint(h.horse_name) ?? `${h.runs} runs · last ${h.last_run ?? '—'}`,
       run: () => goToHorse(h.horse_name),
     });
   });
 
   return items;
 }
+
+/* ── where Enter will take you ────────────────────────────────────────────── */
+
+/** Destinations already fetched, keyed by name. A palette redraws on every
+ *  keystroke and the answer for a horse does not change between them. */
+const whereCache = new Map();
+/** Names already asked about. Separate from the cache because `fillWhere` is
+ *  called by `refresh`, and `refresh` is called when an answer arrives — so a
+ *  name the server did not return would be requested again on every redraw,
+ *  forever. Asked once, and cleared on failure so a later keystroke retries. */
+const whereAsked = new Set();
+let whereSeq = 0;
+
+/** The hint for a row, or null while it is unknown. */
+function whereHint(name) {
+  const w = whereCache.get(name.toUpperCase());
+  if (!w) return null;
+  if (w.kind === 'race') {
+    return w.on_latest_card
+      ? `R${w.race_no} · ${formatMeetingDate(w.race_date)} — declared`
+      : `R${w.race_no} · ${formatMeetingDate(w.race_date)} — last run`;
+  }
+  if (w.kind === 'trial') return `trial · ${formatMeetingDate(w.trial_date)}`;
+  return 'no run or trial on record';
+}
+
+/** Label the horse rows currently on screen.
+ *
+ *  Only the visible ones, and only the ones not already known: the cold list
+ *  holds 400 horses and resolving all of them to draw forty would be most of a
+ *  second of work thrown away.
+ */
+function fillWhere() {
+  const want = state.shown
+    .filter((it) => it.kind === 'HORSE' && !whereAsked.has(it.label.toUpperCase()))
+    .map((it) => it.label)
+    .slice(0, 40);
+  if (!want.length) return;
+  want.forEach((n) => whereAsked.add(n.toUpperCase()));
+  const seq = (whereSeq += 1);
+  api.horsesWhere(want).then((body) => {
+    Object.entries(body.where ?? {}).forEach(([k, v]) => whereCache.set(k, v));
+    // Only redraw if this is still the current list and the palette is open --
+    // otherwise a slow answer repaints a box the reader has moved on from.
+    if (seq === whereSeq && state.open) { state.items = collect(); refresh(); }
+  }).catch(() => {
+    want.forEach((n) => whereAsked.delete(n.toUpperCase()));
+  });
+}
+
 
 /** Open the horse where its news is.
  *
@@ -203,6 +255,7 @@ function refresh() {
 
   state.cursor = 0;
   draw();
+  fillWhere();
 }
 
 function draw() {
@@ -266,6 +319,12 @@ export function open(seed = '', { only = null } = {}) {
   refresh();
   input.focus();
   input.select();
+  // A SEEDED OPEN HAS TO SEARCH TOO. Setting `input.value` fires no `input`
+  // event, so opening with a seed -- which is how the header's date control
+  // and every `palette:open` caller reach this -- filtered the 400 already
+  // loaded and never asked the server. Typing the same letters found more
+  // horses than arriving with them already typed.
+  if (seed) searchHorses(seed.trim());
 
   // Horses are the long tail — fetched once, lazily, so opening the palette is
   // instant and the list fills in behind the first keystroke. This is the

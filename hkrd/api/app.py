@@ -179,6 +179,18 @@ def horse_where(name: str) -> dict:
     return race_q.latest_appearance(name)
 
 
+@app.get("/api/horses/where")
+def horses_where(horses: str) -> dict:
+    """Destinations for the names the palette is about to draw.
+
+    One request for the visible rows rather than one per row: the palette
+    redraws on every keystroke and forty round trips a keystroke is not a
+    search box. Capped, because the caller only ever shows forty.
+    """
+    names = [h.strip() for h in horses.split(",") if h.strip()][:40]
+    return {"where": {n.upper(): race_q.latest_appearance(n) for n in names}}
+
+
 @app.get("/api/meeting/{date}")
 def meeting(date: str) -> dict:
     races = race_q.get_meeting(date)

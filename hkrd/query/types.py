@@ -82,6 +82,10 @@ class RunnerLine:
     dead_heat: bool = False
     finish_time: float | None = None
     lengths_behind: float | None = None
+    #: What a WINNER won by, in lengths — the runner-up's beaten margin seen
+    #: from the other side, and 0.0 for a dead heat. None on a run that did not
+    #: win, where `lengths_behind` is the number to read instead.
+    win_margin: float | None = None
     running_positions: tuple[int, ...] = ()
     section_times: tuple[float, ...] = ()
 

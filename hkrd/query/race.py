@@ -34,6 +34,27 @@ SELECT r.race_date, r.race_no, r.horse_no, r.horse_name, r.draw, r.jockey,
        s.sarr, s.sarr_rank,
        (SELECT count(*) FROM runners f
          WHERE f.race_date = r.race_date AND f.race_no = r.race_no) AS field_size,
+       -- WHAT THE WINNER WON BY. A winner has no lengths-behind -- it is not
+       -- behind anything -- so the margin column was blank on exactly the runs
+       -- worth reading it on, and "won" told you nothing about whether it was
+       -- a nose or six lengths.
+       --
+       -- The margin is the RUNNER-UP's beaten lengths, which is the same fact
+       -- seen from the other side. A dead heat for first has no second placing
+       -- at all, so the subquery would find nothing and the margin is zero by
+       -- definition; that case is answered before it is asked.
+       --
+       -- Correlated, and deliberately so: it runs only for the one runner in a
+       -- field that won, against the (race_date, race_no) primary key. The
+       -- rule about per-race constants is about recomputing one for every row
+       -- of a large result -- this is a twelfth of the rows and an index seek.
+       CASE
+         WHEN r.place = 1 AND r.dead_heat = 1 THEN 0.0
+         WHEN r.place = 1 THEN (
+           SELECT min(w.lengths_behind) FROM runners w
+            WHERE w.race_date = r.race_date AND w.race_no = r.race_no
+              AND w.place = 2)
+       END AS win_margin,
        -- The tote's PLACE payout for THIS horse, per $10. `combination` is the
        -- horse number as published, so it is compared as text on both sides
        -- rather than cast: a cast would turn an unparseable combination into a
@@ -214,6 +235,19 @@ def _comments(conn: Connection, date: str, race_no: int,
     return by_source.get("corunning"), by_source.get("incident")
 
 
+def _column(row, name: str):
+    """A column if the query selected it, else None.
+
+    `_to_line` is fed by more than one SELECT and they do not all carry every
+    column. Indexing a sqlite3.Row that lacks one raises, which would turn a
+    missing column into a broken page rather than a missing number.
+    """
+    try:
+        return row[name]
+    except (IndexError, KeyError):
+        return None
+
+
 def _to_line(row, tags: tuple[str, ...] = (), lane_notes: tuple[str, ...] = (),
              comments: tuple[str | None, str | None] = (None, None)) -> RunnerLine:
     return RunnerLine(
@@ -228,6 +262,7 @@ def _to_line(row, tags: tuple[str, ...] = (), lane_notes: tuple[str, ...] = (),
         place=row["place"], place_code=row["place_code"],
         dead_heat=bool(row["dead_heat"]),
         finish_time=row["finish_time"], lengths_behind=row["lengths_behind"],
+        win_margin=_column(row, "win_margin"),
         running_positions=parse_running_positions(row["running_positions"]),
         section_times=parse_section_times(row["section_times"]),
         et_figure=row["et_figure"], et_len_vs_par=row["et_len_vs_par"],
