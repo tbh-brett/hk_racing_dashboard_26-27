@@ -236,6 +236,17 @@ select:hover, .btn:hover { background: var(--line-2); color: var(--text); }
 .style-closer   { color: var(--style-closer); background: var(--style-closer-g); }
 .style-unknown  { color: var(--text-faint); background: var(--line); }
 
+/* THE HABITUAL STYLE, and the note that the last start disagreed with it. Here
+   rather than in a page sheet because the badge is on Race Day, the Form Guide
+   and the Bets entry card — the same class styled unqualified in two page
+   sheets is a live collision, which is the rule test_smoke keeps.
+
+   The badge is the answer; the dot is a footnote on that answer, not a second
+   badge — two styles in one column is what it replaced. Faint, because it is a
+   "look again", never a signal in itself. */
+.style-cell { display: inline-flex; align-items: baseline; gap: 4px; }
+.style-drift { color: var(--text-faint); font-size: var(--fs-xs); cursor: help; }
+
 
 /* ── trip trouble ────────────────────────────────────────────────────────────
  *

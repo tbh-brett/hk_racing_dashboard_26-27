@@ -186,7 +186,15 @@ class FormGuide:
 
     race: RaceLine
     history: dict[str, tuple[RunnerLine, ...]] = field(default_factory=dict)
+    # HOW EACH HORSE RUNS, keyed by horse name — a property of the HORSE, and
+    # so not a field on RunnerLine. `pace_style` there is one value per horse
+    # per run and answers "where did it sit that day"; putting a career habit
+    # on the same object would give every history row a style computed for
+    # today's card. Keyed like `gear_first` and `vet_form`, which are the other
+    # horse-level facts this payload carries.
+    styles: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {"race": self.race.to_dict(),
-                "history": {k: [r.to_dict() for r in v] for k, v in self.history.items()}}
+                "history": {k: [r.to_dict() for r in v] for k, v in self.history.items()},
+                "running_styles": self.styles}

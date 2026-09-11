@@ -128,6 +128,61 @@ def test_place_odds_are_scraped_never_derived(db):
     assert len(ratios) > 1, "a single ratio would mean place was computed"
 
 
+# ─── the style column ─────────────────────────────────────────────────────────
+
+def test_the_style_column_has_a_value_before_the_race_is_run(db):
+    """It was a dash on every card this page exists to price.
+
+    The column read `pace_style` — the style of TODAY'S run, taken off the race
+    being priced. That is written by the results deriver, so it is NULL until
+    the race is over: by the time the cell held anything, the bet had been
+    struck. The habit is a fact about the HORSE and exists before the off.
+    """
+    conn = get_conn(db)
+    with transaction(conn):
+        # Four Closers and a Leader last start. Four, not three: the last run
+        # is worth three, so three earlier Closers would TIE with it and the
+        # tie goes to the most recent — which is the weighting working, not a
+        # case this test is about.
+        for i, style in enumerate(["Closer"] * 4 + ["Leader"]):
+            date = f"2026-0{i + 1}-04"
+            upsert.upsert_races(conn, [
+                {"race_date": date, "race_no": 1, "venue": "HV", "course": "C",
+                 "surface": "Turf", "going": "G", "distance": 1800,
+                 "race_class": "4"}])
+            upsert.upsert_runners(conn, [
+                {"race_date": date, "race_no": 1, "horse_no": 1,
+                 "horse_name": "KYRUS TREASURE", "place": "2",
+                 "finish_time": 108.0, "draw": 1, "actual_weight": 126}])
+            conn.execute(
+                "INSERT INTO runner_pace (race_date, race_no, horse_no, "
+                "pace_style, derive_version) VALUES (?, 1, 1, ?, 't')",
+                (date, style))
+    card = prebet.entry_card(DATE, 3, conn=conn)
+    conn.close()
+
+    fav = next(r for r in card["runners"] if r["horse_no"] == 1)
+    # The card being priced has no result, so the old field had nothing to read.
+    assert fav["running_style"]["style"] == "Closer"
+    assert fav["running_style"]["last"] == "Leader"
+    assert "pace_style" not in fav, (
+        "the run-level style is back on the entry card, where it is always null")
+
+
+def test_the_entry_card_and_race_day_read_the_same_style(db):
+    """Entry is built ON `raceday.build_card` for exactly this reason: a second
+    assembly is how two surfaces come to disagree about one horse."""
+    from hkrd.query import raceday
+
+    conn = get_conn(db)
+    card = prebet.entry_card(DATE, 3, conn=conn)
+    theirs = raceday.build_card(DATE, 3, conn=conn)
+    conn.close()
+
+    mine = {r["horse_no"]: r["running_style"] for r in card["runners"]}
+    assert mine == {r["horse_no"]: r["running_style"] for r in theirs["runners"]}
+
+
 # ─── guardrails warn, they never block ────────────────────────────────────────
 
 def test_ceiling_flag_fires_without_making_the_ticket_unplaceable(db):

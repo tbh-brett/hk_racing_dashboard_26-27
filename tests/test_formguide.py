@@ -96,6 +96,75 @@ def test_form_guide_serialises_for_the_api(db):
     assert "figure_display" in run and "finish_time_display" in run
 
 
+# ── the STYLE column: how the horse RUNS ─────────────────────────────────────
+
+def _style_history(db, horse, styles):
+    """Give one horse a run of classified styles, newest LAST."""
+    conn = get_conn(db)
+    with transaction(conn):
+        for i, style in enumerate(styles):
+            date = f"2025-{i + 1:02d}-09"
+            upsert.upsert_races(conn, [
+                {"race_date": date, "race_no": 1, "venue": "ST", "course": "A",
+                 "surface": "Turf", "going": "G", "distance": 1800,
+                 "race_class": "4"}])
+            upsert.upsert_runners(conn, [
+                {"race_date": date, "race_no": 1, "horse_no": 1,
+                 "horse_name": horse, "place": "4", "finish_time": 108.0,
+                 "lengths_behind": "1-1/4", "draw": 1, "actual_weight": 120,
+                 "running_positions": "3 3 3 2"}])
+            conn.execute(
+                "INSERT INTO runner_pace (race_date, race_no, horse_no, "
+                "pace_style, derive_version) VALUES (?, 1, 1, ?, 't')",
+                (date, style))
+    return conn
+
+
+def test_the_card_carries_how_each_horse_runs(db):
+    """A property of the HORSE, keyed by horse — not a field on RunnerLine.
+
+    `pace_style` there is one value per horse per run; a career habit on the
+    same object would give every history row a style computed for today's card.
+    """
+    conn = get_conn(db)
+    payload = formguide.build_form_guide(_last_date(db), 1, conn=conn).to_dict()
+    conn.close()
+    assert set(payload["running_styles"]) == set(payload["history"])
+    for cell in payload["running_styles"].values():
+        assert {"style", "n", "counts", "last"} <= set(cell)
+
+
+def test_the_style_is_the_habit_not_the_run_on_top_of_the_form(db):
+    """The column read `history[0].pace_style` — the most recent run, which is
+    a sample of size one, and the six runs on screen cannot correct it either:
+    a habit is read off the record, not off whatever six rows contain."""
+    conn = _style_history(db, "HORSE 0",
+                          ["Closer"] * 5 + ["Leader"])      # newest last
+    payload = formguide.build_form_guide(_last_date(db), 1, conn=conn).to_dict()
+    conn.close()
+
+    cell = payload["running_styles"]["HORSE 0"]
+    assert cell["last"] == "Leader"        # what it did
+    assert cell["style"] == "Closer"       # what it is
+    assert cell["counts"] == {"Closer": 5, "Leader": 1}
+
+
+def test_the_form_guide_and_race_day_read_the_same_style(db):
+    """Two pages, one horse, one race. They cannot answer differently, because
+    both call `query.race.habitual_styles`."""
+    from hkrd.query import raceday
+
+    conn = _style_history(db, "HORSE 0", ["Closer"] * 5 + ["Leader"])
+    date = _last_date(db)
+    guide = formguide.build_form_guide(date, 1, conn=conn).to_dict()
+    card = raceday.build_card(date, 1, conn=conn)
+    conn.close()
+
+    theirs = next(r for r in card["runners"]
+                  if r["horse_name"] == "HORSE 0")["running_style"]
+    assert guide["running_styles"]["HORSE 0"] == theirs
+
+
 # ── race quality retrospective ───────────────────────────────────────────────
 
 def test_race_quality_reports_what_each_finisher_did_next(db):

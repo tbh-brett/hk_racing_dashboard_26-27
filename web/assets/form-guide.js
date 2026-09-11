@@ -11,6 +11,7 @@
  */
 import { api, num, signed } from './api.js';
 import { el, $, DASH, MINUS, renderNav, styleClass, styleOrdinal,
+         habitualStyleBadge,
          replayUrl, trialReplayUrl, externalLink, compactDate,
          tripTags, tripTagChips, ordinal, classCell, classLabel, eszCell,
          paceCell, positionsText, conditionLabel, drawText,
@@ -31,7 +32,12 @@ const TREND_THRESHOLD = 5.9;
 const COLS = [
   { key: 'no', label: 'NO', cls: 'c' },
   { key: 'name', label: 'HORSE' },
-  { key: 'style', label: 'STYLE' },
+  // The HABIT, not the last run — said on the header because the column is
+  // one word and the two readings look identical in it.
+  { key: 'style', label: 'STYLE',
+    hint: 'how the horse RUNS — the habit over its last 15 classified runs, '
+        + 'weighted to the latest, not the last run alone. Hover a badge for '
+        + 'the tally.' },
   { key: 'draw', label: 'DR', cls: 'c' },
   { key: 'jockey', label: 'JOCKEY' },
   { key: 'trainer', label: 'TRAINER' },
@@ -40,10 +46,6 @@ const COLS = [
   { key: 'seq', label: 'LAST 6 FIGURES · NEWEST LEFT · BAR = TREND' },
   { key: 'flags', label: 'FLAGS' },
 ];
-
-/* Positional, front to back. Never an alphabetical sort — "Closer" before
-   "Leader" would put the back of the field first. */
-const STYLE_ORD = { Leader: 0, 'On-Pace': 1, Midfield: 2, Closer: 3 };
 
 const state = {
   date: null, race: 1, races: [], guide: null, pace: null,
@@ -146,6 +148,7 @@ function renderHead() {
   $('fg-head').replaceChildren(...COLS.map((c) => {
     const b = el('button', c.cls ?? null);
     b.append(document.createTextNode(c.label));
+    if (c.hint) b.title = c.hint;
     if (state.sort === c.key) {
       b.setAttribute('aria-sort', state.sortDir > 0 ? 'ascending' : 'descending');
       b.append(el('span', 'ind', state.sortDir > 0 ? '▲' : '▼'));
@@ -166,12 +169,28 @@ function history(runner) {
   return state.guide?.history?.[runner.horse_name] ?? [];
 }
 
+/** How this horse RUNS — the habit, over its record.
+ *
+ *  Not `history(runner)[0].pace_style`, which is where the STYLE column used
+ *  to read from. That is one observation, and the six runs on screen cannot
+ *  correct it either: a habit is read off the whole record, and six rows are
+ *  whatever six rows happen to contain. The server computes it from the same
+ *  rule SARR's style term is scored on, so this page, Race Day, the Bets entry
+ *  card and the Speed Map all name the same thing.
+ */
+function runningStyle(runner) {
+  return state.guide?.running_styles?.[runner.horse_name] ?? null;
+}
+
 function sortValue(r, key) {
   const runs = history(r);
   switch (key) {
     case 'no': return r.horse_no;
     case 'name': return r.horse_name;
-    case 'style': return STYLE_ORD[runs[0]?.pace_style] ?? 9;
+    // The HABIT, and through the ordinal this file already imports rather
+    // than a second copy of the order beside it. Front of the field to the
+    // back; sorting these as strings puts Closer first, which is meaningless.
+    case 'style': return styleOrdinal(runningStyle(r)?.style);
     case 'draw': return r.draw ?? 99;
     case 'jockey': return r.jockey ?? '';
     case 'trainer': return r.trainer ?? '';
@@ -324,7 +343,7 @@ function horseRow(runner) {
   row.append(nameCell);
 
   const st = el('div');
-  st.append(el('span', styleClass(last?.pace_style), last?.pace_style ?? 'UNKNOWN'));
+  st.append(habitualStyleBadge(runningStyle(runner)));
   row.append(st);
 
   row.append(el('div', 'dr', drawText(runner.draw)));
