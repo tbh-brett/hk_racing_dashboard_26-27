@@ -45,3 +45,6 @@ Thumbs.db
 
 # Editor workspace files. Local to whoever opened the folder.
 *.code-workspace
+
+# Personal permission overrides. Machine-specific, and this repo is public.
+.claude/settings.local.json
