@@ -68,6 +68,22 @@ primary_region = "sin"          # Singapore, and only because Hong Kong is no
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "1gb"                # numpy, scipy and pandas are resident, and
+  memory = "2gb"                # numpy, scipy and pandas are resident, and
                                 # the ET rebuild holds a season in memory.
                                 # 512mb OOMs during derive.
+                                #
+                                # 1gb was sized against a two-season archive.
+                                # It is seven now -- 21,493 runners to 71,342,
+                                # 33 MB to 113 MB -- and `rebuild_sarr` loads
+                                # every one of 70,543 runs into pandas to score
+                                # one card. It fits, with about 590 MB free at
+                                # idle and NO SWAP, so an overrun is a kill
+                                # rather than a slowdown, and the job that
+                                # would hit it runs unattended from cron on
+                                # race night.
+                                #
+                                # Scaled with `fly scale memory 2048`, which
+                                # warns that the next deploy overwrites it from
+                                # this file. Hence this line: without it the
+                                # machine silently drops back to 1gb on the
+                                # next release.
