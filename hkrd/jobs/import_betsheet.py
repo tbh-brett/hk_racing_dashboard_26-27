@@ -43,6 +43,7 @@ from hkrd.ingest import betsheet
 from hkrd.query.tickets import (
     SINGLE_RACE_TYPES, allup_formula, allup_lines, combination_count,
 )
+from hkrd.store.bet_edits import deleted_identities, reassert_edits
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
 __all__ = ["run", "run_text", "SheetImportReport"]
@@ -54,6 +55,7 @@ class SheetImportReport:
     tickets: int = 0
     new_tickets: int = 0
     selections: int = 0
+    left_deleted: int = 0
     unmatched: list[str] = field(default_factory=list)
     disagreements: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
@@ -64,6 +66,9 @@ class SheetImportReport:
                  f"  tickets            {self.tickets:>6}   "
                  f"({self.new_tickets} new)",
                  f"  selections         {self.selections:>6}"]
+        if self.left_deleted:
+            lines.append(f"  left deleted       {self.left_deleted:>6}   "
+                         f"(removed from the ledger by hand)")
         for label, items in (("HORSES WITH NO RUNNER ROW", self.unmatched),
                              ("STAKE DISAGREES WITH THE STRUCTURE",
                               self.disagreements),
@@ -213,6 +218,7 @@ def _run(files: list[tuple[str, str]], *, db: Path | None = None,
     try:
         init_db(conn)
         cards: dict[str, dict] = {}
+        dead_ids, _dead_refs = deleted_identities(conn)
         bets: list[tuple] = []
         sels: list[tuple] = []
 
@@ -256,6 +262,12 @@ def _run(files: list[tuple[str, str]], *, db: Path | None = None,
                         f"figure — it is what was staked.")
 
                 bet_id = _bet_id(ticket)
+                # A sheet's ids are deterministic -- date and bet number -- so
+                # a ticket the owner deleted comes back under the same id, and
+                # is left where the owner put it.
+                if bet_id in dead_ids:
+                    report.left_deleted += 1
+                    continue
                 bets.append((
                     bet_id, account.lower(), date,
                     _venue(conn, date), None if all_up else legs[0]["race_no"],
@@ -286,6 +298,7 @@ def _run(files: list[tuple[str, str]], *, db: Path | None = None,
                 "leg_no, is_banker) VALUES (?,?,?,?,?) "
                 "ON CONFLICT (bet_id, race_no, horse_no, leg_no) DO UPDATE SET "
                 "is_banker = excluded.is_banker", sels)
+            reassert_edits(conn, [b[0] for b in bets])
         after = conn.execute("SELECT count(*) FROM bets").fetchone()[0]
         report.tickets, report.new_tickets = len(bets), after - before
         report.selections = len(sels)

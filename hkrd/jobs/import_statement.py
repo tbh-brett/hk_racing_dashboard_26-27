@@ -29,6 +29,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from hkrd.ingest import statement
+from hkrd.store.bet_edits import deleted_identities, reassert_edits
 from hkrd.store.coerce import to_date
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
@@ -42,6 +43,10 @@ class StatementImportReport:
     selections: int = 0
     new_bets: int = 0
     cash_movements: int = 0
+    # Bets on the statement the owner had deleted from the ledger, and so
+    # were not written back. Counted, because a statement that quietly read
+    # fewer bets than it holds looks exactly like one that failed to parse.
+    left_deleted: int = 0
     unparsed: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
@@ -50,6 +55,9 @@ class StatementImportReport:
                  f"  bets               {self.bets:>6}   ({self.new_bets} new)",
                  f"  selections         {self.selections:>6}",
                  f"  cash movements     {self.cash_movements:>6}"]
+        if self.left_deleted:
+            lines.append(f"  left deleted       {self.left_deleted:>6}   "
+                         f"(removed from the ledger by hand)")
         if self.unparsed:
             lines.append(f"  UNPARSED BLOCKS    {len(self.unparsed):>6}")
             lines += [f"    {u}" for u in self.unparsed[:10]]
@@ -133,6 +141,7 @@ def _run(files: list[tuple[str, str]], *, db: Path | None = None,
     try:
         init_db(conn)
         known = _existing_ids(conn)
+        dead_ids, dead_refs = deleted_identities(conn)
         held = _block_returns(conn)
         bets: list[tuple] = []
         sels: list[tuple] = []
@@ -158,6 +167,15 @@ def _run(files: list[tuple[str, str]], *, db: Path | None = None,
                 is_new = (rec["bookie_ref"], date, rec["bet_type"]) not in known
                 bet_id = known.get((rec["bookie_ref"], date, rec["bet_type"]),
                                    _bet_id(rec))
+                # Deleted from the ledger by the owner. Matched two ways: by
+                # the reference a statement identifies a bet by, because with
+                # the original gone `known` has no id for it and a fresh one
+                # would be minted -- and by id, for a bet deleted under the id
+                # this would compute anyway.
+                if ((rec["bookie_ref"], date, rec["bet_type"]) in dead_refs
+                        or bet_id in dead_ids):
+                    report.left_deleted += 1
+                    continue
                 legs = rec.get("legs") or []
                 is_all_up = bool(legs and isinstance(legs[0], dict))
                 credit = rec.get("total_credit")
@@ -264,6 +282,10 @@ def _run(files: list[tuple[str, str]], *, db: Path | None = None,
                 "ON CONFLICT (bet_id, source_file) DO UPDATE SET "
                 "stake = excluded.stake, returned = excluded.returned, "
                 "imported_at = excluded.imported_at", seen)
+            # The owner's corrections, re-applied over what the statement
+            # just wrote -- only the fields they touched. A bet whose account
+            # was moved still takes this statement's settlement.
+            reassert_edits(conn, [b[0] for b in bets])
         after = conn.execute("SELECT count(*) FROM bets").fetchone()[0]
         report.bets, report.new_bets = len(bets), after - before
         report.selections = len(sels)

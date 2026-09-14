@@ -61,7 +61,36 @@ async function post(path, body) {
   return out;
 }
 
+/* PATCH and DELETE, for correcting the ledger. Same error contract as `post`:
+ * the server's own `detail` reaches the page, because a refusal here always
+ * says why ("race 1 on 2026-09-06 has no runner 22") and a bare status line
+ * would throw that away. */
+async function send(method, path, body) {
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    ...(body === undefined ? {} : {
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  });
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(out.detail ?? `${res.status} ${res.statusText}`);
+  return out;
+}
+
 export const api = {
+  // Correcting the ledger. See store/bet_edits.py for why a re-import cannot
+  // undo any of these.
+  editBet: (betId, changes, selections) => send('PATCH',
+    `/bets/${encodeURIComponent(betId)}`,
+    { changes, ...(selections ? { selections } : {}) }),
+  deleteBet: (betId, reason) => send('DELETE',
+    `/bets/${encodeURIComponent(betId)}`
+    + (reason ? `?reason=${encodeURIComponent(reason)}` : '')),
+  restoreBet: (betId) => send('POST', `/bets/${encodeURIComponent(betId)}/restore`),
+  deletedBets: (account) => get(
+    `/bets/deleted${account ? `?account=${encodeURIComponent(account)}` : ''}`),
+  betHistory: (betId) => get(`/bets/${encodeURIComponent(betId)}/history`),
   /* A statement, uploaded as TEXT. The dashboard runs on a machine in
    * Singapore and the file is downloaded on whichever device is to hand, so
    * the older `path` form is a route only the server can use. */

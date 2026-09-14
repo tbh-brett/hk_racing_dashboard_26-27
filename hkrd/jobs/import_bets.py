@@ -25,6 +25,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from hkrd.store.bet_edits import deleted_identities, reassert_edits
 from hkrd.store.coerce import CoerceError, to_date, to_int
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
@@ -37,6 +38,7 @@ class BetsReport:
     selections: int = 0
     legs: int = 0
     unmatched: int = 0
+    left_deleted: int = 0
     errors: list[str] = field(default_factory=list)
 
     def render(self) -> str:
@@ -86,6 +88,7 @@ def run(src: Path, *, db: Path | None = None, account: str = DEFAULT_ACCOUNT,
         init_db(conn)
         bets: list[tuple] = []
         sels: list[tuple] = []
+        dead_ids, _dead_refs = deleted_identities(conn)
 
         for line_no, line in enumerate(src.read_text(encoding="utf-8").splitlines(), 1):
             line = line.strip()
@@ -96,6 +99,9 @@ def run(src: Path, *, db: Path | None = None, account: str = DEFAULT_ACCOUNT,
                 date = _race_date(r.get("meeting_date"))
                 if not r.get("bet_id") or not date:
                     report.errors.append(f"line {line_no}: no bet_id or date")
+                    continue
+                if r["bet_id"] in dead_ids:
+                    report.left_deleted += 1
                     continue
                 race_no = to_int(r.get("race_number"), field="race_number")
                 legs = r.get("legs") or []
@@ -173,6 +179,7 @@ def run(src: Path, *, db: Path | None = None, account: str = DEFAULT_ACCOUNT,
                 "is_banker) VALUES (?, ?, ?, ?, ?) "
                 "ON CONFLICT (bet_id, race_no, horse_no, leg_no) DO UPDATE SET "
                 "is_banker = excluded.is_banker", sels)
+            reassert_edits(conn, [b[0] for b in bets])
 
             report.unmatched = conn.execute("""
                 SELECT count(*) FROM bet_selections s

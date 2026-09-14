@@ -28,7 +28,7 @@ from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["ledger", "bets_for_race", "bets_for_horse", "backed_and_missed",
            "backed_and_missed_by_tag", "backed_by_account",
-           "latest_bet_date", "summary"]
+           "latest_bet_date", "summary", "deleted", "history"]
 
 # What a missed run is priced at, so the two sides of the comparison are
 # commensurable. A round number, stated on the page, never silently applied.
@@ -546,6 +546,40 @@ def backed_by_account(*, entry_id: str | None = None,
             out[a["key"]] = backed_and_missed(
                 entry_id=entry_id, account=a["key"], window=window, conn=conn)
         return out
+    finally:
+        if own:
+            conn.close()
+
+
+# ── corrections ──────────────────────────────────────────────────────────────
+
+def deleted(*, account: str | None = None, limit: int = 200,
+            conn: Connection | None = None) -> list[dict[str, Any]]:
+    """Bets the owner took off the ledger, newest first, restorable.
+
+    Read from the archive `store/bet_edits` keeps, not from `bets` — a deleted
+    bet is genuinely gone from the live table, which is what keeps every figure
+    on the page from counting it without each query having to remember not to.
+    """
+    from hkrd.store import bet_edits
+
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        return bet_edits.deleted_bets(conn, account=account, limit=limit)
+    finally:
+        if own:
+            conn.close()
+
+
+def history(bet_id: str, *, conn: Connection | None = None) -> list[dict[str, Any]]:
+    """Every correction made to one bet: the field, what it was, what it became."""
+    from hkrd.store import bet_edits
+
+    own = conn is None
+    conn = conn or get_conn()
+    try:
+        return bet_edits.edit_history(conn, bet_id)
     finally:
         if own:
             conn.close()

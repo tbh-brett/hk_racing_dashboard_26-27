@@ -21,6 +21,8 @@ import { el, $, DASH, MINUS, renderNav, periodPicker,
          accountPicker } from './vocab.js';
 import { context } from './context.js';
 import { initEntry, loadEntry, renderEntry } from './bets-entry.js';
+import { actionsCell, confirmStrip, deletedPanel, editorPanel, undoBar }
+  from './bets-edit.js';
 import { install as installPalette } from './palette.js';
 
 
@@ -35,6 +37,7 @@ const COLS = [
   { key: 'pnl', label: 'P/L', cls: 'r' },
   { key: 'clv', label: 'CLV', cls: 'r' },
   { key: 'src', label: 'SOURCE' },
+  { key: 'acts', label: '' },
 ];
 
 const RESULTS = [['all', 'ALL'], ['won', 'WON'], ['lost', 'LOST'],
@@ -44,6 +47,11 @@ const SOURCES = [['all', 'ALL'], ['confirmed', 'STATEMENT'],
 
 const state = {
   view: 'entry', bets: [], analysis: null, recon: null,
+  // Correcting the ledger. One bet open for editing or awaiting a delete
+  // confirmation at a time, the last deletion held for UNDO until something
+  // else happens, and the deleted list fetched only when it is opened.
+  editing: null, confirming: null, lastDeleted: null,
+  showDeleted: false, deleted: null, editorFor: null, editorEl: null,
   search: '', type: null, result: 'all', source: 'all',
   // Which book, and how far back. Both drive EVERY view on this page — the
   // ledger, the analysis and the reconciliation — because a page that filters
@@ -364,7 +372,88 @@ function ledgerRow(b) {
       ? `the log quotes reference ${b.bookie_ref}; no statement has been read`
       : 'logged bet with no statement reference');
   row.append(src);
+  row.append(actionsCell(b, {
+    onEdit: (bet) => {
+      state.editing = state.editing === bet.bet_id ? null : bet.bet_id;
+      state.editorFor = null;
+      state.editorEl = null;
+      state.confirming = null;
+      renderLedger();
+    },
+    onDelete: (bet) => {
+      state.confirming = bet.bet_id;
+      state.editing = null;
+      renderLedger();
+    },
+  }));
   return row;
+}
+
+/* ── corrections ─────────────────────────────────────────────────────────── */
+
+async function deleteBet(bet, reason) {
+  const out = await api.deleteBet(bet.bet_id, reason || null);
+  state.confirming = null;
+  state.lastDeleted = { ...bet, ...out.bet, reason: reason || null };
+  state.deleted = null;
+  // Everything re-reads, not just the ledger: the summary strip, the analysis
+  // and the reconciliation all counted this bet a moment ago.
+  await loadLedger();
+}
+
+async function restoreBet(bet) {
+  await api.restoreBet(bet.bet_id);
+  if (state.lastDeleted?.bet_id === bet.bet_id) state.lastDeleted = null;
+  state.deleted = null;
+  if (state.showDeleted) state.deleted = (await api.deletedBets(state.account)).bets;
+  await loadLedger();
+}
+
+function ledgerRows(rows) {
+  const out = [];
+  if (state.lastDeleted) {
+    out.push(undoBar(state.lastDeleted, {
+      onUndo: restoreBet,
+      onDismiss: () => { state.lastDeleted = null; renderLedger(); },
+    }));
+  }
+  rows.forEach((b) => {
+    if (state.confirming === b.bet_id) {
+      out.push(confirmStrip(b, {
+        onConfirm: deleteBet,
+        onCancel: () => { state.confirming = null; renderLedger(); },
+      }));
+      return;
+    }
+    const row = ledgerRow(b);
+    if (state.editing === b.bet_id) row.classList.add('editing');
+    out.push(row);
+    if (state.editing === b.bet_id) {
+      // THE SAME PANEL across re-renders. The ledger redraws on every keystroke
+      // in the search box and every filter chip, and building a fresh editor
+      // each time threw away whatever had been typed into the one on screen.
+      if (state.editorFor !== b.bet_id || !state.editorEl) {
+        const slot = el('div', 'led-editor loading', 'loading the card…');
+        state.editorFor = b.bet_id;
+        state.editorEl = slot;
+        const done = () => {
+          state.editing = null;
+          state.editorFor = null;
+          state.editorEl = null;
+        };
+        // The editor fetches each leg's card, so it lands a moment after the row.
+        editorPanel(b, {
+          onSaved: async () => { done(); await loadLedger(); },
+          onCancel: () => { done(); renderLedger(); },
+        }).then((panel) => {
+          if (state.editorEl === slot) state.editorEl = panel;
+          slot.replaceWith(panel);
+        }).catch((err) => { slot.textContent = err.message; });
+      }
+      out.push(state.editorEl);
+    }
+  });
+  return out;
 }
 
 function renderLedger() {
@@ -393,9 +482,13 @@ function renderLedger() {
     } else {
       box.append(el('div', null, 'NO BET MATCHES THESE FILTERS'));
     }
-    host.replaceChildren(box);
+    host.replaceChildren(...(state.lastDeleted
+      ? [undoBar(state.lastDeleted, {
+        onUndo: restoreBet,
+        onDismiss: () => { state.lastDeleted = null; renderLedger(); },
+      })] : []), box);
   } else {
-    host.replaceChildren(...rows.map(ledgerRow));
+    host.replaceChildren(...ledgerRows(rows));
   }
   $('match-count').textContent =
     `${rows.length} of ${state.bets.length}`;
@@ -419,6 +512,32 @@ function renderLedger() {
     String(rows.filter((b) => b.blackbook.length).length)));
   foot.append(el('span', 'right',
     `${priced} of ${rows.length} priced against the close`));
+
+  // The deleted list, one click away rather than a page of its own. Fetched
+  // on opening, because on most visits nobody wants it.
+  const toggle = el('button', 'act ghost deleted-toggle',
+    state.showDeleted ? 'HIDE DELETED' : 'DELETED BETS');
+  toggle.type = 'button';
+  toggle.addEventListener('click', async () => {
+    state.showDeleted = !state.showDeleted;
+    if (state.showDeleted && state.deleted === null) {
+      try {
+        state.deleted = (await api.deletedBets(state.account)).bets;
+      } catch (err) {
+        state.deleted = [];
+        toggle.title = err.message;
+      }
+    }
+    renderLedger();
+  });
+  foot.append(toggle);
+  const old = document.getElementById('led-deleted');
+  if (old) old.remove();
+  if (state.showDeleted && state.deleted) {
+    const panel = deletedPanel(state.deleted, { onRestore: restoreBet });
+    panel.id = 'led-deleted';
+    foot.after(panel);
+  }
 }
 
 /* ── analysis ────────────────────────────────────────────────────────────── */

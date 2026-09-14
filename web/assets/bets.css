@@ -61,7 +61,7 @@
   /* The selection column takes the slack: an all-up puts one line per race in
      it, so it is the one cell whose height varies. */
   grid-template-columns:
-    88px 46px 40px 96px minmax(210px, 1fr) 66px 72px 68px 74px 62px;
+    88px 46px 40px 96px minmax(210px, 1fr) 66px 72px 68px 74px 62px 74px;
   gap: 10px; padding: 0 14px;
 }
 /* Rows are top-aligned rather than centred, or a four-leg all-up floats its
@@ -583,3 +583,126 @@
 .import-btn:disabled { opacity: .5; cursor: default; }
 .import-out { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted); }
 .import-out.warn { color: var(--loss); }
+
+/* ── correcting the ledger ───────────────────────────────────────────────── */
+
+/* The row's two actions stay quiet until the row is looked at. A ledger of a
+   thousand bets with EDIT and DELETE shouting on every line reads as a form
+   rather than a record. They are still reachable by keyboard focus, and always
+   visible on a touch screen, where there is no hover to reveal them. */
+.led-row .acts {
+  display: flex; gap: 4px; justify-content: flex-end; opacity: 0;
+  transition: opacity .12s;
+}
+.led-row:hover .acts, .led-row:focus-within .acts, .led-row.editing .acts {
+  opacity: 1;
+}
+@media (hover: none) { .led-row .acts { opacity: 1; } }
+
+.act {
+  font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .08em;
+  padding: 2px 7px; cursor: pointer; color: var(--text-dim);
+  background: var(--surface); border: 1px solid var(--line-2);
+}
+.act:hover { color: var(--text); border-color: var(--line-3); }
+.act:disabled { opacity: .5; cursor: default; }
+.act.del:hover, .act.danger { color: var(--loss); border-color: var(--loss-dim); }
+.act.danger:hover { background: var(--loss); color: var(--bg); }
+.act.primary { color: var(--page-accent); border-color: var(--page-accent-ground); }
+.act.primary:hover { background: var(--page-accent-ground); }
+.act.ghost { background: none; border-color: transparent; }
+.led-row.editing { background: var(--page-hover); }
+
+/* Delete, confirmed where the row was — the row is replaced by the question
+   about it, so there is no doubt which bet is meant. */
+.led-confirm, .led-undo {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 7px 14px; font-family: var(--font-mono); font-size: var(--fs-sm);
+  border-bottom: 1px solid var(--line);
+}
+.led-confirm { background: var(--page-hover); border-left: 2px solid var(--loss); }
+.led-confirm .q { color: var(--text); }
+.led-confirm .reason {
+  flex: 1 1 220px; min-width: 0; padding: 3px 7px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--line-2);
+  font-family: var(--font); font-size: var(--fs-sm);
+}
+/* The undo stays until something else happens. It is the only record on the
+   page that the delete just went through. */
+.led-undo { background: var(--surface); border-left: 2px solid var(--page-accent); }
+.led-undo > span:first-child { color: var(--text-2); }
+.err { color: var(--loss); font-family: var(--font-mono); font-size: var(--fs-xs); }
+
+/* The editor opens under its row and spans the ledger's width. */
+.led-editor {
+  padding: 12px 14px 14px; border-bottom: 1px solid var(--line-2);
+  background: var(--surface); border-left: 2px solid var(--page-accent);
+}
+.led-editor.loading { color: var(--text-faint); font-size: var(--fs-xs); }
+.ed-grid {
+  display: grid; gap: 10px 16px;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+}
+.ed-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ed-field .k, .ed-sels > .k, .ed-history .k {
+  font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .08em;
+  color: var(--text-dim);
+}
+.ed-field input, .ed-field select {
+  padding: 4px 7px; background: var(--bg); color: var(--text);
+  border: 1px solid var(--line-2); font-family: var(--font-mono);
+  font-size: var(--fs-sm); min-width: 0;
+}
+.ed-field input:focus, .ed-field select:focus {
+  outline: 1px solid var(--page-accent); outline-offset: -1px;
+}
+.ed-field .hint { font-size: 10px; color: var(--text-faint); }
+
+.ed-sels { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.ed-leg { display: flex; gap: 10px; align-items: flex-start; }
+.ed-leg .lh .r {
+  display: inline-block; width: 30px; font-family: var(--font-mono);
+  color: var(--text-dim); padding-top: 4px;
+}
+.ed-leg .chips { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; }
+.ed-leg .hint { font-size: 10px; color: var(--text-faint); align-self: center; }
+.ed-chip {
+  display: inline-flex; align-items: baseline; gap: 5px; cursor: pointer;
+  padding: 3px 7px; background: var(--bg); color: var(--text-dim);
+  border: 1px solid var(--line-2); font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+}
+.ed-chip .n { color: var(--text-2); }
+.ed-chip .nm { max-width: 130px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; }
+.ed-chip:hover { border-color: var(--line-3); color: var(--text); }
+.ed-chip.s-on { border-color: var(--page-accent); color: var(--text); }
+.ed-chip.s-banker {
+  border-color: var(--page-accent); background: var(--page-accent-ground);
+  color: var(--text);
+}
+.ed-chip.s-banker .b { color: var(--page-accent); }
+.ed-chip.scr { opacity: .45; text-decoration: line-through; }
+
+.ed-history { margin-top: 12px; }
+.ed-history .h { font-family: var(--font-mono); font-size: 10px;
+  color: var(--text-faint); }
+.ed-bar { margin-top: 14px; display: flex; gap: 8px; align-items: center; }
+
+/* The deleted list, opened from the ledger's footer. */
+.led-foot .deleted-toggle { margin-left: 8px; }
+.led-deleted { border-top: 1px solid var(--line-2); background: var(--bg); }
+.led-deleted .head, .led-deleted .none {
+  padding: 8px 14px; font-family: var(--font-mono); font-size: var(--fs-xs);
+  letter-spacing: .06em; color: var(--text-dim);
+}
+.led-deleted .drow {
+  display: grid; align-items: center; gap: 10px; padding: 5px 14px;
+  grid-template-columns: 124px minmax(200px, 1fr) 64px minmax(0, 1fr) auto auto;
+  border-top: 1px solid var(--line); font-family: var(--font-mono);
+  font-size: var(--fs-sm); color: var(--text-muted);
+}
+.led-deleted .drow .when { color: var(--text-faint); }
+.led-deleted .drow .what { color: var(--text-2); }
+.led-deleted .drow .why { color: var(--text-dim); font-family: var(--font);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

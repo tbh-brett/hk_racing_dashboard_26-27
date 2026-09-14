@@ -216,3 +216,55 @@ def bets_for_race(date: str, race_no: int) -> dict:
 def bets_for_horse(name: str, since: str | None = None) -> dict:
     return {"horse_name": name.upper(),
             "bets": bets_q.bets_for_horse(name, since=since)}
+
+
+# ── corrections ──────────────────────────────────────────────────────────────
+# A bet on the ledger can be wrong — entered twice, filed to the wrong account,
+# a stake typed short — and until these existed the only fix was the database
+# itself. The rules about what a correction does, and why the next statement
+# import cannot quietly undo one, live in `store/bet_edits`.
+
+@router.get("/api/bets/deleted")
+def bets_deleted(account: str | None = None, limit: int = 200) -> dict:
+    """What has been taken off the ledger, newest first, each restorable."""
+    return {"bets": bets_q.deleted(account=account, limit=limit)}
+
+
+@router.get("/api/bets/{bet_id}/history")
+def bet_history(bet_id: str) -> dict:
+    return {"bet_id": bet_id, "edits": bets_q.history(bet_id)}
+
+
+@router.patch("/api/bets/{bet_id}")
+def edit_bet(bet_id: str, body: dict = Body(...)) -> dict:
+    """Correct a bet. `changes` holds the fields to set; `selections`, when
+    present, replaces the horses backed. Refused with a reason rather than
+    half-applied."""
+    from hkrd.jobs import edit_bet as job
+
+    try:
+        return job.edit(bet_id, changes=body.get("changes") or {},
+                        selections=body.get("selections"))
+    except job.BetEditError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@router.delete("/api/bets/{bet_id}")
+def delete_bet(bet_id: str, reason: str | None = None) -> dict:
+    """Take a bet off the ledger. Kept in full, so it can be put back."""
+    from hkrd.jobs import edit_bet as job
+
+    try:
+        return job.delete(bet_id, reason=reason)
+    except job.BetEditError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@router.post("/api/bets/{bet_id}/restore")
+def restore_bet(bet_id: str) -> dict:
+    from hkrd.jobs import edit_bet as job
+
+    try:
+        return job.restore(bet_id)
+    except job.BetEditError as exc:
+        raise HTTPException(409, str(exc)) from exc

@@ -258,6 +258,55 @@ CREATE TABLE IF NOT EXISTS bet_selections (
 CREATE INDEX IF NOT EXISTS ix_bets_date ON bets(race_date, race_no);
 CREATE INDEX IF NOT EXISTS ix_bet_sel_race ON bet_selections(race_no, horse_no);
 
+-- A bet the owner took off the ledger, and everything that hung off it.
+--
+-- REMOVED FROM THE LIVE TABLES, NOT FLAGGED IN THEM. A deleted-flag on `bets`
+-- would have to be honoured by every query that reads a bet — the ledger, the
+-- summary, seven analysis slices, reconciliation, the raceday ceiling, the
+-- account totals, the blackbook's backed-versus-missed — and the one that
+-- forgot would go on counting a bet the owner removed, in a P/L figure, with
+-- nothing on screen to say so. Taking the rows out makes every existing reader
+-- correct by construction.
+--
+-- NOT LOST. `snapshot` is the bet row and every child row as they stood, so a
+-- deletion can be undone exactly — including its statement confirmation, its
+-- overrides and its blackbook links, which nothing else could rebuild.
+--
+-- AND NOT RESURRECTED. The importers re-derive a bet from a file each time
+-- they read it, so a deleted statement bet would simply come back on the next
+-- import. `bookie_ref`, `race_date` and `bet_type` are the identity the
+-- statement importer matches on, kept here so it can recognise one it has been
+-- told to leave alone; a bet sheet's and the legacy log's ids are
+-- deterministic, so `bet_id` covers those.
+CREATE TABLE IF NOT EXISTS bet_deletions (
+  bet_id      TEXT PRIMARY KEY,
+  deleted_at  TEXT NOT NULL,
+  reason      TEXT,
+  source      TEXT,
+  bookie_ref  TEXT,
+  race_date   TEXT,
+  bet_type    TEXT,
+  snapshot    TEXT NOT NULL      -- JSON: {"bet": {...}, "children": {table: [...]}}
+);
+
+-- A field the owner corrected, what it was, and what it became.
+--
+-- A correction is a fact about the ledger worth keeping — the same reason an
+-- overridden guardrail is recorded rather than the bet blocked — and it is
+-- also what lets a re-import leave the owner's value standing. An importer
+-- re-applies the latest edit of every field the owner touched, and only those:
+-- a bet whose account was corrected still takes a new settlement from the next
+-- statement, because the settlement was never the owner's to have changed.
+CREATE TABLE IF NOT EXISTS bet_edits (
+  edit_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+  bet_id     TEXT NOT NULL,
+  edited_at  TEXT NOT NULL,
+  field      TEXT NOT NULL,      -- a `bets` column, or 'selections'
+  old_value  TEXT,               -- JSON
+  new_value  TEXT                -- JSON
+);
+CREATE INDEX IF NOT EXISTS ix_bet_edits_bet ON bet_edits(bet_id, field, edit_id);
+
 -- One row per bet a statement was actually read for. Without this, a bet whose
 -- bookie reference was recovered out of the legacy log's notes is
 -- indistinguishable from one a statement confirmed, and the reconciliation
