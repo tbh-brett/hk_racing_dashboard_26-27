@@ -1,135 +1,228 @@
 # Handover to the next agent
 
-Read this, then `AGENTS.md`, then `docs/start-here.md`. Then read §1 below
-before writing any code, because it names the one thing this session did not
-have and you probably need.
+**2026-09-14.** Written on the owner's first PC for an agent on a different
+device. You get none of the sessions that came before you, so everything they
+learned that is not already in the code or `docs/decisions.md` is here.
+
+The previous version of this file (2026-08-31, `git show 8ae6903:docs/handover.md`)
+described a dashboard that was not deployed and captured no odds. Both have been
+untrue for two weeks, so it was rewritten rather than amended.
+
+Read this, then `AGENTS.md`, then the last few entries of `docs/decisions.md`
+(newest last).
 
 ---
 
-## 1. Get the design file before you start
+## 0. First ten minutes
 
-The owner has a **handover file and a Claude Design file** that say what is new,
-what needed migrating from the old dashboard, and what was meant to be thrown
-away. **Neither was ever in the previous session.** The dashboard was therefore
-built from the owner's descriptions and from the old repo's behaviour, not from
-the specification — and the owner has now compared the result against what they
-originally conceptualised and found it short.
+```bash
+git pull                                    # or clone: github.com/tbh-brett/hk_racing_dashboard_26-27
+python -m venv .venv
+.venv/Scripts/python -m pip install -e ".[dev]"
+.venv/Scripts/python -m pytest tests -q     # 1344 passed, 2 skipped on 2026-09-14
+```
 
-So the first thing to do is ask for those files and read them. Everything in §5
-is a gap I could verify from the code; the gaps that matter to the owner are
-most likely the ones only that document names. Do not guess at them, and do not
-treat the current pages as the intent — they are one reading of it.
+If that count has moved and no commit says why, stop and find out before
+building on it. Python 3.11+; the first PC runs 3.13. One test drives
+`web/assets/vocab.js` through Node, so install Node.js too.
 
-The owner said this once already, and it is worth quoting because it is easy to
-get wrong in the other direction:
-
-> "I am not trying to redesign UX/UI from old dashboard, but to create new and
-> improved dashboard, with better architecture and structure, that also happens
-> to have improved UX/UI designed with Claude Design."
-
-So: not a port of the old thing, and not a free redesign either. The design file
-is the arbiter.
-
-## 2. Where everything is
+## 1. Where everything is
 
 | | |
 |---|---|
-| repo | `github.com/tbh-brett/hk_racing_dashboard_26-27`, branch `main` |
-| owner's PC | `C:\Users\tbhbr\hk_racing_dashboard_26-27` |
-| old repo (the data source) | `C:\Users\tbhbr\OneDrive\Desktop\python\HK races anaylsis` |
-| database | `hkrd.db` in the repo root, ~33 MB, not in git |
+| repo | `github.com/tbh-brett/hk_racing_dashboard_26-27`, branch `main`. **Public.** |
+| production | `https://hkrd.fly.dev` — Fly app `hkrd`, one machine in `sin`, SQLite at `/data/hkrd.db` on a volume, Litestream to Cloudflare R2 every 10 s |
+| deploying | **manual**, from a Windows checkout: `Deploy to Fly.bat` → `ops/deploy.ps1` → `fly deploy`. There is no CI. Pushing to `main` deploys nothing |
+| schedule | `ops/crontab` on the machine: `nightly` five times a day, `project_card --pending` three, `scrape_trials` two, `scrape_odds` every minute |
+| design | `web/design-source/*.dc.html`, never hand-edited; the round trip is `docs/design-loop.md`. Speed Map has no export |
+| runbook | `docs/deploy.md` — restore, logs, what each error means |
+| first PC | `C:\Users\tbhbr\hk_racing_dashboard_26-27` — **not on `main`**, see §6 |
 
-The owner is **not a developer**. They do not use a terminal comfortably and
+**The owner is not a developer.** They do not use a terminal comfortably and
 have been tripped up by placeholder paths, multi-line pastes and the Windows
 execution policy. Every instruction you give them should be one line, tested,
-and literal. `ops/*.ps1` exists for exactly this reason — prefer adding to those
-over telling them to type a command with flags.
+and literal. `ops/*.ps1` and the `.bat` files exist for exactly this — prefer
+adding to those over handing them a command with flags. If you have not run a
+command, say so; do not describe it as working.
 
-## 3. What is built
+## 2. What is built
 
-`ingest → store → derive → model → query → api → web`, one-directional, enforced
-by `tests/test_smoke.py`. 38,600 lines. 689 tests, all passing.
+`ingest → store → derive → model → query → api → web`, one direction, enforced
+by `tests/test_smoke.py`. `hkrd/` is 25,391 lines of Python, 30 tables, ~85
+routes, ten pages: Race Day, Speed Map, Form Guide, Bets, Blackbook, Results,
+Lookup, Trials, Model Analysis, and sign-in.
 
-- **9 pages** — raceday, form-guide, lookup, bets, blackbook, results, trials,
-  model-analysis, login
-- **57 endpoints**
-- **21 tables**, SQLite, WAL, foreign keys on
-- **Deployment** — Dockerfile, fly.toml, Litestream to Cloudflare R2, a cron
-  schedule, `ops/deploy.ps1`. Written and tested; **not yet deployed**.
+Since the last handover, roughly in order of how much each changed what the
+dashboard can say:
 
-Hard rules the smoke tests enforce: 600 lines per Python file; no raw hex
-outside `tokens.css`; no HTML built in `api/`; no two page stylesheets styling
-the same top-level class; no duplicate route paths.
+- **Live odds** from HKJC's JSON endpoint every minute — WIN, PLA, QIN, QPL,
+  doubles and pool turnover. `docs/handover-pools.md`.
+- **Deployed**, 2026-09-03. Six things had to be fixed first; `docs/status.md`.
+- **Bet entry**, with ticket pricing checked against the account statement.
+- **SARR rebuilt term by term**: the draw (fitted per venue and distance,
+  walk-forward), trust in a run the vet found something on, a class step, a
+  recency-weighted place rate, habitual style, and clearing rows for horses
+  that were scratched. Each is measured where it is defined, in
+  `hkrd/model/sarr.py`. `sarr.DERIVE_VERSION` is `sarr-1.1`.
+- **A pre-race speed map.** `derive/settle.py` projects first-call position
+  from the ESZ trait, the gate and style — in-race rho 0.622, MAE 0.198, about
+  ±2.4 places in a 13-runner field, and the page says so.
+- **Upcoming cards are scored by the schedule** (`3b67054`). Until 2026-09-14
+  only the Card button did it, and a blank rank now says whether it is a
+  debutant or a card nobody scored.
+- **The blend keeps the model it has** (`107c53b`, `7f71228`). One unrated
+  runner used to blank the fundamental stream for the whole field — two races
+  in three — so the Model Analysis weight control did nothing.
 
-## 4. The central rule
+## 3. The central rule
 
-**A number appears in exactly one place and is computed exactly once.**
+**A number appears in exactly one place and is computed exactly once.** Race
+Day, Form Guide, Lookup and Results are views over one object, a runner's line
+in a race — `RunnerLine` in `query/types.py`. If you are computing a figure a
+second time somewhere, that is the bug. Thresholds count: `sarr.MIN_PRIOR`
+exists because three places each carried a literal 2.
 
-Race lookup, form guide, horse performance and results are four *views over one
-object* — a runner's line in a race. `RunnerLine` (`query/types.py`) is that
-object and every query function returns it. If you find yourself computing a
-figure a second time somewhere, that is the bug.
+## 4. Open work, most urgent first
 
-## 5. Gaps I could verify from the code
+### 4.1 Deploy `main`, then check production's derived tables — not done
 
-**Live odds are never captured.** `ingest/odds.py` parses a snapshot payload but
-nothing fetches one — there is no `fetch` function and no job. `odds_snapshots`
-holds only what the legacy import brought over. So every odds-dependent figure
-reads a stale snapshot, which sits badly against the project's own rule that
-odds-dependent output must use the *latest* snapshot. This is the largest
-verified gap and it is squarely in the "additional data" the owner is missing.
+`main` now carries the scheduled card scoring and the blend fix; neither is on
+production unless someone has deployed since 2026-09-14. **Deploy from a clean
+checkout of `main`** (`git status` empty): `fly deploy` builds from the WORKING
+TREE, which is how production has run code that was never committed (§5).
 
-**The archive stops.** Races, runners, dividends, comments and bets all end
-2026-07-15; trials run to 2026-08-21. Not a bug — the source folder thins out.
-`ops/catch-up.ps1` fetches the rest from HKJC. Run `jobs.coverage` to see the
-shape. **Bets cannot be scraped** — HKJC does not know what anyone staked, so
-those only come from account statements via `jobs.import_statement --src`.
+Then check which model wrote production's SARR rows. Nothing was able to check
+this from the first PC:
 
-**`model/staking.py` does not exist**, deliberately. See §6.
+```bash
+fly ssh console -a hkrd -C "python -c \"import sqlite3;print(sqlite3.connect('/data/hkrd.db').execute('select derive_version,count(*),max(race_date) from runner_sarr group by 1').fetchall())\""
+```
 
-## 6. Decisions already taken — do not silently reverse these
+If anything is not `sarr-1.1`, rebuild it on the machine — minutes, not
+seconds:
 
-Each was a real decision. Reopen any of them if the design file or the owner
-says so, but say that you are doing it.
+```bash
+fly ssh console -a hkrd -C "python -m hkrd.jobs.rebuild_sarr --db /data/hkrd.db"
+```
 
-- **The seven legacy logic modules were discarded entirely** — `decision_engine`,
+Why it matters, measured on the first PC's archive: its table was `sarr-1.0`,
+and rebuilding under `sarr-1.1` changed **99.8% of scores, 39.5% of ranks and
+the top-rated horse in 19.5% of races**. The owner reported SARR results that
+still looked wrong while every fix was committed — that is the likely reason.
+
+### 4.2 Re-derive the blend calibration on production's data
+
+`blend.CALIBRATION` was fitted on the first PC's archive, which ends at
+2026-07-15. Production holds two more months.
+
+```bash
+fly ssh console -a hkrd -C "python -m hkrd.jobs.fit_blend --db /data/hkrd.db"
+```
+
+It prints and writes nothing. If the figures differ materially from
+`hkrd/model/blend.py`, update the constants **and** the docstring beside them,
+which quotes them. Run it only after 4.1 — it reads `runner_sarr`, and the
+constants must describe the model the page shows. Expect the fitted weight to
+stay 0.00: it has on three generations of SARR and on both populations.
+
+### 4.3 The backtest section still drops every race with an unrated runner
+
+`model/backtest.py` skips a race if any runner has no SARR score — the same
+selection just removed from `fit_blend`, where it meant the weight was chosen
+on 660 races of 1,712. Widening it changes every number in the DOES IT BEAT
+THE PRICE table, so it is the owner's call rather than a quiet fix.
+
+### 4.4 Two literals `3b67054` did not reach
+
+- `query/speedmap.py` returns the reason `"fewer than two prior runs"`, and
+  `tests/test_speedmap.py` asserts the string. It should read `sarr.MIN_PRIOR`.
+- The blend footer names unrated runners without a reason, deliberately: a
+  blank is too little history (a rule) or a card nobody scored (a fault), and
+  only Race Day tells them apart (`raceday._unrated`). Surfacing it on Model
+  Analysis needs the prior-run count shared rather than copied, and
+  `query/raceday.py` is at 568 of 600 lines — propose a split first.
+
+## 5. Traps this repo has already sprung
+
+- **Production can run code that is not on `main`.** Deploys have gone out
+  from a checkout with uncommitted work. Before reasoning about production from
+  the repo, ask which machine deployed last.
+- **`python script.py` can import the wrong copy of `hkrd`.** The first PC's
+  `.venv` holds an editable install pointing at the main checkout, and a
+  script's `sys.path[0]` is the script's own directory, so run from a worktree
+  it silently imports the other branch. `python -m` and `pytest` put the cwd
+  first and are fine. It produced a false "no difference" on 2026-09-13; assert
+  on `module.__file__` or set `PYTHONPATH`.
+- **A derived table can be a model generation behind the code.** The
+  `derive_version` column is the cheap tell. Check it before blaming the model.
+- **The repo is public and `hkrd.db` holds the owner's bets.** Never commit a
+  database, a WAL, a statement or `.env`. `.gitignore` covers the known shapes;
+  a backup named `hkrd.db.pre-draw` once was not.
+- **Line endings.** The Windows working tree is CRLF and `.gitattributes` pins
+  everything the container reads to LF. `sed -i` or a bash heredoc rewrites a
+  file LF; git normalises it on commit, but keep a file one or the other.
+- **Agent permissions.** On the first PC the permission classifier blocked
+  `fly ssh console -a hkrd -C ...`. If it happens to you, give the owner the
+  command rather than routing around it. `flyctl` is signed in there.
+- **Production's API needs a session.** `/api/health` is the only open route.
+- **`gh` is not installed on the first PC**, so a pull request there means the
+  GitHub web page.
+
+## 6. The first PC — only if anyone works on it again
+
+`C:\Users\tbhbr\hk_racing_dashboard_26-27` sits on
+`claude/handover-docs-review-qgvvfk`, dozens of commits behind `main`, with
+uncommitted edits that are an EARLIER DRAFT of work now on `main`. Checked file
+by file on 2026-09-14: everything in it either landed on `main` in a later form
+or is identical to `main`, and the one untracked document,
+`docs/handover-draw-and-speedmap.md`, specifies two pieces of work that were
+both since built (`aa4dd2f`, `b026827`). Nothing there is unique.
+
+It matters because everything on that PC binds to that checkout: `Start
+dashboard.bat`, the `.venv`, and `hkrd.db`, whose SARR rows are `sarr-1.0`.
+And `ops/update.ps1` pulls the upstream of the CURRENT branch — a dead one — so
+Update there reports "already up to date" and never delivers `main`.
+
+To put it on `main` without losing anything (the stash is recoverable, and the
+database is gitignored so neither step touches it):
+
+```powershell
+git -C C:\Users\tbhbr\hk_racing_dashboard_26-27 stash push -u -m "pre-main draft 2026-09-14"
+git -C C:\Users\tbhbr\hk_racing_dashboard_26-27 checkout main
+git -C C:\Users\tbhbr\hk_racing_dashboard_26-27 pull --ff-only
+```
+
+then `.\ops\update.ps1` works as documented, and
+`.venv\Scripts\python -m hkrd.jobs.rebuild_sarr` brings the local table to
+`sarr-1.1`. Not run — it is the owner's working copy.
+
+Also on that PC, outside the repo: `C:\Users\tbhbr\hkrd-deploy-assets\` holds
+`hkrd.db.pre-draw` (a 30 MB database from before the draw term — it contains
+bets, never put it anywhere public) and `draw-cache.zip`, the input to a gate
+backfill that is on `main` as `13e143e`. Neither is needed on a new device.
+The worktree `.claude/worktrees/quinella-doubles-odds-scraping-b2147c` is
+merged and can be removed.
+
+## 7. Decisions already taken — do not silently reverse these
+
+Each was a real decision. Reopen one if the owner asks, but say you are doing it.
+
+- **The seven legacy logic modules were discarded** — `decision_engine`,
   `betting_strategy`, `form_screener`, `horse_cycle`, `backtest_model`,
-  `calibration_harness`, `train_gbm`, ~6,800 lines. The owner's words: *"those
-  are all vibe-coded without thorough consideration, and plenty of newly
-  implemented functions and features replaces them."* Do not port them back.
-- **No staking model.** Walk-forward evaluation showed the model does not beat
-  the market price, so building bet sizing on top of it would have dressed up a
-  negative edge. `MEASURED` in `model/backtest.py` records it.
-- **Margin was dropped from the trial-quality score** despite the design
-  specifying FINISH + MARGIN + COMMENT, because measurement said it did not
-  carry signal. The owner was told.
-- **The export/PDF function was removed** at the owner's request.
-- **Image scraping and OCR were removed.**
+  `calibration_harness`, `train_gbm`. The owner's words: *"those are all
+  vibe-coded without thorough consideration, and plenty of newly implemented
+  functions and features replaces them."* Do not port them back.
+- **No staking model.** The model does not beat the market price, so bet sizing
+  on top of it would dress up a negative edge. `MEASURED` in
+  `model/backtest.py`.
+- **The blend's weight on the fundamental stream is 0.00**, fitted, not a
+  placeholder. Every positive weight scores worse out of sample, on 660 fully
+  rated races and on all 1,617 with a complete book. The page shows the
+  alternatives beside it rather than asserting it. `docs/decisions.md`.
+- **Margin was dropped from trial quality** despite the design specifying it,
+  because it carried no signal. The owner was told.
+- **Export/PDF, image scraping and OCR were removed** at the owner's request.
 - **Authentication is one shared password** in `HKRD_PASSWORD`, failing closed.
-
-## 7. Findings that cost real work — do not contradict without re-measuring
-
-- **Join history on `horse_name`, never `horse_id`.** `horse_id` is 0% populated
-  in July 2026, 54.6% in June, 90% in April. Any join on it silently returns
-  partial history.
-- **Never parse `lbw` with `pd.to_numeric`** — it drops 79.1% of values across
-  21,423 rows. Use the shared parser.
-- **Never convert win probability to place probability by linear scaling.**
-  `p / sum(p) * 3` overstates the favourite by ~34 points. Harville with the
-  Henery discount, in `derive/probability.py`.
-- **Running style is field-size scaled**: Closer cutoff is
-  `max(8, field_size * 0.7)`, not a fixed `> 7`.
-- **Settlement is HKJC tote.** You are paid the final dividend regardless of
-  when the bet was struck — so early-price value is not capturable and odds
-  drift is a sizing input, never a timing edge.
-- **Sectionals are 400m measured from the FINISH backwards**, the opening
-  section carrying the remainder. Verified against 21,075 runners, 0 mismatches.
-- **Trial days are Tue/Thu/Fri 26.4% each, Mon 16.4%, Sat 3.1%, Wed 1.3%.** A
-  Tue/Thu schedule misses 47% of them. Ask HKJC for the list; do not guess.
-- **Every parser maps columns by header text** and raises on a shape it does not
-  recognise. This is the "corunning lesson": a parser confident about positions
-  it never verified put a trainer's name in the horse column and nothing looked
-  wrong for three days.
 
 ## 8. How to work here
 
@@ -137,23 +230,42 @@ Run the dashboard and look at it. Do not describe a page you have not seen.
 
 ```bash
 HKRD_ALLOW_NO_AUTH=1 python -m hkrd.serve --port 8000
-python -m pytest tests -q          # 689 tests, keep them green
+python -m pytest tests -q
 python -m hkrd.jobs.coverage       # what the database actually holds
 ```
 
-Screenshot pages with Playwright before and after a change — the owner responds
-far better to a picture than to a description, and it catches the class of bug
-where a page renders but is wrong.
+A local database comes from `ops/start.ps1` (bootstraps from the legacy repo,
+which only the first PC has) or from production. `docs/deploy.md` restores
+from R2. To copy production down without catching SQLite mid-write — **not
+run from the first PC**, check the volume has room for a second copy first:
+
+```bash
+fly ssh console -a hkrd -C "python -c \"import sqlite3;sqlite3.connect('/data/hkrd.db').backup(sqlite3.connect('/data/copy.db'))\""
+fly ssh sftp get /data/copy.db hkrd.db -a hkrd
+fly ssh console -a hkrd -C "rm /data/copy.db"
+```
+
+Commit messages here are a sentence saying what was wrong, then prose with the
+measured numbers — read `git log` before writing one. The owner responds far
+better to a screenshot than to a description.
 
 ## 9. What not to do
 
-- Do not write `except: pass`. The old `dashboard.py` had 66 of them and that is
-  why bugs went unnoticed for months.
+- Do not write `except: pass`. The old `dashboard.py` had 66 of them, and that
+  is why bugs went unnoticed for months.
 - Do not present a bare number. Every figure carries rank, percentile or delta
   vs par, **and a sample size**.
 - Do not let a missing minor input void a whole result. Degrade the term and
-  label it.
+  label it — the blend fix in §2 is that rule, applied late.
 - Do not add a dependency without asking.
-- Do not tell the owner something works without having run it. This session
-  shipped two PowerShell bugs that only a real run caught — a function calling
-  itself, and `Get-Command` returning every match on PATH.
+- Do not evaluate a model change on data it has seen. Walk-forward or nothing.
+
+## 10. What you cannot see
+
+Claude sessions do not travel between devices. These artifacts do, for the
+same account:
+
+- ESZ Speed Map design canvas —
+  https://claude.ai/code/artifact/e45df474-af3c-433c-9a88-be760ef07ac4
+- SARR draw handover (historical; both parts are built) —
+  https://claude.ai/code/artifact/84698c8c-ef67-401a-aa5c-88b7dc22dfbd
