@@ -527,17 +527,19 @@ runner in the race was scored, so the blended column was the de-vigged market
 at every weight and the page's one control did nothing. The reasoning was
 sound — a softmax over part of a field is normalised against a denominator
 missing terms — and the remedy was not, because the case is not an edge case.
-SARR needs two prior runs before it rates a horse and a card always carries
-debutants: **1,116 of the archive's 1,712 races, 65.2%, hold at least one
-runner it will not score.** The page built to put a model beside the market
-showed no model on two races in three, and said so in a footer nobody had
-reason to read as "this is normal".
+SARR rates nothing with fewer than `sarr.MIN_PRIOR` (two) prior runs and a
+card always carries debutants: **1,116 of the archive's 1,712 races, 65.2%,
+hold at least one runner it will not score.** The page built to put a model
+beside the market showed no model on two races in three, and said so in a
+footer nobody had reason to read as "this is normal".
 
 The denominator was the fixable part. The rated runners now share the market's
 OWN total on that group rather than the whole 1.0 — `fundamental_probability`
 takes a `mass` — and a runner SARR cannot rate falls through to its market
 price, because `w·m + (1−w)·m` is `m` at every weight. The column sums to that
-share, not to 100%, and the footer states which runners it covers. An unrated
+share, not to 100%, and the footer names the runners it does not cover —
+without a reason, because a blank rank is either too little history or a card
+nobody scored, and Race Day is the page that tells those apart. An unrated
 runner is not a horse with no chance, which is what dropping it said, and not
 the field average, which is a number nobody measured.
 

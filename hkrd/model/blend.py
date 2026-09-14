@@ -95,8 +95,9 @@ def fundamental_probability(sarr: list[float], beta: float = BETA, *,
     take the whole column with it: the caller blanked the stream unless every
     runner scored, on the argument that a softmax over part of a field is
     normalised against a denominator missing terms. The argument is right and
-    the remedy was wrong, because the case is not rare. SARR needs two prior
-    runs, every card carries debutants, and 65.2% of the 1,712 races in the
+    the remedy was wrong, because the case is not rare. SARR rates nothing
+    with fewer than `sarr.MIN_PRIOR` prior runs, every card carries debutants,
+    and 65.2% of the 1,712 races in the
     archive hold at least one runner it will not score -- so the page built to
     show a model beside the market showed no model on two races in three.
 

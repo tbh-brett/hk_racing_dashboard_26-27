@@ -338,9 +338,10 @@ def blend_breakdown(date: str, race_no: int, *, weight: float | None = None,
         # market stream.
         #
         # The fundamental stream needed the same thing until this changed, and
-        # it should not have. SARR wants two prior runs before it rates a horse
-        # and a card always carries debutants, so 65.2% of the 1,712 races in
-        # the archive hold at least one runner it will not score -- the page
+        # it should not have. SARR rates nothing with fewer than
+        # `sarr.MIN_PRIOR` prior runs and a card always carries debutants, so
+        # 65.2% of the 1,712 races in the archive hold at least one runner it
+        # will not score -- the page
         # existed to put a model beside the market and showed no model on two
         # races in three, with the blended column silently identical to the
         # de-vigged one at every weight the reader tried.
@@ -399,6 +400,14 @@ def blend_breakdown(date: str, race_no: int, *, weight: float | None = None,
             # column to 100% needs both or the shortfall looks like an error.
             "fund_covers": len(scored),
             "fund_of": len(rows),
+            # Named, not counted, and deliberately WITHOUT a reason. A blank
+            # rank is two different things -- too little history, which is a
+            # rule, or a card nobody scored, which is a fault -- and Race Day
+            # tells them apart (`raceday._unrated`). This page only needs to
+            # say how the blend treats them, which is the same either way; a
+            # footer that explained every blank as the two-run rule would be
+            # wrong on exactly the day the fault recurs.
+            "unrated": [r["horse_name"] for r in rows if r["sarr"] is None],
             "fund_mass": (round(100 * fund_mass, 1)
                           if scored and len(market) else None),
             "calibration": blend_m.CALIBRATION,

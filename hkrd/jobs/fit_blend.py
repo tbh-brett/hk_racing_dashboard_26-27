@@ -33,11 +33,11 @@ def _races(conn) -> list[tuple[str, np.ndarray, np.ndarray, np.ndarray]]:
 
     The fundamental stream used to impose the same requirement, which quietly
     made this a fit on a DIFFERENT POPULATION from the one the page runs on.
-    SARR wants two prior runs before it rates a horse, so requiring a fully
-    scored field selects for races without debutants: 660 of the archive's
-    1,712, and the other 1,052 were never in the window the weight was chosen
-    in. An unrated runner now arrives as NaN and is carried, so the fit sees
-    the cards the reader sees.
+    SARR rates nothing with fewer than `sarr.MIN_PRIOR` prior runs, so
+    requiring a fully scored field selects for races without debutants: 660 of
+    the archive's 1,712, and the other 1,052 were never in the window the
+    weight was chosen in. An unrated runner now arrives as NaN and is carried,
+    so the fit sees the cards the reader sees.
     """
     scored: dict[tuple[str, int], list] = {}
     for r in conn.execute("""

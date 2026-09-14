@@ -292,6 +292,7 @@ def test_a_partly_scored_field_keeps_the_model_it_has(db):
 
     assert out["missing"]["unscored"] == 1
     assert out["fund_covers"] == out["fund_of"] - 1
+    assert out["unrated"] == ["HORSE 0"]     # named, not counted
     gone = next(r for r in out["runners"] if r["horse_no"] == 1)
     rated = [r for r in out["runners"] if r["horse_no"] != 1]
     assert gone["fundamental"] is None

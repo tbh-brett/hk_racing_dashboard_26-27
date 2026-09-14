@@ -339,15 +339,18 @@ function renderBlend() {
       `${data.missing.unpriced} UNPRICED — THE DE-VIG NEEDS THE WHOLE BOOK, `
       + 'SO THE MARKET COLUMN IS BLANK'));
   }
+  // Named, and without a reason: a blank rank is either too little history
+  // or a card nobody scored, and Race Day is the page that says which. What
+  // this page owes the reader is how the blend treats them, which is the same.
   if (data.missing.unscored) {
+    const names = data.unrated.join(', ');
     foot.append(el('span', 'warn',
       `FUND PROB COVERS ${data.fund_covers} OF ${data.fund_of} RUNNERS`
       + (data.fund_mass === null ? ''
         : ` AND SUMS TO ${data.fund_mass}%, THE MARKET'S OWN SHARE OF THAT `
           + 'GROUP')
-      + ` — SARR WANTS TWO PRIOR RUNS, SO ${data.missing.unscored} `
-      + `${data.missing.unscored === 1 ? 'RUNNER IS' : 'RUNNERS ARE'} `
-      + 'HELD AT THE MARKET PRICE AT EVERY WEIGHT'));
+      + ' — UNRATED, SO HELD AT THE MARKET PRICE AT EVERY WEIGHT: '
+      + names));
   }
   foot.append(el('span', 'warn',
     (data.weight === cal.fitted_weight
