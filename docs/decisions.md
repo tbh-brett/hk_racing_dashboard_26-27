@@ -519,3 +519,48 @@ backwards.
 Nothing is claimed either way now when the card is gone and nothing was
 declared. That leaves the last run which DID fetch a card standing, and "when
 did the card last land" is what the strip is asking.
+
+## A model with an opinion about most of the field has an opinion
+
+**2026-09-13.** `blend_breakdown` blanked the FUND PROB column unless every
+runner in the race was scored, so the blended column was the de-vigged market
+at every weight and the page's one control did nothing. The reasoning was
+sound — a softmax over part of a field is normalised against a denominator
+missing terms — and the remedy was not, because the case is not an edge case.
+SARR rates nothing with fewer than `sarr.MIN_PRIOR` (two) prior runs and a
+card always carries debutants: **1,116 of the archive's 1,712 races, 65.2%,
+hold at least one runner it will not score.** The page built to put a model
+beside the market showed no model on two races in three, and said so in a
+footer nobody had reason to read as "this is normal".
+
+The denominator was the fixable part. The rated runners now share the market's
+OWN total on that group rather than the whole 1.0 — `fundamental_probability`
+takes a `mass` — and a runner SARR cannot rate falls through to its market
+price, because `w·m + (1−w)·m` is `m` at every weight. The column sums to that
+share, not to 100%, and the footer names the runners it does not cover —
+without a reason, because a blank rank is either too little history or a card
+nobody scored, and Race Day is the page that tells those apart. An unrated
+runner is not a horse with no chance, which is what dropping it said, and not
+the field average, which is a number nobody measured.
+
+The de-vig still needs the whole book and still blanks without it: the
+overround IS the gap between the book and 100%, so a book missing a runner has
+a gap that is partly the missing runner. One of the two shortfalls was real.
+
+**What this changed about the published figures.** The same requirement had
+been silently selecting the fitting population — `fit_blend` could only use
+races with a fully rated field, so the weight was chosen on 660 races and
+applied to all of them. It now fits on all 1,617 races with a complete book
+and reports both. THE ANSWER DOES NOT MOVE: the fitted weight is 0.00 on
+either population, and on the wider one every positive weight is still worse
+(2.0155 at w=0.00, 2.0242 at 0.10, 2.0543 at 0.32, 2.2482 at 1.00, over 535
+test races). Tripling the evidence did not rescue the fundamental stream,
+which is a stronger statement of the finding than the page could make before.
+
+One number moved for a reason worth recording: `_log_loss` took the first row
+with `place = 1`, and a dead heat has two. Reading the archive through
+`runners` rather than through `runner_sarr` therefore moved the market's test
+loss from 2.0466 to 2.0545 with no model change at all — a published constant
+that depended on a join order. A dead heat now contributes the mean of its
+winners' log likelihoods. Three of 1,712 races are dead heats and two fall
+after the split, which is enough to move the fourth decimal.
