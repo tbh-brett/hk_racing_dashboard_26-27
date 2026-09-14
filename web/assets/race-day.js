@@ -827,6 +827,33 @@ function sparkline(r) {
   return s;
 }
 
+/** The SARR rank, or the reason there is none.
+ *
+ *  A dash used to mean two different things. SOLID STATE on 2026-09-13 had a
+ *  single run and the model needs two, which is a rule; a horse with twenty
+ *  runs and no rank is a card nobody scored, which is a fault -- and every
+ *  upcoming card sat in that state until someone pressed Card. They look alike
+ *  as a dash and nothing like each other here, so the fault announces itself
+ *  the next time rather than passing for a debutant.
+ */
+function sarrCell(r) {
+  if (r.sarr_rank !== null && r.sarr_rank !== undefined) {
+    const sv = el('span', null, String(r.sarr_rank));
+    if (r.sarr_rank === 1) sv.style.color = 'var(--edge)';
+    return sv;
+  }
+  const why = r.sarr_unrated;
+  if (!why) return el('span', null, DASH);
+  const tag = el('span', `sarr-why ${why.kind}`, why.label);
+  tag.title = why.kind === 'unscored'
+    ? `${why.prior} prior runs, enough to rate, but this card has not been `
+      + 'scored. Press Card in the header to score it.'
+    : `${why.prior === 0 ? 'No run' : `${why.prior} run`} in Hong Kong. `
+      + `SARR rates a horse from its history and needs ${why.needs}.`;
+  return tag;
+}
+
+
 function edgeCell(r) {
   const td = el('td', 'c-num');
   const box = el('div', 'edge-cell');
@@ -954,9 +981,7 @@ function cardRow(r, index) {
   tr.append(el('td', 'c-num', String(r.market_rank ?? DASH)));
 
   const sr = el('td', 'c-num');
-  const sv = el('span', null, String(r.sarr_rank ?? DASH));
-  if (r.sarr_rank === 1) sv.style.color = 'var(--edge)';
-  sr.append(sv);
+  sr.append(sarrCell(r));
   tr.append(sr);
 
   tr.append(edgeCell(r));
@@ -1184,7 +1209,8 @@ function renderDetail() {
     e.classList.add(x.rank_delta <= -3 ? 'strong' : 'quiet');
     row.append(e);
     row.append(el('span', null, `${x.horse_no} ${x.horse_name}`));
-    row.append(el('span', 'r', `SARR ${x.sarr_rank ?? DASH} · MKT ${x.market_rank ?? DASH}`));
+    row.append(el('span', 'r',
+      `SARR ${x.sarr_rank ?? x.sarr_unrated?.label ?? DASH} · MKT ${x.market_rank ?? DASH}`));
     dis.append(row);
   });
   host.append(dis);

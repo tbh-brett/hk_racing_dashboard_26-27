@@ -20,6 +20,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
+from hkrd.model import sarr as sarr_m
 from hkrd.derive.probability import devig
 from hkrd.query import (blackbook as bb_q, formguide as fg_q,
                         gear as gear_q, market as market_q,
@@ -139,6 +140,25 @@ def _odds_series(conn: Connection, date: str, race_no: int) -> dict[int, list[fl
     return out
 
 
+def _unrated(rank: int | None, prior: int) -> dict[str, Any] | None:
+    """Why a runner has no SARR rank, or None when it has one.
+
+    A blank used to stand for two different things and the page could not
+    tell them apart. SOLID STATE on 2026-09-13 had one run, which is a rule;
+    a horse with twenty runs and no rank is a card nobody scored, which is a
+    fault -- and the nightly job left every upcoming card in exactly that state
+    until someone pressed Card. Named separately, the fault shows up on the
+    page the next time it happens instead of passing for a debutant.
+    """
+    if rank is not None:
+        return None
+    if prior < sarr_m.MIN_PRIOR:
+        return {"kind": "history", "prior": prior, "needs": sarr_m.MIN_PRIOR,
+                "label": "DEBUT" if prior == 0 else f"{prior} RUN"}
+    return {"kind": "unscored", "prior": prior, "needs": sarr_m.MIN_PRIOR,
+            "label": "NOT SCORED"}
+
+
 def build_card(date: str, race_no: int, *,
                conn: Connection | None = None) -> dict[str, Any]:
     """One race, assembled for the card."""
@@ -240,6 +260,19 @@ def build_card(date: str, race_no: int, *,
         flow = {r["horse_no"]: r for r in
                 money_q.money_arrived(date, race_no, conn=conn)["runners"]}
 
+        # How much history each horse brings, counted the way the rebuild
+        # counts it: runs strictly before today that have a finishing time.
+        # One grouped query for the field, against ix_runners_horse.
+        names = [r.horse_name for r in race.runners if r.horse_name]
+        prior_runs: dict[str, int] = {}
+        if names:
+            marks = ",".join("?" * len(names))
+            prior_runs = {row[0]: row[1] for row in conn.execute(
+                f"SELECT horse_name, count(*) FROM runners "
+                f"WHERE horse_name IN ({marks}) AND race_date < ? "
+                f"AND finish_time IS NOT NULL GROUP BY horse_name",
+                [*names, date])}
+
         runners: list[dict[str, Any]] = []
         for r in race.runners:
             prior = get_horse_form(r.horse_name, limit=1, before=date, conn=conn)
@@ -285,6 +318,9 @@ def build_card(date: str, race_no: int, *,
                 # Negative means the model likes it more than the market does.
                 "rank_delta": (r.sarr_rank - m_rank
                                if r.sarr_rank and m_rank else None),
+                "sarr_prior": prior_runs.get(r.horse_name, 0),
+                "sarr_unrated": _unrated(r.sarr_rank,
+                                         prior_runs.get(r.horse_name, 0)),
                 "last_run": {
                     "race_date": last.race_date, "place": last.place,
                     "figure": last.et_figure, "figure_display": last.figure_display,

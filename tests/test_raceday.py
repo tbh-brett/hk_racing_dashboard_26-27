@@ -558,3 +558,45 @@ def test_the_margin_survives_the_horse_form_query_too(tmp_path):
     form = race_q.get_horse_form("WINNER", limit=5, conn=conn)
     conn.close()
     assert form[0].win_margin == pytest.approx(1.25)
+
+
+# ── why a runner has no SARR rank ────────────────────────────────────────────
+
+def test_a_rated_runner_has_no_reason():
+    assert raceday._unrated(3, prior=22) is None
+
+
+def test_a_horse_short_of_history_is_named_as_a_rule():
+    """SOLID STATE on 2026-09-13: one run, and the model needs two."""
+    from hkrd.model import sarr
+    one = raceday._unrated(None, prior=1)
+    debut = raceday._unrated(None, prior=0)
+    assert one["kind"] == debut["kind"] == "history"
+    assert one["label"] == "1 RUN" and debut["label"] == "DEBUT"
+    assert one["needs"] == sarr.MIN_PRIOR
+
+
+def test_enough_history_and_no_rank_is_a_fault_not_a_debutant():
+    """A horse with twenty runs and no rank is a card nobody scored. The
+    nightly job left every upcoming card in that state, and as a dash it was
+    indistinguishable from a horse having its first start."""
+    why = raceday._unrated(None, prior=20)
+    assert why["kind"] == "unscored"
+    assert why["label"] == "NOT SCORED"
+
+
+def test_the_threshold_on_the_page_is_the_one_the_rebuild_uses():
+    """Three places decide "enough history" -- the rebuild, the speed map and
+    this page. A page explaining a blank with a different number from the one
+    that caused it explains nothing."""
+    import inspect
+    from hkrd.jobs import rebuild_sarr
+    from hkrd.model import evaluate, sarr
+    assert inspect.signature(rebuild_sarr.rebuild).parameters[
+        "min_prior"].default == sarr.MIN_PRIOR
+    assert inspect.signature(rebuild_sarr.score_runners).parameters[
+        "min_prior"].default == sarr.MIN_PRIOR
+    assert inspect.signature(evaluate.score).parameters[
+        "min_prior"].default == sarr.MIN_PRIOR
+    assert raceday._unrated(None, prior=sarr.MIN_PRIOR - 1)["kind"] == "history"
+    assert raceday._unrated(None, prior=sarr.MIN_PRIOR)["kind"] == "unscored"

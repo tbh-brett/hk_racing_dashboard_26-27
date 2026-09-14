@@ -580,3 +580,15 @@ table.card td { padding: 6px 8px; }
    in this file and does not follow the tokens when they move. */
 .dis-row .e.strong { color: var(--edge); }
 .dis-row .e.quiet  { color: var(--text-dim); }
+
+/* Why a runner has no SARR rank. HISTORY is a rule and reads quietly; UNSCORED
+   is a fault and must not look like it -- it is the state every upcoming card
+   was left in by the nightly job, and a quiet grey tag is how that went
+   unnoticed. */
+.sarr-why {
+  font-size: var(--fs-xs); letter-spacing: .04em; white-space: nowrap;
+  cursor: help;
+}
+.sarr-why.history  { color: var(--text-dim); }
+.sarr-why.unscored { color: var(--alert); font-weight: 600; }
+

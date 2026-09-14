@@ -61,6 +61,11 @@ class NightlyReport:
     plans: list[Plan] = field(default_factory=list)
     scraped: list[str] = field(default_factory=list)
     derived: str = ""
+    # Cards scored for SARR this run. Its own line because it is the step that
+    # did not exist: the dateless derive below only reaches races with results,
+    # so an upcoming card was fetched here five times a day and ranked by
+    # nobody. A run that scored one says so.
+    scored_cards: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -80,6 +85,9 @@ class NightlyReport:
         if self.derived:
             lines.append("  derived")
             lines += [f"  {line}" for line in self.derived.splitlines()]
+        lines.append(f"  cards scored       {len(self.scored_cards):>6}")
+        for c in self.scored_cards:
+            lines.append(f"    {c}")
         if self.warnings:
             lines.append(f"  not available      {len(self.warnings):>6}")
             lines += [f"    {w}" for w in self.warnings[:8]]
@@ -92,8 +100,8 @@ class NightlyReport:
         """What goes in job_runs.detail and, from there, onto the page."""
         if self.errors:
             return f"{len(self.errors)} error(s): {self.errors[0][:160]}"
-        if self.scraped:
-            return "; ".join(self.scraped)
+        if self.scraped or self.scored_cards:
+            return "; ".join([*self.scraped, *self.scored_cards])
         return "nothing outstanding"
 
 
@@ -224,6 +232,7 @@ def run(db: Path | None = None, *, today: dt.date | None = None,
         return report
 
     touched = False
+    cards: list[str] = []          # dates whose card landed this run
     probes = unparsed = 0
     for plan in report.plans:
         if not plan.act:
@@ -232,8 +241,11 @@ def run(db: Path | None = None, *, today: dt.date | None = None,
 
         if plan.venue:
             # The database already knows this meeting and its venue. No probe.
-            touched |= _scrape(report, plan.date, plan.venue, past=past,
-                                db=db, session=session, expected=True)
+            results, card = _scrape(report, plan.date, plan.venue, past=past,
+                                    db=db, session=session, expected=True)
+            touched |= results
+            if results or card:
+                cards.append(plan.date)
             continue
 
         for venue in VENUES:
@@ -245,8 +257,11 @@ def run(db: Path | None = None, *, today: dt.date | None = None,
                 continue
             if verdict == "none":
                 continue
-            touched |= _scrape(report, plan.date, venue, past=past, db=db,
-                                session=session, expected=False)
+            results, card = _scrape(report, plan.date, venue, past=past, db=db,
+                                    session=session, expected=False)
+            touched |= results
+            if results or card:
+                cards.append(plan.date)
             break        # one meeting per date; the other venue is not racing
 
     if probes and probes == unparsed:
@@ -266,14 +281,78 @@ def run(db: Path | None = None, *, today: dt.date | None = None,
         out = derive_all.run(db)
         report.derived = out.render()
         report.errors.extend(out.errors)
+
+    if derive:
+        # After the full derive, so a card is ranked against any results that
+        # landed earlier in this same run.
+        _score_cards(report, cards, db=db)
     return report
 
 
+def _unrun(db: Path | None, date: str) -> bool:
+    """Does this date have a race nobody has run yet?
+
+    A race with NO placing on any runner, not a runner with no placing: every
+    settled meeting carries scratched horses with a NULL there, and testing for
+    those would rescore every recent meeting every night.
+
+    `place`, not `finish_time`, because `_decide` above already defines a race
+    as finished that way and one module must not hold two definitions of the
+    same fact -- a card this called unrun and that called finished would be
+    scraped as settled and scored as upcoming. On real data the two agree.
+    """
+    conn = get_conn(db if db is not None else db_path())
+    try:
+        return bool(conn.execute(
+            "SELECT 1 FROM races ra WHERE ra.race_date = ? AND NOT EXISTS ("
+            "  SELECT 1 FROM runners r WHERE r.race_date = ra.race_date"
+            "     AND r.race_no = ra.race_no AND r.place IS NOT NULL) "
+            "LIMIT 1", (date,)).fetchone())
+    finally:
+        conn.close()
+
+
+def _score_cards(report: NightlyReport, dates: list[str], *,
+                 db: Path | None) -> None:
+    """SARR for every card this run fetched that still has races to run.
+
+    THE DATELESS DERIVE ABOVE NEVER REACHES AN UPCOMING CARD. It rebuilds the
+    races that have finishing times, which an unrun card has none of, so a card
+    fetched here was ranked only if someone pressed Card in the header -- the
+    one path that passed a date. 2026-09-13 had ranks on race day because the
+    card was scored by hand three days earlier; left to this job it would have
+    had none.
+
+    RESCORED EVERY TIME THE CARD LANDS, not once. This job refetches a card
+    through to race day, which is how scratchings and replacements arrive, and
+    a card scored once is a card whose replacement runner shows a blank that
+    looks exactly like a debutant's. The rebuild is walk-forward -- a profile
+    reads only runs before the race -- so scoring it again is the same numbers
+    for the same field, and new numbers only where the field or the history
+    changed.
+
+    One date at a time and each failure recorded against its date, so a card
+    that will not score does not take the others down with it.
+    """
+    for date in dict.fromkeys(dates):          # de-duplicated, order kept
+        if not _unrun(db, date):
+            continue
+        try:
+            out = derive_all.run(db, date=date, only=("sarr",))
+        except Exception as exc:                   # noqa: BLE001 - recorded
+            report.errors.append(f"{date} SARR: {type(exc).__name__}: {exc}")
+            continue
+        report.errors.extend(f"{date} SARR: {e}" for e in out.errors)
+        n = out.written.get("runner_sarr", 0)
+        report.scored_cards.append(f"{date}: SARR {n} runners")
+
+
 def _scrape(report: NightlyReport, date: str, venue: str, *, past: bool,
-            db: Path | None, session, expected: bool) -> bool:
+            db: Path | None, session, expected: bool) -> tuple[bool, bool]:
     """Fetch one meeting into the database and fold the counts into `report`.
 
-    Returns whether anything landed, which is what decides if derive runs."""
+    Returns (results landed, card landed). Results decide whether the full
+    derive runs; a card decides whether that date is scored for SARR."""
     # A meeting in the future has no results yet; asking for them is not a
     # failure, so post_race is decided by the calendar and not by what comes
     # back.
@@ -285,7 +364,18 @@ def _scrape(report: NightlyReport, date: str, venue: str, *, past: bool,
             f"{got.dividends} dividends")
         report.warnings.extend(f"{date} {venue}: {w}" for w in got.warnings)
         report.errors.extend(f"{date} {venue}: {e}" for e in got.errors)
-        return True
+        return True, bool(got.declared)
+    if got.declared:
+        # A DECLARED FIELD IS A RESULT. Before a meeting is run the scrape
+        # stores the card and nothing else, so `races` is zero -- and this used
+        # to fall through to the error below. Every refresh of an upcoming card
+        # was logged as "the database has this meeting but the scrape returned
+        # no races": seven in a row from 2026-09-11 to race morning on 09-13,
+        # each one a successful fetch that picked up the scratchings.
+        report.scraped.append(f"{date} {venue}: card, {got.declared} declared")
+        report.warnings.extend(f"{date} {venue}: {w}" for w in got.warnings)
+        report.errors.extend(f"{date} {venue}: {e}" for e in got.errors)
+        return False, True
     if expected:
         # The database said there was a meeting here. Coming back with nothing
         # is a failure, not a quiet night.
@@ -293,7 +383,7 @@ def _scrape(report: NightlyReport, date: str, venue: str, *, past: bool,
             f"{date} {venue}: the database has this meeting but the scrape "
             "returned no races — " +
             (got.errors[0] if got.errors else "no error given"))
-    return False
+    return False, False
 
 
 def main(argv: list[str] | None = None) -> int:

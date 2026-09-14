@@ -186,7 +186,8 @@ def _vet_flags(conn, runs: pd.DataFrame) -> pd.Series:
 
 
 def score_runners(runs: pd.DataFrame, targets: pd.DataFrame, *,
-                  min_prior: int = 2, report: SarrReport | None = None,
+                  min_prior: int = sarr.MIN_PRIOR,
+                  report: SarrReport | None = None,
                   adjust: ProfileAdjust | None = None
                   ) -> tuple[list[tuple], list[tuple]]:
     """Score every target walk-forward. The one place a SARR score is produced.
@@ -290,7 +291,7 @@ def score_runners(runs: pd.DataFrame, targets: pd.DataFrame, *,
     return rows, component_rows
 
 
-def rebuild(db: Path | None = None, *, min_prior: int = 2,
+def rebuild(db: Path | None = None, *, min_prior: int = sarr.MIN_PRIOR,
             date: str | None = None) -> SarrReport:
     report = SarrReport()
     conn = get_conn(db if db is not None else db_path())
@@ -343,7 +344,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--db", type=Path, default=None)
     ap.add_argument("--date", default=None, help="one meeting; omit for all")
-    ap.add_argument("--min-prior", type=int, default=2,
+    ap.add_argument("--min-prior", type=int, default=sarr.MIN_PRIOR,
                     help="runs of history required before a horse is rated")
     a = ap.parse_args(argv)
     report = rebuild(a.db, min_prior=a.min_prior, date=a.date)

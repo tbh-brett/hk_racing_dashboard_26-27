@@ -32,6 +32,15 @@ from scipy import stats
 # changed model left rows that could not be told apart from the rest.
 DERIVE_VERSION = "sarr-1.1"
 
+# Runs of history a horse needs before it is rated at all.
+#
+# Named here, beside the model, because three things have to agree on it: the
+# rebuild that decides who gets a score, the speed map that uses the same
+# profiles, and the Race Day page that has to say WHY a horse has none. Each
+# used to carry its own literal 2, and a page that explains a blank with a
+# different threshold from the one that caused it explains nothing.
+MIN_PRIOR = 2
+
 RECENCY_LAMBDA = 0.85
 MAX_PRIOR_RUNS = 15
 # LAST_STYLE_BOOST used to sit here. It is `derive.pace.LAST_STYLE_BOOST` now,

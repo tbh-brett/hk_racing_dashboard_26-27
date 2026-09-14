@@ -256,3 +256,118 @@ def test_a_raised_exception_still_closes_the_row(db):
         assert row["ok"] is False and "scraper blew up" in row["detail"]
     finally:
         conn.close()
+
+
+# ── the card, which is a result, and which gets ranked ───────────────────────
+
+def _card_only_scrape(monkeypatch, declared: int = 12):
+    """What `scrape_meeting` returns for a meeting that has not been run: the
+    declared field stored, and not one race of results."""
+    from hkrd.jobs import scrape_meeting as scrape_job
+    monkeypatch.setattr(scrape_job, "scrape_meeting",
+                        lambda date, venue, **k: scrape_job.ScrapeReport(
+                            date=date, venue=venue, declared=declared))
+    monkeypatch.setattr(racecard, "fetch_race",
+                        lambda *a, **k: (_ for _ in ()).throw(NotFound("404")))
+
+
+def test_refreshing_an_upcoming_card_is_not_an_error(db, monkeypatch):
+    """A card scrape stores the field and counts no races, and this used to be
+    logged as "the database has this meeting but the scrape returned no races"
+    -- seven runs in a row from 2026-09-11 to race morning on 09-13, every one
+    a successful fetch that picked up the scratchings. A declared field is a
+    result."""
+    tomorrow = (TODAY + dt.timedelta(days=1)).isoformat()
+    _meeting(db, tomorrow, "HV", results=False, dividends=False)
+    _card_only_scrape(monkeypatch)
+
+    report = nightly.run(db, today=TODAY, derive=False)
+    assert report.ok, report.errors
+    assert any(tomorrow in s and "card" in s and "declared" in s
+               for s in report.scraped)
+
+
+def test_an_upcoming_card_is_scored_for_sarr(db, monkeypatch):
+    """The dateless derive only reaches races with finishing times, so an
+    upcoming card was ranked only when someone pressed Card in the header.
+    2026-09-13 had ranks on race day because it was scored by hand."""
+    from hkrd.jobs import derive_all
+    tomorrow = (TODAY + dt.timedelta(days=1)).isoformat()
+    _meeting(db, tomorrow, "HV", results=False, dividends=False)
+    _card_only_scrape(monkeypatch)
+
+    calls = []
+
+    class Out:
+        errors: list = []
+        written = {"runner_sarr": 24}
+
+    monkeypatch.setattr(derive_all, "run",
+                        lambda db=None, **k: calls.append(k) or Out())
+
+    report = nightly.run(db, today=TODAY)
+    assert {"date": tomorrow, "only": ("sarr",)} in calls
+    assert any(tomorrow in c and "SARR" in c for c in report.scored_cards)
+    assert "SARR" in report.one_line()
+
+
+def test_the_card_is_rescored_every_time_it_lands(db, monkeypatch):
+    """Not once. The job refetches a card through to race day, which is how
+    replacements arrive, and a card scored once leaves a replacement with a
+    blank that looks exactly like a debutant's."""
+    from hkrd.jobs import derive_all
+    tomorrow = (TODAY + dt.timedelta(days=1)).isoformat()
+    _meeting(db, tomorrow, "HV", results=False, dividends=False)
+    _card_only_scrape(monkeypatch)
+
+    calls = []
+
+    class Out:
+        errors: list = []
+        written = {"runner_sarr": 24}
+
+    monkeypatch.setattr(derive_all, "run",
+                        lambda db=None, **k: calls.append(k) or Out())
+    nightly.run(db, today=TODAY)
+    nightly.run(db, today=TODAY)
+    assert sum(1 for c in calls if c.get("date") == tomorrow) == 2
+
+
+def test_a_settled_meeting_with_scratchings_is_not_rescored(db):
+    """Every settled meeting carries scratched runners with no finishing time.
+    Testing for THOSE would rescore every recent meeting every night; the test
+    is a race nobody has run."""
+    _meeting(db, "2026-08-23", "ST")
+    conn = get_conn(db)
+    with transaction(conn):
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-08-23", "race_no": 1, "horse_no": 9,
+             "horse_name": "SCRATCHED", "place": None}])
+    conn.close()
+    assert nightly._unrun(db, "2026-08-23") is False
+
+
+def test_a_card_nobody_has_run_is_unrun(db):
+    _meeting(db, "2026-08-27", "HV", results=False, dividends=False)
+    assert nightly._unrun(db, "2026-08-27") is True
+
+
+def test_one_card_that_will_not_score_does_not_stop_the_others(db, monkeypatch):
+    from hkrd.jobs import derive_all
+    _meeting(db, "2026-08-27", "HV", results=False, dividends=False)
+    _meeting(db, "2026-08-28", "ST", results=False, dividends=False)
+
+    def boom(db=None, **k):
+        if k.get("date") == "2026-08-27":
+            raise RuntimeError("history would not load")
+
+        class Out:
+            errors: list = []
+            written = {"runner_sarr": 6}
+        return Out()
+
+    monkeypatch.setattr(derive_all, "run", boom)
+    report = nightly.NightlyReport()
+    nightly._score_cards(report, ["2026-08-27", "2026-08-28"], db=db)
+    assert any("2026-08-27" in e and "SARR" in e for e in report.errors)
+    assert any("2026-08-28" in c for c in report.scored_cards)

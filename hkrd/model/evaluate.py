@@ -103,7 +103,8 @@ class Comparison:
 
 
 def score(conn: Connection | None = None, *, adjust=None,
-          min_prior: int = 2, since: str | None = None) -> pd.DataFrame:
+          min_prior: int = sarr.MIN_PRIOR,
+          since: str | None = None) -> pd.DataFrame:
     """Walk-forward SARR for every runnable race, without writing anything.
 
     Returns one row per scored runner: the race, the horse, its score and where
