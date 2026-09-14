@@ -89,6 +89,61 @@ def test_a_missing_stream_does_not_void_the_race():
     assert blend.blend(np.array([]), mkt) == pytest.approx(mkt)
 
 
+def test_an_unrated_runner_does_not_void_the_fundamental_stream():
+    """SARR needs two prior runs and every card carries debutants, so 65.2% of
+    the archive's races hold at least one runner it will not score. Blanking
+    the column for the whole field meant the page showed no model on two races
+    in three, with the blended column silently identical to the market at every
+    weight the reader picked."""
+    p = blend.fundamental_probability([0.4, None, 0.25])
+    assert np.isnan(p[1])
+    assert not np.isnan(p[[0, 2]]).any()
+    assert p[2] > p[0]                      # lower SARR still ranks higher
+    assert np.nansum(p) == pytest.approx(1.0)
+
+
+def test_the_rated_group_can_be_held_to_the_markets_own_share_of_the_book():
+    """`mass` is what keeps the two streams on one scale. Without it the rated
+    runners would share the whole 1.0 between them while the market gave them
+    less, and the blend would inflate every horse SARR happened to rate."""
+    p = blend.fundamental_probability([0.4, None, 0.25], mass=0.8)
+    assert np.nansum(p) == pytest.approx(0.8)
+
+
+def test_a_fully_rated_field_is_untouched_by_the_change():
+    """The published beta and weight were fitted on fields with nothing
+    missing, so this path has to return exactly what it returned before."""
+    s = [0.4, -0.1, 0.25, 0.0]
+    p = blend.fundamental_probability(s)
+    z = np.exp(-blend.BETA * (np.array(s) - np.mean(s)))
+    assert p == pytest.approx(z / z.sum())
+
+
+def test_an_unrated_runner_falls_through_to_its_market_price():
+    """Not to zero, which is what dropping it would say, and not to the field
+    average, which is a number nobody measured. At every weight the row is its
+    own de-vigged price, because w*m + (1-w)*m is m."""
+    mkt = blend.market_probability([3.0, 5.0, 8.0])
+    # The market's own share of the two runners SARR rated. Hand the stream
+    # anything else and the renormalisation inside blend() drags this row off
+    # its price, which is the whole reason `mass` is a parameter.
+    fund = blend.fundamental_probability([0.4, None, 0.25],
+                                         mass=float(mkt[[0, 2]].sum()))
+    for w in (0.0, 0.3, 1.0):
+        out = blend.blend(fund, mkt, w)
+        assert out[1] == pytest.approx(mkt[1], rel=1e-9)
+        assert out.sum() == pytest.approx(1.0)
+
+
+def test_the_published_calibration_reports_both_populations():
+    """The headline figures are fitted on fully rated fields; the page runs on
+    every race with a complete book. A reader has to be able to see both, or
+    the weight looks like it was chosen on the cards it is applied to."""
+    cal = blend.CALIBRATION
+    assert cal["partial"]["races"] > cal["races"]
+    assert cal["partial"]["fitted_weight"] == cal["fitted_weight"]
+
+
 def test_the_published_calibration_keys_survive_json():
     """JSON turns 1.0 into "1.0"; a reader looking up "1" finds nothing, and
     the page rendered `undefined` until these were strings."""
@@ -222,6 +277,53 @@ def test_a_weight_the_reader_picks_is_honoured_and_clamped(db):
     assert half["weight"] == 0.5
     assert any(r["blended"] != r["market_devig"] for r in half["runners"])
     assert over["weight"] == 1.0
+
+
+def test_a_partly_scored_field_keeps_the_model_it_has(db):
+    """The bug this replaces: one unrated runner blanked FUND PROB for the
+    whole field, so the blended column was the market at every weight and
+    moving the slider changed nothing on screen."""
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.execute("DELETE FROM runner_sarr_component WHERE horse_no = 1")
+        conn.execute("DELETE FROM runner_sarr WHERE horse_no = 1")
+    out = model.blend_breakdown("2026-03-22", 1, weight=0.5, conn=conn)
+    conn.close()
+
+    assert out["missing"]["unscored"] == 1
+    assert out["fund_covers"] == out["fund_of"] - 1
+    gone = next(r for r in out["runners"] if r["horse_no"] == 1)
+    rated = [r for r in out["runners"] if r["horse_no"] != 1]
+    assert gone["fundamental"] is None
+    assert gone["blended"] == gone["market_devig"]
+    assert all(r["fundamental"] is not None for r in rated)
+    # The column sums to the market's own share of the group it covers, which
+    # is what the footer states, rather than to 100% over part of the field.
+    assert sum(r["fundamental"] for r in rated) == pytest.approx(
+        out["fund_mass"], abs=0.5)
+    assert sum(r["blended"] for r in out["runners"]) == pytest.approx(100, abs=0.5)
+
+
+def test_the_weight_still_moves_the_ranking_when_a_runner_is_unrated(db):
+    """The symptom the reader sees. Without this the page's one control is
+    inert on two races in three and nothing on screen says why."""
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.execute("DELETE FROM runner_sarr_component WHERE horse_no = 1")
+        conn.execute("DELETE FROM runner_sarr WHERE horse_no = 1")
+        # The fixture prices its horses in the same order it times them, so
+        # the two streams agree and no weight could separate them. Reverse the
+        # book and the market's favourite becomes SARR's outsider, which is
+        # the only arrangement in which the slider has anything to show.
+        conn.execute("UPDATE runners SET win_odds = 20.0 - win_odds "
+                     "WHERE race_date = '2026-03-22' AND race_no = 1")
+    order = {}
+    for w in (0.0, 1.0):
+        out = model.blend_breakdown("2026-03-22", 1, weight=w, conn=conn)
+        order[w] = [r["horse_no"] for r in
+                    sorted(out["runners"], key=lambda r: r["blend_rank"])]
+    conn.close()
+    assert order[0.0] != order[1.0]
 
 
 def test_a_partly_priced_field_blanks_the_stream_rather_than_mixing_scales(db):

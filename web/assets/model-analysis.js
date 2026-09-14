@@ -238,7 +238,7 @@ function renderWeightPicker() {
     const active = (state.weight ?? fitted) === w;
     b.setAttribute('aria-pressed', String(active));
     b.title = w === fitted ? 'the fitted weight'
-      : `test log loss ${cal?.log_loss_by_weight?.[w.toFixed(2)] ?? '—'}`;
+      : `test log loss ${cal?.log_loss_by_weight?.[w.toFixed(2)]?.toFixed(4) ?? '—'}`;
     b.addEventListener('click', () => { state.weight = w; loadBlend(); });
     seg.append(b);
   });
@@ -262,7 +262,8 @@ function renderBlend() {
     { key: 'no', label: 'NO', align: 'centre', width: '34px' },
     { key: 'name', label: 'HORSE', align: 'left', width: '190px' },
     { key: 'fund', label: 'FUND PROB', width: '110px',
-      title: 'SARR mapped to a win probability' },
+      title: 'SARR mapped to a win probability, over the runners it could '
+        + 'rate; a dash is no opinion, not a low one' },
     { key: 'raw', label: 'MKT PROB (RAW)', width: '130px',
       title: '1/odds, not normalised — the gap to 100% IS the overround' },
     { key: 'devig', label: 'MARKET (DE-VIGGED)', width: '150px' },
@@ -329,10 +330,24 @@ function renderBlend() {
       `MARKET (RAW) CARRIES OVERROUND ${data.overround}%; DE-VIGGING DIVIDES IT `
       + 'OUT PROPORTIONALLY SO THE COLUMN SUMS TO 100%'));
   }
-  if (data.missing.unpriced || data.missing.unscored) {
+  // Two different shortfalls, and they used to share one line that said the
+  // stream was blank. Only the price one still blanks anything: the de-vig
+  // needs the whole book because the overround IS the gap to 100%. A runner
+  // SARR cannot rate costs that row and no other.
+  if (data.missing.unpriced) {
     foot.append(el('span', 'warn',
-      `${data.missing.unpriced} UNPRICED · ${data.missing.unscored} UNSCORED — `
-      + 'BOTH STREAMS NEED THE WHOLE FIELD, SO THE SHORT ONE IS BLANK'));
+      `${data.missing.unpriced} UNPRICED — THE DE-VIG NEEDS THE WHOLE BOOK, `
+      + 'SO THE MARKET COLUMN IS BLANK'));
+  }
+  if (data.missing.unscored) {
+    foot.append(el('span', 'warn',
+      `FUND PROB COVERS ${data.fund_covers} OF ${data.fund_of} RUNNERS`
+      + (data.fund_mass === null ? ''
+        : ` AND SUMS TO ${data.fund_mass}%, THE MARKET'S OWN SHARE OF THAT `
+          + 'GROUP')
+      + ` — SARR WANTS TWO PRIOR RUNS, SO ${data.missing.unscored} `
+      + `${data.missing.unscored === 1 ? 'RUNNER IS' : 'RUNNERS ARE'} `
+      + 'HELD AT THE MARKET PRICE AT EVERY WEIGHT'));
   }
   foot.append(el('span', 'warn',
     (data.weight === cal.fitted_weight
@@ -340,9 +355,9 @@ function renderBlend() {
       : `YOU ARE VIEWING ${data.weight.toFixed(2)}; THE FITTED WEIGHT IS `
         + `${cal.fitted_weight.toFixed(2)}: `)
     + `OVER ${cal.test_races} WALK-FORWARD RACES THE MARKET ALONE SCORES `
-    + `${cal.log_loss.market} AND EVERY POSITIVE WEIGHT IS WORSE `
-    + `(0.10 → ${cal.log_loss_by_weight['0.10']}, `
-    + `1.00 → ${cal.log_loss_by_weight['1.00']})`));
+    + `${cal.log_loss.market.toFixed(4)} AND EVERY POSITIVE WEIGHT IS WORSE `
+    + `(0.10 → ${cal.log_loss_by_weight['0.10'].toFixed(4)}, `
+    + `1.00 → ${cal.log_loss_by_weight['1.00'].toFixed(4)})`));
   foot.append(el('span', 'right',
     'THE BLEND LEANS ON A NUMBER THE MARKET ALREADY PROVIDES — THAT IS THE '
     + 'FINDING THIS PAGE DOCUMENTS, NOT A LIMITATION IT HIDES'));

@@ -285,6 +285,20 @@ def sarr_influence(*, conn: Connection | None = None) -> list[dict]:
 
 # ── the blend, and what it is worth ──────────────────────────────────────────
 
+def _pct(stream, i: int) -> float | None:
+    """One stream's figure for row `i` as a percentage, or None.
+
+    NaN means the stream has no opinion about this runner, and it has to leave
+    here as None: `json` writes a bare `NaN` token, which no JSON parser
+    accepts, so a single unrated runner on an unpriced card would have broken
+    the whole response rather than one cell.
+    """
+    if len(stream) == 0:
+        return None
+    v = float(stream[i])
+    return None if v != v else round(100 * v, 1)
+
+
 def blend_breakdown(date: str, race_no: int, *, weight: float | None = None,
                     conn: Connection | None = None) -> dict:
     """The blend's components side by side, never just its output.
@@ -318,18 +332,42 @@ def blend_breakdown(date: str, race_no: int, *, weight: float | None = None,
         for r in rows:
             if r["win_odds"] is None and r["horse_no"] in live:
                 r["win_odds"] = live[r["horse_no"]]["win_odds"]
-        # Both streams need the whole field: a softmax over some of the runners
-        # and a de-vig over some of the prices are each normalised against a
-        # denominator missing terms. Say which is short rather than blending
-        # two numbers that mean different things.
+        # The de-vig genuinely does need every price: the overround is the gap
+        # between the book and 100%, and a book missing a runner has a gap that
+        # is partly the missing runner. So an unpriced field still blanks the
+        # market stream.
+        #
+        # The fundamental stream needed the same thing until this changed, and
+        # it should not have. SARR wants two prior runs before it rates a horse
+        # and a card always carries debutants, so 65.2% of the 1,712 races in
+        # the archive hold at least one runner it will not score -- the page
+        # existed to put a model beside the market and showed no model on two
+        # races in three, with the blended column silently identical to the
+        # de-vigged one at every weight the reader tried.
+        #
+        # What the model actually has is an opinion about the runners it rated
+        # and none about the rest, so that is what it now says. The rated group
+        # shares the market's OWN total on that group rather than the whole
+        # 1.0, which keeps the two streams on one scale and the blend summing
+        # to 100%; the unrated runners fall through to their market price. The
+        # fundamental column therefore sums to `fund_mass`, not to 100%, and
+        # the page says so rather than leaving a reader to notice.
         priced = [r for r in rows if r["win_odds"]]
         scored = [r for r in rows if r["sarr"] is not None]
         missing = {"unpriced": len(rows) - len(priced),
                    "unscored": len(rows) - len(scored)}
 
-        market = blend_m.market_probability([r["win_odds"] for r in rows])             if len(priced) == len(rows) and rows else []
-        fund = blend_m.fundamental_probability([r["sarr"] for r in rows])             if len(scored) == len(rows) and rows else []
-        blended = blend_m.blend(fund, market, weight) if len(rows) else []
+        market = (blend_m.market_probability([r["win_odds"] for r in rows])
+                  if len(priced) == len(rows) and rows else [])
+        # With no market to share out, the rated runners hold the whole book
+        # between them -- which is what the stream meant on its own anyway.
+        fund_mass = (float(sum(p for r, p in zip(rows, market)
+                               if r["sarr"] is not None))
+                     if len(market) else 1.0)
+        fund = (blend_m.fundamental_probability([r["sarr"] for r in rows],
+                                                mass=fund_mass)
+                if scored else [])
+        blended = blend_m.blend(fund, market, weight) if rows else []
 
         overround = (round(100 * (sum(1 / r["win_odds"] for r in priced) - 1), 1)
                      if len(priced) == len(rows) and rows else None)
@@ -344,12 +382,9 @@ def blend_breakdown(date: str, race_no: int, *, weight: float | None = None,
                 # sum to 100%. That gap is the overround.
                 "market_raw": (round(100 / r["win_odds"], 1)
                                if r["win_odds"] else None),
-                "market_devig": (round(100 * float(market[i]), 1)
-                                 if len(market) else None),
-                "fundamental": (round(100 * float(fund[i]), 1)
-                                if len(fund) else None),
-                "blended": (round(100 * float(blended[i]), 1)
-                            if len(blended) else None),
+                "market_devig": _pct(market, i),
+                "fundamental": _pct(fund, i),
+                "blended": _pct(blended, i),
             })
         order = sorted((r for r in runners if r["blended"] is not None),
                        key=lambda r: -r["blended"])
@@ -359,6 +394,13 @@ def blend_breakdown(date: str, race_no: int, *, weight: float | None = None,
         return {
             "race_date": date, "race_no": race_no, "runners": runners,
             "weight": weight, "overround": overround, "missing": missing,
+            # How much of the field the fundamental stream actually covers, and
+            # how much of the book that group holds. A reader comparing the
+            # column to 100% needs both or the shortfall looks like an error.
+            "fund_covers": len(scored),
+            "fund_of": len(rows),
+            "fund_mass": (round(100 * fund_mass, 1)
+                          if scored and len(market) else None),
             "calibration": blend_m.CALIBRATION,
         }
     finally:
