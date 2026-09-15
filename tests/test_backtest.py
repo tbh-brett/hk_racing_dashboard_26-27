@@ -47,25 +47,74 @@ def db(tmp_path):
     return path
 
 
-def test_a_race_missing_any_of_the_three_requirements_is_left_out(db):
-    """A race missing one runner's odds cannot be de-vigged, one missing a
-    SARR cannot be scored as a field, and one with no winner cannot be
-    evaluated. Letting any through with a gap changes what the probabilities
-    mean without saying so."""
+def test_a_race_missing_odds_or_a_winner_is_left_out(db):
+    """The two requirements that are still requirements. A race missing one
+    runner's odds cannot be de-vigged -- the overround IS the gap between the
+    book and 100%, so a book missing a runner has a gap that is partly the
+    missing runner -- and one with no winner cannot be evaluated."""
     conn = get_conn(db)
     before = len(bt.races_for_backtest(conn=conn))
     with transaction(conn):
         conn.execute("UPDATE runners SET win_odds = NULL "
                      "WHERE race_date = '2026-01-01' AND horse_no = 4")
-        conn.execute("DELETE FROM runner_sarr WHERE race_date = '2026-01-08' "
-                     "AND horse_no = 2")
         conn.execute("UPDATE runners SET place = '2' "
                      "WHERE race_date = '2026-01-15' AND place = '1'")
     after = bt.races_for_backtest(conn=conn)
     conn.close()
-    assert len(after) == before - 3
+    assert len(after) == before - 2
     dates = {r["race_date"] for r in after}
-    assert {"2026-01-01", "2026-01-08", "2026-01-15"}.isdisjoint(dates)
+    assert {"2026-01-01", "2026-01-15"}.isdisjoint(dates)
+
+
+def test_a_race_with_an_unrated_runner_is_measured_not_dropped(db):
+    """The selection this replaces. "Every runner rated" means "no debutant
+    declared", which is a property of the CARD and not of the model -- 65.2% of
+    the archive fails it, so the table asking whether the model beats the price
+    was answering on the third of races that happen to carry no newcomer."""
+    conn = get_conn(db)
+    before = len(bt.races_for_backtest(conn=conn))
+    with transaction(conn):
+        conn.execute("DELETE FROM runner_sarr WHERE race_date = '2026-01-08' "
+                     "AND horse_no = 2")
+    after = bt.races_for_backtest(conn=conn)
+    conn.close()
+    assert len(after) == before
+    kept = next(r for r in after if r["race_date"] == "2026-01-08")
+    # And it says what it is measuring on, rather than leaving the reader to
+    # assume a full field.
+    assert kept["rated"] == kept["runners"] - 1
+
+
+def test_a_race_with_one_rated_runner_is_left_out(db):
+    """A softmax over one runner is 1.0 whatever its score, which is not an
+    opinion. `fit_blend` draws the floor in the same place."""
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.execute("DELETE FROM runner_sarr WHERE race_date = '2026-01-08' "
+                     "AND horse_no > 1")
+    after = bt.races_for_backtest(conn=conn)
+    conn.close()
+    assert "2026-01-08" not in {r["race_date"] for r in after}
+
+
+def test_an_unrated_runner_is_held_at_its_market_price_at_every_weight(db):
+    """`w*m + (1-w)*m` is `m`. The honest reading of "unrated": not a horse
+    with no chance, which is what dropping the race said, and not the field
+    average, which is a number nobody measured."""
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.execute("DELETE FROM runner_sarr WHERE race_date = '2026-01-08' "
+                     "AND horse_no = 2")
+    race = next(r for r in bt.races_for_backtest(conn=conn)
+                if r["race_date"] == "2026-01-08")
+    conn.close()
+    field = race["field"]
+    market = bt.blend_m.market_probability([f["win_odds"] for f in field])
+    i = next(n for n, f in enumerate(field) if f["sarr"] is None)
+    for weight in (0.0, 0.25, 1.0):
+        p = bt._probabilities(field, weight)
+        assert p[i] == pytest.approx(market[i], abs=1e-9)
+        assert p.sum() == pytest.approx(1.0, abs=1e-9)
 
 
 def test_the_split_is_by_date_never_by_row(db):
@@ -160,3 +209,56 @@ def test_value_bets_compare_against_the_de_vigged_price_not_the_raw_one(db):
     v = bt.value_bets(races, weight=1.0)
     runners = sum(len(r["field"]) for r in races)
     assert 0 < v["bets"] < runners
+
+
+# ── one definition of the fundamental stream ─────────────────────────────────
+
+def test_the_backtest_builds_the_same_stream_the_page_and_the_fit_do(db):
+    """Three callers wanted "the softmax, scaled to the market's own share of
+    the runners it rated", and the one that worked it out differently was this
+    module -- which is why it dropped the races instead."""
+    import inspect
+    from hkrd.jobs import fit_blend
+    from hkrd.query import model as model_q
+    for module in (bt, fit_blend, model_q):
+        assert "fundamental_for_race" in inspect.getsource(module), \
+            module.__name__
+
+
+def test_a_fully_rated_field_returns_exactly_what_it_returned_before(db):
+    """The published figures were fitted on fully rated fields. If the widening
+    had moved those races too, every constant in the repo would be wrong rather
+    than merely measured on a narrower population."""
+    conn = get_conn(db)
+    race = next(r for r in bt.races_for_backtest(conn=conn))
+    conn.close()
+    field = race["field"]
+    assert all(f["sarr"] is not None for f in field)
+    market = bt.blend_m.market_probability([f["win_odds"] for f in field])
+    plain = bt.blend_m.fundamental_probability([f["sarr"] for f in field])
+    shared = bt.blend_m.fundamental_for_race([f["sarr"] for f in field], market)
+    for a, b in zip(plain, shared):
+        assert a == pytest.approx(b, abs=1e-12)
+
+
+def test_the_payload_says_which_population_it_measured(db):
+    """Never a bare number. A table whose selection changed has to carry the
+    selection, or it cannot be compared with the version a reader remembers."""
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.execute("DELETE FROM runner_sarr WHERE race_date = '2026-02-22' "
+                     "AND horse_no = 3")
+    out = bt.walk_forward(conn=conn)
+    conn.close()
+    cov = out["coverage"]
+    assert cov["races"] == out["test_races"]
+    assert cov["runners_rated"] <= cov["runners"]
+    assert cov["races_with_an_unrated_runner"] >= 0
+
+
+def test_the_published_block_is_labelled_with_the_selection_that_made_it():
+    """`MEASURED` was produced under the old rule and cannot be recomputed
+    without the real archive. Left unlabelled beside the live figures it reads
+    as a disagreement rather than as a different population."""
+    assert "population" in bt.MEASURED
+    assert "pre-2026-09-15" in bt.MEASURED["population"]

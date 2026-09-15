@@ -412,9 +412,19 @@ function share(v, digits = 1) {
 function renderBacktest() {
   const b = state.backtest;
   if (!b) return;
+  // WHAT THE TABLE IS MEASURED ON, in the subtitle rather than a footnote.
+  // This selection used to require every runner rated, which is "no debutant
+  // declared" -- a property of the card, true of about a third of races. Every
+  // figure below moved when that was lifted, so a reader comparing this with a
+  // number they remember has to be told which population they are looking at.
+  const cov = b.coverage;
   $('bt-sub').textContent = b.usable
     ? `WALK-FORWARD · SPLIT ${b.split_date} · TRAIN ${b.train_races} / `
       + `TEST ${b.test_races} RACES · ${b.calibration.runners.toLocaleString()} RUNNERS`
+      + (cov && cov.races_with_an_unrated_runner
+        ? ` · ${cov.races_with_an_unrated_runner} OF THEM CARRY A RUNNER SARR `
+          + `DID NOT RATE, HELD AT ITS MARKET PRICE`
+        : '')
     : 'NOT ENOUGH SCORED RACES TO BACKTEST';
   if (!b.usable) {
     $('bt-body').replaceChildren();
@@ -474,8 +484,22 @@ function renderBacktest() {
   host.append(line);
 
   // What happens as the model is asked to disagree with the market more.
+  //
+  // THESE ARE PUBLISHED FIGURES, NOT THE LIVE ONES ABOVE. The calibration
+  // table is recomputed on every load; this block is the constant in
+  // `model/backtest.MEASURED`, so that a rerun disagreeing with what was
+  // published is visible. It became a DIFFERENT POPULATION on 2026-09-15 when
+  // the selection stopped requiring a fully rated field, and two tables from
+  // two populations stacked with nothing between them is a comparison the
+  // reader would make and get wrong.
   const m = b.measured;
   if (m && m.value_by_weight.length) {
+    if (m.population) {
+      host.append(el('div', 'bt-note warn',
+        `PUBLISHED FIGURES, MEASURED ON ${m.population.toUpperCase()} — `
+        + `NOT THE ${b.test_races}-RACE TEST SET ABOVE. REGENERATE WITH `
+        + '`python -m hkrd.jobs.fit_backtest`'));
+    }
     const tbl = el('table', 'model-grid');
     const head = el('tr');
     [['WEIGHT ON THE MODEL', ''], ['EDGE REQUIRED', 'num'], ['BETS', 'num'],

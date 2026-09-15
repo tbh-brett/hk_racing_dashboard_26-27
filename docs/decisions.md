@@ -770,3 +770,53 @@ One piece of dead code went with it: `rebuild_sarr` stamped
 `sarr.DERIVE_VERSION if hasattr(...) else "sarr-1.0"`. The fallback has been
 unreachable since `model/sarr` defined the constant, and a version stamp that
 can silently be wrong is the thing `jobs/coverage` was just taught to check.
+
+## The table asking whether the model beats the price was answering about a third of races
+
+**2026-09-15.** `races_for_backtest` required a complete book, a recorded
+winner, AND every runner rated. The first two are real requirements. The third
+was not, and it had already been removed from `fit_blend` on 2026-09-13 for
+exactly the reason it should have been removed here.
+
+**"Every runner rated" means "no debutant declared".** SARR rates nothing with
+fewer than `sarr.MIN_PRIOR` prior runs, so the condition is a property of the
+CARD and not of the model — and **65.2% of the archive's 1,712 races fail it**.
+The page built to answer whether the model beats the price was answering on the
+third of races that happen to carry no newcomer, and presenting that as the
+archive. The same selection, in `fit_blend`, had chosen the published weight on
+660 races of 1,712.
+
+**The complete book stays required.** The overround IS the gap between the book
+and 100%, so a book missing a runner has a gap that is partly the missing
+runner; the de-vig cannot be done without every price. Nothing equivalent is
+true of the model. It has an opinion about the runners it rated and none about
+the rest, and `blend` already carries that: `w·m + (1−w)·m` is `m`, so an
+unrated runner falls through to its market price at every weight. Two rated
+runners is the floor, because a softmax over one is 1.0 whatever the score —
+`fit_blend` draws the line in the same place.
+
+**THREE PLACES BUILT THE SAME STREAM AND THE ONE THAT BUILT IT DIFFERENTLY WAS
+THE ONE THAT DROPPED THE RACES.** The Model Analysis footer, the weight fit and
+the backtest each needed "the softmax, scaled to the market's own share of the
+runners it rated". Two worked it out; `backtest._probabilities` called the plain
+softmax and then required a full field so the scale would be right. It is
+`blend.fundamental_for_race` now, called by all three, and a test asserts each
+module uses it. On a fully rated field the share is 1.0 and the call is the
+plain softmax, which is why every constant fitted before this survives.
+
+**Measured on a synthetic archive seeded to the real debutant rate** — a
+newcomer in about two races in three. The selection went from **60 races to
+178, 2.97x**, and **66.3% of the widened set carries a runner SARR did not
+rate** against the archive's own 65.2%. Every figure moved with it. The
+absolute brier and log-loss figures from that run are not transferable — the
+finishing order is random — so they are not recorded here; what transfers is
+that the population roughly triples and that the arithmetic holds: an unrated
+runner's blended probability equals its market price at every weight, and the
+column still sums to 1.
+
+**`MEASURED` was NOT guessed at.** Every figure in it was produced under the old
+selection and can only be recomputed against the real archive. It carries a
+`population` key saying so, `jobs/fit_backtest` regenerates the whole block
+ready to paste, and the page prints the population in red above the published
+value table — which sits directly under a live calibration computed on a
+different set of races, and read as one table before.

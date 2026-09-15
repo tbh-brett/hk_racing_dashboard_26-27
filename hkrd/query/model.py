@@ -7,6 +7,8 @@ than it has been shown to be.
 """
 from __future__ import annotations
 
+import math
+
 
 from hkrd.model import blend as blend_m, sarr as sarr_m
 from hkrd.query import market as market_q, rating as rating_q
@@ -395,14 +397,18 @@ def blend_breakdown(date: str, race_no: int, *, weight: float | None = None,
 
         market = (blend_m.market_probability([r["win_odds"] for r in rows])
                   if len(priced) == len(rows) and rows else [])
-        # With no market to share out, the rated runners hold the whole book
-        # between them -- which is what the stream meant on its own anyway.
-        fund_mass = (float(sum(p for r, p in zip(rows, market)
-                               if r["sarr"] is not None))
-                     if len(market) else 1.0)
-        fund = (blend_m.fundamental_probability([r["sarr"] for r in rows],
-                                                mass=fund_mass)
+        # `fundamental_for_race` shares the market's own total on the rated
+        # group, and with no market to share out gives them the whole 1.0 --
+        # which is what the stream meant on its own anyway. The weight fit and
+        # the backtest build the same stream from the same call.
+        sarr_col = [r["sarr"] for r in rows]
+        fund = (blend_m.fundamental_for_race(sarr_col, market)
                 if scored else [])
+        # The stream sums to the mass by construction, so the figure the footer
+        # quotes is read off the column it describes rather than worked out a
+        # second time beside it.
+        fund_mass = (float(sum(p for p in fund if not math.isnan(p)))
+                     if scored and len(fund) else 1.0)
         blended = blend_m.blend(fund, market, weight) if rows else []
 
         overround = (round(100 * (sum(1 / r["win_odds"] for r in priced) - 1), 1)

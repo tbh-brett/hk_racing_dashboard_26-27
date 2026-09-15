@@ -73,7 +73,21 @@ __all__ = ["races_for_backtest", "calibration", "value_bets", "walk_forward",
 # Published so the page renders the finding rather than restating it, and so a
 # rerun that disagrees with it is visible. Recomputed live by `walk_forward`;
 # this is what it returned when the module was written.
+#
+# STALE SINCE 2026-09-15 AND DELIBERATELY NOT GUESSED AT. Every figure here was
+# measured while `races_for_backtest` required a fully rated field, which is
+# 596 races of the archive's 1,712 -- the ones carrying no debutant. Lifting
+# that changes all of them, and the new values can only be produced by running
+# the job against the real archive:
+#
+#     python -m hkrd.jobs.fit_backtest --db /data/hkrd.db
+#
+# `population` says which selection a set of figures belongs to, so a reader
+# comparing these with the live ones is comparing like with like or is told
+# they are not. Replace the whole block from that job's output; do not edit
+# figures individually.
 MEASURED = {
+    "population": "fully-rated fields only (pre-2026-09-15 selection)",
     "races": 596, "train_races": 327, "test_races": 269,
     "split_date": "2025-12-14", "test_runners": 3321,
     "brier": 0.06788, "log_loss": 2.0983, "off_bins": 0,
@@ -107,12 +121,25 @@ _EPS = 1e-9
 
 def races_for_backtest(*, conn: Connection | None = None,
                        since: str | None = None) -> list[dict[str, Any]]:
-    """Every race with a complete scored field, a winner, and complete odds.
+    """Every race with a winner, a complete book, and two rated runners.
 
-    All three are required together. A race missing one runner's odds cannot be
-    de-vigged, a race missing one runner's SARR cannot be scored as a field,
-    and a race with no recorded winner cannot be evaluated -- and letting any
-    of them through with a gap silently changes what the probabilities mean.
+    A COMPLETE BOOK IS STILL REQUIRED and a complete SARR field is not. The
+    de-vig needs every price, because the overround IS the gap between the book
+    and 100% and a book missing a runner has a gap that is partly the missing
+    runner. Nothing equivalent is true of the model: it has an opinion about
+    the runners it rated and none about the rest, and `blend` carries that.
+
+    Requiring every runner rated was the same selection `fit_blend` carried
+    until 2026-09-13, and it chose the weight on 660 of the archive's 1,712
+    races. SARR rates nothing with fewer than `sarr.MIN_PRIOR` prior runs and
+    every card has debutants, so "fully rated" means "no first-starter
+    declared" -- which is a property of the CARD and not of the model, and
+    65.2% of races fail it. The page measuring whether the model beats the
+    price was measuring it on the third of races that happen to carry no
+    newcomer, and calling that the archive.
+
+    Two rated runners is the floor, because a softmax over one is 1.0 whatever
+    the score. That is `fit_blend`'s rule too.
     """
     own = conn is None
     conn = conn or get_conn()
@@ -135,13 +162,18 @@ def races_for_backtest(*, conn: Connection | None = None,
 
         out = []
         for (date, race_no), field in races.items():
-            if any(f["sarr"] is None for f in field):
-                continue
             if any(not f["win_odds"] or f["win_odds"] <= 0 for f in field):
                 continue
             if not any(f["place"] == 1 for f in field):
                 continue
-            out.append({"race_date": date, "race_no": race_no, "field": field})
+            rated = sum(1 for f in field if f["sarr"] is not None)
+            if rated < 2:
+                continue
+            out.append({"race_date": date, "race_no": race_no, "field": field,
+                        # Carried so every figure downstream can say what
+                        # population it is on. A reader comparing this table
+                        # with the one published before the widening needs it.
+                        "rated": rated, "runners": len(field)})
         return out
     finally:
         if own:
@@ -149,8 +181,16 @@ def races_for_backtest(*, conn: Connection | None = None,
 
 
 def _probabilities(field: list[dict], weight: float) -> np.ndarray:
-    fund = blend_m.fundamental_probability([f["sarr"] for f in field])
+    """The blended probability for one race, unrated runners carried.
+
+    `fundamental_for_race` is the shared definition: the rated runners share the
+    market's OWN total on that group rather than the whole 1.0, and a runner
+    SARR could not rate falls through to its market price at every weight,
+    because `w*m + (1-w)*m` is `m`. This module used to call the plain softmax
+    and then drop any race it could not cover completely.
+    """
     market = blend_m.market_probability([f["win_odds"] for f in field])
+    fund = blend_m.fundamental_for_race([f["sarr"] for f in field], market)
     return blend_m.blend(fund, market, weight)
 
 
@@ -318,12 +358,25 @@ def walk_forward(*, split_date: str | None = None, edge: float = 0.0,
         test = [r for r in races if r["race_date"] >= split_date]
         w = blend_m.DEFAULT_BLEND_WEIGHT if weight is None else weight
 
+        # What the figures below are measured ON. Until 2026-09-15 this table
+        # silently required every runner rated, which is "no debutant
+        # declared" -- a property of the card, true of about a third of races.
+        # Every figure here moved when that was lifted, so the population has
+        # to travel with them or the page cannot be compared with itself.
+        partial = [r for r in test if r["rated"] < r["runners"]]
+        coverage = {
+            "races": len(test),
+            "races_with_an_unrated_runner": len(partial),
+            "runners": sum(r["runners"] for r in test),
+            "runners_rated": sum(r["rated"] for r in test),
+        }
         return {
             "races": len(races),
             "split_date": split_date,
             "train_races": len(train),
             "test_races": len(test),
             "weight": w,
+            "coverage": coverage,
             "calibration": calibration(test, weight=w),
             "value": value_bets(test, weight=w, edge=edge),
             # The market alone, on the same test set, as the thing to beat.

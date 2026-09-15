@@ -133,12 +133,22 @@ which quotes them. Run it only after 4.1 — it reads `runner_sarr`, and the
 constants must describe the model the page shows. Expect the fitted weight to
 stay 0.00: it has on three generations of SARR and on both populations.
 
-### 4.3 The backtest section still drops every race with an unrated runner
+### 4.3 The backtest dropped every race with an unrated runner — done
 
-`model/backtest.py` skips a race if any runner has no SARR score — the same
-selection just removed from `fit_blend`, where it meant the weight was chosen
-on 660 races of 1,712. Widening it changes every number in the DOES IT BEAT
-THE PRICE table, so it is the owner's call rather than a quiet fix.
+**Done 2026-09-15, on the owner's instruction.** `races_for_backtest` still
+requires a complete book and a winner; it no longer requires a fully rated
+field, which meant "no debutant declared" and excluded 65.2% of races. Two
+rated runners is the floor, as in `fit_blend`.
+
+`blend.fundamental_for_race` is now the one definition of the stream the three
+callers build, and the backtest was the one that built it differently — which
+is why it dropped the races rather than carrying them.
+
+**`MEASURED` is stale and deliberately not guessed at.** Its figures were
+produced under the old selection. `python -m hkrd.jobs.fit_backtest --db
+/data/hkrd.db` regenerates the block ready to paste; run it after 4.1, since it
+reads `runner_sarr`. Until then the page prints the population above the
+published table in red so it is not read as the live one.
 
 ### 4.4 The literals `3b67054` did not reach — the speed map half is done
 
