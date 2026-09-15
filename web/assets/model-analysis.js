@@ -134,8 +134,7 @@ function renderSarr() {
       data ? 'NO SARR SCORES FOR THIS RACE' : 'LOADING'));
     body.firstChild.firstChild.colSpan = 12;
     $('sarr-foot').replaceChildren(el('span', null,
-      data?.unscored?.length
-        ? `NOT SCORED: ${data.unscored.join(', ')}` : ''));
+      data?.unscored?.length ? `NOT RATED: ${named(data.unscored)}` : ''));
     return;
   }
 
@@ -209,8 +208,7 @@ function renderSarr() {
       `${inert.join(', ').toUpperCase()} CONTRIBUTES NOTHING: NO DRAW SCORE IS SUPPLIED`));
   }
   if (data.unscored.length) {
-    foot.append(el('span', 'warn',
-      `NOT SCORED: ${data.unscored.join(', ')}`));
+    foot.append(el('span', 'warn', `NOT RATED: ${named(data.unscored)}`));
   }
   foot.append(el('span', 'right',
     'LOWER SARR IS BETTER · BRIGHT HELPS THE SCORE, DIM HURTS IT · '
@@ -339,11 +337,14 @@ function renderBlend() {
       `${data.missing.unpriced} UNPRICED — THE DE-VIG NEEDS THE WHOLE BOOK, `
       + 'SO THE MARKET COLUMN IS BLANK'));
   }
-  // Named, and without a reason: a blank rank is either too little history
-  // or a card nobody scored, and Race Day is the page that says which. What
-  // this page owes the reader is how the blend treats them, which is the same.
+  // Named, and now with the reason each one carries. A blank rank is two
+  // different things and only one of them is anybody's problem: too little
+  // history is a RULE and fires on most cards, a card nobody scored is a
+  // FAULT. `query/rating` decides which, so this page and Race Day cannot
+  // disagree about the same horse on the same day.
   if (data.missing.unscored) {
-    const names = data.unrated.join(', ');
+    const names = data.unrated
+      .map((r) => `${r.horse_name} (${r.label})`).join(', ');
     foot.append(el('span', 'warn',
       `FUND PROB COVERS ${data.fund_covers} OF ${data.fund_of} RUNNERS`
       + (data.fund_mass === null ? ''
@@ -351,6 +352,17 @@ function renderBlend() {
           + 'GROUP')
       + ' — UNRATED, SO HELD AT THE MARKET PRICE AT EVERY WEIGHT: '
       + names));
+    // The fault gets its own line, because it is the only one of the two a
+    // reader can act on and it reads as normal buried among debutants.
+    const fault = data.unrated.filter((r) => r.kind === 'unscored');
+    if (fault.length) {
+      const one = fault.length === 1;
+      foot.append(el('span', 'warn',
+        `${fault.length} OF THOSE ${one ? 'HAS' : 'HAVE'} ${fault[0].needs} OR `
+        + `MORE PRIOR RUNS AND NO RATING — A FAULT RATHER THAN A RULE, AND SARR `
+        + `SHOULD HAVE REACHED ${one ? 'IT' : 'THEM'}: `
+        + fault.map((r) => `${r.horse_name} (${r.prior} RUNS)`).join(', ')));
+    }
   }
   foot.append(el('span', 'warn',
     (data.weight === cal.fitted_weight
@@ -365,6 +377,14 @@ function renderBlend() {
     'THE BLEND LEANS ON A NUMBER THE MARKET ALREADY PROVIDES — THAT IS THE '
     + 'FINDING THIS PAGE DOCUMENTS, NOT A LIMITATION IT HIDES'));
 }
+
+/** A list of runners the model could not rate, each with the reason it
+ *  carries. `query/rating` decides the label, so every panel on this page and
+ *  the Race Day card give the same answer about the same horse. */
+function named(rows) {
+  return rows.map((r) => `${r.horse_name} (${r.label})`).join(', ');
+}
+
 
 function pct(v) {
   return v === null || v === undefined ? DASH : `${v.toFixed(1)}%`;

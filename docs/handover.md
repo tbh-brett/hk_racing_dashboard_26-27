@@ -150,19 +150,20 @@ canonical threshold test named the speed map in its docstring without checking
 it, which is how they survived; it checks both files now. `docs/decisions.md`
 has the measurement.
 
-**Still open — the blend footer's missing reason.** It names unrated runners
-without saying why, deliberately: a blank is too little history (a rule) or a
-card nobody scored (a fault), and only Race Day tells them apart
-(`raceday._unrated`). Surfacing it on Model Analysis needs the prior-run count
-shared rather than copied, and `query/raceday.py` is at 568 of 600 lines.
+**Done 2026-09-15 — the blend footer says why.** Both panels on Model Analysis
+now name each unrated runner with its reason, and give the same answer as Race
+Day about the same horse, because all three read `query/rating`. Options A and
+C of `docs/proposal-raceday-split.md` were built: `query/rating.py` owns the
+rule and the page-side prior-run count, and `query/meeting.py` took the two
+meeting-level functions, leaving `query/raceday.py` at **447 of 600**.
 
-**The split is proposed: `docs/proposal-raceday-split.md`.** Three options,
-audited, with a recommendation (a new `query/rating.py`, plus carving the two
-meeting-level functions out to get the file under 500). Nothing is built —
-it is the owner's call which shape to take. The audit turned up two things the
-handover did not know: the prior-run count is already computed in THREE places
-under TWO different predicates, and `rebuild_sarr` writes no row at all for a
-runner it did not score, which is why Race Day re-counts history per request.
+**Still open — option B.** `rebuild_sarr` writes no row at all for a runner it
+did not score, so the page-side count and the job-side count are still two
+definitions under two predicates (`rebuild_sarr` counts an earlier race on the
+SAME day; the pages do not). Reconciling them changes who the model scores, so
+it is a model change needing its own walk-forward check, and four places read
+"there is a `runner_sarr` row" as "it was scored". The proposal names all four.
+`rating.PRIOR_RUN_RULE` is where the page-side rule is written down.
 
 ## 5. Traps this repo has already sprung
 

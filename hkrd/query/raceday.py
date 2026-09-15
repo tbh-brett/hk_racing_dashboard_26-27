@@ -20,12 +20,11 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
-from hkrd.model import sarr as sarr_m
 from hkrd.derive.probability import devig
 from hkrd.query import (blackbook as bb_q, formguide as fg_q,
                         gear as gear_q, market as market_q,
                         money as money_q, movement as movement_q,
-                        pools as pools_q, vet as vet_q)
+                        pools as pools_q, rating as rating_q, vet as vet_q)
 from hkrd.query.race import (get_horse_form, get_race, habitual_styles,
                              vet_form)
 from hkrd.query.types import RaceLine
@@ -38,8 +37,7 @@ from hkrd.query.types import RaceLine
 PAIR_MONEY_SHOWN = 24
 from hkrd.store.connect import Connection, get_conn
 
-__all__ = ["build_card", "meeting_blackbook", "meeting_summary",
-           "spark_points"]
+__all__ = ["build_card", "spark_points"]
 
 # Routine stewards' notes are stored but never surfaced as a flag. A passed
 # veterinary examination rendering like a real finding is how a badge becomes
@@ -138,25 +136,6 @@ def _odds_series(conn: Connection, date: str, race_no: int) -> dict[int, list[fl
     for r in rows:
         out.setdefault(r["horse_no"], []).append(r["win_odds"])
     return out
-
-
-def _unrated(rank: int | None, prior: int) -> dict[str, Any] | None:
-    """Why a runner has no SARR rank, or None when it has one.
-
-    A blank used to stand for two different things and the page could not
-    tell them apart. SOLID STATE on 2026-09-13 had one run, which is a rule;
-    a horse with twenty runs and no rank is a card nobody scored, which is a
-    fault -- and the nightly job left every upcoming card in exactly that state
-    until someone pressed Card. Named separately, the fault shows up on the
-    page the next time it happens instead of passing for a debutant.
-    """
-    if rank is not None:
-        return None
-    if prior < sarr_m.MIN_PRIOR:
-        return {"kind": "history", "prior": prior, "needs": sarr_m.MIN_PRIOR,
-                "label": "DEBUT" if prior == 0 else f"{prior} RUN"}
-    return {"kind": "unscored", "prior": prior, "needs": sarr_m.MIN_PRIOR,
-            "label": "NOT SCORED"}
 
 
 def build_card(date: str, race_no: int, *,
@@ -260,18 +239,11 @@ def build_card(date: str, race_no: int, *,
         flow = {r["horse_no"]: r for r in
                 money_q.money_arrived(date, race_no, conn=conn)["runners"]}
 
-        # How much history each horse brings, counted the way the rebuild
-        # counts it: runs strictly before today that have a finishing time.
-        # One grouped query for the field, against ix_runners_horse.
-        names = [r.horse_name for r in race.runners if r.horse_name]
-        prior_runs: dict[str, int] = {}
-        if names:
-            marks = ",".join("?" * len(names))
-            prior_runs = {row[0]: row[1] for row in conn.execute(
-                f"SELECT horse_name, count(*) FROM runners "
-                f"WHERE horse_name IN ({marks}) AND race_date < ? "
-                f"AND finish_time IS NOT NULL GROUP BY horse_name",
-                [*names, date])}
+        # How much history each horse brings. Model Analysis asks the same
+        # question of the same field, so the count and the rule it counts to
+        # are `query/rating`'s, not this page's.
+        prior_runs = rating_q.prior_run_counts(
+            conn, [r.horse_name for r in race.runners], before=date)
 
         runners: list[dict[str, Any]] = []
         for r in race.runners:
@@ -319,8 +291,8 @@ def build_card(date: str, race_no: int, *,
                 "rank_delta": (r.sarr_rank - m_rank
                                if r.sarr_rank and m_rank else None),
                 "sarr_prior": prior_runs.get(r.horse_name, 0),
-                "sarr_unrated": _unrated(r.sarr_rank,
-                                         prior_runs.get(r.horse_name, 0)),
+                "sarr_unrated": rating_q.unrated_reason(
+                    r.sarr_rank, prior_runs.get(r.horse_name, 0)),
                 "last_run": {
                     "race_date": last.race_date, "place": last.place,
                     "figure": last.et_figure, "figure_display": last.figure_display,
@@ -381,99 +353,6 @@ def _days_between(earlier: str, later: str) -> int | None:
     except ValueError:
         return None
     return (b - a).days
-
-
-def meeting_blackbook(date: str, *, conn: Connection | None = None
-                      ) -> dict[str, Any]:
-    """Every booked horse declared across the meeting, for the sticky band.
-
-    The band is meeting-wide by design: the entries in OTHER races are what
-    make it worth keeping on screen, since they are the ones you would
-    otherwise miss. Each carries its race so the chip can jump there.
-    """
-    own = conn is None
-    conn = conn or get_conn()
-    try:
-        entries = bb_q.declared_on(date, conn=conn)
-        if not entries:
-            return {"race_date": date, "entries": [], "count": 0}
-
-        off = {r["race_no"]: r["off_time"] for r in conn.execute(
-            "SELECT race_no, off_time FROM races WHERE race_date = ?", (date,))}
-        # One movement query per race that actually has a booked runner, not
-        # one per runner and not one for the whole card.
-        #
-        # Live prices come the same way and for the same reason the card's do:
-        # `blackbook.declared_on` reads `runners.win_odds`, which is the
-        # STARTING price and is NULL until the results scrape writes it. So the
-        # band showed a booked horse drifting 6% with no price beside it to
-        # drift FROM — a movement without a market, which is the one thing on
-        # this band you cannot act on.
-        moves: dict[int, dict[int, dict]] = {}
-        live: dict[int, dict[int, dict]] = {}
-        for race_no in sorted({e["race_no"] for e in entries}):
-            moves[race_no] = {m["horse_no"]: m for m in
-                              movement_q.price_movement(date, race_no, conn=conn)}
-            live[race_no] = market_q.live_prices(date, race_no, conn=conn)
-
-        out = []
-        for e in entries:
-            move = moves.get(e["race_no"], {}).get(e["horse_no"])
-            now = live.get(e["race_no"], {}).get(e["horse_no"]) or {}
-            # Fill, never overwrite: a race that has been run keeps the
-            # starting price, which is what it actually paid.
-            win = e["win_odds"] if e["win_odds"] is not None else now.get("win_odds")
-            out.append({
-                "id": e["id"], "race_no": e["race_no"],
-                "horse_no": e["horse_no"], "horse_name": e["horse_name"],
-                "draw": e["draw"], "win_odds": win,
-                "place_odds": now.get("place_odds"),
-                "off_time": off.get(e["race_no"]),
-                "status": e["status"], "confidence": e["confidence"],
-                "added_date": e["added_date"],
-                "reasoning": e["reasoning"],
-                "live_at_race": bool(e["live_at_race"]),
-                "booked_before_race": bool(e["booked_before_race"]),
-                "tags": sorted((e["tag_csv"] or "").split(","))
-                        if e["tag_csv"] else [],
-                # None, not 0. A runner with one captured price has no movement
-                # to report, and 0% would read as a market that held steady.
-                "change_pct": move["change_pct"] if move else None,
-                "observed": bool(move and move["observed"]),
-            })
-        return {"race_date": date, "entries": out, "count": len(out)}
-    finally:
-        if own:
-            conn.close()
-
-
-def meeting_summary(date: str, *, conn: Connection | None = None) -> dict[str, Any]:
-    """Race-by-race header for the meeting: field size and concentration.
-
-    Concentration carries the age of the price it was computed from, because
-    read early it understates the band in about 60% of races -- and every
-    surviving snapshot in the archive is hours before racing.
-    """
-    own = conn is None
-    conn = conn or get_conn()
-    try:
-        rows = conn.execute(
-            "SELECT race_no, distance, race_class, going, course, "
-            "(SELECT count(*) FROM runners r WHERE r.race_date = a.race_date "
-            " AND r.race_no = a.race_no) AS field_size "
-            "FROM races a WHERE race_date = ? ORDER BY race_no", (date,)).fetchall()
-        out = []
-        for r in rows:
-            conc = market_q.concentration(date, r["race_no"], conn=conn)
-            out.append({"race_no": r["race_no"], "distance": r["distance"],
-                        "race_class": r["race_class"], "going": r["going"],
-                        "course": r["course"], "field_size": r["field_size"],
-                        "concentration": conc["value"], "band": conc["band"],
-                        "stale": conc["stale"]})
-        return {"race_date": date, "races": out}
-    finally:
-        if own:
-            conn.close()
 
 
 def _place_ratio_range(runners) -> str | None:

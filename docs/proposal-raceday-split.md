@@ -1,8 +1,16 @@
 # Proposal: where the "why is this runner unrated" answer should live
 
 **2026-09-15.** `docs/handover.md` §4.4 asks for a split to be proposed before
-anything moves. This is that proposal. Nothing here is built; it is the owner's
-call which shape to take, and §4.3 is a separate decision.
+anything moves. This is that proposal.
+
+> **DECIDED 2026-09-15: A and C were built. B was not.** The blend footer now
+> names each unrated runner with its reason, `query/raceday.py` is 447 lines,
+> and `query/rating.py` owns the rule and the page-side count. This file stays
+> because the audit in it is the standing record for **B**, which is still
+> worth doing and still wants its own commit — the four silent reads below are
+> what someone taking it on needs to know. `docs/decisions.md` has the outcome.
+
+§4.3 remains a separate decision and is untouched.
 
 ---
 

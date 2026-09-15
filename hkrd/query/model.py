@@ -9,7 +9,7 @@ from __future__ import annotations
 
 
 from hkrd.model import blend as blend_m, sarr as sarr_m
-from hkrd.query import market as market_q
+from hkrd.query import market as market_q, rating as rating_q
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["et_breakdown", "et_reference_summary", "model_status",
@@ -215,18 +215,30 @@ def sarr_breakdown(date: str, race_no: int, *,
             conn.close()
 
 
-def _unscored(conn: Connection, date: str, race_no: int) -> list[str]:
-    """Runners in the race that SARR could not score.
+def _unscored(conn: Connection, date: str,
+              race_no: int) -> list[dict[str, Any]]:
+    """Runners in the race that SARR could not score, and why.
 
     Named, not counted: a field of 12 showing 9 rows with no explanation is how
     the old page let a silent skip look like a short field.
+
+    The reason comes from `query/rating`, the same call the blend footer below
+    this panel makes. Without it the two lines sat two inches apart on one page
+    calling the same debutant "not scored" and "DEBUT".
     """
-    return [r["horse_name"] for r in conn.execute("""
-        SELECT r.horse_name FROM runners r
+    rows = [dict(r) for r in conn.execute("""
+        SELECT r.horse_no, r.horse_name FROM runners r
         LEFT JOIN runner_sarr s USING (race_date, race_no, horse_no)
         WHERE r.race_date = ? AND r.race_no = ? AND s.sarr IS NULL
         ORDER BY r.horse_no
     """, (date, race_no))]
+    if not rows:
+        return []
+    priors = rating_q.prior_run_counts(
+        conn, [r["horse_name"] for r in rows], before=date)
+    # Every row here has a NULL score, so the rank is NULL with it.
+    return [{**r, **rating_q.unrated_reason(None, priors.get(r["horse_name"], 0))}
+            for r in rows]
 
 
 def sarr_influence(*, conn: Connection | None = None) -> list[dict]:
@@ -357,6 +369,14 @@ def blend_breakdown(date: str, race_no: int, *, weight: float | None = None,
         scored = [r for r in rows if r["sarr"] is not None]
         missing = {"unpriced": len(rows) - len(priced),
                    "unscored": len(rows) - len(scored)}
+        # A runner SARR did not score has no `runner_sarr` row at all, so the
+        # LEFT JOIN above carries a NULL `n_prior` in exactly the case the
+        # footer needs it. The count comes from `query/rating`, which is also
+        # where Race Day gets it, so the two pages cannot answer "how much
+        # history" differently about the same horse on the same day.
+        priors = (rating_q.prior_run_counts(
+            conn, [r["horse_name"] for r in rows], before=date)
+            if missing["unscored"] else {})
 
         market = (blend_m.market_probability([r["win_odds"] for r in rows])
                   if len(priced) == len(rows) and rows else [])
@@ -400,14 +420,18 @@ def blend_breakdown(date: str, race_no: int, *, weight: float | None = None,
             # column to 100% needs both or the shortfall looks like an error.
             "fund_covers": len(scored),
             "fund_of": len(rows),
-            # Named, not counted, and deliberately WITHOUT a reason. A blank
-            # rank is two different things -- too little history, which is a
-            # rule, or a card nobody scored, which is a fault -- and Race Day
-            # tells them apart (`raceday._unrated`). This page only needs to
-            # say how the blend treats them, which is the same either way; a
-            # footer that explained every blank as the two-run rule would be
-            # wrong on exactly the day the fault recurs.
-            "unrated": [r["horse_name"] for r in rows if r["sarr"] is None],
+            # Named, counted, and now WITH the reason. It was left off while
+            # the rule lived in Race Day's module, on the argument that a
+            # footer explaining every blank as the two-run rule would be wrong
+            # on exactly the day the fault recurs. That argument was right
+            # about the danger and wrong about the remedy: the fix is to say
+            # which of the two it is, not to say neither. `query/rating`
+            # decides, so both pages give the same answer about the same horse.
+            "unrated": [{"horse_no": r["horse_no"],
+                         "horse_name": r["horse_name"],
+                         **rating_q.unrated_reason(
+                             r["sarr_rank"], priors.get(r["horse_name"], 0))}
+                        for r in rows if r["sarr"] is None],
             "fund_mass": (round(100 * fund_mass, 1)
                           if scored and len(market) else None),
             "calibration": blend_m.CALIBRATION,

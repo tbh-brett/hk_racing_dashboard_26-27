@@ -247,8 +247,33 @@ def test_unscored_runners_are_named_not_silently_dropped(db):
         conn.execute("DELETE FROM runner_sarr WHERE horse_no = 1")
     out = model.sarr_breakdown("2026-03-22", 1, conn=conn)
     conn.close()
-    assert out["unscored"] == ["HORSE 0"]
+    # And with the reason, which is the same call the blend footer below this
+    # panel makes: the two used to sit on one page calling the same debutant
+    # "not scored" and "DEBUT".
+    assert out["unscored"] == [{"horse_no": 1, "horse_name": "HORSE 0",
+                                "kind": "unscored", "prior": 11, "needs": 2,
+                                "label": "NOT SCORED"}]
     assert all(r["horse_no"] != 1 for r in out["runners"])
+
+
+def test_both_panels_on_the_page_give_one_answer_about_one_horse(db):
+    """The SARR panel and the blend footer name the same runners a few inches
+    apart. Answering from two rules is how they disagreed."""
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.execute(
+            "INSERT INTO runners (race_date, race_no, horse_no, horse_name,"
+            " draw, win_odds) VALUES ('2026-03-22', 1, 9, 'FIRST TIMER', 9, 21.0)")
+        conn.execute("DELETE FROM runner_sarr_component WHERE horse_no = 1")
+        conn.execute("DELETE FROM runner_sarr WHERE horse_no = 1")
+    panel = model.sarr_breakdown("2026-03-22", 1, conn=conn)
+    footer = model.blend_breakdown("2026-03-22", 1, conn=conn)
+    conn.close()
+
+    def by_name(rows):
+        return {r["horse_name"]: (r["kind"], r["label"], r["prior"]) for r in rows}
+    assert by_name(panel["unscored"]) == by_name(footer["unrated"])
+    assert by_name(panel["unscored"])["FIRST TIMER"] == ("history", "DEBUT", 0)
 
 
 def test_the_blend_breakdown_shows_the_overround_rather_than_hiding_it(db):
@@ -292,7 +317,12 @@ def test_a_partly_scored_field_keeps_the_model_it_has(db):
 
     assert out["missing"]["unscored"] == 1
     assert out["fund_covers"] == out["fund_of"] - 1
-    assert out["unrated"] == ["HORSE 0"]     # named, not counted
+    # Named, not counted -- and with the reason, which is the part that used to
+    # be missing. HORSE 0 has eleven runs behind it and no rating, so this is a
+    # card nobody scored and not a horse nobody could score.
+    assert out["unrated"] == [{"horse_no": 1, "horse_name": "HORSE 0",
+                               "kind": "unscored", "prior": 11, "needs": 2,
+                               "label": "NOT SCORED"}]
     gone = next(r for r in out["runners"] if r["horse_no"] == 1)
     rated = [r for r in out["runners"] if r["horse_no"] != 1]
     assert gone["fundamental"] is None
@@ -303,6 +333,30 @@ def test_a_partly_scored_field_keeps_the_model_it_has(db):
     assert sum(r["fundamental"] for r in rated) == pytest.approx(
         out["fund_mass"], abs=0.5)
     assert sum(r["blended"] for r in out["runners"]) == pytest.approx(100, abs=0.5)
+
+
+def test_the_footer_tells_a_debutant_apart_from_a_card_nobody_scored(db):
+    """The two blanks look identical on screen and have different remedies.
+    One needs nothing; the other needs the card scoring, and reads as normal
+    buried among debutants -- which is how every upcoming card sat unscored."""
+    conn = get_conn(db)
+    with transaction(conn):
+        # A first-starter declared on the card: no history, so no rating, and
+        # nothing anyone can do about it.
+        conn.execute(
+            "INSERT INTO runners (race_date, race_no, horse_no, horse_name,"
+            " draw, win_odds) VALUES ('2026-03-22', 1, 9, 'FIRST TIMER', 9, 21.0)")
+        # And one the rebuild should have reached and did not.
+        conn.execute("DELETE FROM runner_sarr_component WHERE horse_no = 1")
+        conn.execute("DELETE FROM runner_sarr WHERE horse_no = 1")
+    out = model.blend_breakdown("2026-03-22", 1, weight=0.5, conn=conn)
+    conn.close()
+
+    why = {r["horse_name"]: r for r in out["unrated"]}
+    assert why["FIRST TIMER"]["kind"] == "history"
+    assert why["FIRST TIMER"]["label"] == "DEBUT"
+    assert why["HORSE 0"]["kind"] == "unscored"
+    assert why["HORSE 0"]["prior"] == 11
 
 
 def test_the_weight_still_moves_the_ranking_when_a_runner_is_unrated(db):

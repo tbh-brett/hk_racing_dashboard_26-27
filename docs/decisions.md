@@ -641,3 +641,60 @@ Four decisions inside it:
 
 A stale table is also a gap in `gaps()`, because the rows are there and the
 figures they carry are not the ones the code would produce.
+
+## The reason a runner has no rating belongs to the rating, not to a page
+
+**2026-09-15.** Model Analysis named the runners the blend could not rate and
+said nothing about why, on the argument that a blank is two different things —
+too little history, a RULE that fires on 65.2% of cards, or a card nobody
+scored, a FAULT — and that a footer explaining every blank as the two-run rule
+would be wrong on exactly the day the fault recurs. That argument was right
+about the danger and wrong about the remedy. The fix is to say which of the two
+it is, not to say neither.
+
+It could not say which, because the rule lived in `query/raceday._unrated` and
+the count it needs was eleven lines of SQL inside `build_card`. A page reaching
+into another page's module for a fact is how two pages start disagreeing about
+the same horse on the same day, and `query/raceday.py` was 568 of a 600-line cap
+so neither piece could grow there. Options A and C of
+`docs/proposal-raceday-split.md` were taken.
+
+**`query/rating.py` owns one question:** what does the model know about this
+runner, and if nothing, why. `unrated_reason` is the rule, moved unchanged.
+`prior_run_counts` is one grouped query for the whole field — per runner it is a
+scan apiece, which is the performance rule this project already wrote down.
+Race Day, the blend footer and the SARR panel all read it.
+
+**Two panels on one page were answering differently.** `model._unscored` feeds
+the SARR panel's NOT SCORED line a few inches above the blend footer, and it
+returned bare names. With the footer distinguishing the two kinds and the panel
+not, the page called the same debutant "NOT SCORED" and "DEBUT" at once. Both
+read `query/rating` now and the panel's line reads NOT RATED, which is what it
+means.
+
+**A runner the rebuild did not score has no `runner_sarr` row at all**, so the
+LEFT JOIN both pages already do carries a NULL `n_prior` in exactly the case the
+footer needs it. That is why the count is a query and not a column, and it is
+the thing option B would fix.
+
+**`query/meeting.py`** took `meeting_blackbook` and `meeting_summary` — 93 lines
+that touch nothing `build_card` uses. The four helpers below them did not go
+with them: `_days_between`, `_place_ratio_range`, `_pairs_meeting_again` and
+`_swing_favours` are all called from `build_card` and belong to the card, so the
+seam is narrower than the file's shape suggests. `query/raceday.py` is **447**.
+
+**What was NOT done, deliberately.** `jobs/rebuild_sarr` counts prior runs at
+`(race_date, race_no) < (today, this_race)` — an earlier race on the SAME day
+counts — where the pages count `race_date < today`. No horse runs twice on one
+card, so they agree on every row in the archive, and they are still two rules.
+Reconciling them changes who the model scores, which is a model change and needs
+a walk-forward check of its own; folding it into a page fix is how a rating
+silently moves. `rating.PRIOR_RUN_RULE` records the page-side rule and the
+discrepancy.
+
+Checked in the browser on a nine-runner card carrying both kinds of blank: the
+SARR panel reads `NOT RATED: GOLDEN SIXTY (NOT SCORED), FIRST TIMER (DEBUT)`,
+the blend footer names the same two the same way, and a separate line says
+`1 OF THOSE HAS 2 OR MORE PRIOR RUNS AND NO RATING — A FAULT RATHER THAN A RULE`.
+Race Day shows NOT SCORED in red against that horse and DEBUT in grey against
+the other, which is what it showed before and now what the other page shows too.

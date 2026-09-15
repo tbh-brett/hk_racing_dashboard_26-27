@@ -14,7 +14,8 @@ from fastapi.staticfiles import StaticFiles
 
 from hkrd.api import auth, live, routes
 from hkrd.query import (blackbook as bb_q, formguide as fg_q,
-                        health as health_q, market as market_q, model,
+                        health as health_q, market as market_q,
+                        meeting as meeting_q, model,
                         race as race_q, raceday as raceday_q,
                         vet as vet_q, freshness as fresh_q,
                         pace as pace_q, speedmap as speedmap_q,
@@ -418,7 +419,7 @@ def head_to_head(horse_a: str, horse_b: str, before: str | None = None) -> dict:
 @app.get("/api/raceday/{date}/blackbook")
 def meeting_blackbook(date: str) -> dict:
     """The sticky band's data: booked horses across the whole meeting."""
-    return raceday_q.meeting_blackbook(date)
+    return meeting_q.meeting_blackbook(date)
 
 
 @app.get("/api/raceday/{date}/{race_no}")
@@ -441,7 +442,7 @@ def race_card(request: Request, date: str, race_no: int) -> Response:
 
 @app.get("/api/raceday/{date}")
 def meeting_card(date: str) -> dict:
-    summary = raceday_q.meeting_summary(date)
+    summary = meeting_q.meeting_summary(date)
     if not summary["races"]:
         raise HTTPException(404, f"no meeting on {date}")
     return summary
