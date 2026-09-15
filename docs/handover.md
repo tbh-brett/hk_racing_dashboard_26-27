@@ -154,11 +154,15 @@ has the measurement.
 without saying why, deliberately: a blank is too little history (a rule) or a
 card nobody scored (a fault), and only Race Day tells them apart
 (`raceday._unrated`). Surfacing it on Model Analysis needs the prior-run count
-shared rather than copied, and `query/raceday.py` is at 568 of 600 lines — so it
-needs a split proposed first, and that proposal has not been written. The
-shape it probably wants: `_unrated` and the prior-run count are not Race Day's,
-they are a property of a runner's rating, so they belong beside the thing that
-decides it rather than on the page that currently explains it best.
+shared rather than copied, and `query/raceday.py` is at 568 of 600 lines.
+
+**The split is proposed: `docs/proposal-raceday-split.md`.** Three options,
+audited, with a recommendation (a new `query/rating.py`, plus carving the two
+meeting-level functions out to get the file under 500). Nothing is built —
+it is the owner's call which shape to take. The audit turned up two things the
+handover did not know: the prior-run count is already computed in THREE places
+under TWO different predicates, and `rebuild_sarr` writes no row at all for a
+runner it did not score, which is why Race Day re-counts history per request.
 
 ## 5. Traps this repo has already sprung
 
