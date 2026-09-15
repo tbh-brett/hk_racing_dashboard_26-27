@@ -595,3 +595,49 @@ docstring and did not check it, which is how the literals survived the commit
 that removed the others. It checks both now, including the CLI default, which is
 the value that actually runs: `ops/crontab` calls `project_card --pending` and
 never passes the flag.
+
+## "Is the model behind?" is a question about the database, so `coverage` answers it
+
+**2026-09-15.** A derived table survives a deploy. The volume is not rebuilt, so
+shipping a changed model leaves every existing row written by the old one, and
+every page goes on showing them without a word. Rebuilding one archive's
+`runner_sarr` from `sarr-1.0` to `sarr-1.1` moved **99.8% of scores, 39.5% of
+ranks and the top-rated horse in 19.5% of races** — and the only symptom was the
+owner reporting that the ratings still looked wrong while every fix was
+committed.
+
+`derive_version` was already the cheap tell and nothing read it. The handover
+carried the check as a command instead:
+
+```
+fly ssh console -a hkrd -C "python -c \"import sqlite3;print(sqlite3.connect('/data/hkrd.db')...\""
+```
+
+which is three levels of quoting, answers one table, and is exactly the shape of
+instruction this project has learned not to hand the owner. It is now a section
+of `jobs/coverage`, whose stated question — "is the dashboard missing data, or
+is it broken?" — this is the third version of. One command, no nested quotes,
+the same on the machine, the first PC and a laptop:
+
+```
+python -m hkrd.jobs.coverage --db /data/hkrd.db
+```
+
+Four decisions inside it:
+
+- **The wanted version is imported, never copied.** `current_versions()` reads
+  `DERIVE_VERSION` off the module that stamps the table. A constant duplicated
+  into the survey would report every fresh row as stale the day a model moved.
+- **Every generation present is listed, not the newest.** A table rebuilt for two
+  meetings under a changed model and left alone for the rest is the case the
+  column exists to make visible, and a "latest version" row would hide precisely
+  that: the new rows read current and the archive is never mentioned.
+- **Empty is not stale.** Nothing derived yet needs a first run; a generation
+  behind needs a rebuild. Different remedies, so different words.
+- **The rebuild command it prints carries the `--db` it was given.** A report read
+  off the production machine and pasted back would otherwise rebuild whatever
+  `HKRD_DB` points at wherever it was pasted, which is not the database the
+  report described.
+
+A stale table is also a gap in `gaps()`, because the rows are there and the
+figures they carry are not the ones the code would produce.

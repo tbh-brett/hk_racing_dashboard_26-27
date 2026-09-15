@@ -19,7 +19,7 @@ Read this, then `AGENTS.md`, then the last few entries of `docs/decisions.md`
 git pull                                    # or clone: github.com/tbh-brett/hk_racing_dashboard_26-27
 python -m venv .venv
 .venv/Scripts/python -m pip install -e ".[dev]"
-.venv/Scripts/python -m pytest tests -q     # 1344 passed, 2 skipped on 2026-09-14
+.venv/Scripts/python -m pytest tests -q     # 1382 passed, 2 skipped on 2026-09-15
 ```
 
 If that count has moved and no commit says why, stop and find out before
@@ -91,15 +91,17 @@ production unless someone has deployed since 2026-09-14. **Deploy from a clean
 checkout of `main`** (`git status` empty): `fly deploy` builds from the WORKING
 TREE, which is how production has run code that was never committed (§5).
 
-Then check which model wrote production's SARR rows. Nothing was able to check
-this from the first PC:
+Then check which model wrote production's derived tables. `jobs/coverage`
+answers this since 2026-09-15 — one command, no nested quotes, all four derived
+tables rather than just SARR:
 
 ```bash
-fly ssh console -a hkrd -C "python -c \"import sqlite3;print(sqlite3.connect('/data/hkrd.db').execute('select derive_version,count(*),max(race_date) from runner_sarr group by 1').fetchall())\""
+fly ssh console -a hkrd -C "python -m hkrd.jobs.coverage --db /data/hkrd.db"
 ```
 
-If anything is not `sarr-1.1`, rebuild it on the machine — minutes, not
-seconds:
+Read the `model generation of each derived table` section. Anything marked
+BEHIND prints its own rebuild command, already carrying `--db /data/hkrd.db`, so
+it can be pasted back:
 
 ```bash
 fly ssh console -a hkrd -C "python -m hkrd.jobs.rebuild_sarr --db /data/hkrd.db"
@@ -109,6 +111,12 @@ Why it matters, measured on the first PC's archive: its table was `sarr-1.0`,
 and rebuilding under `sarr-1.1` changed **99.8% of scores, 39.5% of ranks and
 the top-rated horse in 19.5% of races**. The owner reported SARR results that
 still looked wrong while every fix was committed — that is the likely reason.
+The check is also worth running on the first PC's own database (§6), whose
+`runner_sarr` is `sarr-1.0`.
+
+Still not done by anyone: neither the deploy nor the check has been run. There
+is no `flyctl` and no Fly credential in a cloud agent container, so this stays
+the owner's step.
 
 ### 4.2 Re-derive the blend calibration on production's data
 
@@ -241,7 +249,8 @@ Run the dashboard and look at it. Do not describe a page you have not seen.
 ```bash
 HKRD_ALLOW_NO_AUTH=1 python -m hkrd.serve --port 8000
 python -m pytest tests -q
-python -m hkrd.jobs.coverage       # what the database actually holds
+python -m hkrd.jobs.coverage       # what the database holds, and which
+                                   # model generation wrote each derived table
 ```
 
 A local database comes from `ops/start.ps1` (bootstraps from the legacy repo,
