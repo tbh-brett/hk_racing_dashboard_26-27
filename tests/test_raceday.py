@@ -588,15 +588,32 @@ def test_enough_history_and_no_rank_is_a_fault_not_a_debutant():
 def test_the_threshold_on_the_page_is_the_one_the_rebuild_uses():
     """Three places decide "enough history" -- the rebuild, the speed map and
     this page. A page explaining a blank with a different number from the one
-    that caused it explains nothing."""
+    that caused it explains nothing.
+
+    The speed map is named in that sentence and was not checked by it, which is
+    how `jobs/project_card` and `query/speedmap` each kept a literal 2 through
+    the commit that removed the others."""
     import inspect
-    from hkrd.jobs import rebuild_sarr
+    from hkrd.jobs import project_card, rebuild_sarr
     from hkrd.model import evaluate, sarr
+    from hkrd.query import speedmap
     assert inspect.signature(rebuild_sarr.rebuild).parameters[
         "min_prior"].default == sarr.MIN_PRIOR
     assert inspect.signature(rebuild_sarr.score_runners).parameters[
         "min_prior"].default == sarr.MIN_PRIOR
     assert inspect.signature(evaluate.score).parameters[
         "min_prior"].default == sarr.MIN_PRIOR
+    # The job that writes the speed map's NULLs -- and its CLI default, which
+    # is the value that actually runs: `ops/crontab` calls `project_card
+    # --pending` and never passes the flag.
+    assert inspect.signature(project_card.project).parameters[
+        "min_prior"].default == sarr.MIN_PRIOR
+    assert project_card._parser().get_default("min_prior") == sarr.MIN_PRIOR
     assert raceday._unrated(None, prior=sarr.MIN_PRIOR - 1)["kind"] == "history"
     assert raceday._unrated(None, prior=sarr.MIN_PRIOR)["kind"] == "unscored"
+    # And the sentence the speed map writes under the ladder.
+    short = speedmap._reason({"settle": None, "draw": 1,
+                              "n_prior": sarr.MIN_PRIOR - 1})
+    assert str(sarr.MIN_PRIOR) in short
+    assert speedmap._reason({"settle": None, "draw": 1,
+                             "n_prior": sarr.MIN_PRIOR}) != short

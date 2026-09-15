@@ -99,10 +99,34 @@ def test_an_unprojected_runner_is_returned_not_dropped(tmp_path):
 
 
 def test_an_unprojected_runner_is_named_with_a_reason(tmp_path):
-    rows = FULL + [(5, 5, None, None, None, None, None, 1)]
+    from hkrd.model import sarr
+    rows = FULL + [(5, 5, None, None, None, None, None, sarr.MIN_PRIOR - 1)]
     out = _map(_db(tmp_path, rows, field_size=5))
     assert [u["horse_name"] for u in out["unprojected"]] == ["HORSE 5"]
-    assert out["unprojected"][0]["reason"] == "fewer than two prior runs"
+    assert out["unprojected"][0]["reason"] == \
+        f"fewer than {sarr.MIN_PRIOR} prior runs"
+
+
+def test_the_short_history_reason_quotes_the_threshold_that_caused_it(tmp_path):
+    """The sentence and the NULL it explains are decided in two files. Written
+    as a literal here it was a second opinion: with the model's minimum at
+    three, a two-run horse gets no projection from `jobs/project_card` and this
+    would have blamed a missing sectional -- a scrape gap -- for a horse whose
+    history is simply short."""
+    from hkrd.model import sarr
+    rows = FULL + [(5, 5, None, None, None, None, None, sarr.MIN_PRIOR - 1)]
+    out = _map(_db(tmp_path, rows, field_size=5))
+    assert str(sarr.MIN_PRIOR) in out["unprojected"][0]["reason"]
+
+
+def test_a_horse_at_the_threshold_is_not_explained_by_its_history(tmp_path):
+    """At the minimum, the blank is a missing sectional -- a scrape gap, and a
+    different fix from a short career. The reason has to switch at exactly the
+    threshold the job used, not near it."""
+    from hkrd.model import sarr
+    rows = FULL + [(5, 5, None, None, None, None, None, sarr.MIN_PRIOR)]
+    out = _map(_db(tmp_path, rows, field_size=5))
+    assert out["unprojected"][0]["reason"] == "no early-sectional history"
 
 
 def test_a_missing_gate_is_reported_as_the_reason_it_is(tmp_path):

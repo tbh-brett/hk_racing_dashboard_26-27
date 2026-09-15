@@ -1,8 +1,10 @@
 """The pre-race speed map — one gate ladder per race.
 
-Reads `runner_projection`, which `jobs/project_card` writes. No model code and
-no pandas: the query layer's contract is plain data, and every figure on this
-page was computed by the job that filled the table.
+Reads `runner_projection`, which `jobs/project_card` writes. No model
+computation and no pandas: the query layer's contract is plain data, and every
+figure on this page was computed by the job that filled the table. The one
+thing it takes from the model is `sarr.MIN_PRIOR`, because the sentence it
+writes under the ladder has to quote the threshold that caused the blank.
 
 TWO NUMBERS THAT LOOK ALIKE AND ARE NOT. `bar` is how quickly the horse
 habitually GETS AWAY -- the ESZ trait, as a within-race rank. `settle` is where
@@ -13,16 +15,17 @@ a paragraph insisting pace and style are independent axes that must not share a
 hue family.
 
 UNPROJECTED RUNNERS ARE RETURNED, NOT DROPPED. A horse with no gate or with
-fewer than two prior runs comes back with `settle: None` and a `reason`, and the
-page shows it on the ladder with no bar and that reason written out.
-`query/model.py:_unscored` is the pattern: name them, do not count them. A zero
-bar would read as "breaks at field average", which is a claim about a horse we
-know nothing about.
+fewer than `sarr.MIN_PRIOR` prior runs comes back with `settle: None` and a
+`reason`, and the page shows it on the ladder with no bar and that reason
+written out. `query/model.py:_unscored` is the pattern: name them, do not count
+them. A zero bar would read as "breaks at field average", which is a claim about
+a horse we know nothing about.
 """
 from __future__ import annotations
 
 from typing import Any
 
+from hkrd.model import sarr
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["speed_map", "meeting_speed_map", "MAE"]
@@ -46,13 +49,21 @@ ORDER BY p.race_no, n.draw IS NULL, n.draw, p.horse_no
 
 
 def _reason(row: dict[str, Any]) -> str | None:
-    """Why this runner has no projection. None when it has one."""
+    """Why this runner has no projection. None when it has one.
+
+    The threshold is `sarr.MIN_PRIOR` and not a literal, because the job that
+    wrote the NULL applies the same constant. Carrying a 2 here made this
+    sentence a second opinion about a decision taken in `jobs/project_card`:
+    move the model's minimum to three and every two-run horse on the card would
+    have come back "no early-sectional history" -- the fall-through reason,
+    naming a scrape gap for a horse whose history is simply short.
+    """
     if row["settle"] is not None:
         return None
     if row["draw"] is None:
         return "no gate declared"
-    if (row["n_prior"] or 0) < 2:
-        return "fewer than two prior runs"
+    if (row["n_prior"] or 0) < sarr.MIN_PRIOR:
+        return f"fewer than {sarr.MIN_PRIOR} prior runs"
     return "no early-sectional history"
 
 

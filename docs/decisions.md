@@ -564,3 +564,34 @@ loss from 2.0466 to 2.0545 with no model change at all — a published constant
 that depended on a join order. A dead heat now contributes the mean of its
 winners' log likelihoods. Three of 1,712 races are dead heats and two fall
 after the split, which is enough to move the fourth decimal.
+
+## The speed map explained a blank with its own number
+
+**2026-09-15.** `sarr.MIN_PRIOR` exists because three places each carried a
+literal 2 and a page explaining a blank with a different threshold from the one
+that caused it explains nothing. `3b67054` moved the rebuild, the evaluator and
+the Race Day card onto the constant. It did not reach the speed map, which
+carried the literal twice more — once in `jobs/project_card`, which decides who
+gets a projection, and once in `query/speedmap`, which writes the sentence
+saying why a horse did not.
+
+Those two are not two statements of one rule; they are a rule and a claim about
+it, in different files, agreeing only by coincidence. Moving the model's minimum
+to three demonstrates what that bought: `project_card` would still have built a
+profile from two runs and drawn the horse a bar, while SARR refused to rate the
+same horse on Race Day — and `query/speedmap`, asked why a horse HAD no
+projection, would have fallen through to `"no early-sectional history"`, naming
+a scrape gap for a horse whose history is simply short. Two wrong answers and
+neither visible.
+
+Both now read `sarr.MIN_PRIOR`, so the reason on the page is generated from the
+number that caused it: `f"fewer than {sarr.MIN_PRIOR} prior runs"`. Changing the
+constant in `model/sarr.py` alone now moves the rebuild, the evaluator, the
+projection job, its CLI default and both pages together — verified by changing
+it to 3 and reading all five back.
+
+The test that was supposed to catch this already named the speed map in its own
+docstring and did not check it, which is how the literals survived the commit
+that removed the others. It checks both now, including the CLI default, which is
+the value that actually runs: `ops/crontab` calls `project_card --pending` and
+never passes the flag.

@@ -22,10 +22,13 @@ Tuesday and shown on Saturday, after three horses came out, is subtly wrong
 across the whole card -- every gate reads wider than it is. Re-run this on the
 last card scrape before the off; it is idempotent and costs one pass.
 
-WHAT IT REFUSES TO INVENT. A runner with no gate, or with fewer than the two
-prior runs a profile needs, is written with a NULL settle and named on the page
-as an absence. `query/model.py:_unscored` is the pattern: name them, do not
-count them, and never draw a bar for a horse we know nothing about.
+WHAT IT REFUSES TO INVENT. A runner with no gate, or with fewer than the
+`sarr.MIN_PRIOR` prior runs a profile needs, is written with a NULL settle and
+named on the page as an absence. `query/model.py:_unscored` is the pattern: name
+them, do not count them, and never draw a bar for a horse we know nothing about.
+The threshold is the model's own constant and not a literal here: this job
+decides who gets a projection and `query/speedmap` writes the sentence saying
+why, so a 2 in either place is the same number stated twice.
 """
 from __future__ import annotations
 
@@ -95,7 +98,7 @@ class ProjectionReport:
 
 
 def project(date: str, db: Path | None = None, *,
-            min_prior: int = 2) -> ProjectionReport:
+            min_prior: int = sarr.MIN_PRIOR) -> ProjectionReport:
     report = ProjectionReport(card_date=date)
     conn = get_conn(db if db is not None else db_path())
     try:
@@ -209,16 +212,26 @@ def pending_cards(db: Path | None = None) -> list[str]:
         conn.close()
 
 
-def main(argv: list[str] | None = None) -> int:
+def _parser() -> argparse.ArgumentParser:
+    """Built here rather than inside `main` so a test can read the defaults.
+
+    `ops/crontab` runs `project_card --pending` and passes no threshold, so the
+    default below IS the number that decides who gets a projection in
+    production -- and `query/speedmap` has to quote the same one.
+    """
     ap = argparse.ArgumentParser(description=__doc__)
     group = ap.add_mutually_exclusive_group(required=True)
     group.add_argument("--date", help="YYYY-MM-DD, the card to project")
     group.add_argument("--pending", action="store_true",
                        help="every stored card that has not been run")
     ap.add_argument("--db", type=Path, default=None)
-    ap.add_argument("--min-prior", type=int, default=2,
+    ap.add_argument("--min-prior", type=int, default=sarr.MIN_PRIOR,
                     help="runs of history required before a horse is projected")
-    a = ap.parse_args(argv)
+    return ap
+
+
+def main(argv: list[str] | None = None) -> int:
+    a = _parser().parse_args(argv)
 
     dates = pending_cards(a.db) if a.pending else [a.date]
     if not dates:

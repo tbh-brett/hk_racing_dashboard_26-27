@@ -132,15 +132,25 @@ selection just removed from `fit_blend`, where it meant the weight was chosen
 on 660 races of 1,712. Widening it changes every number in the DOES IT BEAT
 THE PRICE table, so it is the owner's call rather than a quiet fix.
 
-### 4.4 Two literals `3b67054` did not reach
+### 4.4 The literals `3b67054` did not reach — the speed map half is done
 
-- `query/speedmap.py` returns the reason `"fewer than two prior runs"`, and
-  `tests/test_speedmap.py` asserts the string. It should read `sarr.MIN_PRIOR`.
-- The blend footer names unrated runners without a reason, deliberately: a
-  blank is too little history (a rule) or a card nobody scored (a fault), and
-  only Race Day tells them apart (`raceday._unrated`). Surfacing it on Model
-  Analysis needs the prior-run count shared rather than copied, and
-  `query/raceday.py` is at 568 of 600 lines — propose a split first.
+**Done 2026-09-15.** There were three, not one: `jobs/project_card` carried the
+literal twice (the `project()` default and the `--min-prior` default, which is
+the one the schedule actually runs) and `query/speedmap` once, plus the prose
+reason. All read `sarr.MIN_PRIOR` now, and the reason is generated from it. The
+canonical threshold test named the speed map in its docstring without checking
+it, which is how they survived; it checks both files now. `docs/decisions.md`
+has the measurement.
+
+**Still open — the blend footer's missing reason.** It names unrated runners
+without saying why, deliberately: a blank is too little history (a rule) or a
+card nobody scored (a fault), and only Race Day tells them apart
+(`raceday._unrated`). Surfacing it on Model Analysis needs the prior-run count
+shared rather than copied, and `query/raceday.py` is at 568 of 600 lines — so it
+needs a split proposed first, and that proposal has not been written. The
+shape it probably wants: `_unrated` and the prior-run count are not Race Day's,
+they are a property of a runner's rating, so they belong beside the thing that
+decides it rather than on the page that currently explains it best.
 
 ## 5. Traps this repo has already sprung
 
