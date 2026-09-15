@@ -354,6 +354,13 @@ function renderBlend() {
       + names));
     // The fault gets its own line, because it is the only one of the two a
     // reader can act on and it reads as normal buried among debutants.
+    // Nothing has scored the card at all: a fact about the race, so it is
+    // stated once rather than once per runner.
+    if (data.unrated.some((r) => r.kind === 'no_card_score')) {
+      foot.append(el('span', 'warn',
+        'NOTHING HAS SCORED THIS CARD, SO NO RUNNER ON IT HAS A RATING — A '
+        + 'FAULT RATHER THAN A RULE, AND NOT A STATEMENT ABOUT ANY HORSE'));
+    }
     const fault = data.unrated.filter((r) => r.kind === 'unscored');
     if (fault.length) {
       const one = fault.length === 1;

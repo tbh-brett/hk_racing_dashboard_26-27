@@ -244,6 +244,9 @@ def build_card(date: str, race_no: int, *,
         # are `query/rating`'s, not this page's.
         prior_runs = rating_q.prior_run_counts(
             conn, [r.horse_name for r in race.runners], before=date)
+        # A card nobody scored is a fault the strip above this table can act
+        # on, and it outranks every per-runner reason below it.
+        scored_card = rating_q.race_was_scored(conn, date, race_no)
 
         runners: list[dict[str, Any]] = []
         for r in race.runners:
@@ -292,7 +295,8 @@ def build_card(date: str, race_no: int, *,
                                if r.sarr_rank and m_rank else None),
                 "sarr_prior": prior_runs.get(r.horse_name, 0),
                 "sarr_unrated": rating_q.unrated_reason(
-                    r.sarr_rank, prior_runs.get(r.horse_name, 0)),
+                    r.sarr_rank, prior_runs.get(r.horse_name, 0),
+                    card_scored=scored_card),
                 "last_run": {
                     "race_date": last.race_date, "place": last.place,
                     "figure": last.et_figure, "figure_display": last.figure_display,

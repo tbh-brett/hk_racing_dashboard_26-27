@@ -698,3 +698,75 @@ the blend footer names the same two the same way, and a separate line says
 `1 OF THOSE HAS 2 OR MORE PRIOR RUNS AND NO RATING — A FAULT RATHER THAN A RULE`.
 Race Day shows NOT SCORED in red against that horse and DEBUT in grey against
 the other, which is what it showed before and now what the other page shows too.
+
+## `runner_sarr` records what the model declined, not only what it rated
+
+**2026-09-15.** The table held a row per RATED runner, so "no row" meant four
+different things: the runner had too little history, the model could not build
+a profile, the card had not been scored, or the horse was scratched after it
+was. A page reading it could not tell them apart, and one of the four is a fault
+somebody can fix.
+
+`rebuild_sarr` now writes a row for every runner it looked at. A runner it
+declined gets `sarr` and `sarr_rank` NULL and `n_prior` filled, so the table is
+a complete statement of what the model did with a card.
+
+**NOTHING ABOUT THE RATINGS MOVED, and that was checked rather than asserted.**
+One synthetic archive, rebuilt twice — once with the job as it was, once with
+the job as it is, `model/sarr` identical in both arms so only the change under
+test differs. **960 rated rows either way; the same keys; not one score, rank or
+`n_prior` different.** 28 unrated rows were added. Races with no row at all went
+**2 → 0**, which is the distinction the change exists to create.
+
+**SIX READERS TOOK "THERE IS A ROW" FOR "IT WAS RATED", not the four the audit
+in `docs/proposal-raceday-split.md` found.** A LEFT JOIN is safe either way — a
+missing row and a NULL column read the same through `s.sarr` — so the exposure
+is the inner joins and the non-SQL readers:
+
+- `model/power.py` inner-joined to count the population a variant is measured
+  over; without a guard it becomes the whole declared field.
+- `query/model.py:sarr_breakdown` inner-joins and orders by `sarr_rank`, and
+  **NULL sorts FIRST in SQLite** — unrated runners would have headed a table
+  ordered by merit.
+- `query/model.py:model_status` prints row counts on the freshness strip. It
+  reports `rated` beside `rows` now, or the figure jumps 23% overnight and reads
+  as 23% more model.
+- `jobs/rebuild_sarr`'s own `skipped_*` counters stopped meaning skipped.
+- **`model/evaluate.score`** — missed by a grep for `runner_sarr`, because it
+  reads `score_runners`' return rather than the table. A NaN score there would
+  have widened the population every variant is measured over, inside the one
+  module built to detect that kind of drift. `score_runners` returns the
+  declined runners as a third value, so the unpack fails loudly rather than
+  quietly carrying them.
+- **`jobs/derive_all`** sums the skip counters into the freshness strip.
+
+`tests/test_sarr.py` fails if an inner join on `runner_sarr` is added without
+`sarr IS NOT NULL` nearby. Verified by removing the guard from `model/power.py`
+and watching it fail.
+
+**WHAT THIS BOUGHT ON THE PAGE.** A race with no rows at all now means one
+thing: nothing has scored this card. It used to also mean "the card was scored
+and nothing in it could be rated", which is ordinary — a maiden field of
+first-starters is exactly that. `rating.race_was_scored` reads it, and
+`unrated_reason` takes `card_scored`, which outranks the runner's own history: a
+debutant on an unscored card used to read DEBUT in grey, telling the reader
+nothing was wrong on a card the model had never looked at. It reads CARD NOT
+SCORED in red now, on Race Day and on Model Analysis.
+
+**WHAT IT DID NOT BUY, against the proposal's own prediction.** The proposal
+said B would leave one definition of the prior-run count. It leaves two.
+
+- The fault the whole thread is about — a card nobody scored — is defined by the
+  job's output being ABSENT, so there is no stored `n_prior` in precisely the
+  case the count is needed. `rating.prior_run_counts` stays.
+- `rebuild_sarr` counts prior runs at `(race_date, race_no) < (today,
+  this_race)`, where an earlier race on the same day counts; the pages count
+  `race_date < today`. Reading the stored count on one page and the computed one
+  on another mixes two rules instead of removing one. Reconciling them changes
+  who the model scores, which is still a model change and still wants its own
+  walk-forward check.
+
+One piece of dead code went with it: `rebuild_sarr` stamped
+`sarr.DERIVE_VERSION if hasattr(...) else "sarr-1.0"`. The fallback has been
+unreachable since `model/sarr` defined the constant, and a version stamp that
+can silently be wrong is the thing `jobs/coverage` was just taught to check.

@@ -23,7 +23,8 @@ from typing import Any
 from hkrd.model import sarr
 from hkrd.store.connect import Connection
 
-__all__ = ["unrated_reason", "prior_run_counts", "PRIOR_RUN_RULE"]
+__all__ = ["unrated_reason", "prior_run_counts", "race_was_scored",
+           "PRIOR_RUN_RULE"]
 
 # The page-side definition of "a prior run", stated once so the two readers of
 # it cannot drift apart: a run on an EARLIER DATE that has a finishing time.
@@ -38,15 +39,25 @@ __all__ = ["unrated_reason", "prior_run_counts", "PRIOR_RUN_RULE"]
 PRIOR_RUN_RULE = "runs on an earlier date that have a finishing time"
 
 
-def unrated_reason(rank: int | None, prior: int) -> dict[str, Any] | None:
+def unrated_reason(rank: int | None, prior: int, *,
+                   card_scored: bool = True) -> dict[str, Any] | None:
     """Why a runner has no SARR rank, or None when it has one.
 
     `kind` is the part a page acts on: `history` is a rule and needs no
-    attention, `unscored` is a fault and does. `prior` and `needs` travel with
-    it so no caller has to know the threshold to render the sentence.
+    attention, `unscored` and `no_card_score` are faults and do. `prior` and
+    `needs` travel with it so no caller has to know the threshold to render
+    the sentence.
+
+    `card_scored` is the race-level question and it outranks the runner-level
+    one. A card nobody scored whose field happens to be short of history would
+    otherwise report every runner as a debutant -- true of the horse, and the
+    wrong thing to tell someone who could fix it by scoring the card.
     """
     if rank is not None:
         return None
+    if not card_scored:
+        return {"kind": "no_card_score", "prior": prior,
+                "needs": sarr.MIN_PRIOR, "label": "CARD NOT SCORED"}
     if prior < sarr.MIN_PRIOR:
         return {"kind": "history", "prior": prior, "needs": sarr.MIN_PRIOR,
                 "label": "DEBUT" if prior == 0 else f"{prior} RUN"}
@@ -75,3 +86,18 @@ def prior_run_counts(conn: Connection, names: list[str], *,
         f"WHERE horse_name IN ({marks}) AND race_date < ? "
         f"AND finish_time IS NOT NULL GROUP BY horse_name",
         [*names, before])}
+
+
+def race_was_scored(conn: Connection, date: str, race_no: int) -> bool:
+    """Whether the rebuild has looked at this race at all.
+
+    ONLY ANSWERABLE BECAUSE THE JOB RECORDS ITS REFUSALS. While `runner_sarr`
+    held rows for rated runners only, a race with no rows meant either "nobody
+    scored this card" or "the card was scored and nothing in it could be
+    rated", and the second is ordinary: a maiden field of first-starters
+    produces exactly that. One row per runner looked at makes the absence mean
+    one thing again.
+    """
+    return conn.execute(
+        "SELECT 1 FROM runner_sarr WHERE race_date = ? AND race_no = ? LIMIT 1",
+        (date, race_no)).fetchone() is not None

@@ -145,6 +145,13 @@ def model_status(*, conn: Connection | None = None) -> dict:
                 "through": covered,
                 "current": bool(covered and covered == latest_race),
             }
+        # `runner_sarr` holds a row per runner the job looked at, and a rating
+        # for the subset it could rate. The strip would otherwise report a row
+        # count that jumped 23% the day the job started recording refusals,
+        # and read it as 23% more model.
+        out["tables"]["runner_sarr"]["rated"] = conn.execute(
+            "SELECT count(*) FROM runner_sarr WHERE sarr IS NOT NULL"
+        ).fetchone()[0]
         return out
     finally:
         if own:
@@ -170,7 +177,11 @@ def sarr_breakdown(date: str, race_no: int, *,
                    r.win_odds, r.draw, r.jockey, s.derive_version
             FROM runner_sarr s
             JOIN runners r USING (race_date, race_no, horse_no)
-            WHERE s.race_date = ? AND s.race_no = ?
+            -- The table carries a row for every runner the job looked at,
+            -- rated or not. This panel is the rated ones: without the filter
+            -- the unrated arrive with a NULL rank, and NULL sorts FIRST in
+            -- SQLite, so they would head a table ordered by merit.
+            WHERE s.race_date = ? AND s.race_no = ? AND s.sarr IS NOT NULL
             ORDER BY s.sarr_rank
         """, (date, race_no))]
         # The same fill the card and the blend do. `runners.win_odds` is the
@@ -236,8 +247,10 @@ def _unscored(conn: Connection, date: str,
         return []
     priors = rating_q.prior_run_counts(
         conn, [r["horse_name"] for r in rows], before=date)
+    scored_card = rating_q.race_was_scored(conn, date, race_no)
     # Every row here has a NULL score, so the rank is NULL with it.
-    return [{**r, **rating_q.unrated_reason(None, priors.get(r["horse_name"], 0))}
+    return [{**r, **rating_q.unrated_reason(
+                None, priors.get(r["horse_name"], 0), card_scored=scored_card)}
             for r in rows]
 
 
@@ -377,6 +390,8 @@ def blend_breakdown(date: str, race_no: int, *, weight: float | None = None,
         priors = (rating_q.prior_run_counts(
             conn, [r["horse_name"] for r in rows], before=date)
             if missing["unscored"] else {})
+        scored_card = (rating_q.race_was_scored(conn, date, race_no)
+                       if missing["unscored"] else True)
 
         market = (blend_m.market_probability([r["win_odds"] for r in rows])
                   if len(priced) == len(rows) and rows else [])
@@ -430,7 +445,8 @@ def blend_breakdown(date: str, race_no: int, *, weight: float | None = None,
             "unrated": [{"horse_no": r["horse_no"],
                          "horse_name": r["horse_name"],
                          **rating_q.unrated_reason(
-                             r["sarr_rank"], priors.get(r["horse_name"], 0))}
+                             r["sarr_rank"], priors.get(r["horse_name"], 0),
+                             card_scored=scored_card)}
                         for r in rows if r["sarr"] is None],
             "fund_mass": (round(100 * fund_mass, 1)
                           if scored and len(market) else None),

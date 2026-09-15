@@ -3,12 +3,15 @@
 **2026-09-15.** `docs/handover.md` §4.4 asks for a split to be proposed before
 anything moves. This is that proposal.
 
-> **DECIDED 2026-09-15: A and C were built. B was not.** The blend footer now
-> names each unrated runner with its reason, `query/raceday.py` is 447 lines,
-> and `query/rating.py` owns the rule and the page-side count. This file stays
-> because the audit in it is the standing record for **B**, which is still
-> worth doing and still wants its own commit — the four silent reads below are
-> what someone taking it on needs to know. `docs/decisions.md` has the outcome.
+> **DECIDED 2026-09-15: all three were built, in that order.** A and C first,
+> then B in its own commit with its own before/after check. This file stays as
+> the record of what each was and what the audit found; `docs/decisions.md` has
+> the outcomes.
+>
+> **Two things below turned out to be wrong, and are corrected in place.** The
+> audit said four readers take row existence for a rating; there are **six**.
+> And the table promises "copies of the count: 1", which B did **not** deliver —
+> see the corrections under Option B.
 
 §4.3 remains a separate decision and is untouched.
 
@@ -93,8 +96,10 @@ rule becomes a pure function over columns that are already on the row.
 This is the central rule applied properly: the number is computed once, by the
 job that owns the definition, and read everywhere.
 
-**But it changes what "there is a `runner_sarr` row" means, and four places read
-it that way:**
+**But it changes what "there is a `runner_sarr` row" means, and ~~four~~ SIX
+places read it that way.** The audit found four by grepping for `runner_sarr`.
+Two more only showed up when the change was made, and both are the kind that
+fail silently:
 
 | | what breaks |
 |---|---|
@@ -102,10 +107,33 @@ it that way:**
 | `query/model.py:171` | `sarr_breakdown` inner-joins and does `ORDER BY s.sarr_rank`; NULL sorts first in SQLite, so unrated runners head the SARR panel |
 | `query/model.py:139` | the freshness strip prints `runner_sarr` row counts; 17,262 → ~21,280 overnight, and "is it complete" becomes a different question |
 | `jobs/rebuild_sarr.py` | `skipped_no_history` stops meaning skipped |
+| **`model/evaluate.score`** | **missed by the grep — it reads `score_runners`' return, not the table. A NaN score would widen the population every variant is measured over, in the one place built to detect exactly that kind of drift** |
+| **`jobs/derive_all.py:132`** | **sums the two skip counters into the freshness strip's "not produced" figure** |
 
-Each is a one-line fix (`AND s.sarr IS NOT NULL`), and each is a place where
-forgetting it is silent — which is the failure mode this rebuild exists to
-remove.
+Each table fix is one clause, and each omission is silent — which is the
+failure mode this rebuild exists to remove. `tests/test_sarr.py` now fails if
+any inner join on the table is added without the guard.
+
+**CORRECTION — B does not collapse the count to one definition.** The table
+above predicted "copies of the count left: 1". It is still 2, for two reasons
+found while building it:
+
+- The fault this whole thread is about — *a card nobody scored* — is defined by
+  the job's output being ABSENT. Where there are no rows there is no stored
+  `n_prior`, so the page-side count cannot be retired; it is needed in exactly
+  the case it exists for.
+- `rebuild_sarr` counts to `(race_date, race_no) < (today, this_race)` and the
+  pages to `race_date < today`. Reading the stored count on one page and the
+  computed one on another would mix two rules rather than remove one, and
+  reconciling them changes who the model scores — still a model change, still
+  needing its own walk-forward check.
+
+**What B did deliver** is the distinction the table could not previously make:
+a race with no rows at all now means "nothing scored this card", where before it
+also meant "the card was scored and nothing in it could be rated" — ordinary for
+a maiden field of first-starters. `rating.race_was_scored` reads it, and a
+debutant on an unscored card no longer reads DEBUT, which told the reader
+nothing was wrong.
 
 **Cost:** four guarded reads, a changed job report, and a full
 `rebuild_sarr` — which production needs anyway under §4.1, so the expensive part
@@ -130,9 +158,10 @@ nowhere to live.
 
 ---
 
-## Recommended
+## Recommended at the time
 
-**A now, C alongside it, B not yet.**
+**A now, C alongside it, B not yet.** All three were built; B followed in its
+own commit, which is what this section asked for.
 
 A is the smallest change that actually unblocks the footer, and it is correct on
 its own terms: the rating status of a runner is a property of the rating, not of

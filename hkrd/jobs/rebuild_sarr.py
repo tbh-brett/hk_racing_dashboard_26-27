@@ -89,11 +89,17 @@ SELECT race_date, race_no, horse_no, category FROM (
 @dataclass
 class SarrReport:
     runs_loaded: int = 0
+    races_seen: int = 0
     races_scored: int = 0
     rows_written: int = 0
+    rated_rows: int = 0
+    unrated_rows: int = 0
     component_rows: int = 0
-    skipped_no_history: int = 0
-    skipped_no_distance: int = 0
+    # Not "skipped" since the table carries a row for these. A runner the model
+    # declined is a fact about the runner, and it is now recorded as one.
+    unrated_no_history: int = 0
+    unrated_no_distance: int = 0
+    unrated_no_value: int = 0
     scored_without_draw: int = 0
     vet_flagged_runs: int = 0
     profiles_with_vet_run: int = 0
@@ -103,12 +109,16 @@ class SarrReport:
     def render(self) -> str:
         lines = [
             f"  runs loaded        {self.runs_loaded:>7,}",
-            f"  races scored       {self.races_scored:>7,}",
+            f"  races seen         {self.races_seen:>7,}",
+            f"  races with a score {self.races_scored:>7,}",
             f"  runner_sarr rows   {self.rows_written:>7,}",
+            f"    rated                   {self.rated_rows:>7,}",
+            f"    unrated, row written    {self.unrated_rows:>7,}",
             f"  component rows     {self.component_rows:>7,}",
-            f"  skipped, no prior history {self.skipped_no_history:>7,}",
-            f"  skipped, no distance      {self.skipped_no_distance:>7,}",
-            f"  scored, but no gate       {self.scored_without_draw:>7,}",
+            f"  unrated, no prior history {self.unrated_no_history:>7,}",
+            f"  unrated, no distance      {self.unrated_no_distance:>7,}",
+            f"  unrated, no value         {self.unrated_no_value:>7,}",
+            f"  rated, but no gate        {self.scored_without_draw:>7,}",
             f"  prior runs vet-flagged    {self.vet_flagged_runs:>7,}",
             f"  profiles using one        {self.profiles_with_vet_run:>7,}",
             f"  stale rows cleared        {self.stale_rows_cleared:>7,}",
@@ -233,6 +243,7 @@ def score_runners(runs: pd.DataFrame, targets: pd.DataFrame, *,
 
     rows: list[tuple] = []
     component_rows: list[tuple] = []
+    unrated_rows: list[tuple] = []
     for (race_date, race_no), race in targets.groupby(["race_date", "race_no"]):
         med_rating = pd.to_numeric(race["rating"], errors="coerce").median()
         dtable = table_for(race_date)
@@ -241,24 +252,35 @@ def score_runners(runs: pd.DataFrame, targets: pd.DataFrame, *,
         # thin history must not shrink the field its rivals are measured in.
         field_size = len(race)
         scored: list[tuple[int, float]] = []
+        # Runners this pass looked at and would not rate, with how much history
+        # each brought. They are written too -- see the module docstring.
+        declined: list[tuple[int, int]] = []
+        report.races_seen += 1
         for rec in race.to_dict("records"):
+            # The history the model would have read, counted before anything
+            # can decline the runner, because the count is what the page needs
+            # in order to say WHICH refusal this is.
+            prior = [r for r in by_horse[rec["horse_name"]]
+                     if (r["race_date"], r["race_no"]) < (race_date, race_no)]
+            n_prior = len(prior)
             # SARR's distance term needs a distance. Five legacy races
             # (55 runners) have none -- their venue column holds a course
             # code rather than ST/HV, so the source rows are malformed.
-            # Skip and count them; do not invent a distance.
+            # Count them; do not invent a distance.
             if pd.isna(rec["distance"]):
-                report.skipped_no_distance += 1
+                report.unrated_no_distance += 1
+                declined.append((rec["horse_no"], n_prior))
                 continue
-            prior = [r for r in by_horse[rec["horse_name"]]
-                     if (r["race_date"], r["race_no"]) < (race_date, race_no)]
-            if len(prior) < min_prior:
-                report.skipped_no_history += 1
+            if n_prior < min_prior:
+                report.unrated_no_history += 1
+                declined.append((rec["horse_no"], n_prior))
                 continue
             profile = sarr.build_profile(
                 prior, rec["distance"], rec["venue"], rec["surface"],
                 today_class=rec.get("race_class"))
             if profile is None:
-                report.skipped_no_history += 1
+                report.unrated_no_history += 1
+                declined.append((rec["horse_no"], n_prior))
                 continue
             if any(r.get("vet_category") for r in prior[:sarr.MAX_PRIOR_RUNS]):
                 report.profiles_with_vet_run += 1
@@ -273,22 +295,27 @@ def score_runners(runs: pd.DataFrame, targets: pd.DataFrame, *,
                 draw_score=ds)
             value = sum(parts.values())
             if value is None or pd.isna(value):
+                report.unrated_no_value += 1
+                declined.append((rec["horse_no"], n_prior))
                 continue
-            scored.append((rec["horse_no"], float(value), len(prior)))
+            scored.append((rec["horse_no"], float(value), n_prior))
             component_rows.extend(
                 (race_date, race_no, rec["horse_no"], k, float(v))
                 for k, v in parts.items())
 
-        if not scored:
-            continue
-        report.races_scored += 1
-        # Lower is better, so rank ascending.
+        if scored:
+            report.races_scored += 1
+        # Lower is better, so rank ascending. The rank is over the runners that
+        # SCORED, which is what it always was: a NULL score takes a NULL rank
+        # and never displaces a real one.
         for rank, (horse_no, value, n_prior) in enumerate(
                 sorted(scored, key=lambda s: s[1]), start=1):
             rows.append((race_date, race_no, horse_no, value, rank, n_prior,
-                         sarr.DERIVE_VERSION if hasattr(sarr, "DERIVE_VERSION")
-                         else "sarr-1.0"))
-    return rows, component_rows
+                         sarr.DERIVE_VERSION))
+        for horse_no, n_prior in declined:
+            unrated_rows.append((race_date, race_no, horse_no, None, None,
+                                 n_prior, sarr.DERIVE_VERSION))
+    return rows, component_rows, unrated_rows
 
 
 def rebuild(db: Path | None = None, *, min_prior: int = sarr.MIN_PRIOR,
@@ -308,7 +335,7 @@ def rebuild(db: Path | None = None, *, min_prior: int = sarr.MIN_PRIOR,
         report.vet_flagged_runs = int(runs["vet_category"].notna().sum())
         targets = (pd.read_sql(CARD_SQL, conn, params=(date,))
                    if date else runs)
-        rows, component_rows = score_runners(
+        rows, component_rows, unrated_rows = score_runners(
             runs, targets, min_prior=min_prior, report=report)
         with transaction(conn):
             if date:
@@ -321,10 +348,10 @@ def rebuild(db: Path | None = None, *, min_prior: int = sarr.MIN_PRIOR,
                 "ON CONFLICT (race_date, race_no, horse_no) DO UPDATE SET "
                 "sarr = excluded.sarr, sarr_rank = excluded.sarr_rank, "
                 "n_prior = excluded.n_prior, derive_version = excluded.derive_version",
-                rows)
-            # Only for the runners that scored -- a race skipped for a missing
-            # distance must not leave orphaned components behind from a
-            # previous run.
+                rows + unrated_rows)
+            # Only for the runners that scored. An unrated runner has no
+            # contributions to store, and a race skipped for a missing distance
+            # must not leave orphaned components from a previous run.
             scored_keys = {(r[0], r[1], r[2]) for r in rows}
             kept = [c for c in component_rows if (c[0], c[1], c[2]) in scored_keys]
             conn.executemany(
@@ -332,8 +359,14 @@ def rebuild(db: Path | None = None, *, min_prior: int = sarr.MIN_PRIOR,
                 "horse_no, component, contribution) VALUES (?, ?, ?, ?, ?) "
                 "ON CONFLICT (race_date, race_no, horse_no, component) "
                 "DO UPDATE SET contribution = excluded.contribution", kept)
-            report.stale_rows_cleared = _clear_stale(conn, scored_keys)
-        report.rows_written = len(rows)
+            # Every key this pass WROTE, not just the rated ones -- otherwise
+            # the unrated rows would be deleted by the same statement that
+            # inserted them.
+            report.stale_rows_cleared = _clear_stale(
+                conn, scored_keys | {(r[0], r[1], r[2]) for r in unrated_rows})
+        report.rated_rows = len(rows)
+        report.unrated_rows = len(unrated_rows)
+        report.rows_written = len(rows) + len(unrated_rows)
         report.component_rows = len(kept)
     finally:
         conn.close()

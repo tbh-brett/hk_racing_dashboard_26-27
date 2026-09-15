@@ -189,8 +189,10 @@ def db(tmp_path):
 
 def test_the_rebuild_stores_a_component_row_for_every_term(db):
     conn = get_conn(db)
+    # Against the RATED rows: a runner the job declined has a row and no
+    # contributions, because there is nothing it contributed.
     counts = conn.execute(
-        "SELECT (SELECT count(*) FROM runner_sarr), "
+        "SELECT (SELECT count(*) FROM runner_sarr WHERE sarr IS NOT NULL), "
         "(SELECT count(*) FROM runner_sarr_component)").fetchone()
     conn.close()
     assert counts[0] > 0

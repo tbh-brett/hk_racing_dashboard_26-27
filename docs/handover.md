@@ -157,13 +157,24 @@ C of `docs/proposal-raceday-split.md` were built: `query/rating.py` owns the
 rule and the page-side prior-run count, and `query/meeting.py` took the two
 meeting-level functions, leaving `query/raceday.py` at **447 of 600**.
 
-**Still open — option B.** `rebuild_sarr` writes no row at all for a runner it
-did not score, so the page-side count and the job-side count are still two
-definitions under two predicates (`rebuild_sarr` counts an earlier race on the
-SAME day; the pages do not). Reconciling them changes who the model scores, so
-it is a model change needing its own walk-forward check, and four places read
-"there is a `runner_sarr` row" as "it was scored". The proposal names all four.
-`rating.PRIOR_RUN_RULE` is where the page-side rule is written down.
+**Option B is built too.** `rebuild_sarr` writes a row for every runner it
+looked at — `sarr` and `sarr_rank` NULL for the ones it declined, `n_prior`
+filled — so `runner_sarr` is now a complete record of what the model did with a
+card rather than a list of its successes. Checked before and after on a
+synthetic archive: **960 rated rows either way, same keys, same scores, same
+ranks, same `n_prior`, zero differences**; 28 unrated rows added, and races with
+no row at all went 2 → 0.
+
+Six readers took "there is a row" for "it was rated", not the four the proposal
+found. `tests/test_sarr.py` now fails if an inner join on the table is added
+without `sarr IS NOT NULL`.
+
+**Still two definitions of the prior-run count.** B did not collapse them, and
+the proposal was wrong to predict it would: a card nobody scored has no stored
+count at all, which is exactly the case the count is needed for. And
+`rebuild_sarr` counts an earlier race on the SAME day where the pages do not —
+reconciling that changes who the model scores, so it stays a model change
+needing its own walk-forward check. `rating.PRIOR_RUN_RULE` records both rules.
 
 ## 5. Traps this repo has already sprung
 

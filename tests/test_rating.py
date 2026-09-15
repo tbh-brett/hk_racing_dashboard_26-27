@@ -174,3 +174,58 @@ def test_the_counting_predicate_is_written_down_once():
     holders = [f.name for f in sorted(Path("hkrd/query").glob("*.py"))
                if fragment in f.read_text()]
     assert holders == ["rating.py"]
+
+
+# ── a card nobody scored, told apart from a card that scored nobody ──────────
+
+def _race(tmp_path, *, sarr_rows):
+    """One race of four. `sarr_rows`: {horse_no: sarr or None}, absent = no row."""
+    path = tmp_path / "s.db"
+    conn = get_conn(path)
+    init_db(conn)
+    with transaction(conn):
+        conn.execute(
+            "INSERT INTO races (race_date, race_no, venue, surface, going,"
+            " distance) VALUES ('2026-09-20', 1, 'ST', 'Turf', 'G', 1200)")
+        for no in range(1, 5):
+            conn.execute(
+                "INSERT INTO runners (race_date, race_no, horse_no, horse_name)"
+                " VALUES ('2026-09-20', 1, ?, ?)", (no, f"HORSE {no}"))
+            if no in sarr_rows:
+                conn.execute(
+                    "INSERT INTO runner_sarr (race_date, race_no, horse_no,"
+                    " sarr, sarr_rank, n_prior, derive_version)"
+                    " VALUES ('2026-09-20', 1, ?, ?, ?, 6, 'sarr-1.1')",
+                    (no, sarr_rows[no], 1 if sarr_rows[no] is not None else None))
+    return conn
+
+
+def test_a_race_with_no_rows_at_all_was_never_scored(tmp_path):
+    conn = _race(tmp_path, sarr_rows={})
+    assert rating.race_was_scored(conn, "2026-09-20", 1) is False
+    conn.close()
+
+
+def test_a_race_that_rated_nobody_was_still_scored(tmp_path):
+    """The case that makes this answerable. A maiden field of first-starters
+    produces no ratings at all, and while the table held rated runners only it
+    was indistinguishable from a card nobody had looked at."""
+    conn = _race(tmp_path, sarr_rows={1: None, 2: None, 3: None, 4: None})
+    assert rating.race_was_scored(conn, "2026-09-20", 1) is True
+    conn.close()
+
+
+def test_an_unscored_card_outranks_a_runners_own_history(tmp_path):
+    """True of the horse is not the useful thing to say. A debutant on a card
+    nobody scored would read DEBUT, which tells the reader nothing is wrong."""
+    debut = rating.unrated_reason(None, 0, card_scored=False)
+    assert debut["kind"] == "no_card_score"
+    assert debut["label"] == "CARD NOT SCORED"
+    # And once the card IS scored, the same runner reads as the rule it is.
+    assert rating.unrated_reason(None, 0)["label"] == "DEBUT"
+
+
+def test_a_rated_runner_is_unaffected_by_the_card_level_signal():
+    """The race-level fault cannot apply to a runner that has a rank, because
+    having one is proof the card was scored."""
+    assert rating.unrated_reason(2, 9, card_scored=False) is None

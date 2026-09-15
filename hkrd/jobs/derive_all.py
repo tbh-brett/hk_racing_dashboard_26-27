@@ -129,7 +129,12 @@ def run(db: Path | None = None, *, date: str | None = None,
         out = rebuild_sarr.rebuild(target, date=date)
         report.written["runner_sarr"] = out.rows_written
         report.written["sarr_component"] = out.component_rows
-        report.skipped["sarr"] = out.skipped_no_history + out.skipped_no_distance
+        # Not skipped any more -- a runner SARR declines gets a row saying so.
+        # The key stays "skipped" because the strip that reads it asks "how
+        # many did this step not produce a figure for", which is unchanged.
+        report.skipped["sarr"] = (out.unrated_no_history
+                                  + out.unrated_no_distance
+                                  + out.unrated_no_value)
     if "tags" in only:
         from hkrd.jobs import rebuild_tags
         out = rebuild_tags.rebuild(target)
