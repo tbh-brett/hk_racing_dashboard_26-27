@@ -141,13 +141,17 @@ def archive_size(*, conn: Connection | None = None,
     own = conn is None
     conn = conn or get_conn()
     try:
-        where = "WHERE r.race_date >= ?" if since else ""
+        where = "AND r.race_date >= ?" if since else ""
         args = (since,) if since else ()
         row = conn.execute(f"""
             SELECT count(*) races, coalesce(sum(n), 0) runners FROM (
                 SELECT r.race_date, r.race_no, count(*) n
                   FROM runners r
                   JOIN runner_sarr s USING (race_date, race_no, horse_no)
+                 -- A row in `runner_sarr` stopped meaning "it was rated" when
+                 -- the job began recording the runners it declined. Without
+                 -- this the rated population silently becomes the whole field.
+                 WHERE s.sarr IS NOT NULL
                  {where}
                  GROUP BY r.race_date, r.race_no
                 HAVING sum(CASE WHEN r.place = 1 THEN 1 ELSE 0 END) > 0

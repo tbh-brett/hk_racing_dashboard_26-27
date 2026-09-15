@@ -845,11 +845,17 @@ function sarrCell(r) {
   const why = r.sarr_unrated;
   if (!why) return el('span', null, DASH);
   const tag = el('span', `sarr-why ${why.kind}`, why.label);
-  tag.title = why.kind === 'unscored'
-    ? `${why.prior} prior runs, enough to rate, but this card has not been `
-      + 'scored. Press Card in the header to score it.'
-    : `${why.prior === 0 ? 'No run' : `${why.prior} run`} in Hong Kong. `
-      + `SARR rates a horse from its history and needs ${why.needs}.`;
+  // `no_card_score` is a fact about the RACE and outranks the runner's own
+  // history: the model has not looked at this card at all, so a blank here
+  // says nothing about the horse yet.
+  tag.title = why.kind === 'no_card_score'
+    ? 'Nothing has scored this card, so no runner on it has a rating. '
+      + 'Press Card in the header to score it.'
+    : why.kind === 'unscored'
+      ? `${why.prior} prior runs, enough to rate, and no rating. `
+        + 'Press Card in the header to rescore this race.'
+      : `${why.prior === 0 ? 'No run' : `${why.prior} run`} in Hong Kong. `
+        + `SARR rates a horse from its history and needs ${why.needs}.`;
   return tag;
 }
 

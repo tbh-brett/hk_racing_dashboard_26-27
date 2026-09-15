@@ -51,7 +51,8 @@ from __future__ import annotations
 
 import numpy as np
 
-__all__ = ["BETA", "DEFAULT_BLEND_WEIGHT", "CALIBRATION", "fundamental_probability",
+__all__ = ["BETA", "DEFAULT_BLEND_WEIGHT", "CALIBRATION",
+           "fundamental_probability", "fundamental_for_race",
            "market_probability", "blend"]
 
 # Softmax temperature mapping SARR (lower is better) to a win probability,
@@ -123,6 +124,32 @@ def fundamental_probability(sarr: list[float], beta: float = BETA, *,
     p = np.exp(z - z.max())
     out[rated] = mass * p / p.sum()
     return out
+
+
+def fundamental_for_race(sarr: list[float], market=(), *,
+                         beta: float = BETA) -> np.ndarray:
+    """The fundamental stream for one race, on the market's own scale.
+
+    `mass` above is the share of the book the rated runners may hold between
+    them, and every caller computes it the same way: the de-vigged market
+    probability of the runners SARR rated, summed. Three of them worked it out
+    separately -- the Model Analysis footer, the weight fit, and the backtest --
+    and the backtest's copy was the one that did not, which is why it dropped
+    every race carrying a debutant instead.
+
+    `market` is the de-vigged market, or empty when the book is incomplete and
+    there is none to share out. With no market the rated runners hold the whole
+    1.0 between them, which is what the stream meant on its own anyway.
+
+    On a fully rated field the share is 1.0 and this is the plain softmax, so
+    every published figure fitted before it survives unchanged.
+    """
+    s = np.asarray(sarr, dtype=float)
+    m = np.asarray(market, dtype=float)
+    if m.size == 0:
+        return fundamental_probability(s, beta)
+    rated = ~np.isnan(s)
+    return fundamental_probability(s, beta, mass=float(m[rated].sum()))
 
 
 def market_probability(win_odds: list[float]) -> np.ndarray:

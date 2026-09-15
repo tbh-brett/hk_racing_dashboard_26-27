@@ -7,9 +7,11 @@ than it has been shown to be.
 """
 from __future__ import annotations
 
+import math
+
 
 from hkrd.model import blend as blend_m, sarr as sarr_m
-from hkrd.query import market as market_q
+from hkrd.query import market as market_q, rating as rating_q
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["et_breakdown", "et_reference_summary", "model_status",
@@ -145,6 +147,13 @@ def model_status(*, conn: Connection | None = None) -> dict:
                 "through": covered,
                 "current": bool(covered and covered == latest_race),
             }
+        # `runner_sarr` holds a row per runner the job looked at, and a rating
+        # for the subset it could rate. The strip would otherwise report a row
+        # count that jumped 23% the day the job started recording refusals,
+        # and read it as 23% more model.
+        out["tables"]["runner_sarr"]["rated"] = conn.execute(
+            "SELECT count(*) FROM runner_sarr WHERE sarr IS NOT NULL"
+        ).fetchone()[0]
         return out
     finally:
         if own:
@@ -170,7 +179,11 @@ def sarr_breakdown(date: str, race_no: int, *,
                    r.win_odds, r.draw, r.jockey, s.derive_version
             FROM runner_sarr s
             JOIN runners r USING (race_date, race_no, horse_no)
-            WHERE s.race_date = ? AND s.race_no = ?
+            -- The table carries a row for every runner the job looked at,
+            -- rated or not. This panel is the rated ones: without the filter
+            -- the unrated arrive with a NULL rank, and NULL sorts FIRST in
+            -- SQLite, so they would head a table ordered by merit.
+            WHERE s.race_date = ? AND s.race_no = ? AND s.sarr IS NOT NULL
             ORDER BY s.sarr_rank
         """, (date, race_no))]
         # The same fill the card and the blend do. `runners.win_odds` is the
@@ -215,18 +228,32 @@ def sarr_breakdown(date: str, race_no: int, *,
             conn.close()
 
 
-def _unscored(conn: Connection, date: str, race_no: int) -> list[str]:
-    """Runners in the race that SARR could not score.
+def _unscored(conn: Connection, date: str,
+              race_no: int) -> list[dict[str, Any]]:
+    """Runners in the race that SARR could not score, and why.
 
     Named, not counted: a field of 12 showing 9 rows with no explanation is how
     the old page let a silent skip look like a short field.
+
+    The reason comes from `query/rating`, the same call the blend footer below
+    this panel makes. Without it the two lines sat two inches apart on one page
+    calling the same debutant "not scored" and "DEBUT".
     """
-    return [r["horse_name"] for r in conn.execute("""
-        SELECT r.horse_name FROM runners r
+    rows = [dict(r) for r in conn.execute("""
+        SELECT r.horse_no, r.horse_name FROM runners r
         LEFT JOIN runner_sarr s USING (race_date, race_no, horse_no)
         WHERE r.race_date = ? AND r.race_no = ? AND s.sarr IS NULL
         ORDER BY r.horse_no
     """, (date, race_no))]
+    if not rows:
+        return []
+    priors = rating_q.prior_run_counts(
+        conn, [r["horse_name"] for r in rows], before=date)
+    scored_card = rating_q.race_was_scored(conn, date, race_no)
+    # Every row here has a NULL score, so the rank is NULL with it.
+    return [{**r, **rating_q.unrated_reason(
+                None, priors.get(r["horse_name"], 0), card_scored=scored_card)}
+            for r in rows]
 
 
 def sarr_influence(*, conn: Connection | None = None) -> list[dict]:
@@ -357,17 +384,31 @@ def blend_breakdown(date: str, race_no: int, *, weight: float | None = None,
         scored = [r for r in rows if r["sarr"] is not None]
         missing = {"unpriced": len(rows) - len(priced),
                    "unscored": len(rows) - len(scored)}
+        # A runner SARR did not score has no `runner_sarr` row at all, so the
+        # LEFT JOIN above carries a NULL `n_prior` in exactly the case the
+        # footer needs it. The count comes from `query/rating`, which is also
+        # where Race Day gets it, so the two pages cannot answer "how much
+        # history" differently about the same horse on the same day.
+        priors = (rating_q.prior_run_counts(
+            conn, [r["horse_name"] for r in rows], before=date)
+            if missing["unscored"] else {})
+        scored_card = (rating_q.race_was_scored(conn, date, race_no)
+                       if missing["unscored"] else True)
 
         market = (blend_m.market_probability([r["win_odds"] for r in rows])
                   if len(priced) == len(rows) and rows else [])
-        # With no market to share out, the rated runners hold the whole book
-        # between them -- which is what the stream meant on its own anyway.
-        fund_mass = (float(sum(p for r, p in zip(rows, market)
-                               if r["sarr"] is not None))
-                     if len(market) else 1.0)
-        fund = (blend_m.fundamental_probability([r["sarr"] for r in rows],
-                                                mass=fund_mass)
+        # `fundamental_for_race` shares the market's own total on the rated
+        # group, and with no market to share out gives them the whole 1.0 --
+        # which is what the stream meant on its own anyway. The weight fit and
+        # the backtest build the same stream from the same call.
+        sarr_col = [r["sarr"] for r in rows]
+        fund = (blend_m.fundamental_for_race(sarr_col, market)
                 if scored else [])
+        # The stream sums to the mass by construction, so the figure the footer
+        # quotes is read off the column it describes rather than worked out a
+        # second time beside it.
+        fund_mass = (float(sum(p for p in fund if not math.isnan(p)))
+                     if scored and len(fund) else 1.0)
         blended = blend_m.blend(fund, market, weight) if rows else []
 
         overround = (round(100 * (sum(1 / r["win_odds"] for r in priced) - 1), 1)
@@ -400,14 +441,19 @@ def blend_breakdown(date: str, race_no: int, *, weight: float | None = None,
             # column to 100% needs both or the shortfall looks like an error.
             "fund_covers": len(scored),
             "fund_of": len(rows),
-            # Named, not counted, and deliberately WITHOUT a reason. A blank
-            # rank is two different things -- too little history, which is a
-            # rule, or a card nobody scored, which is a fault -- and Race Day
-            # tells them apart (`raceday._unrated`). This page only needs to
-            # say how the blend treats them, which is the same either way; a
-            # footer that explained every blank as the two-run rule would be
-            # wrong on exactly the day the fault recurs.
-            "unrated": [r["horse_name"] for r in rows if r["sarr"] is None],
+            # Named, counted, and now WITH the reason. It was left off while
+            # the rule lived in Race Day's module, on the argument that a
+            # footer explaining every blank as the two-run rule would be wrong
+            # on exactly the day the fault recurs. That argument was right
+            # about the danger and wrong about the remedy: the fix is to say
+            # which of the two it is, not to say neither. `query/rating`
+            # decides, so both pages give the same answer about the same horse.
+            "unrated": [{"horse_no": r["horse_no"],
+                         "horse_name": r["horse_name"],
+                         **rating_q.unrated_reason(
+                             r["sarr_rank"], priors.get(r["horse_name"], 0),
+                             card_scored=scored_card)}
+                        for r in rows if r["sarr"] is None],
             "fund_mass": (round(100 * fund_mass, 1)
                           if scored and len(market) else None),
             "calibration": blend_m.CALIBRATION,

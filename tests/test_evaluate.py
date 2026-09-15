@@ -52,8 +52,12 @@ def test_the_evaluator_reproduces_what_the_job_writes(tmp_path):
     _seed(db)
     rebuild_sarr.rebuild(db)
     conn = get_conn(db)
+    # The rated rows. `runner_sarr` also carries the runners the job declined,
+    # and an evaluation must never see them -- a NaN score would widen the
+    # population a variant is measured over without changing what it measured.
     written = {(r[0], r[1], r[2]): r[3] for r in conn.execute(
-        "SELECT race_date, race_no, horse_no, sarr FROM runner_sarr")}
+        "SELECT race_date, race_no, horse_no, sarr FROM runner_sarr "
+        "WHERE sarr IS NOT NULL")}
     scored = evaluate.score(conn)
     conn.close()
     assert len(scored) == len(written)

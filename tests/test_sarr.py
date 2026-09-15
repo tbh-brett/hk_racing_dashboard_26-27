@@ -103,17 +103,33 @@ def test_exactly_one_rank_one_per_race(tmp_path):
 
 
 def test_ranks_are_dense_and_start_at_one(tmp_path):
+    """Over the RATED runners. The table also carries the ones the job
+    declined, and a NULL rank must never take a place in the sequence."""
     db = tmp_path / "t.db"
     _seed(db)
     rebuild_sarr.rebuild(db)
     conn = get_conn(db)
     for row in conn.execute("SELECT race_date, race_no FROM runner_sarr "
-                            "GROUP BY 1, 2 LIMIT 5"):
+                            "WHERE sarr IS NOT NULL GROUP BY 1, 2 LIMIT 5"):
         ranks = [r[0] for r in conn.execute(
             "SELECT sarr_rank FROM runner_sarr WHERE race_date=? AND race_no=? "
-            "ORDER BY sarr_rank", (row["race_date"], row["race_no"]))]
+            "AND sarr IS NOT NULL ORDER BY sarr_rank",
+            (row["race_date"], row["race_no"]))]
         assert ranks == list(range(1, len(ranks) + 1))
     conn.close()
+
+
+def test_an_unrated_runner_takes_no_rank(tmp_path):
+    """A NULL score with a rank beside it would push every real runner one
+    place down, which is the fault `_clear_stale` was written for."""
+    db = tmp_path / "t.db"
+    _seed(db, meetings=3)
+    rebuild_sarr.rebuild(db)
+    conn = get_conn(db)
+    stray = conn.execute("SELECT count(*) FROM runner_sarr "
+                         "WHERE sarr IS NULL AND sarr_rank IS NOT NULL").fetchone()[0]
+    conn.close()
+    assert stray == 0
 
 
 def test_lower_score_ranks_better(tmp_path):
@@ -131,19 +147,25 @@ def test_lower_score_ranks_better(tmp_path):
     assert scores == sorted(scores)
 
 
-def test_a_horse_with_no_history_is_skipped_and_counted(tmp_path):
+def test_a_horse_with_no_history_is_recorded_as_unrated_not_dropped(tmp_path):
     """The first meeting has no prior runs for anyone, so nothing there can be
-    rated. That must be reported, not silently produce zeros."""
+    rated. That must be reported, not silently produce zeros -- and the rows
+    must exist, or "nobody scored this card" and "this card scored nobody"
+    are the same empty result."""
     db = tmp_path / "t.db"
     _seed(db, meetings=3)
     report = rebuild_sarr.rebuild(db, min_prior=2)
-    assert report.skipped_no_history > 0
+    assert report.unrated_no_history > 0
     conn = get_conn(db)
     first = conn.execute("SELECT min(race_date) FROM races").fetchone()[0]
-    rated = conn.execute(
-        "SELECT count(*) FROM runner_sarr WHERE race_date = ?", (first,)).fetchone()[0]
+    rated, present = conn.execute(
+        "SELECT count(sarr), count(*) FROM runner_sarr WHERE race_date = ?",
+        (first,)).fetchone()
+    declared = conn.execute(
+        "SELECT count(*) FROM runners WHERE race_date = ?", (first,)).fetchone()[0]
     conn.close()
     assert rated == 0
+    assert present == declared
 
 
 def test_date_scoped_rebuild_scores_a_declared_card_from_prior_runs(tmp_path):
@@ -189,7 +211,7 @@ def test_a_race_without_a_distance_is_skipped_not_crashed(tmp_path):
                      "(SELECT max(race_date) FROM races)")
     conn.close()
     report = rebuild_sarr.rebuild(db)
-    assert report.skipped_no_distance > 0
+    assert report.unrated_no_distance > 0
     assert not report.errors
 
 
@@ -516,3 +538,62 @@ def test_the_going_band_no_longer_gates_the_place_rate():
     parts = sarr.contributions(profile, 1200, "HV", 60.0)
     assert parts["wpr"] == pytest.approx(
         sarr.WEIGHTS["f_wpr"] * (-profile["place_rate"] * 5))
+
+
+# ── what a row in runner_sarr means ──────────────────────────────────────────
+
+def test_every_inner_join_on_runner_sarr_asks_for_a_rating():
+    """A row stopped meaning "it was rated" when the job began recording the
+    runners it declined, and four readers took row existence for a rating.
+
+    A LEFT JOIN is safe either way -- a missing row and a NULL column read the
+    same through `s.sarr`. An INNER JOIN is not: it used to select the rated
+    field and now selects the declared one, silently and in whichever direction
+    flatters the number. `model/power.py` counted the population a variant is
+    measured over; `query/model.py:sarr_breakdown` ordered a merit table by a
+    rank that is NULL for the unrated, and NULL sorts FIRST in SQLite.
+    """
+    import re
+    from pathlib import Path
+    offenders = []
+    for path in sorted(Path("hkrd").rglob("*.py")):
+        lines = path.read_text().splitlines()
+        for i, line in enumerate(lines):
+            if "JOIN runner_sarr" not in line or "LEFT JOIN" in line:
+                continue
+            window = "\n".join(lines[max(0, i - 12):i + 18])
+            if not re.search(r"sarr\s+IS\s+NOT\s+NULL", window, re.I):
+                offenders.append(f"{path}:{i + 1}")
+    assert offenders == [], (
+        "inner JOIN on runner_sarr with no `sarr IS NOT NULL` nearby: "
+        + ", ".join(offenders))
+
+
+def test_the_table_covers_every_runner_the_job_looked_at(tmp_path):
+    """The property the readers above were guarded for, asserted directly.
+
+    It is also the one that makes "no row for this race" mean one thing: while
+    the table held rated runners only, a card nobody scored and a card whose
+    whole field was too short of history produced the same empty result, and
+    the second is ordinary -- a maiden field of first-starters is exactly that.
+    """
+    db = tmp_path / "t.db"
+    _seed(db, meetings=4)
+    report = rebuild_sarr.rebuild(db)
+    conn = get_conn(db)
+    missing = conn.execute("""
+        SELECT count(*) FROM runners r
+        WHERE r.finish_time IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM runner_sarr s
+                           WHERE s.race_date = r.race_date
+                             AND s.race_no   = r.race_no
+                             AND s.horse_no  = r.horse_no)""").fetchone()[0]
+    races_without_rows = conn.execute("""
+        SELECT count(*) FROM races a
+        WHERE NOT EXISTS (SELECT 1 FROM runner_sarr s
+                           WHERE s.race_date = a.race_date
+                             AND s.race_no   = a.race_no)""").fetchone()[0]
+    conn.close()
+    assert missing == 0
+    assert races_without_rows == 0
+    assert report.rows_written == report.rated_rows + report.unrated_rows

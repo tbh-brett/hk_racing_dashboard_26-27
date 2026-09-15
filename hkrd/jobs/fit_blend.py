@@ -15,7 +15,8 @@ from pathlib import Path
 
 import numpy as np
 
-from hkrd.model.blend import blend, fundamental_probability, market_probability
+from hkrd.model.blend import (blend, fundamental_for_race,
+                              fundamental_probability, market_probability)
 from hkrd.store.connect import db_path, get_conn
 
 # Fractions of the fundamental stream to report beside the fitted one: zero,
@@ -71,12 +72,13 @@ def _complete(race) -> bool:
 
 
 def _fund(race, beta: float) -> np.ndarray:
-    """The fundamental stream for one race, scaled to the market's own share of
-    the runners it rated. On a fully rated field that share is 1.0 and this is
-    the plain softmax, which is why the published beta survives the change."""
-    mkt = market_probability(race[3])
-    rated = ~np.isnan(race[1])
-    return fundamental_probability(race[1], beta, mass=float(mkt[rated].sum()))
+    """The fundamental stream for one race, on the market's own scale.
+
+    `blend.fundamental_for_race` since 2026-09-15. This function was the first
+    place that worked the share out, and the backtest was the last place that
+    did not -- so it is one definition now rather than the good copy.
+    """
+    return fundamental_for_race(race[1], market_probability(race[3]), beta=beta)
 
 
 def _log_loss(races, probability) -> float:

@@ -270,7 +270,7 @@ def test_the_rebuild_counts_runners_it_scored_without_a_gate(tmp_path):
     conn.close()
     report = rebuild_sarr.rebuild(path, min_prior=2)
     assert report.scored_without_draw == 8
-    assert "scored, but no gate" in report.render()
+    assert "rated, but no gate" in report.render()
 
 
 # ── walk-forward, which is the whole guardrail ───────────────────────────────

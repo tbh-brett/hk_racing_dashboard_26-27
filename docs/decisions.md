@@ -564,3 +564,259 @@ loss from 2.0466 to 2.0545 with no model change at all — a published constant
 that depended on a join order. A dead heat now contributes the mean of its
 winners' log likelihoods. Three of 1,712 races are dead heats and two fall
 after the split, which is enough to move the fourth decimal.
+
+## The speed map explained a blank with its own number
+
+**2026-09-15.** `sarr.MIN_PRIOR` exists because three places each carried a
+literal 2 and a page explaining a blank with a different threshold from the one
+that caused it explains nothing. `3b67054` moved the rebuild, the evaluator and
+the Race Day card onto the constant. It did not reach the speed map, which
+carried the literal twice more — once in `jobs/project_card`, which decides who
+gets a projection, and once in `query/speedmap`, which writes the sentence
+saying why a horse did not.
+
+Those two are not two statements of one rule; they are a rule and a claim about
+it, in different files, agreeing only by coincidence. Moving the model's minimum
+to three demonstrates what that bought: `project_card` would still have built a
+profile from two runs and drawn the horse a bar, while SARR refused to rate the
+same horse on Race Day — and `query/speedmap`, asked why a horse HAD no
+projection, would have fallen through to `"no early-sectional history"`, naming
+a scrape gap for a horse whose history is simply short. Two wrong answers and
+neither visible.
+
+Both now read `sarr.MIN_PRIOR`, so the reason on the page is generated from the
+number that caused it: `f"fewer than {sarr.MIN_PRIOR} prior runs"`. Changing the
+constant in `model/sarr.py` alone now moves the rebuild, the evaluator, the
+projection job, its CLI default and both pages together — verified by changing
+it to 3 and reading all five back.
+
+The test that was supposed to catch this already named the speed map in its own
+docstring and did not check it, which is how the literals survived the commit
+that removed the others. It checks both now, including the CLI default, which is
+the value that actually runs: `ops/crontab` calls `project_card --pending` and
+never passes the flag.
+
+## "Is the model behind?" is a question about the database, so `coverage` answers it
+
+**2026-09-15.** A derived table survives a deploy. The volume is not rebuilt, so
+shipping a changed model leaves every existing row written by the old one, and
+every page goes on showing them without a word. Rebuilding one archive's
+`runner_sarr` from `sarr-1.0` to `sarr-1.1` moved **99.8% of scores, 39.5% of
+ranks and the top-rated horse in 19.5% of races** — and the only symptom was the
+owner reporting that the ratings still looked wrong while every fix was
+committed.
+
+`derive_version` was already the cheap tell and nothing read it. The handover
+carried the check as a command instead:
+
+```
+fly ssh console -a hkrd -C "python -c \"import sqlite3;print(sqlite3.connect('/data/hkrd.db')...\""
+```
+
+which is three levels of quoting, answers one table, and is exactly the shape of
+instruction this project has learned not to hand the owner. It is now a section
+of `jobs/coverage`, whose stated question — "is the dashboard missing data, or
+is it broken?" — this is the third version of. One command, no nested quotes,
+the same on the machine, the first PC and a laptop:
+
+```
+python -m hkrd.jobs.coverage --db /data/hkrd.db
+```
+
+Four decisions inside it:
+
+- **The wanted version is imported, never copied.** `current_versions()` reads
+  `DERIVE_VERSION` off the module that stamps the table. A constant duplicated
+  into the survey would report every fresh row as stale the day a model moved.
+- **Every generation present is listed, not the newest.** A table rebuilt for two
+  meetings under a changed model and left alone for the rest is the case the
+  column exists to make visible, and a "latest version" row would hide precisely
+  that: the new rows read current and the archive is never mentioned.
+- **Empty is not stale.** Nothing derived yet needs a first run; a generation
+  behind needs a rebuild. Different remedies, so different words.
+- **The rebuild command it prints carries the `--db` it was given.** A report read
+  off the production machine and pasted back would otherwise rebuild whatever
+  `HKRD_DB` points at wherever it was pasted, which is not the database the
+  report described.
+
+A stale table is also a gap in `gaps()`, because the rows are there and the
+figures they carry are not the ones the code would produce.
+
+## The reason a runner has no rating belongs to the rating, not to a page
+
+**2026-09-15.** Model Analysis named the runners the blend could not rate and
+said nothing about why, on the argument that a blank is two different things —
+too little history, a RULE that fires on 65.2% of cards, or a card nobody
+scored, a FAULT — and that a footer explaining every blank as the two-run rule
+would be wrong on exactly the day the fault recurs. That argument was right
+about the danger and wrong about the remedy. The fix is to say which of the two
+it is, not to say neither.
+
+It could not say which, because the rule lived in `query/raceday._unrated` and
+the count it needs was eleven lines of SQL inside `build_card`. A page reaching
+into another page's module for a fact is how two pages start disagreeing about
+the same horse on the same day, and `query/raceday.py` was 568 of a 600-line cap
+so neither piece could grow there. Options A and C of
+`docs/proposal-raceday-split.md` were taken.
+
+**`query/rating.py` owns one question:** what does the model know about this
+runner, and if nothing, why. `unrated_reason` is the rule, moved unchanged.
+`prior_run_counts` is one grouped query for the whole field — per runner it is a
+scan apiece, which is the performance rule this project already wrote down.
+Race Day, the blend footer and the SARR panel all read it.
+
+**Two panels on one page were answering differently.** `model._unscored` feeds
+the SARR panel's NOT SCORED line a few inches above the blend footer, and it
+returned bare names. With the footer distinguishing the two kinds and the panel
+not, the page called the same debutant "NOT SCORED" and "DEBUT" at once. Both
+read `query/rating` now and the panel's line reads NOT RATED, which is what it
+means.
+
+**A runner the rebuild did not score has no `runner_sarr` row at all**, so the
+LEFT JOIN both pages already do carries a NULL `n_prior` in exactly the case the
+footer needs it. That is why the count is a query and not a column, and it is
+the thing option B would fix.
+
+**`query/meeting.py`** took `meeting_blackbook` and `meeting_summary` — 93 lines
+that touch nothing `build_card` uses. The four helpers below them did not go
+with them: `_days_between`, `_place_ratio_range`, `_pairs_meeting_again` and
+`_swing_favours` are all called from `build_card` and belong to the card, so the
+seam is narrower than the file's shape suggests. `query/raceday.py` is **447**.
+
+**What was NOT done, deliberately.** `jobs/rebuild_sarr` counts prior runs at
+`(race_date, race_no) < (today, this_race)` — an earlier race on the SAME day
+counts — where the pages count `race_date < today`. No horse runs twice on one
+card, so they agree on every row in the archive, and they are still two rules.
+Reconciling them changes who the model scores, which is a model change and needs
+a walk-forward check of its own; folding it into a page fix is how a rating
+silently moves. `rating.PRIOR_RUN_RULE` records the page-side rule and the
+discrepancy.
+
+Checked in the browser on a nine-runner card carrying both kinds of blank: the
+SARR panel reads `NOT RATED: GOLDEN SIXTY (NOT SCORED), FIRST TIMER (DEBUT)`,
+the blend footer names the same two the same way, and a separate line says
+`1 OF THOSE HAS 2 OR MORE PRIOR RUNS AND NO RATING — A FAULT RATHER THAN A RULE`.
+Race Day shows NOT SCORED in red against that horse and DEBUT in grey against
+the other, which is what it showed before and now what the other page shows too.
+
+## `runner_sarr` records what the model declined, not only what it rated
+
+**2026-09-15.** The table held a row per RATED runner, so "no row" meant four
+different things: the runner had too little history, the model could not build
+a profile, the card had not been scored, or the horse was scratched after it
+was. A page reading it could not tell them apart, and one of the four is a fault
+somebody can fix.
+
+`rebuild_sarr` now writes a row for every runner it looked at. A runner it
+declined gets `sarr` and `sarr_rank` NULL and `n_prior` filled, so the table is
+a complete statement of what the model did with a card.
+
+**NOTHING ABOUT THE RATINGS MOVED, and that was checked rather than asserted.**
+One synthetic archive, rebuilt twice — once with the job as it was, once with
+the job as it is, `model/sarr` identical in both arms so only the change under
+test differs. **960 rated rows either way; the same keys; not one score, rank or
+`n_prior` different.** 28 unrated rows were added. Races with no row at all went
+**2 → 0**, which is the distinction the change exists to create.
+
+**SIX READERS TOOK "THERE IS A ROW" FOR "IT WAS RATED", not the four the audit
+in `docs/proposal-raceday-split.md` found.** A LEFT JOIN is safe either way — a
+missing row and a NULL column read the same through `s.sarr` — so the exposure
+is the inner joins and the non-SQL readers:
+
+- `model/power.py` inner-joined to count the population a variant is measured
+  over; without a guard it becomes the whole declared field.
+- `query/model.py:sarr_breakdown` inner-joins and orders by `sarr_rank`, and
+  **NULL sorts FIRST in SQLite** — unrated runners would have headed a table
+  ordered by merit.
+- `query/model.py:model_status` prints row counts on the freshness strip. It
+  reports `rated` beside `rows` now, or the figure jumps 23% overnight and reads
+  as 23% more model.
+- `jobs/rebuild_sarr`'s own `skipped_*` counters stopped meaning skipped.
+- **`model/evaluate.score`** — missed by a grep for `runner_sarr`, because it
+  reads `score_runners`' return rather than the table. A NaN score there would
+  have widened the population every variant is measured over, inside the one
+  module built to detect that kind of drift. `score_runners` returns the
+  declined runners as a third value, so the unpack fails loudly rather than
+  quietly carrying them.
+- **`jobs/derive_all`** sums the skip counters into the freshness strip.
+
+`tests/test_sarr.py` fails if an inner join on `runner_sarr` is added without
+`sarr IS NOT NULL` nearby. Verified by removing the guard from `model/power.py`
+and watching it fail.
+
+**WHAT THIS BOUGHT ON THE PAGE.** A race with no rows at all now means one
+thing: nothing has scored this card. It used to also mean "the card was scored
+and nothing in it could be rated", which is ordinary — a maiden field of
+first-starters is exactly that. `rating.race_was_scored` reads it, and
+`unrated_reason` takes `card_scored`, which outranks the runner's own history: a
+debutant on an unscored card used to read DEBUT in grey, telling the reader
+nothing was wrong on a card the model had never looked at. It reads CARD NOT
+SCORED in red now, on Race Day and on Model Analysis.
+
+**WHAT IT DID NOT BUY, against the proposal's own prediction.** The proposal
+said B would leave one definition of the prior-run count. It leaves two.
+
+- The fault the whole thread is about — a card nobody scored — is defined by the
+  job's output being ABSENT, so there is no stored `n_prior` in precisely the
+  case the count is needed. `rating.prior_run_counts` stays.
+- `rebuild_sarr` counts prior runs at `(race_date, race_no) < (today,
+  this_race)`, where an earlier race on the same day counts; the pages count
+  `race_date < today`. Reading the stored count on one page and the computed one
+  on another mixes two rules instead of removing one. Reconciling them changes
+  who the model scores, which is still a model change and still wants its own
+  walk-forward check.
+
+One piece of dead code went with it: `rebuild_sarr` stamped
+`sarr.DERIVE_VERSION if hasattr(...) else "sarr-1.0"`. The fallback has been
+unreachable since `model/sarr` defined the constant, and a version stamp that
+can silently be wrong is the thing `jobs/coverage` was just taught to check.
+
+## The table asking whether the model beats the price was answering about a third of races
+
+**2026-09-15.** `races_for_backtest` required a complete book, a recorded
+winner, AND every runner rated. The first two are real requirements. The third
+was not, and it had already been removed from `fit_blend` on 2026-09-13 for
+exactly the reason it should have been removed here.
+
+**"Every runner rated" means "no debutant declared".** SARR rates nothing with
+fewer than `sarr.MIN_PRIOR` prior runs, so the condition is a property of the
+CARD and not of the model — and **65.2% of the archive's 1,712 races fail it**.
+The page built to answer whether the model beats the price was answering on the
+third of races that happen to carry no newcomer, and presenting that as the
+archive. The same selection, in `fit_blend`, had chosen the published weight on
+660 races of 1,712.
+
+**The complete book stays required.** The overround IS the gap between the book
+and 100%, so a book missing a runner has a gap that is partly the missing
+runner; the de-vig cannot be done without every price. Nothing equivalent is
+true of the model. It has an opinion about the runners it rated and none about
+the rest, and `blend` already carries that: `w·m + (1−w)·m` is `m`, so an
+unrated runner falls through to its market price at every weight. Two rated
+runners is the floor, because a softmax over one is 1.0 whatever the score —
+`fit_blend` draws the line in the same place.
+
+**THREE PLACES BUILT THE SAME STREAM AND THE ONE THAT BUILT IT DIFFERENTLY WAS
+THE ONE THAT DROPPED THE RACES.** The Model Analysis footer, the weight fit and
+the backtest each needed "the softmax, scaled to the market's own share of the
+runners it rated". Two worked it out; `backtest._probabilities` called the plain
+softmax and then required a full field so the scale would be right. It is
+`blend.fundamental_for_race` now, called by all three, and a test asserts each
+module uses it. On a fully rated field the share is 1.0 and the call is the
+plain softmax, which is why every constant fitted before this survives.
+
+**Measured on a synthetic archive seeded to the real debutant rate** — a
+newcomer in about two races in three. The selection went from **60 races to
+178, 2.97x**, and **66.3% of the widened set carries a runner SARR did not
+rate** against the archive's own 65.2%. Every figure moved with it. The
+absolute brier and log-loss figures from that run are not transferable — the
+finishing order is random — so they are not recorded here; what transfers is
+that the population roughly triples and that the arithmetic holds: an unrated
+runner's blended probability equals its market price at every weight, and the
+column still sums to 1.
+
+**`MEASURED` was NOT guessed at.** Every figure in it was produced under the old
+selection and can only be recomputed against the real archive. It carries a
+`population` key saying so, `jobs/fit_backtest` regenerates the whole block
+ready to paste, and the page prints the population in red above the published
+value table — which sits directly under a live calibration computed on a
+different set of races, and read as one table before.

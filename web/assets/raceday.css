@@ -591,4 +591,7 @@ table.card td { padding: 6px 8px; }
 }
 .sarr-why.history  { color: var(--text-dim); }
 .sarr-why.unscored { color: var(--alert); font-weight: 600; }
+/* A card nobody scored is the same class of fault as a runner
+   nobody scored, and reads identically on the row. */
+.sarr-why.no_card_score { color: var(--alert); font-weight: 600; }
 

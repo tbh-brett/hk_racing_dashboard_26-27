@@ -121,8 +121,13 @@ def score(conn: Connection | None = None, *, adjust=None,
         runs = sarr.annotate_runs(raw)
         runs["vet_category"] = job._vet_flags(conn, runs)
         targets = runs[runs["race_date"] >= since] if since else runs
-        rows, _ = job.score_runners(runs, targets, min_prior=min_prior,
-                                    adjust=adjust)
+        # The third return is every runner the job DECLINED to rate, which it
+        # now writes to `runner_sarr` with a NULL score. An evaluation must
+        # never see them: a NaN score in this frame would widen the population
+        # a variant is measured over without changing what it measured.
+        rows, _, _unrated = job.score_runners(runs, targets,
+                                              min_prior=min_prior,
+                                              adjust=adjust)
         scored = pd.DataFrame(
             [(r[0], r[1], r[2], r[3]) for r in rows],
             columns=["race_date", "race_no", "horse_no", "sarr"])

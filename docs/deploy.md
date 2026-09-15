@@ -389,6 +389,49 @@ cookie is signed with the password as the key, so a changed password makes
 every outstanding cookie fail its signature check. That is the logout-everywhere
 button.
 
+### After a deploy that changes the model
+
+A deploy replaces the CODE. It does not touch the volume, so every derived row
+stays exactly as the previous model wrote it and every page goes on showing
+them without a word. Rebuilding one archive's `runner_sarr` from `sarr-1.0` to
+`sarr-1.1` moved 99.8% of scores, 39.5% of ranks and the top-rated horse in
+19.5% of races — and the only symptom was the ratings looking wrong while every
+fix was committed.
+
+So after a deploy carrying a model change, run these **in this order**, one line
+each. Each is safe to re-run.
+
+```bash
+fly ssh console -a hkrd -C "python -m hkrd.jobs.coverage --db /data/hkrd.db"
+```
+
+Read the `model generation of each derived table` section. Anything marked
+BEHIND prints its own rebuild command, already carrying `--db /data/hkrd.db`.
+Usually that is:
+
+```bash
+fly ssh console -a hkrd -C "python -m hkrd.jobs.rebuild_sarr --db /data/hkrd.db"
+```
+
+Minutes, not seconds. Then re-run `coverage` and check nothing still says
+BEHIND. Only once it is clean do the two jobs that read `runner_sarr` to
+regenerate published constants:
+
+```bash
+fly ssh console -a hkrd -C "python -m hkrd.jobs.fit_blend --db /data/hkrd.db"
+fly ssh console -a hkrd -C "python -m hkrd.jobs.fit_backtest --db /data/hkrd.db"
+```
+
+Neither writes anything. Each prints figures to compare against the constants
+in `hkrd/model/blend.py` and `hkrd/model/backtest.py`; `fit_backtest` prints a
+`MEASURED` block ready to paste over the one in the source. If the figures
+differ materially, update the constants **and** the docstrings beside them that
+quote them, then commit and deploy again.
+
+**Order matters.** Both fits read `runner_sarr`, so running them against a table
+a generation behind fits the wrong model and publishes constants that describe
+something the page is not showing.
+
 ### Live odds
 
 `hkrd.jobs.scrape_odds` runs **every minute**, all day. Almost every tick does
