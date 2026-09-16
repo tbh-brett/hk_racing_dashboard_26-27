@@ -873,14 +873,23 @@ thesis that was, as far as anything knows, standing at the time. Every close
 from here on carries its date, so the fallback only ever covers entries retired
 before there was a column to record it in.
 
-**The migration moves the meaning before it drops the column** (`store/connect._migrate_blackbook_close`):
+**The migration drops the column and decides nothing on its way past**
+(`store/connect._migrate_blackbook_close`):
 
 | was | becomes |
 |---|---|
-| `active`, expiry passed | `retired`, closed on that date, reason "lapsed under the old 90-day expiry" |
-| `active`, expiry ahead | `active`, no closing date — nobody has closed it |
-| `expired`, no date | `retired`, no date, **no reason invented** |
-| `won_out` | **untouched.** It is closed because the thesis PAID, and its expiry date is not when that happened |
+| `active`, expiry passed | `active`. The clock is being removed; it does not get a last decision |
+| `active`, expiry ahead | `active`, unchanged |
+| `expired` | `active` — the clock was the only thing that ever wrote it |
+| `retired` / `won_out` | **untouched.** Somebody decided these |
+
+An earlier version of this migration read the lapsed dates one final time and
+retired the entries behind them. Measured against the owner's book that was
+**147 of 179 entries, 16 of them declared to run that evening** — a migration
+taking a hundred and forty-seven decisions on behalf of the person whose book
+it is, which is a larger version of the fault the change exists to fix. The
+dates are not preserved because nothing is lost with them: an expiry was
+`added_date` plus ninety days, and it is recomputable from a column that stays.
 
 **Reopening takes a new thesis, and keeps the old one.** `REOPEN` already
 existed and set the status back to `active`; what it had no way to record was

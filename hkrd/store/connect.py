@@ -180,7 +180,7 @@ def _migrate_blackbook_prefs(conn: sqlite3.Connection) -> None:
 
 
 def _migrate_blackbook_close(conn: sqlite3.Connection) -> None:
-    """`expiry_date` becomes `closed_date`, and expiry stops closing anything.
+    """`expiry_date` becomes `closed_date`, and expiry closes NOTHING.
 
     The two were the same thing said twice. An entry could be RETIRED by the
     button on the row, or it could go quiet on its own ninety days after it was
@@ -189,18 +189,26 @@ def _migrate_blackbook_close(conn: sqlite3.Connection) -> None:
     outcomes. They are not: both mean the thesis is no longer being followed,
     and only one of them was a decision.
 
-    The date itself is worth keeping, because it is the only record of WHEN an
-    entry stopped being live, which is what an archived card needs to answer
-    "was I watching this horse that day". So it moves rather than being dropped:
+    THE DEAD CLOCK DOES NOT GET A LAST RUN. An earlier version of this
+    migration read the lapsed dates one final time and retired the entries
+    behind them. Measured against the owner's book that was 147 of 179 entries,
+    16 of them declared to run that evening — a migration quietly making
+    hundreds of decisions on the way past, which is the exact thing the change
+    exists to stop. An expiry was never a decision, so nothing is decided from
+    one here: every entry keeps the status a person gave it, and `status` alone
+    now says whether a thesis is being followed.
 
-      - an entry whose expiry had passed is now RETIRED, closed on that date
-      - an entry still inside its window keeps running, with no closing date
-      - an entry retired by hand before this migration keeps a NULL date, which
-        reads as "closed, day unknown" and never as "closed on day zero"
+      - an entry whose expiry had passed stays ACTIVE, and is retired by the
+        button on its row if and when the owner decides that
+      - an entry marked `expired` — closed by the clock and by nothing else —
+        goes back to ACTIVE for the same reason
+      - an entry retired or won out by hand is left exactly as it is, with a
+        NULL date that reads as "closed, day unknown" and never as "closed on
+        day zero"
 
-    Only then is the column dropped, so no meaning is destroyed ahead of being
-    carried over. Safe to re-run: after the first pass there is no column left
-    to find.
+    The column is dropped once it can decide nothing: what it held is
+    `added_date` plus ninety days, so no fact is lost with it. Safe to re-run —
+    after the first pass there is no column left to find.
     """
     cols = _columns(conn, "blackbook")
     if not cols:
@@ -211,36 +219,10 @@ def _migrate_blackbook_close(conn: sqlite3.Connection) -> None:
     if "expiry_date" not in cols:
         return                                   # already migrated
 
-    # Only an entry the expiry actually closed. A WON OUT entry is closed too,
-    # but it is closed because the thesis PAID, and rewriting that as "retired"
-    # would throw away the one outcome the book exists to count. Its expiry
-    # date is not when it was won out either, so nothing is stamped from it.
-    conn.execute("""
-        UPDATE blackbook
-           SET status = 'retired',
-               closed_date = expiry_date,
-               closed_reason = 'lapsed under the old 90-day expiry'
-         WHERE status IN ('active', 'expired')
-           AND closed_date IS NULL
-           AND expiry_date IS NOT NULL AND expiry_date < date('now')
-    """)
-    # A status of 'expired' with no date behind it is the same decision with
-    # the evidence missing. It is still a closed thesis, so it reads as one —
-    # but with no reason invented for it, because none was recorded.
-    conn.execute("UPDATE blackbook SET status = 'retired' "
+    # The one status change here, and it un-closes rather than closes: a clock
+    # was the only thing that ever wrote `expired`, and the clock is gone.
+    conn.execute("UPDATE blackbook SET status = 'active' "
                  "WHERE status = 'expired'")
-    # Every close from here on is stamped, so this row is the record of the
-    # ones that were not.
-    conn.execute("""
-        INSERT INTO blackbook_status_log
-               (id, changed_at, from_status, to_status, reason, reasoning)
-        SELECT b.id, coalesce(b.closed_date, b.added_date) || 'T00:00:00+00:00',
-               'active', 'retired', b.closed_reason, b.reasoning
-          FROM blackbook b
-         WHERE b.closed_reason = 'lapsed under the old 90-day expiry'
-           AND NOT EXISTS (SELECT 1 FROM blackbook_status_log l
-                            WHERE l.id = b.id)
-    """)
     # SQLite has had DROP COLUMN since 3.35 (2021); the deploy image is
     # Debian bookworm, which carries 3.40. Nothing reads the column by the
     # time this runs, so a database on something older is merely carrying an

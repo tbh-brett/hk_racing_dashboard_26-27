@@ -178,8 +178,9 @@ deliberate click). It is the right pattern; it is just only in one place.
 
 ### 2.5 Review has to have a verdict, not just a prompt
 
-`review_due` fires at four runs since booking and the row says
-`REVIEW · n RUNS UNRESOLVED`. There is nothing to click. Resolving means
+`review_due` fires after five runs on an entry's own conditions with nothing
+in the top five (`query/blackbook_review`), and the row says why. There is
+still nothing to click. Resolving means
 choosing WON OUT or RETIRE, which are both endings — there is no way to say
 "tested, wrong, and here is what I learned".
 

@@ -36,10 +36,17 @@ from hkrd.store.connect import Connection, get_conn
 # to every caller outside it, and a split in this module is not a reason
 # for `query/raceday` to learn a second import path.
 from hkrd.query.blackbook_band import declared_on, for_race  # noqa: F401
+# The review rule, carved out at the same cap. Re-exported because
+# `review_due` is read off an entry and the page asks this module for
+# entries -- a caller should not have to know which file the threshold
+# lives in to find out that one moved.
+from hkrd.query.blackbook_review import (  # noqa: F401
+    REVIEW_RUNS, REVIEW_TOP, REVIEW_UNTESTED_DAYS, review_reason)
 
 __all__ = ["list_entries", "entry_detail", "for_race", "declared_on",
            "tag_performance", "tag_definitions", "book_summary",
-           "entry_bets"]
+           "entry_bets", "review_reason", "REVIEW_RUNS", "REVIEW_TOP",
+           "REVIEW_UNTESTED_DAYS"]
 
 # HK pays three places in fields of seven or more, two in smaller fields. Using
 # a flat top-3 would credit the book with places that never paid.
@@ -122,6 +129,10 @@ def _entry_rows(conn: Connection, where: str = "", params: Any = ()) -> list[dic
                             THEN 1 ELSE 0 END) on_wins,
                    sum(CASE WHEN {_TRIGGER_MET_SQL} THEN {_PLACES_SQL}
                             ELSE 0 END) on_places,
+                   -- Ran well enough to keep watching, which is wider than
+                   -- the payout. See REVIEW_TOP.
+                   sum(CASE WHEN {_TRIGGER_MET_SQL} AND r.place <= {REVIEW_TOP}
+                            THEN 1 ELSE 0 END) on_top,
                    min(r.race_date) first_run,
                    max(r.race_date) last_run
             {_RUNS_SINCE_FROM}
@@ -135,6 +146,11 @@ def _entry_rows(conn: Connection, where: str = "", params: Any = ()) -> list[dic
                coalesce(s.on_runs, 0) runs_on_conditions,
                coalesce(s.on_wins, 0) wins_on_conditions,
                coalesce(s.on_places, 0) places_on_conditions,
+               coalesce(s.on_top, 0) top_on_conditions,
+               -- How long the thesis has been standing, for the entry that
+               -- never gets its race. Computed here rather than in Python so
+               -- the rule reads one clock, the database's.
+               CAST(julianday('now') - julianday(b.added_date) AS INTEGER) age_days,
                s.first_run, s.last_run,
                (SELECT group_concat(t.tag) FROM blackbook_tags t
                  WHERE t.id = b.id) tag_csv,
@@ -165,9 +181,10 @@ def _entry_rows(conn: Connection, where: str = "", params: Any = ()) -> list[dic
         # disagreed anywhere that did not. There is one way an entry closes
         # and it is a decision somebody took — `closed_date` says when.
         d["closed"] = d["status"] in ("won_out", "retired")
-        # Four runs without resolution is the brief's prompt-for-review
-        # threshold. A book that only grows is unusable within a season.
-        d["review_due"] = d["status"] == "active" and d["runs_since"] >= 4
+        # Owed a verdict — the prompt, never the verdict itself. The rule and
+        # the measurements behind its thresholds are above, at REVIEW_RUNS.
+        d["review_reason"] = review_reason(d)
+        d["review_due"] = d["review_reason"] is not None
         out.append(d)
     return out
 
@@ -393,13 +410,14 @@ def book_summary(*, today: str | None = None,
         """).fetchone()
 
         priced = row["priced"] or 0
-        review = conn.execute(f"""
-            SELECT count(*) FROM (
-              SELECT b.id FROM blackbook b
-              JOIN runners r ON r.horse_name = b.horse_name
-                            AND r.race_date >= b.added_date
-              WHERE b.status = 'active' AND r.place IS NOT NULL
-              GROUP BY b.id HAVING count(*) >= 4)""").fetchone()[0]
+        # Counted through the rows themselves rather than by a second query
+        # shaped like the rule. The summary sits directly above the list, and a
+        # headline that said "9 are owed a verdict" over a list showing seven
+        # REVIEW chips would be the page arguing with itself — which is what
+        # the previous version did as soon as conditions started deciding which
+        # runs test a thesis.
+        review = sum(1 for e in _entry_rows(conn, "WHERE b.status = 'active'")
+                     if e["review_due"])
 
         return {
             "total": total, "status": status,
@@ -407,6 +425,10 @@ def book_summary(*, today: str | None = None,
             "resolved": total - status.get("active", 0),
             "declared_today": declared, "today": today,
             "review_due": review,
+            # The rule itself, so the page can say what it is without holding
+            # a second copy of the number. See `query/blackbook_review`.
+            "review_rule": {"runs": REVIEW_RUNS, "top": REVIEW_TOP,
+                            "untested_days": REVIEW_UNTESTED_DAYS},
             "runs_since": row["runs"] or 0,
             "wins_since": row["wins"] or 0,
             "flat_roi": (round(((row["returned"] or 0) - priced) / priced, 3)

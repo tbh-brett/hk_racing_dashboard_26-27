@@ -193,12 +193,12 @@ def booked(tmp_path, db):
     races so `live_at_race` has something to separate.
 
     The export still carries `expiry_date`, because that is what the legacy
-    file holds and the importer's translation of it is worth exercising. The
-    entry therefore arrives RETIRED, closed on that date: expiry was only ever
-    a second word for "no longer followed", and the date is read as the day the
-    decision landed.
+    file holds, and the importer is expected to DROP it: a clock running out
+    while a file sat on disk is not a decision anybody took. So the entry
+    arrives active, and this fixture then closes it the only way an entry can
+    now be closed — by saying so.
 
-    That date is in the PAST, which is what the historical tests need and what
+    That close is in the PAST, which is what the historical tests need and what
     the "is it live now" tests must not silently inherit: any test about an
     OPEN entry reopens it and says so.
     """
@@ -212,6 +212,12 @@ def booked(tmp_path, db):
                            "finish": "1", "bb_verdict": "VALIDATED"}]},
     ]))
     import_blackbook.run(src, db=db)
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.execute("UPDATE blackbook SET status = 'retired', "
+                     "closed_date = '2026-06-15', closed_reason = 'gave up on it' "
+                     "WHERE id = 'bb_1'")
+    conn.close()
     return db
 
 
@@ -268,22 +274,147 @@ def test_an_entry_with_no_runs_since_reports_zero_not_absent(booked):
     assert rows["bb_new"]["review_due"] is False
 
 
-def test_review_is_prompted_after_four_unresolved_runs(booked):
-    conn = get_conn(booked)
-    # Review is only prompted on a LIVE entry, so this test needs one: the
-    # fixture arrives closed, and a closed entry is not awaiting a verdict.
+def _live(conn, **cols):
+    """The fixture entry, reopened and adjusted. Review is only ever prompted
+    on a LIVE entry: the fixture arrives closed, and a closed thesis is not
+    awaiting a verdict."""
+    sets = "".join(f", {k} = :{k}" for k in cols)
     with transaction(conn):
         conn.execute("UPDATE blackbook SET status = 'active', "
-                     "closed_date = NULL WHERE id = 'bb_1'")
-    entry = bb.entry_detail("bb_1", conn=conn)
-    assert entry["review_due"] is False              # three runs
-    with transaction(conn):
-        conn.execute("UPDATE blackbook SET added_date = '2026-01-01'")
-    entry = bb.entry_detail("bb_1", conn=conn)
+                     f"closed_date = NULL{sets} WHERE id = 'bb_1'", cols)
+    return bb.entry_detail("bb_1", conn=conn)
+
+
+def test_a_thesis_is_not_owed_a_verdict_until_it_has_had_its_chances(booked):
+    """Four runs used to prompt a review. Measured on the owner's own book,
+    a quarter of the entries with nothing after three or four runs went on to
+    place — so the old threshold asked for a verdict while the answer was still
+    coming."""
+    conn = get_conn(booked)
+    entry = _live(conn, added_date="2026-01-01")
     conn.close()
-    # Five races in the fixture, one of which is the source run and does not
-    # count as a test of the thesis it produced.
-    assert entry["runs_since"] == 4 and entry["review_due"] is True
+    assert entry["runs_since"] == 4
+    assert entry["review_due"] is False, "four runs is not yet an answer"
+
+
+def test_five_runs_with_nothing_in_the_top_five_is_owed_a_verdict(booked):
+    conn = get_conn(booked)
+    # A fifth run, well beaten, for a horse whose other runs were nowhere near
+    # the top five either.
+    with transaction(conn):
+        conn.execute("UPDATE runners SET place = 9 WHERE horse_name = 'FAST ONE'")
+        conn.execute("INSERT INTO races (race_date, race_no, venue, distance, "
+                     "surface, race_class) VALUES ('2026-06-20', 1, 'ST', 1200, "
+                     "'Turf', 4)")
+        conn.execute("INSERT INTO runners (race_date, race_no, horse_no, "
+                     "horse_name, place, finish_time) VALUES ('2026-06-20', 1, 3, "
+                     "'FAST ONE', 11, 70.0)")
+    entry = _live(conn, added_date="2026-01-01")
+    conn.close()
+    assert entry["runs_since"] == 5 and entry["top_on_conditions"] == 0
+    assert entry["review_due"] is True
+    assert entry["review_reason"] == "5 runs, none in the top 5"
+
+
+def test_a_run_in_the_top_five_keeps_the_thesis_open(booked):
+    """Wider than the payout on purpose: a fifth of fourteen beaten a length is
+    the run that says the reason is real and the day was not."""
+    conn = get_conn(booked)
+    with transaction(conn):
+        conn.execute("UPDATE runners SET place = 9 WHERE horse_name = 'FAST ONE'")
+        conn.execute("UPDATE runners SET place = 5 WHERE horse_name = 'FAST ONE' "
+                     "AND race_date = (SELECT max(race_date) FROM runners "
+                     "WHERE horse_name = 'FAST ONE')")
+        conn.execute("INSERT INTO races (race_date, race_no, venue, distance, "
+                     "surface, race_class) VALUES ('2026-06-20', 1, 'ST', 1200, "
+                     "'Turf', 4)")
+        conn.execute("INSERT INTO runners (race_date, race_no, horse_no, "
+                     "horse_name, place, finish_time) VALUES ('2026-06-20', 1, 3, "
+                     "'FAST ONE', 11, 70.0)")
+    entry = _live(conn, added_date="2026-01-01")
+    conn.close()
+    assert entry["runs_since"] == 5 and entry["top_on_conditions"] == 1
+    assert entry["review_due"] is False
+
+
+def test_runs_that_did_not_meet_the_conditions_do_not_count_against_it(booked):
+    """The reason the count is over qualifying runs. A horse booked for 1200m
+    and beaten five times at 1650m has not failed its thesis — nobody has asked
+    it the question yet, and retiring it would be closing the wrong entry."""
+    import datetime as dt
+
+    conn = get_conn(booked)
+    today = dt.date.today()
+    # Five recent runs, every one of them at the wrong trip. Recent, so the
+    # other half of the rule — the thesis that never gets its race — has not
+    # run out and cannot be what answers this.
+    with transaction(conn):
+        conn.execute("INSERT INTO blackbook_trigger (id, kind, op, value) "
+                     "VALUES ('bb_1', 'distance', 'is', '1200')")
+        for n, back in enumerate((70, 50, 30, 20, 10), start=2):
+            day = (today - dt.timedelta(days=back)).isoformat()
+            conn.execute("INSERT INTO races (race_date, race_no, venue, course, "
+                         "surface, going, distance) VALUES (?, ?, 'HV', 'C', "
+                         "'Turf', 'G', 1650)", (day, n))
+            conn.execute("INSERT INTO runners (race_date, race_no, horse_no, "
+                         "horse_name, place, win_odds, draw) VALUES "
+                         "(?, ?, 1, 'FAST ONE', '9', 5.0, 1)", (day, n))
+    entry = _live(conn, added_date=(today - dt.timedelta(days=100)).isoformat())
+    conn.close()
+    assert entry["runs_since"] == 6, "six runs, and not one of them at 1200m"
+    assert entry["runs_on_conditions"] == 0
+    assert entry["review_due"] is False, "a question nobody asked is not a no"
+
+
+def test_a_thesis_that_never_gets_its_race_is_eventually_owed_one_too(booked):
+    """Every entry in the archive that eventually placed did so within 150 days
+    of being booked. At 180 with no qualifying run, the silence is the answer —
+    and the question it raises is whether the condition was ever realistic."""
+    import datetime as dt
+
+    conn = get_conn(booked)
+    with transaction(conn):
+        conn.execute("UPDATE races SET distance = 1650")
+        conn.execute("INSERT INTO blackbook_trigger (id, kind, op, value) "
+                     "VALUES ('bb_1', 'distance', 'is', '1200')")
+    long_ago = (dt.date.today() - dt.timedelta(days=200)).isoformat()
+    entry = _live(conn, added_date=long_ago)
+    conn.close()
+    assert entry["runs_on_conditions"] == 0 and entry["review_due"] is True
+    assert entry["review_reason"].endswith("has not run its conditions yet")
+
+
+def test_the_page_is_told_the_threshold_rather_than_repeating_it(booked):
+    """The literal-in-two-places trap, which this repo has already paid for:
+    `sarr.MIN_PRIOR` was a hardcoded 2 in three files and the speed map went on
+    printing a threshold the model no longer used. The footer names the review
+    rule, so the rule travels to it."""
+    from pathlib import Path
+
+    conn = get_conn(booked)
+    rule = bb.book_summary(conn=conn)["review_rule"]
+    conn.close()
+    assert rule == {"runs": bb.REVIEW_RUNS, "top": bb.REVIEW_TOP,
+                    "untested_days": bb.REVIEW_UNTESTED_DAYS}
+
+    js = (Path(__file__).resolve().parents[1]
+          / "web/assets/blackbook.js").read_text(encoding="utf-8")
+    assert "review_rule" in js, "the footer must read the rule it prints"
+    assert "4+ RUNS" not in js, "the superseded threshold is still on the page"
+
+
+def test_the_headline_count_and_the_rows_cannot_disagree(booked):
+    """The summary sits directly above the list. A headline saying two entries
+    are owed a verdict over a list showing one is the page arguing with
+    itself, which is what a second query shaped like the rule always risks."""
+    conn = get_conn(booked)
+    with transaction(conn):
+        conn.execute("UPDATE runners SET place = 9 WHERE horse_name = 'FAST ONE'")
+    _live(conn, added_date="2026-01-01")
+    flagged = [e for e in bb.list_entries(conn=conn) if e["review_due"]]
+    summary = bb.book_summary(conn=conn)
+    conn.close()
+    assert summary["review_due"] == len(flagged)
 
 
 def test_the_run_the_thesis_came_from_is_not_a_test_of_it(booked):
@@ -631,13 +762,17 @@ def test_a_missing_entry_gives_nothing_not_an_empty_ledger(booked):
 # ── retiring is the only way a thesis ends ──────────────────────────────────
 
 
-def test_an_expiry_that_has_passed_becomes_a_retirement(tmp_path):
-    """The two words named one outcome and only RETIRE was ever a decision.
+def test_a_passed_expiry_retires_nothing_on_the_way_past(tmp_path):
+    """The clock is removed, and it does not get to make a last decision.
 
-    A ninety-day clock closed entries nobody had decided anything about, then
+    A ninety-day expiry closed entries nobody had decided anything about, then
     printed EXPIRED beside RETIRED as though they were different endings. The
-    date survives as the day the entry closed, which is the one job it was
-    really doing; the second word does not.
+    first version of this migration read those dead dates one final time and
+    retired everything behind them — 147 of the owner's 179 entries, 16 of them
+    declared to run that evening. A migration is not entitled to a hundred
+    judgements on its way past, so it takes none: the column goes, every status
+    a person chose is left alone, and `expired` — which only the clock ever
+    wrote — goes back to active.
     """
     import datetime as dt
     import sqlite3
@@ -672,30 +807,30 @@ def test_an_expiry_that_has_passed_becomes_a_retirement(tmp_path):
     init_db(conn)
     rows = {e["horse_name"]: e for e in bb.list_entries(conn=conn)}
 
-    # The clock ran out, so the entry is closed — on the day it ran out.
-    assert rows["LAPSED"]["status"] == "retired"
-    assert rows["LAPSED"]["closed_date"] == past
-    # Still inside its window, so nobody has closed it and nothing does it for
-    # them. This is the entry the old rule would have retired in a month's time
-    # without being asked.
+    # The clock ran out and that is all it did. The thesis is still the owner's
+    # to close, and the row keeps its RETIRE button rather than its verdict.
+    assert rows["LAPSED"]["status"] == "active"
+    assert (rows["LAPSED"]["closed_date"], rows["LAPSED"]["closed_reason"]) == (None, None)
+    # Still inside its window, and equally untouched.
     assert rows["LIVE"]["status"] == "active"
     assert rows["LIVE"]["closed_date"] is None
-    # A status with no date behind it is the same decision with the evidence
-    # missing. It reads as closed, and no reason is invented for it.
-    assert rows["FLAGGED"]["status"] == "retired"
-    assert (rows["FLAGGED"]["closed_date"], rows["FLAGGED"]["closed_reason"]) == (None, None)
-    # WON OUT is closed because the thesis PAID. Rewriting it as retired would
-    # throw away the one outcome the book exists to count, and its expiry date
-    # is not when it was won out either.
+    # `expired` was written by the clock and by nothing else, so it cannot
+    # survive the clock. It reads as open, which is what it always was.
+    assert rows["FLAGGED"]["status"] == "active"
+    # A status somebody chose is kept exactly as they left it, with a NULL date
+    # that reads as "closed, day unknown" and never as "closed on day zero".
     assert rows["PAID"]["status"] == "won_out"
     assert rows["PAID"]["closed_date"] is None
 
-    # Nothing left to find on a second pass, and no second history row for it.
+    # Nothing decided means nothing to record: a status log full of retirements
+    # nobody ordered would be the same fault written down.
+    assert conn.execute("SELECT count(*) FROM blackbook_status_log").fetchone()[0] == 0
+    # Nothing left to find on a second pass.
     init_db(conn)
     assert "expiry_date" not in {
         r["name"] for r in conn.execute("PRAGMA table_info(blackbook)")}
-    assert conn.execute("SELECT count(*) FROM blackbook_status_log "
-                        "WHERE id = 'x1'").fetchone()[0] == 1
+    assert {r["horse_name"]: r["status"] for r in bb.list_entries(conn=conn)} == {
+        "LAPSED": "active", "LIVE": "active", "FLAGGED": "active", "PAID": "won_out"}
     conn.close()
 
 

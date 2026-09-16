@@ -129,24 +129,26 @@ def _recover_source_dates(conn) -> int:
 
 # The export carries an expiry date and this schema no longer does. The two
 # words meant one thing -- the thesis is no longer being followed -- and only
-# RETIRE was ever a decision somebody took, so the date is read as the day the
-# entry closed rather than as a second kind of ending.
+# RETIRE was ever a decision somebody took.
 #
-# `date.today()`, so a re-import a season later does not retire entries that
-# were still running when the file was written. An entry inside its window is
-# an entry nobody has closed.
+# SO THE EXPIRY IS DROPPED RATHER THAN READ. It is the same rule the migration
+# in `store/connect` follows and for the same reason: an importer is not
+# entitled to close a hundred theses because a clock nobody set ran out while
+# the file sat on disk. `expired` is the status that clock wrote, so it comes
+# back as active; a status somebody chose is kept exactly as they left it.
 def _close(status: str | None, expiry: str | None
            ) -> tuple[str, str | None, str | None]:
-    """(status, closed_date, closed_reason) as this schema records them."""
-    from datetime import date
+    """(status, closed_date, closed_reason) as this schema records them.
 
+    `expiry` is accepted and deliberately unused: the export still carries the
+    column, and a signature that quietly ignored it would read as an oversight
+    rather than a decision.
+    """
     status = status or "active"
     if status in ("won_out", "retired"):
-        # Already closed by hand. The expiry date is not when that happened and
-        # must not be written as though it were.
+        # Closed by hand. The expiry date is not when that happened and must
+        # not be written as though it were.
         return status, None, None
-    if status == "expired" or (expiry and expiry < date.today().isoformat()):
-        return "retired", expiry, "lapsed under the old 90-day expiry"
     return "active", None, None
 
 

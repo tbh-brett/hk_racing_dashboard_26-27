@@ -390,8 +390,12 @@ function entryRow(e) {
 
   const acts = el('div', 'acts');
   if (e.review_due) {
-    const r = el('span', 'review', `REVIEW · ${e.runs_since} RUNS UNRESOLVED`);
-    r.title = 'four or more runs since booking with the thesis still open';
+    // The reason travels with the flag rather than being rebuilt here. The row
+    // and the health line above it then say the same thing about the same
+    // entry, and a threshold moves in one place — `query/blackbook.REVIEW_RUNS`
+    // carries the measurements it was chosen from.
+    const r = el('span', 'review', `REVIEW · ${e.review_reason.toUpperCase()}`);
+    r.title = 'owed a verdict — nothing closes an entry but you';
     acts.append(r);
   }
   if (e.status !== 'won_out') acts.append(statusButton(e, 'won_out', 'WON OUT'));
@@ -852,7 +856,16 @@ function renderList() {
     'CLICK AN ENTRY FOR THE THESIS AND EVERY RUN SINCE — DERIVED FROM THE '
     + 'RUNNERS TABLE, NOT FROM WHAT WAS LOGGED'));
   foot.append(el('span', 'amber', '■ DECLARED AT THE LATEST MEETING'));
-  foot.append(el('span', 'magenta', 'REVIEW PROMPT AT 4+ RUNS UNRESOLVED'));
+  // The thresholds come off the summary rather than being typed here. This
+  // repo has already paid for the other way: `sarr.MIN_PRIOR` was written as a
+  // literal 2 in three places, and the page went on quoting a number the model
+  // had stopped using.
+  const rule = state.summary?.review_rule;
+  if (rule) {
+    foot.append(el('span', 'magenta',
+      `REVIEW PROMPT AFTER ${rule.runs} RUNS ON AN ENTRY'S OWN CONDITIONS `
+      + `WITH NOTHING IN THE TOP ${rule.top}`));
+  }
   foot.append(el('span', 'right',
     'RETIRING IS ONE CLICK — A BOOK THAT ONLY GROWS IS UNUSABLE WITHIN A SEASON'));
 }
@@ -1202,8 +1215,8 @@ function renderStatusPanel() {
   host.append(el('div', 'closing',
     `${judged} of ${s.total} entries were closed by a decision — there is no `
     + 'longer any other way for one to close. '
-    + `${s.review_due} of the ${s.active} still open have four or more runs `
-    + 'since booking and are waiting on a verdict.'));
+    + `${s.review_due} of the ${s.active} still open have had their chances `
+    + 'and are waiting on a verdict.'));
 }
 
 /* ── loading ─────────────────────────────────────────────────────────────── */
