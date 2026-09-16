@@ -820,3 +820,158 @@ selection and can only be recomputed against the real archive. It carries a
 ready to paste, and the page prints the population in red above the published
 value table — which sits directly under a live calibration computed on a
 different set of races, and read as one table before.
+
+---
+
+## Blackbook — an entry ends when it is retired, and only then. **Settled**
+
+The page carried two words for one outcome. `RETIRE` sat on every row, and
+beside it `EXPIRED` appeared on rows nobody had touched, because
+`promote_to_blackbook` stamped `expiry_date = today + 90 days` on every entry
+it created. The Blackbook's own artboard — `web/design-source/Blackbook.dc.html`,
+which the rebuild was ported from — has no expiry in it at all: four statuses,
+`ALL / ACTIVE / WON OUT / RETIRED`. The concept was introduced by the rebuild
+and never went back to the design.
+
+The two were not merely redundant. They said different things about who
+decided:
+
+- **RETIRE** is a judgement. The thesis was tested and it failed, or the horse
+  left, or the reason it was written no longer applies.
+- **EXPIRED** is a clock. Ninety days after an entry was written it closed
+  itself, whatever had or had not happened in between.
+
+And the flag was a cache of a date nothing recomputed, so `query/blackbook`
+derived `expired` on every read to stop the row disagreeing with the file —
+which meant the derivation existed only in the one place that ran it. Race Day
+and the Form Guide never did. **Both pages lit a horse's name in the book
+colour on the mere existence of an entry**, so a horse booked in March, retired
+in June, went on reading as a live thesis on every card after it. That is the
+one thing the colour is supposed to mean.
+
+**Decision: `expiry_date` becomes `closed_date`, and closing is always a
+decision.**
+
+`closed_date` is the day the decision was taken. It is what an archived card
+needs to answer "was I watching this horse THAT day", which is a different
+question from "am I watching it now" and the one real job the expiry date was
+doing — without it, retiring a horse in December would rewrite every September
+card to say the thesis had never been standing.
+
+One rule, `_LIVE_AT_RACE_SQL`, now answers it for both bands and both pages:
+
+```sql
+b.added_date <= r.race_date
+AND (b.status = 'active'
+     OR coalesce(b.closed_date, date('now')) > r.race_date)
+```
+
+An entry closed on a day nobody recorded reads as closed **today**. That is the
+only reading that satisfies both halves at once: it is certainly not live over
+a card being looked at now, and over an archived card it does not erase a
+thesis that was, as far as anything knows, standing at the time. Every close
+from here on carries its date, so the fallback only ever covers entries retired
+before there was a column to record it in.
+
+**The migration moves the meaning before it drops the column** (`store/connect._migrate_blackbook_close`):
+
+| was | becomes |
+|---|---|
+| `active`, expiry passed | `retired`, closed on that date, reason "lapsed under the old 90-day expiry" |
+| `active`, expiry ahead | `active`, no closing date — nobody has closed it |
+| `expired`, no date | `retired`, no date, **no reason invented** |
+| `won_out` | **untouched.** It is closed because the thesis PAID, and its expiry date is not when that happened |
+
+**Reopening takes a new thesis, and keeps the old one.** `REOPEN` already
+existed and set the status back to `active`; what it had no way to record was
+that the horse is worth following again *for a different reason*. Writing the
+new reason into `blackbook.reasoning` types over the reason the horse was
+booked for in the first place — which is the record of a thesis that failed,
+and the most useful thing in the book. `blackbook_status_log` holds every
+transition with the thesis as it stood at the time; `reasoning` is the head of
+that list rather than a substitute for it. A new thesis is refused on a
+*closure*, because that would be rewriting history rather than recording it.
+
+The log is keyed on its own autoincrement id, like `bet_edits`, and not on
+`(id, changed_at)`: retiring an entry and reopening it in the same second are
+two decisions, and a composite key on a second-resolution timestamp silently
+kept only the first.
+
+---
+
+## Blackbook — a thesis is a condition, not just a sentence. **Settled**
+
+`docs/proposal-blackbook.md` §2.1, built. The complaint it answers: the module
+*"really only functions as a reminder module for myself when manually screening
+through races."*
+
+It read that way because it was one. An entry said a horse would run better than
+its form suggested, and almost always that claim came with circumstances — at a
+trip, on a surface, from a draw. The prose said so and nothing could read it, so
+**every run counted equally against the thesis**. A horse booked for 1200m and
+beaten four times at 1650m looked like a failed idea. It is an untested one, and
+those are different facts.
+
+**The first attempt at this was already in the schema and was write-only.**
+`pref_distance`, `pref_surface` and `pref_jockey` were filled by the legacy
+import and read by nothing — the only two lines in the codebase that named them
+were the two that wrote them. They migrate into `blackbook_trigger`, which is
+read by the record, both bands and the Form Guide.
+
+**No new data.** Every `kind` in `query/triggers.KINDS` is a column the archive
+already holds and `query/slices.DIMENSIONS` already groups by, so a condition
+means the same thing here as it does on Lookup, and nothing has to be derived,
+scraped or guessed to check one.
+
+**The record is reported both ways.** `runs_since` over every run, and
+`runs_on_conditions` over the runs that asked the question. The difference
+between them is itself the finding: a thesis that never gets its race is a
+different problem from one that gets it and loses. An entry stating no
+conditions is met by every run, which is what the whole book was before this,
+and is the right default — a claim with no stated circumstances is a claim about
+the horse.
+
+**Three rules worth naming, each with a test that fails without it:**
+
+- **NULL is a failure, not a pass.** A race whose distance was never scraped
+  cannot be shown to be the 1200m the entry asked for. `query/gear` draws the
+  same line: a NULL column is "this scrape did not carry it", never "there was
+  none". Crediting an unknown would quietly hand a thesis runs it never had.
+- **A list is comma-wrapped on both sides.** `',11,12,' LIKE '%,1,%'` is false;
+  `'11,12' LIKE '%1%'` is true. Without the wrapping a horse drawn 1 satisfies
+  "drawn 11 or 12", and every list condition silently widens to anything whose
+  text appears inside it. Caught by mutating the SQL and watching the test go
+  red — the first version of that test passed against the broken code.
+- **Text compares case-folded and trimmed.** "Turf" typed into a form and
+  "TURF" off the scrape are one condition. A trigger failing on capitalisation
+  would be the worst kind of bug available here: silent, and the horse simply
+  stops appearing.
+
+**A condition nothing can evaluate is refused at the point it is written**
+(`query/triggers.validate`), and the vocabulary is served from
+`/api/blackbook/conditions` rather than copied into the page — a form offering
+something the band cannot check would never match, and the book would look empty
+rather than broken.
+
+**Cost, measured** on a synthetic archive at the real one's size (1,712 races,
+20,544 runners, 196 entries, two thirds of them carrying two conditions each):
+
+| | |
+|---|---|
+| `list_entries` | 36.7 ms |
+| `book_summary` | 23.6 ms |
+| `tag_performance` | 24.0 ms |
+| `declared_on` / `for_race` | 0.1 ms |
+
+Against a 500 ms budget. The shape is pinned in `tests/test_performance.py`:
+one `NOT EXISTS` per run whatever the number of conditions, one query for the
+whole book's conditions rather than one per entry, and an index on
+`blackbook_trigger(id)`.
+
+**`query/blackbook.py` was split at 628 of the 600-line cap.** `for_race` and
+`declared_on` moved to `query/blackbook_band.py` — the same seam `query/meeting`
+was carved on. They are the only two functions in the module that take a DATE
+rather than an entry, and the only ones that answer "as at that race" rather
+than "as it stands". Both are re-exported from `query/blackbook`, because they
+ARE the blackbook to every caller outside it and a split in that module is not a
+reason for `query/raceday` to learn a second import path.

@@ -1,11 +1,17 @@
-"""Apply schema.sql to the configured database.
+"""Bring the configured database up to the current schema.
 
     python -m hkrd.jobs.init_store
 
-Every statement is CREATE ... IF NOT EXISTS, so this is safe to run on a full
-database and is what makes a schema addition reach an existing one. The API
-calls it at startup for exactly that reason: a table added in a later release
-must not surface as a 500 on the page that reads it.
+This is what makes a schema change reach a database that predates it, and the
+API calls it at startup for exactly that reason: a table added in a later
+release must not surface as a 500 on the page that reads it.
+
+IT IS NO LONGER ONLY `CREATE ... IF NOT EXISTS`. That was true while every
+change was additive, and it stopped being true when a column had to be
+REPLACED rather than added — `store/connect._migrate` also ALTERs and, having
+moved the meaning across, DROPs. Still safe to run on a full database and still
+idempotent, but it is a migration and not a no-op, so it is worth knowing that
+running it is the thing that changes the file.
 """
 from __future__ import annotations
 

@@ -72,9 +72,31 @@ def get_conn(path: str | Path | None = None) -> sqlite3.Connection:
 
 
 @contextmanager
-def transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
-    """One atomic unit. Rolls back and re-raises — never swallows."""
-    conn.execute("BEGIN")
+def transaction(conn: sqlite3.Connection, *, immediate: bool = False
+                ) -> Iterator[sqlite3.Connection]:
+    """One atomic unit. Rolls back and re-raises — never swallows.
+
+    `immediate` takes the write lock UP FRONT instead of on the first write,
+    and it is the answer to a specific deadlock rather than a tuning knob.
+
+    A plain `BEGIN` is deferred. A transaction that READS and then writes takes
+    a read lock first and tries to upgrade — and in WAL mode, if another writer
+    committed in between, that upgrade fails with SQLITE_BUSY *immediately*.
+    The busy timeout does not help: SQLite refuses to wait there on purpose,
+    because both holders would be waiting on each other. So the losing side
+    gets "database is locked" no matter how long it is willing to wait.
+
+    Measured, because it is the difference between a deploy and an outage: two
+    processes calling `init_db` on the same un-migrated database failed 12 times
+    out of 12. That is not a hypothetical — `ops/entrypoint.sh` starts cron
+    BEFORE uvicorn, `scrape_odds` runs every minute and calls `init_db`, and so
+    does the API's startup hook. The first boot after a schema change is
+    exactly two processes racing to migrate one file.
+
+    With `immediate` the second one simply waits out `busy_timeout`, then reads
+    a schema the first has already migrated and does nothing.
+    """
+    conn.execute("BEGIN IMMEDIATE" if immediate else "BEGIN")
     try:
         yield conn
     except Exception:
@@ -84,5 +106,144 @@ def transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
 
 
 def init_db(conn: sqlite3.Connection) -> None:
-    """Apply schema.sql. Idempotent — every statement is CREATE ... IF NOT EXISTS."""
+    """Apply schema.sql, then bring an older database up to its shape.
+
+    Idempotent in both halves — every statement in the file is
+    `CREATE ... IF NOT EXISTS`, and every migration below checks the table
+    before it touches it.
+    """
     conn.executescript(_SCHEMA.read_text(encoding="utf-8"))
+    _migrate(conn)
+
+
+def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    return {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Changes `schema.sql` cannot make on a database that already exists.
+
+    `CREATE TABLE IF NOT EXISTS` is a no-op against a table that is already
+    there, so a column added to the file reaches a fresh database and never the
+    one the season is being run on — and then every reader of that column fails
+    on the only database that matters. These run on the way in instead.
+    """
+    # IMMEDIATE, because every migration below reads the schema before it
+    # changes it, and a deferred transaction cannot upgrade that read to a
+    # write once another process has committed. See `transaction`.
+    with transaction(conn, immediate=True):
+        _migrate_blackbook_close(conn)
+        _migrate_blackbook_prefs(conn)
+
+
+def _migrate_blackbook_prefs(conn: sqlite3.Connection) -> None:
+    """`pref_distance`, `pref_surface` and `pref_jockey` become conditions.
+
+    They were the first attempt at saying what a thesis depends on, and they
+    were write-only: the legacy import filled them and not one line anywhere
+    else in the codebase ever read one back. So an entry could record that a
+    horse wants 1200m on Dirt and nothing was ever going to check whether
+    today's race was that race.
+
+    `blackbook_trigger` is read — by the band, the record and the Form Guide —
+    so the values move there and the dead columns go. `pref_distance` is a csv
+    in the export ("1200,1400"), which is exactly the `in` operator.
+
+    Safe to re-run: after the first pass the columns are gone, and the guard
+    below stops a second copy of the rows if they are not.
+    """
+    cols = _columns(conn, "blackbook")
+    if not cols or "pref_distance" not in cols:
+        return
+
+    for kind, column, op in (("distance", "pref_distance", "in"),
+                             ("surface", "pref_surface", "is"),
+                             ("jockey", "pref_jockey", "is")):
+        conn.execute(f"""
+            INSERT INTO blackbook_trigger (id, kind, op, value)
+            SELECT b.id, ?, ?, trim(b.{column})
+              FROM blackbook b
+             WHERE b.{column} IS NOT NULL AND trim(b.{column}) != ''
+               AND NOT EXISTS (SELECT 1 FROM blackbook_trigger g
+                                WHERE g.id = b.id AND g.kind = ?)
+        """, (kind, op, kind))
+
+    # A single-valued `in` is an `is` said the long way. Both work, but the
+    # page prints the operator and "distance 1200" reads better than
+    # "distance in 1200".
+    conn.execute("UPDATE blackbook_trigger SET op = 'is' "
+                 "WHERE op = 'in' AND instr(value, ',') = 0")
+
+    if sqlite3.sqlite_version_info >= (3, 35):
+        for column in ("pref_distance", "pref_surface", "pref_jockey"):
+            conn.execute(f"ALTER TABLE blackbook DROP COLUMN {column}")
+
+
+def _migrate_blackbook_close(conn: sqlite3.Connection) -> None:
+    """`expiry_date` becomes `closed_date`, and expiry stops closing anything.
+
+    The two were the same thing said twice. An entry could be RETIRED by the
+    button on the row, or it could go quiet on its own ninety days after it was
+    written because `promote_to_blackbook` stamped a date nobody chose — and
+    the page then printed EXPIRED beside RETIRED as though they were different
+    outcomes. They are not: both mean the thesis is no longer being followed,
+    and only one of them was a decision.
+
+    The date itself is worth keeping, because it is the only record of WHEN an
+    entry stopped being live, which is what an archived card needs to answer
+    "was I watching this horse that day". So it moves rather than being dropped:
+
+      - an entry whose expiry had passed is now RETIRED, closed on that date
+      - an entry still inside its window keeps running, with no closing date
+      - an entry retired by hand before this migration keeps a NULL date, which
+        reads as "closed, day unknown" and never as "closed on day zero"
+
+    Only then is the column dropped, so no meaning is destroyed ahead of being
+    carried over. Safe to re-run: after the first pass there is no column left
+    to find.
+    """
+    cols = _columns(conn, "blackbook")
+    if not cols:
+        return                                   # no blackbook table yet
+    for name in ("closed_date", "closed_reason"):
+        if name not in cols:
+            conn.execute(f"ALTER TABLE blackbook ADD COLUMN {name} TEXT")
+    if "expiry_date" not in cols:
+        return                                   # already migrated
+
+    # Only an entry the expiry actually closed. A WON OUT entry is closed too,
+    # but it is closed because the thesis PAID, and rewriting that as "retired"
+    # would throw away the one outcome the book exists to count. Its expiry
+    # date is not when it was won out either, so nothing is stamped from it.
+    conn.execute("""
+        UPDATE blackbook
+           SET status = 'retired',
+               closed_date = expiry_date,
+               closed_reason = 'lapsed under the old 90-day expiry'
+         WHERE status IN ('active', 'expired')
+           AND closed_date IS NULL
+           AND expiry_date IS NOT NULL AND expiry_date < date('now')
+    """)
+    # A status of 'expired' with no date behind it is the same decision with
+    # the evidence missing. It is still a closed thesis, so it reads as one —
+    # but with no reason invented for it, because none was recorded.
+    conn.execute("UPDATE blackbook SET status = 'retired' "
+                 "WHERE status = 'expired'")
+    # Every close from here on is stamped, so this row is the record of the
+    # ones that were not.
+    conn.execute("""
+        INSERT INTO blackbook_status_log
+               (id, changed_at, from_status, to_status, reason, reasoning)
+        SELECT b.id, coalesce(b.closed_date, b.added_date) || 'T00:00:00+00:00',
+               'active', 'retired', b.closed_reason, b.reasoning
+          FROM blackbook b
+         WHERE b.closed_reason = 'lapsed under the old 90-day expiry'
+           AND NOT EXISTS (SELECT 1 FROM blackbook_status_log l
+                            WHERE l.id = b.id)
+    """)
+    # SQLite has had DROP COLUMN since 3.35 (2021); the deploy image is
+    # Debian bookworm, which carries 3.40. Nothing reads the column by the
+    # time this runs, so a database on something older is merely carrying an
+    # inert one rather than a broken one.
+    if sqlite3.sqlite_version_info >= (3, 35):
+        conn.execute("ALTER TABLE blackbook DROP COLUMN expiry_date")

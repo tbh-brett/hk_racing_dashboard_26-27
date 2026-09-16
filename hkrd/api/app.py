@@ -60,8 +60,16 @@ def _warm() -> None:
 
     The schema step is what makes a table added in a later release reach a
     database that predates it — otherwise the page reading it 500s, which is
-    the silent-failure class this rebuild exists to remove. Every statement is
-    CREATE ... IF NOT EXISTS, so it is a no-op on a current database.
+    the silent-failure class this rebuild exists to remove.
+
+    IT IS A MIGRATION, not only `CREATE ... IF NOT EXISTS`. `store/connect`
+    also ALTERs and DROPs where a column had to be replaced rather than added,
+    so the first boot after such a release is the moment the production file
+    changes shape. Two things make that safe to do here: each step checks the
+    schema before touching it, so it is idempotent; and it takes its write lock
+    up front, because cron starts before this hook does and `scrape_odds` calls
+    the same code every minute — two processes racing to migrate one file
+    failed 12 times out of 12 before that changed.
 
     The warm-up is 1,008ms cold against 5.6ms warm, and on race day the first
     request is the one that matters most.
@@ -366,6 +374,10 @@ def create_blackbook_entry(body: dict = Body(...)) -> dict:
             source_trial_no=(int(body["source_trial_no"])
                              if body.get("source_trial_no") is not None else None),
             tags=body.get("tags") or [],
+            # The circumstances the thesis depends on, written with the entry
+            # rather than added later — the moment you know them is the moment
+            # you are writing down why the horse is interesting.
+            conditions=body.get("conditions") or [],
             confidence=body.get("confidence", "medium"))
     except KeyError as exc:
         raise HTTPException(422, f"missing field: {exc.args[0]}") from exc

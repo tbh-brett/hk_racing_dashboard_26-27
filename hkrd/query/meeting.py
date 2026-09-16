@@ -71,7 +71,15 @@ def meeting_blackbook(date: str, *, conn: Connection | None = None
                 "off_time": off.get(e["race_no"]),
                 "status": e["status"], "confidence": e["confidence"],
                 "added_date": e["added_date"],
+                "closed_date": e["closed_date"],
+                "closed_reason": e["closed_reason"],
                 "reasoning": e["reasoning"],
+                # Whether TODAY is the race this thesis was written for, and
+                # what it asked for. The band's whole claim to the space it
+                # takes: "runs today" is a reminder, "runs today at the trip
+                # you booked it for" is a reason to look.
+                "on_conditions": e["on_conditions"],
+                "conditions_text": e["conditions_text"],
                 "live_at_race": bool(e["live_at_race"]),
                 "booked_before_race": bool(e["booked_before_race"]),
                 "tags": sorted((e["tag_csv"] or "").split(","))

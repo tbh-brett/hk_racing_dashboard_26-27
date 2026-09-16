@@ -30,8 +30,11 @@ const COLS = [
   { key: 'acts', label: '' },
 ];
 
+// EXPIRED is gone. It and RETIRED named one outcome — the thesis is no longer
+// being followed — and only one of them was ever a decision somebody took; the
+// other was a ninety-day clock closing entries nobody had looked at.
 const STATUS_TABS = [
-  ['all', 'ALL'], ['active', 'ACTIVE'], ['expired', 'EXPIRED'],
+  ['all', 'ALL'], ['active', 'ACTIVE'],
   ['won_out', 'WON OUT'], ['retired', 'RETIRED'],
 ];
 
@@ -54,6 +57,10 @@ const state = {
   // how it is PERFORMING is a question about the season being bet.
   period: 'season', season: null, seasons: [], window: null,
   sort: 'added', sortDir: -1, busy: new Set(),
+  // Fetched once, on the first edit. The page must not hold its own copy of
+  // what a condition can be — a form offering something the band cannot
+  // evaluate would never match, and the horse would silently stop appearing.
+  conditionVocab: null,
 };
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
@@ -287,6 +294,29 @@ function recordLabel(e) {
   return `${e.wins_since}W-${e.places_since}P`;
 }
 
+/** The record over the runs that actually asked the thesis's question.
+ *
+ *  A horse booked for 1200m and beaten four times at 1650m has not failed; it
+ *  has not been tested, and the whole-record figure says the opposite. Only
+ *  shown for an entry that STATES conditions — for the rest the two numbers are
+ *  identical and a second column would be noise on every row in the book.
+ */
+function conditionRecord(e) {
+  if (!e.conditions?.length) return null;
+  if (!e.runs_on_conditions) {
+    return { text: 'NOT YET TESTED', cls: 'untested',
+             title: `${e.runs_since} runs since booking, none of them `
+                    + `${e.conditions_text} — the claim has not been asked yet` };
+  }
+  return {
+    text: `${e.wins_on_conditions}W-${e.places_on_conditions}P `
+          + `/ ${e.runs_on_conditions}`,
+    cls: e.wins_on_conditions ? 'hit' : 'miss',
+    title: `over the ${e.runs_on_conditions} of ${e.runs_since} runs since `
+           + `booking that met ${e.conditions_text}`,
+  };
+}
+
 function entryRow(e) {
   const open = state.open.has(e.id);
   const today = state.declared.has(e.horse_name);
@@ -309,6 +339,15 @@ function entryRow(e) {
     pill.title = state.tagMeta?.[t] ?? 'no definition written for this tag';
     tags.append(pill);
   });
+  // The circumstances the claim depends on, beside the reason for it. They
+  // belong together: "traffic" is why, "1200-1400m" is when, and an entry
+  // showing only the first is the one the book could never test.
+  if (e.conditions_text) {
+    const cond = el('span', 'cond-pill', e.conditions_text);
+    cond.title = `booked for ${e.conditions_text} — runs outside that are not `
+      + 'a test of this thesis';
+    tags.append(cond);
+  }
   row.append(tags);
 
   const booked = el('div', 'booked', e.added_date);
@@ -326,11 +365,18 @@ function entryRow(e) {
   row.append(el('div', `runs${e.runs_since ? '' : ' none'}`,
     String(e.runs_since)));
 
-  const rec = el('div', `record ${e.wins_since ? 'hit' : 'miss'}`, recordLabel(e));
+  const rec = el('div', `record ${e.wins_since ? 'hit' : 'miss'}`);
+  rec.append(el('span', 'all', recordLabel(e)));
   rec.title = e.runs_since
     ? `${e.wins_since} wins and ${e.places_since} places from ${e.runs_since} runs `
       + `since ${e.added_date}, derived from the runners table`
     : 'no runs since booking';
+  const on = conditionRecord(e);
+  if (on) {
+    const sub = el('span', `on-cond ${on.cls}`, on.text);
+    sub.title = on.title;
+    rec.append(sub);
+  }
   row.append(rec);
 
   const next = el('div');
@@ -350,11 +396,105 @@ function entryRow(e) {
   }
   if (e.status !== 'won_out') acts.append(statusButton(e, 'won_out', 'WON OUT'));
   if (e.status !== 'retired') acts.append(statusButton(e, 'retired', 'RETIRE', 'retire'));
-  if (e.status === 'won_out' || e.status === 'retired') {
-    acts.append(statusButton(e, 'active', 'REOPEN'));
-  }
+  if (e.status !== 'active') acts.append(statusButton(e, 'active', 'REOPEN'));
   row.append(acts);
   return row;
+}
+
+/* What each button asks for before it acts.
+ *
+ * Closing asks WHY, and takes silence for an answer — retiring has to stay as
+ * cheap as booking, or the book goes back to only growing. Reopening asks for
+ * the NEW thesis, because that is the whole point of reopening: the horse is
+ * worth following again for a reason that is not the reason it failed on. The
+ * old thesis is not overwritten either way; it goes to the entry's history.
+ */
+const PROMPTS = {
+  retired: { reason: 'Why retire this one? (optional)' },
+  won_out: { reason: 'What settled it? (optional)' },
+  active: {
+    reasoning: 'Reopening — what is the thesis NOW?\n\n'
+      + 'Leave blank to keep the one it already carries. The previous thesis '
+      + 'is kept on the entry either way.',
+    reason: 'Why is it worth following again? (optional)',
+  },
+};
+
+/** Re-read the list. Narrower than the whole page load, and used where a
+ *  write has changed something DERIVED from the rows rather than on them —
+ *  setting a condition changes which runs count as a test, so every record
+ *  column in the book can move. Patching the one row would leave the others
+ *  stating a figure the server no longer agrees with. */
+async function reloadEntries() {
+  const list = await api.blackbook();
+  // The open panels are keyed by id and their detail is refetched separately,
+  // so replacing the rows wholesale keeps whatever is expanded expanded.
+  state.entries = list.entries;
+}
+
+/* Editing the circumstances a thesis depends on.
+ *
+ * One line per condition, typed as `kind op value` — "distance between
+ * 1200-1400", "surface is Turf", "draw <= 6". A text form rather than a row of
+ * pickers because this is edited rarely and read constantly, and because the
+ * same three words are what the API takes and what `query/triggers.describe`
+ * prints back.
+ *
+ * The VOCABULARY is fetched, never hard-coded here: a page holding its own copy
+ * of the list is how a form comes to offer a condition the band cannot
+ * evaluate, which then never matches and makes the horse silently disappear.
+ */
+async function editConditions(e) {
+  let vocab = state.conditionVocab;
+  if (!vocab) {
+    try {
+      vocab = await api.blackbookConditionVocabulary();
+      state.conditionVocab = vocab;
+    } catch (err) {
+      window.alert(`cannot read the condition vocabulary — ${err.message}`);
+      return;
+    }
+  }
+
+  const current = (e.conditions ?? [])
+    .map((c) => `${c.kind} ${c.op} ${c.value}`).join('\n');
+  const typed = window.prompt(
+    'One condition per line, as "what how value".\n\n'
+    + `WHAT: ${vocab.kinds.join(', ')}\n`
+    + `HOW:  ${vocab.ops.join(', ')}  (<=, >= and between need a number)\n\n`
+    + 'distance between 1200-1400\nsurface is Turf\ndraw <= 6\n\n'
+    + 'Lines are ANDed. Leave it empty to clear them, which says the claim is '
+    + 'about the horse rather than about a race.',
+    current);
+  if (typed === null) return;
+
+  const conditions = [];
+  for (const line of typed.split('\n').map((l) => l.trim()).filter(Boolean)) {
+    // Three parts, and the value keeps its spaces — a jockey is "Z Purton".
+    const [kind, op, ...rest] = line.split(/\s+/);
+    if (!rest.length) {
+      window.alert(`"${line}" needs three parts: what, how, and a value.`);
+      return;
+    }
+    conditions.push({ kind, op, value: rest.join(' ') });
+  }
+
+  state.busy.add(e.id);
+  render();
+  try {
+    const out = await api.setBlackbookConditions(e.id, conditions);
+    e.conditions = out.conditions;
+    // The record is measured against these, so it has to be re-read rather
+    // than patched — which runs count as a test has just changed.
+    delete state.details[e.id];
+    await reloadEntries();
+    if (state.open.has(e.id)) await loadDetail(e.id);
+  } catch (err) {
+    window.alert(err.message);
+  } finally {
+    state.busy.delete(e.id);
+    render();
+  }
 }
 
 function statusButton(e, status, label, extra) {
@@ -362,11 +502,33 @@ function statusButton(e, status, label, extra) {
   b.disabled = state.busy.has(e.id);
   b.addEventListener('click', async (event) => {
     event.stopPropagation();
+    const ask = PROMPTS[status] ?? {};
+    const body = {};
+    if (ask.reasoning) {
+      // Cancel means cancel. An empty string is a deliberate "keep the thesis
+      // it has", and the two must not collapse into one another.
+      const next = window.prompt(ask.reasoning, '');
+      if (next === null) return;
+      if (next.trim()) body.reasoning = next.trim();
+    }
+    if (ask.reason) {
+      const why = window.prompt(ask.reason, '');
+      if (why === null) return;
+      if (why.trim()) body.reason = why.trim();
+    }
+
     state.busy.add(e.id);
     render();
     try {
-      const out = await api.setBlackbookStatus(e.id, status);
+      const out = await api.setBlackbookStatus(e.id, status, body);
       e.status = out.status;
+      e.closed_date = out.closed_date;
+      e.closed_reason = out.closed_reason;
+      e.reasoning = out.reasoning;
+      // The detail panel holds a cached copy with the history on it, and the
+      // history is exactly what has just changed.
+      delete state.details[e.id];
+      if (state.open.has(e.id)) loadDetail(e.id);
       // The summary counts by status, so it has to be re-read, not patched.
       state.summary = await api.blackbookSummary(state.today);
     } catch (err) {
@@ -416,6 +578,14 @@ function runLine(r, cls) {
   trail.append(el('span', 'pos', `${r.field_size ?? DASH} RAN`));
   trail.append(el('span', 'trip', r.placed ? 'placed' : ''));
   line.append(trail);
+  // `on_conditions` is 1 for an entry with no conditions at all, so the mark
+  // is drawn from the ENTRY having some — otherwise every run in the book
+  // would carry a tick that meant nothing.
+  if (cls !== 'source' && r.on_conditions === 0) {
+    line.classList.add('off-cond');
+    line.title = 'this run did not meet the conditions on the entry, so it is '
+      + 'not a test of the thesis';
+  }
   return line;
 }
 
@@ -426,12 +596,41 @@ function entryDetail(e) {
 
   const thesis = el('div', 'thesis');
   const cap = el('div', 'cap');
-  cap.append(document.createTextNode('THE THESIS'));
+  // "THE THESIS" is the one standing NOW, and on a reopened entry that is not
+  // the one it was booked on. Saying which is the difference between a claim
+  // and a claim with a date on it.
+  cap.append(document.createTextNode(
+    e.reopened ? 'THE THESIS · AS REOPENED' : 'THE THESIS'));
   cap.append(el('span', 'meta',
     `BOOKED ${e.added_date}${e.source_race ? ` FROM ${e.source_race}` : ''}`
     + `${e.confidence ? ` · ${e.confidence.toUpperCase()} CONFIDENCE` : ''}`));
   thesis.append(cap);
   thesis.append(el('div', 'body', e.reasoning || 'no reason was recorded'));
+  // The conditions, and a way to change them. On the panel rather than the
+  // row because writing one is a considered act — it decides which runs count
+  // as evidence — and because the row has no space for a form.
+  const cond = el('div', 'cond-line');
+  cond.append(el('span', 'k', 'ONLY COUNTS AT'));
+  cond.append(el('span', 'v', e.conditions_text
+    || 'no conditions — every run tests this thesis'));
+  const editBtn = el('button', 'act-btn', e.conditions_text ? 'EDIT' : 'SET');
+  editBtn.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    editConditions(e);
+  });
+  cond.append(editBtn);
+  thesis.append(cond);
+
+  if (e.closed) {
+    // The close, under the thesis it closed on. An entry that reads only as
+    // its claim, with a status word somewhere else on the row, is how a
+    // retired horse went on looking like one still being followed.
+    const shut = el('div', 'closed-line');
+    shut.append(el('span', 'k', e.status === 'won_out' ? 'WON OUT' : 'RETIRED'));
+    if (e.closed_date) shut.append(el('span', null, e.closed_date));
+    shut.append(el('span', 'why', e.closed_reason || 'no reason recorded'));
+    thesis.append(shut);
+  }
   main.append(thesis);
 
   if (!detail) {
@@ -471,6 +670,34 @@ function entryDetail(e) {
   box.append(main);
 
   const side = el('div', 'entry-side');
+
+  // Every thesis this entry has carried, and what closed each one.
+  //
+  // Only worth the space once there is more than the opening line: an entry
+  // booked and never touched has its whole history in THE THESIS above, and
+  // repeating it here would push the notes and the money down the panel for
+  // nothing. A reopened entry is the case this exists for — its current claim
+  // is not the claim it was booked on, and the one it replaced is the record
+  // of a thesis that failed, which is the most useful thing the book holds.
+  const history = detail.history ?? [];
+  if (history.length > 1) {
+    side.append(el('div', 'sub-cap', 'HOW THIS ENTRY HAS CHANGED'));
+    history.forEach((h) => {
+      const row = el('div', 'hist-row');
+      row.append(el('span', 'd', (h.changed_at ?? '').slice(0, 10)));
+      row.append(el('span', `mv ${h.to_status}`,
+        h.from_status === null ? 'BOOKED'
+          : h.to_status === 'active' ? 'REOPENED'
+            : h.to_status.replace('_', ' ').toUpperCase()));
+      const txt = el('span', 'txt', h.reason || h.reasoning || '');
+      // The thesis that was standing at the time, which is the half a status
+      // word cannot carry.
+      txt.title = h.reasoning ? `thesis then: ${h.reasoning}` : '';
+      row.append(txt);
+      side.append(row);
+    });
+  }
+
   side.append(el('div', 'sub-cap', 'HAND-WRITTEN NOTES ON THIS HORSE'));
   const written = detail.notes_written ?? [];
   if (!written.length) {
@@ -948,8 +1175,8 @@ function renderStatusPanel() {
   if (!s) return;
 
   const total = s.total || 1;
-  const order = [['active', 'ACTIVE'], ['expired', 'EXPIRED'],
-                 ['won_out', 'WON OUT'], ['retired', 'RETIRED']];
+  const order = [['active', 'ACTIVE'], ['won_out', 'WON OUT'],
+                 ['retired', 'RETIRED']];
   order.forEach(([key, label]) => {
     const n = s.status[key] ?? 0;
     const row = el('div', 'status-row');
@@ -967,14 +1194,16 @@ function renderStatusPanel() {
     host.append(row);
   });
 
-  // Expiry is a timer running out, not a judgement. Counting it as resolution
-  // would make a book nobody ever reviewed look healthy.
+  // Every close is now a judgement, because a timer is no longer able to make
+  // one. What the health line has to say instead is how much of the book is
+  // still open and how much of THAT is overdue a verdict — which is the number
+  // that decides whether the book is being kept or merely added to.
   const judged = (s.status.won_out ?? 0) + (s.status.retired ?? 0);
   host.append(el('div', 'closing',
-    `${judged} of ${s.total} entries were resolved by a judgement; `
-    + `${s.status.expired ?? 0} simply expired, which is a timer running out `
-    + `rather than a verdict. ${s.review_due} active entries have four or more `
-    + 'runs since booking and are waiting on one.'));
+    `${judged} of ${s.total} entries were closed by a decision — there is no `
+    + 'longer any other way for one to close. '
+    + `${s.review_due} of the ${s.active} still open have four or more runs `
+    + 'since booking and are waiting on a verdict.'));
 }
 
 /* ── loading ─────────────────────────────────────────────────────────────── */
@@ -989,6 +1218,18 @@ function render() {
   else renderAnalysis();
 }
 
+/** The expanded panel's data. Its own function because closing or reopening an
+ *  entry changes the history the panel draws, so the row's buttons have to be
+ *  able to ask for it again. */
+async function loadDetail(id) {
+  try {
+    state.details[id] = await api.blackbookEntry(id);
+  } catch {
+    state.details[id] = { runs: [], notes_written: [], history: [] };
+  }
+  render();
+}
+
 async function toggleEntry(e) {
   if (state.open.has(e.id)) {
     state.open.delete(e.id);
@@ -997,14 +1238,7 @@ async function toggleEntry(e) {
   }
   state.open.add(e.id);
   render();
-  if (!state.details[e.id]) {
-    try {
-      state.details[e.id] = await api.blackbookEntry(e.id);
-    } catch {
-      state.details[e.id] = { runs: [], notes_written: [] };
-    }
-    render();
-  }
+  if (!state.details[e.id]) await loadDetail(e.id);
 }
 
 async function init() {

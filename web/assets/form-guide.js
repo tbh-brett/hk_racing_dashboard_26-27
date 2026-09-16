@@ -15,7 +15,7 @@ import { el, $, DASH, MINUS, renderNav, styleClass, styleOrdinal,
          replayUrl, trialReplayUrl, externalLink, compactDate,
          tripTags, tripTagChips, ordinal, classCell, classLabel, eszCell,
          paceCell, positionsText, conditionLabel, drawText,
-         tagLabel } from './vocab.js';
+         tagLabel, isLiveBooking, bookingStatus, closedNote } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 import { loadTags, renderReview, trialSubject } from './review.js';
@@ -236,8 +236,26 @@ function flagsFor(runner) {
       more: vet.length > 1 ? vet.length - 1 : 0,
     });
   }
+  // A closed entry keeps its chip and loses its colour. The horse IS in the
+  // book and that is worth seeing when it turns up; what it is not is a thesis
+  // still being followed, and the chip that says both used to say only the
+  // second one.
   const bb = state.guide?.blackbook?.[runner.horse_name];
-  if (bb) out.push({ kind: 'bb', text: 'BLACKBOOK', bb });
+  if (bb) {
+    // A live entry whose conditions TODAY MEETS says so on the chip. That is
+    // the whole difference between the book reminding you a horse is in it and
+    // the book telling you this is the race it was written for.
+    const live = isLiveBooking(bb);
+    const onDay = live && bb.conditions_text && bb.on_conditions;
+    out.push(live
+      ? { kind: onDay ? 'bb on-cond' : 'bb',
+          text: onDay ? bb.conditions_text.toUpperCase() : 'BLACKBOOK',
+          title: onDay
+            ? `booked for ${bb.conditions_text}, and today is that race`
+            : null,
+          bb }
+      : { kind: 'bb closed', text: bookingStatus(bb), bb });
+  }
 
   const runs = history(runner);
   const last = runs[0];
@@ -330,9 +348,10 @@ function horseRow(runner) {
   const runs = history(runner);
   const last = runs[0];
   const bb = state.guide?.blackbook?.[runner.horse_name];
+  const live = isLiveBooking(bb);
   const open = state.open.has(runner.horse_no);
 
-  const row = el('div', `fg-row${open ? ' open' : ''}${bb ? ' booked' : ''}`);
+  const row = el('div', `fg-row${open ? ' open' : ''}${live ? ' booked' : ''}`);
   row.setAttribute('role', 'row');
   row.addEventListener('click', () => toggleHorse(runner.horse_no));
   row.addEventListener('mouseenter', () => focusHorse(runner));
@@ -341,7 +360,8 @@ function horseRow(runner) {
 
   const nameCell = el('div', 'name-cell');
   nameCell.append(el('span', 'caret', open ? '▼' : '▶'));
-  const nm = el('span', `nm${bb ? ' booked' : ''}`, runner.horse_name);
+  const nm = el('span', `nm${live ? ' booked' : ''}`, runner.horse_name);
+  if (bb && !live) nm.title = closedNote(bb) ?? '';
   nameCell.append(nm);
   row.append(nameCell);
 
@@ -985,7 +1005,8 @@ function renderAside() {
   const bb = state.guide?.blackbook?.[runner.horse_name];
   const hd = el('div', 'fit-hd');
   hd.append(el('span', 'no', String(runner.horse_no)));
-  hd.append(el('span', `nm${bb ? ' booked' : ''}`, runner.horse_name));
+  hd.append(el('span', `nm${isLiveBooking(bb) ? ' booked' : ''}`,
+                runner.horse_name));
   hd.append(el('span', 'odds', runner.win_odds ? num(runner.win_odds, 1) : DASH));
 
   const race = state.guide.race;
@@ -1081,6 +1102,22 @@ function showBlackbookNote(event, bb) {
   hd.append(el('span', 'meta', `ADDED ${bb.added_date}`));
   pop.replaceChildren(hd);
   pop.append(el('div', 'body', bb.reasoning || 'no reason recorded'));
+  // The circumstances the thesis depends on, and whether today is one of them.
+  // The reason for a booking without the conditions on it is the half of the
+  // claim that cannot be checked.
+  if (bb.conditions_text) {
+    const cond = el('div', `body cond${bb.on_conditions ? ' met' : ''}`,
+      bb.on_conditions
+        ? `TODAY MEETS THIS — ${bb.conditions_text}`
+        : `BOOKED FOR ${bb.conditions_text} — NOT TODAY`);
+    pop.append(cond);
+  }
+
+  // Why it was CLOSED, when it was. Without it the popover shows the reason a
+  // horse was booked and nothing about the decision to stop following it,
+  // which is the more recent and usually the more useful of the two.
+  const closed = closedNote(bb);
+  if (closed) pop.append(el('div', 'body closed', closed));
   pop.append(el('div', 'trace', [
     bb.source_race ? `TRIGGERED BY ${bb.source_race}` : null,
     (bb.tags ?? []).join(' · ').toUpperCase() || null,

@@ -131,6 +131,24 @@
 }
 .thesis .cap .meta { color: var(--book-dim); letter-spacing: 0; }
 .thesis .body { font-size: var(--fs); line-height: 1.45; color: var(--text-2); margin-top: 5px; }
+/* The circumstances the claim depends on, under the claim. */
+.thesis .cond-line {
+  display: flex; align-items: center; gap: 8px; margin-top: 6px;
+  font-family: var(--font-mono); font-size: var(--fs-xs);
+}
+.thesis .cond-line .k { color: var(--book-dim); letter-spacing: .08em; }
+.thesis .cond-line .v { color: var(--text-2); }
+/* The close, directly under the claim it closed on. */
+.thesis .closed-line {
+  display: flex; align-items: baseline; gap: 8px; margin-top: 6px;
+  font-family: var(--font-mono); font-size: var(--fs-xs);
+  color: var(--text-faint); min-width: 0;
+}
+.thesis .closed-line .k { color: var(--loss); letter-spacing: .08em; }
+.thesis .closed-line .why {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .run-line {
   display: grid; grid-template-columns: var(--run-grid); align-items: center;
@@ -159,7 +177,28 @@
   overflow: hidden; text-overflow: ellipsis;
 }
 
+/* A run that did not meet the entry's conditions. Still listed — it happened,
+   and a horse that keeps being asked the wrong question is worth seeing — but
+   it is not evidence for or against the thesis, so it must not read like it. */
+.run-line.off-cond { opacity: .5; }
+
 .entry-side { width: 330px; flex: none; }
+/* An entry's own history: booked, closed, reopened. Same shape as a note row,
+   because both are "a date, a word, and what was said" and the panel reads as
+   one column when they line up. */
+.entry-side .hist-row {
+  display: flex; align-items: baseline; gap: 7px; padding: 2px 12px;
+  font-family: var(--font-mono); font-size: var(--fs-sm); white-space: nowrap;
+}
+.entry-side .hist-row .d { color: var(--text-muted); width: 62px; }
+.entry-side .hist-row .mv { width: 62px; font-size: 9px; letter-spacing: .08em; }
+.entry-side .hist-row .mv.active { color: var(--book); }
+.entry-side .hist-row .mv.won_out { color: var(--win); }
+.entry-side .hist-row .mv.retired { color: var(--loss); }
+.entry-side .hist-row .txt {
+  flex: 1; min-width: 0; color: var(--text-muted); font-size: var(--fs-xs);
+  overflow: hidden; text-overflow: ellipsis;
+}
 .entry-side .note-row {
   display: flex; align-items: baseline; gap: 7px; padding: 2px 12px;
   font-family: var(--font-mono); font-size: var(--fs-sm); white-space: nowrap;
@@ -171,6 +210,23 @@
   overflow: hidden; text-overflow: ellipsis;
 }
 .entry-side .verdict { font-weight: 600; }
+
+/* The conditions on the row, beside the reason. A different shape from a tag
+   pill because it is a different kind of thing: the tags say WHY, this says
+   WHEN, and they must not read as one list. */
+.cond-pill {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .04em;
+  padding: 1px 5px; color: var(--text-faint); border: 1px dashed var(--line-2);
+  white-space: nowrap;
+}
+/* The record over the runs that actually asked the question, under the record
+   over all of them. Only ever drawn for an entry that states conditions. */
+.bb-row .record .on-cond {
+  display: block; font-size: 10px; letter-spacing: .04em; font-weight: 400;
+}
+.bb-row .record .on-cond.untested { color: var(--text-faint); }
+.bb-row .record .on-cond.hit { color: var(--win); }
+.bb-row .record .on-cond.miss { color: var(--text-muted); }
 .verdict-VALIDATED { color: var(--win); }
 .verdict-PARTIAL { color: var(--edge); }
 .verdict-MISSED { color: var(--loss); }

@@ -39,6 +39,7 @@ class BlackbookReport:
     merged_tags: int = 0
     undefined_tags: list[str] = field(default_factory=list)
     dates_recovered: int = 0
+    triggers: int = 0
     errors: list[str] = field(default_factory=list)
 
     def render(self) -> str:
@@ -47,7 +48,8 @@ class BlackbookReport:
                  f"  tag definitions    {self.definitions:>6}",
                  f"  hand-written notes {self.notes:>6}",
                  f"  aliases merged     {self.merged_tags:>6}",
-                 f"  source dates found {self.dates_recovered:>6}"]
+                 f"  source dates found {self.dates_recovered:>6}",
+                 f"  conditions         {self.triggers:>6}"]
         if self.undefined_tags:
             # Not an error: a tag in use with no definition written for it. The
             # UI falls back to the tag name, but it is worth seeing.
@@ -125,6 +127,47 @@ def _recover_source_dates(conn) -> int:
     return len(found)
 
 
+# The export carries an expiry date and this schema no longer does. The two
+# words meant one thing -- the thesis is no longer being followed -- and only
+# RETIRE was ever a decision somebody took, so the date is read as the day the
+# entry closed rather than as a second kind of ending.
+#
+# `date.today()`, so a re-import a season later does not retire entries that
+# were still running when the file was written. An entry inside its window is
+# an entry nobody has closed.
+def _close(status: str | None, expiry: str | None
+           ) -> tuple[str, str | None, str | None]:
+    """(status, closed_date, closed_reason) as this schema records them."""
+    from datetime import date
+
+    status = status or "active"
+    if status in ("won_out", "retired"):
+        # Already closed by hand. The expiry date is not when that happened and
+        # must not be written as though it were.
+        return status, None, None
+    if status == "expired" or (expiry and expiry < date.today().isoformat()):
+        return "retired", expiry, "lapsed under the old 90-day expiry"
+    return "active", None, None
+
+
+# The export's `conditions` block, as rows something can read. `preferred_
+# distance` is a list, which is the `in` operator; a list of one is written as
+# `is`, because "distance 1200" reads better than "distance in 1200".
+def _triggers(entry_id: str, cond: dict) -> list[tuple[str, str, str, str]]:
+    out: list[tuple[str, str, str, str]] = []
+    distances = [str(d).strip() for d in (cond.get("preferred_distance") or [])
+                 if str(d).strip()]
+    if distances:
+        out.append((entry_id, "distance", "is" if len(distances) == 1 else "in",
+                    ",".join(distances)))
+    for kind, key in (("surface", "preferred_surface"),
+                      ("jockey", "jockey_preference")):
+        value = (cond.get(key) or "").strip()
+        if value:
+            out.append((entry_id, kind, "is", value))
+    return out
+
+
 def run(src: Path, *, db: Path | None = None) -> BlackbookReport:
     report = BlackbookReport()
     doc = json.loads(src.read_text(encoding="utf-8"))
@@ -141,7 +184,7 @@ def run(src: Path, *, db: Path | None = None) -> BlackbookReport:
                 [(TAG_ALIASES.get(k, k), v) for k, v in definitions.items()])
             report.definitions = len(definitions)
 
-            rows, tag_rows, note_rows = [], [], []
+            rows, tag_rows, note_rows, trigger_rows = [], [], [], []
             for e in entries:
                 try:
                     added = to_date(e.get("added_date"))
@@ -150,16 +193,19 @@ def run(src: Path, *, db: Path | None = None) -> BlackbookReport:
                         continue
                     src_date, src_no = _split_source(e.get("source_race"))
                     cond = e.get("conditions") or {}
+                    status, closed_date, closed_reason = _close(
+                        e.get("status"), to_date(e.get("expiry_date")))
                     rows.append((
                         e["id"], e["horse_name"].strip().upper(), added,
-                        to_date(e.get("expiry_date")), e.get("status") or "active",
+                        closed_date, closed_reason, status,
                         e.get("reasoning"), e.get("confidence"),
                         e.get("source_race"), src_date, src_no,
                         "memo" if src_date else None,
-                        ",".join(str(d) for d in (cond.get("preferred_distance") or [])) or None,
-                        cond.get("preferred_surface"),
-                        (cond.get("jockey_preference") or "").strip() or None,
                     ))
+                    # The export's `conditions` block IS a trigger, and it was
+                    # being written to three columns nothing read. Same three
+                    # facts, in the table the band and the record join to.
+                    trigger_rows += _triggers(e["id"], cond)
                     for tag in e.get("tags") or []:
                         canonical = TAG_ALIASES.get(tag, tag)
                         if canonical != tag:
@@ -178,13 +224,14 @@ def run(src: Path, *, db: Path | None = None) -> BlackbookReport:
                     report.errors.append(f"{e.get('id')}: {exc}")
 
             conn.executemany(
-                "INSERT INTO blackbook (id, horse_name, added_date, expiry_date, "
-                "status, reasoning, confidence, source_race, source_date, "
-                "source_race_no, source_date_from, pref_distance, pref_surface, "
-                "pref_jockey) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+                "INSERT INTO blackbook (id, horse_name, added_date, closed_date, "
+                "closed_reason, status, reasoning, confidence, source_race, "
+                "source_date, source_race_no, source_date_from) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?) "
                 "ON CONFLICT (id) DO UPDATE SET "
                 "horse_name=excluded.horse_name, added_date=excluded.added_date, "
-                "expiry_date=excluded.expiry_date, status=excluded.status, "
+                "closed_date=excluded.closed_date, "
+                "closed_reason=excluded.closed_reason, status=excluded.status, "
                 "reasoning=excluded.reasoning, confidence=excluded.confidence, "
                 "source_race=excluded.source_race, source_date=excluded.source_date, "
                 "source_race_no=excluded.source_race_no, "
@@ -192,14 +239,22 @@ def run(src: Path, *, db: Path | None = None) -> BlackbookReport:
             conn.executemany(
                 "INSERT INTO blackbook_tags (id, tag) VALUES (?, ?) "
                 "ON CONFLICT (id, tag) DO NOTHING", tag_rows)
+            # Replaced rather than added to, so a re-import of a corrected file
+            # does not leave the conditions it corrected standing beside the
+            # new ones. Every other write here is an upsert for the same reason.
+            conn.executemany("DELETE FROM blackbook_trigger WHERE id = ?",
+                             [(r[0],) for r in rows])
+            conn.executemany(
+                "INSERT INTO blackbook_trigger (id, kind, op, value) "
+                "VALUES (?, ?, ?, ?)", trigger_rows)
             conn.executemany(
                 "INSERT INTO blackbook_notes (id, race_date, race_no, finish, "
                 "model_rank, verdict, notes) VALUES (?,?,?,?,?,?,?) "
                 "ON CONFLICT (id, race_date, race_no) DO UPDATE SET "
                 "finish=excluded.finish, verdict=excluded.verdict, "
                 "notes=excluded.notes", note_rows)
-            report.entries, report.tags, report.notes = (
-                len(rows), len(tag_rows), len(note_rows))
+            report.entries, report.tags, report.notes, report.triggers = (
+                len(rows), len(tag_rows), len(note_rows), len(trigger_rows))
             report.dates_recovered = _recover_source_dates(conn)
             report.undefined_tags = [
                 r[0] for r in conn.execute(

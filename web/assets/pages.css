@@ -488,7 +488,6 @@ select:hover, .btn:hover { background: var(--line-2); color: var(--text); }
 .badge.today { color: var(--edge); border-color: var(--edge-ground-2); background: var(--edge-ground); }
 .badge.quiet { border-color: transparent; color: var(--text-faint); font-weight: 400; }
 .badge.active { color: var(--page-accent); border-color: var(--page-accent-ground); background: var(--pop-act); }
-.badge.expired { color: var(--text-muted); }
 .badge.won_out { color: var(--win); border-color: var(--win); }
 .badge.retired { color: var(--loss); border-color: var(--h2h-rule); }
 .act-btn {
@@ -620,6 +619,21 @@ select:hover, .btn:hover { background: var(--line-2); color: var(--text); }
   position: fixed; z-index: 20; width: 344px; max-height: 60vh; overflow-y: auto;
   background: var(--pop); border: 1px solid var(--book-ground); padding: 8px 10px;
   box-shadow: 0 8px 22px rgba(0, 0, 0, .65);
+}
+
+/* The conditions on a booking, in the popover that explains it. */
+.popover > .body.cond {
+  margin-top: 6px; font-family: var(--font-mono); font-size: var(--fs-xs);
+  letter-spacing: .04em; color: var(--text-muted);
+}
+.popover > .body.cond.met { color: var(--edge); }
+
+/* Why a booking was closed, in the popover that explains why it was made.
+   Set apart from the thesis above it, because it is the later fact and it
+   contradicts the one it sits under. */
+.popover > .body.closed {
+  margin-top: 6px; color: var(--text-faint); font-family: var(--font-mono);
+  font-size: var(--fs-xs); letter-spacing: .04em;
 }
 
 /* The FORM's own styling, on the form rather than on the popover it usually
