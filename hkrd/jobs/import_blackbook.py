@@ -125,6 +125,29 @@ def _recover_source_dates(conn) -> int:
     return len(found)
 
 
+# The export carries an expiry date and this schema no longer does. The two
+# words meant one thing -- the thesis is no longer being followed -- and only
+# RETIRE was ever a decision somebody took, so the date is read as the day the
+# entry closed rather than as a second kind of ending.
+#
+# `date.today()`, so a re-import a season later does not retire entries that
+# were still running when the file was written. An entry inside its window is
+# an entry nobody has closed.
+def _close(status: str | None, expiry: str | None
+           ) -> tuple[str, str | None, str | None]:
+    """(status, closed_date, closed_reason) as this schema records them."""
+    from datetime import date
+
+    status = status or "active"
+    if status in ("won_out", "retired"):
+        # Already closed by hand. The expiry date is not when that happened and
+        # must not be written as though it were.
+        return status, None, None
+    if status == "expired" or (expiry and expiry < date.today().isoformat()):
+        return "retired", expiry, "lapsed under the old 90-day expiry"
+    return "active", None, None
+
+
 def run(src: Path, *, db: Path | None = None) -> BlackbookReport:
     report = BlackbookReport()
     doc = json.loads(src.read_text(encoding="utf-8"))
@@ -150,9 +173,11 @@ def run(src: Path, *, db: Path | None = None) -> BlackbookReport:
                         continue
                     src_date, src_no = _split_source(e.get("source_race"))
                     cond = e.get("conditions") or {}
+                    status, closed_date, closed_reason = _close(
+                        e.get("status"), to_date(e.get("expiry_date")))
                     rows.append((
                         e["id"], e["horse_name"].strip().upper(), added,
-                        to_date(e.get("expiry_date")), e.get("status") or "active",
+                        closed_date, closed_reason, status,
                         e.get("reasoning"), e.get("confidence"),
                         e.get("source_race"), src_date, src_no,
                         "memo" if src_date else None,
@@ -178,13 +203,14 @@ def run(src: Path, *, db: Path | None = None) -> BlackbookReport:
                     report.errors.append(f"{e.get('id')}: {exc}")
 
             conn.executemany(
-                "INSERT INTO blackbook (id, horse_name, added_date, expiry_date, "
-                "status, reasoning, confidence, source_race, source_date, "
-                "source_race_no, source_date_from, pref_distance, pref_surface, "
-                "pref_jockey) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+                "INSERT INTO blackbook (id, horse_name, added_date, closed_date, "
+                "closed_reason, status, reasoning, confidence, source_race, "
+                "source_date, source_race_no, source_date_from, pref_distance, "
+                "pref_surface, pref_jockey) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
                 "ON CONFLICT (id) DO UPDATE SET "
                 "horse_name=excluded.horse_name, added_date=excluded.added_date, "
-                "expiry_date=excluded.expiry_date, status=excluded.status, "
+                "closed_date=excluded.closed_date, "
+                "closed_reason=excluded.closed_reason, status=excluded.status, "
                 "reasoning=excluded.reasoning, confidence=excluded.confidence, "
                 "source_race=excluded.source_race, source_date=excluded.source_date, "
                 "source_race_no=excluded.source_race_no, "

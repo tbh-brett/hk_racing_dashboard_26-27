@@ -139,6 +139,12 @@
 .fg-row.open .caret { color: var(--edge); }
 .fg-row .nm { font-size: var(--fs); font-weight: 600; white-space: nowrap; }
 .fg-row .nm.booked { color: var(--book); }
+/* A flag for an entry that has been closed. It keeps its place in the row —
+   the horse IS in the book — and loses the book colour, which is reserved for
+   a thesis still being followed. */
+.flag.bb.closed {
+  color: var(--text-faint); border-color: var(--line-2); background: none;
+}
 .fg-row .dr { padding: 0 4px; text-align: center; color: var(--text-2); }
 .fg-row .jockey, .fg-row .trainer {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

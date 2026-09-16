@@ -68,11 +68,19 @@ def blackbook_summary(today: str | None = None) -> dict:
 
 @router.post("/api/blackbook/{entry_id}/status")
 def set_blackbook_status(entry_id: str, body: dict = Body(...)) -> dict:
-    """Resolve an entry. One call, because a book that only grows is unusable."""
+    """Close an entry, or reopen it. One call, because a book that only grows
+    is unusable.
+
+    `reason` is why the decision was taken, either way. `reasoning` is the NEW
+    thesis and only means anything when reopening — the old one is kept on the
+    entry's history rather than typed over.
+    """
     from hkrd.jobs import write_notes
 
     try:
-        return write_notes.set_status(entry_id, body.get("status", ""))
+        return write_notes.set_status(entry_id, body.get("status", ""),
+                                      reason=body.get("reason"),
+                                      reasoning=body.get("reasoning"))
     except KeyError as exc:
         raise HTTPException(404, f"no blackbook entry {exc.args[0]}") from exc
     except ValueError as exc:

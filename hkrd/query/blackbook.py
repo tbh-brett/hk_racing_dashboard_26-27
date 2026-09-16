@@ -24,8 +24,6 @@ were the source runs themselves.
 """
 from __future__ import annotations
 
-import datetime as dt
-
 from typing import Any
 
 from hkrd.derive.probability import actual_over_expected
@@ -85,6 +83,26 @@ _IMPLIED_SQL = """
     CASE WHEN r.win_odds > 0 AND f.book > 0 AND f.priced = f.field_size
          THEN (1.0 / r.win_odds) / f.book END"""
 
+# Was this entry a LIVE thesis over that race — as opposed to one I hold now?
+#
+# Two different questions, and the band over an archived card asks the second
+# one. A horse retired in December must not rewrite every September card to say
+# the thesis had never been standing; equally, a horse retired in June must not
+# go on lighting up today's card as though it were still being followed. That
+# is the bug this replaces: nothing here read `status` at all, so an entry
+# retired by hand stayed live everywhere except the Blackbook page itself.
+#
+# An entry closed on a day nobody recorded reads as closed TODAY. It is
+# certainly not live over a card being looked at now, which is the complaint;
+# and over an archived card the honest default is the one that does not erase a
+# thesis that was, as far as anything here knows, standing at the time. Every
+# close from now on carries its date, so this fallback only ever covers entries
+# retired before there was a column to record it in.
+_LIVE_AT_RACE_SQL = """
+    (b.added_date <= r.race_date
+     AND (b.status = 'active'
+          OR coalesce(b.closed_date, date('now')) > r.race_date))"""
+
 
 def _entry_rows(conn: Connection, where: str = "", params: Any = ()) -> list[dict]:
     """Entries with their derived record. One query, not one per entry."""
@@ -107,29 +125,26 @@ def _entry_rows(conn: Connection, where: str = "", params: Any = ()) -> list[dic
                s.first_run, s.last_run,
                (SELECT group_concat(t.tag) FROM blackbook_tags t
                  WHERE t.id = b.id) tag_csv,
-               (SELECT count(*) FROM blackbook_notes n WHERE n.id = b.id) notes
+               (SELECT count(*) FROM blackbook_notes n WHERE n.id = b.id) notes,
+               (SELECT count(*) FROM blackbook_status_log l
+                 WHERE l.id = b.id AND l.to_status = 'active'
+                   AND l.from_status IS NOT NULL) reopened
         FROM blackbook b
         LEFT JOIN since s ON s.id = b.id
         {where}
         ORDER BY b.added_date DESC, b.id
     """, params).fetchall()
 
-    today = dt.date.today().isoformat()
     out = []
     for row in rows:
         d = dict(row)
         d["tags"] = sorted((d.pop("tag_csv") or "").split(",")) if d["tag_csv"] else []
-        # `status` is a snapshot taken when the JSON was last exported, and
-        # nothing recomputes it on the way in. An entry whose expiry has passed
-        # therefore keeps reading "active" until somebody exports the file
-        # again — the book quietly claims a horse is live because a file is
-        # stale, which is the opposite of what an expiry date is for.
-        #
-        # The date is the fact; the flag is a cache of it. An entry still
-        # inside its window keeps whatever the file said, so a horse retired
-        # early by hand stays retired.
-        if d.get("expiry_date") and d["expiry_date"] < today:
-            d["status"] = "expired"
+        # `status` is now the whole answer. It used to be half of one: an entry
+        # could also be closed by an expiry date the page had to notice for
+        # itself, so the row recomputed the flag on every read and the two
+        # disagreed anywhere that did not. There is one way an entry closes
+        # and it is a decision somebody took — `closed_date` says when.
+        d["closed"] = d["status"] in ("won_out", "retired")
         # Four runs without resolution is the brief's prompt-for-review
         # threshold. A book that only grows is unusable within a season.
         d["review_due"] = d["status"] == "active" and d["runs_since"] >= 4
@@ -145,18 +160,11 @@ def list_entries(*, status: str | None = None, tag: str | None = None,
     try:
         clauses, params = [], []
         if status:
-            # The same rule the rows are read by, or the filter and the list
-            # disagree: asking for "active" would hand back an entry the row
-            # itself then prints as expired.
-            today = dt.date.today().isoformat()
-            if status == "active":
-                clauses.append("b.status = 'active' AND (b.expiry_date IS NULL "
-                               "OR b.expiry_date >= ?)")
-                params.append(today)
-            elif status == "expired":
-                clauses.append("(b.status = 'expired' OR (b.expiry_date IS NOT NULL "
-                               "AND b.expiry_date < ?))")
-                params.append(today)
+            # One column, one rule. This used to read the expiry date as well,
+            # because the row did; with expiry gone there is nothing left for
+            # the filter and the list to disagree about.
+            if status == "closed":
+                clauses.append("b.status IN ('won_out', 'retired')")
             else:
                 clauses.append("b.status = ?")
                 params.append(status)
@@ -227,6 +235,18 @@ def entry_detail(entry_id: str, *, conn: Connection | None = None
             "SELECT race_date, race_no, finish, model_rank, verdict, notes "
             "FROM blackbook_notes WHERE id = ? ORDER BY race_date DESC",
             (entry_id,)).fetchall()]
+
+        # Every thesis this entry has carried, newest first. `reasoning` above
+        # is only the one standing now; reopening a horse on a fresh reason
+        # used to type over the reason it was booked for, which is the record
+        # of a thesis that failed and the most useful thing in the book.
+        entry["history"] = [dict(r) for r in conn.execute(
+            "SELECT changed_at, from_status, to_status, reason, reasoning "
+            "FROM blackbook_status_log WHERE id = ? "
+            # The row id, not just the clock: two decisions can land in the
+            # same second and the newer of them has to sort first.
+            "ORDER BY changed_at DESC, log_id DESC",
+            (entry_id,)).fetchall()]
         return entry
     finally:
         if own:
@@ -237,9 +257,10 @@ def for_race(date: str, race_no: int, *, conn: Connection | None = None
              ) -> list[dict[str, Any]]:
     """Booked horses declared in one race — the Race Day blackbook band.
 
-    Expired entries are returned too, flagged: a thesis that ran out of time is
-    still worth knowing about when the horse turns up, and hiding it is how the
-    band silently under-reports.
+    Closed entries are returned too, flagged: a horse I once followed and gave
+    up on is worth knowing about when it turns up, and dropping it is how the
+    band silently under-reports. What it must NOT do is read as a live thesis —
+    see `_LIVE_AT_RACE_SQL`, which is what every caller gates its highlight on.
 
     `status` is the entry's state NOW. On an archived race that is not the same
     question as "was I watching this horse that day", so `live_at_race` is
@@ -249,14 +270,12 @@ def for_race(date: str, race_no: int, *, conn: Connection | None = None
     own = conn is None
     conn = conn or get_conn()
     try:
-        return [dict(r) for r in conn.execute("""
+        return [dict(r) for r in conn.execute(f"""
             SELECT b.id, b.horse_name, b.status, b.confidence, b.reasoning,
-                   b.added_date, b.expiry_date, b.source_race,
+                   b.added_date, b.closed_date, b.closed_reason, b.source_race,
                    r.horse_no, r.draw, r.jockey, r.win_odds,
                    b.added_date <= r.race_date AS booked_before_race,
-                   (b.added_date <= r.race_date
-                    AND (b.expiry_date IS NULL
-                         OR b.expiry_date >= r.race_date)) AS live_at_race,
+                   {_LIVE_AT_RACE_SQL} AS live_at_race,
                    (SELECT group_concat(t.tag) FROM blackbook_tags t
                      WHERE t.id = b.id) tag_csv
             FROM blackbook b
@@ -283,14 +302,12 @@ def declared_on(date: str, *, conn: Connection | None = None
     own = conn is None
     conn = conn or get_conn()
     try:
-        return [dict(r) for r in conn.execute("""
+        return [dict(r) for r in conn.execute(f"""
             SELECT b.id, b.horse_name, b.status, b.confidence, b.added_date,
-                   b.expiry_date, b.reasoning,
+                   b.closed_date, b.closed_reason, b.reasoning,
                    r.race_no, r.horse_no, r.draw, r.win_odds,
                    b.added_date <= r.race_date AS booked_before_race,
-                   (b.added_date <= r.race_date
-                    AND (b.expiry_date IS NULL
-                         OR b.expiry_date >= r.race_date)) AS live_at_race,
+                   {_LIVE_AT_RACE_SQL} AS live_at_race,
                    (SELECT group_concat(t.tag) FROM blackbook_tags t
                      WHERE t.id = b.id) tag_csv
             FROM blackbook b

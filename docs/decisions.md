@@ -820,3 +820,79 @@ selection and can only be recomputed against the real archive. It carries a
 ready to paste, and the page prints the population in red above the published
 value table — which sits directly under a live calibration computed on a
 different set of races, and read as one table before.
+
+---
+
+## Blackbook — an entry ends when it is retired, and only then. **Settled**
+
+The page carried two words for one outcome. `RETIRE` sat on every row, and
+beside it `EXPIRED` appeared on rows nobody had touched, because
+`promote_to_blackbook` stamped `expiry_date = today + 90 days` on every entry
+it created. The Blackbook's own artboard — `web/design-source/Blackbook.dc.html`,
+which the rebuild was ported from — has no expiry in it at all: four statuses,
+`ALL / ACTIVE / WON OUT / RETIRED`. The concept was introduced by the rebuild
+and never went back to the design.
+
+The two were not merely redundant. They said different things about who
+decided:
+
+- **RETIRE** is a judgement. The thesis was tested and it failed, or the horse
+  left, or the reason it was written no longer applies.
+- **EXPIRED** is a clock. Ninety days after an entry was written it closed
+  itself, whatever had or had not happened in between.
+
+And the flag was a cache of a date nothing recomputed, so `query/blackbook`
+derived `expired` on every read to stop the row disagreeing with the file —
+which meant the derivation existed only in the one place that ran it. Race Day
+and the Form Guide never did. **Both pages lit a horse's name in the book
+colour on the mere existence of an entry**, so a horse booked in March, retired
+in June, went on reading as a live thesis on every card after it. That is the
+one thing the colour is supposed to mean.
+
+**Decision: `expiry_date` becomes `closed_date`, and closing is always a
+decision.**
+
+`closed_date` is the day the decision was taken. It is what an archived card
+needs to answer "was I watching this horse THAT day", which is a different
+question from "am I watching it now" and the one real job the expiry date was
+doing — without it, retiring a horse in December would rewrite every September
+card to say the thesis had never been standing.
+
+One rule, `_LIVE_AT_RACE_SQL`, now answers it for both bands and both pages:
+
+```sql
+b.added_date <= r.race_date
+AND (b.status = 'active'
+     OR coalesce(b.closed_date, date('now')) > r.race_date)
+```
+
+An entry closed on a day nobody recorded reads as closed **today**. That is the
+only reading that satisfies both halves at once: it is certainly not live over
+a card being looked at now, and over an archived card it does not erase a
+thesis that was, as far as anything knows, standing at the time. Every close
+from here on carries its date, so the fallback only ever covers entries retired
+before there was a column to record it in.
+
+**The migration moves the meaning before it drops the column** (`store/connect._migrate_blackbook_close`):
+
+| was | becomes |
+|---|---|
+| `active`, expiry passed | `retired`, closed on that date, reason "lapsed under the old 90-day expiry" |
+| `active`, expiry ahead | `active`, no closing date — nobody has closed it |
+| `expired`, no date | `retired`, no date, **no reason invented** |
+| `won_out` | **untouched.** It is closed because the thesis PAID, and its expiry date is not when that happened |
+
+**Reopening takes a new thesis, and keeps the old one.** `REOPEN` already
+existed and set the status back to `active`; what it had no way to record was
+that the horse is worth following again *for a different reason*. Writing the
+new reason into `blackbook.reasoning` types over the reason the horse was
+booked for in the first place — which is the record of a thesis that failed,
+and the most useful thing in the book. `blackbook_status_log` holds every
+transition with the thesis as it stood at the time; `reasoning` is the head of
+that list rather than a substitute for it. A new thesis is refused on a
+*closure*, because that would be rewriting history rather than recording it.
+
+The log is keyed on its own autoincrement id, like `bet_edits`, and not on
+`(id, changed_at)`: retiring an entry and reopening it in the same second are
+two decisions, and a composite key on a second-resolution timestamp silently
+kept only the first.

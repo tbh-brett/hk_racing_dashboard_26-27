@@ -11,7 +11,7 @@
 import { api, num } from './api.js';
 import { el, $, DASH, MINUS, renderNav, habitualStyleBadge, styleOrdinal,
          compactDate, ordinal, tagLabel, tripTagChips, drawText,
-         isVetTag } from './vocab.js';
+         isVetTag, isLiveBooking, bookingStatus, closedNote } from './vocab.js';
 import { context } from './context.js';
 import { Live } from './live.js';
 import { anchoredPanel } from './overlay.js';
@@ -165,7 +165,15 @@ function bbNote(e) {
 
 function renderBlackbookBand() {
   const host = $('band-bb');
-  const all = state.blackbook?.entries ?? [];
+  const declared = state.blackbook?.entries ?? [];
+  // The band is the live book, not the whole book. A horse I followed and gave
+  // up on used to sit in this row at full strength and be counted in the "5
+  // BOOKED TODAY" beside it, which is the number you glance at to decide
+  // whether the meeting is worth a second look — so the count answered a
+  // question nobody was asking. The closed ones are not thrown away; they are
+  // in the expanded grid below, muted and labelled with why they closed.
+  const all = declared.filter(isLiveBooking);
+  const closed = declared.filter((e) => !isLiveBooking(e));
   const here = all.filter((e) => e.race_no === state.race);
   const rest = all.filter((e) => e.race_no !== state.race);
 
@@ -224,27 +232,36 @@ function renderBlackbookBand() {
     row.append(strip);
   }
 
-  const toggle = el('button', 'band-toggle',
-    state.bbOpen ? 'COLLAPSE ▴' : `ALL ${all.length} ▾`);
+  // The expanded view is the whole book on this card, live and closed, because
+  // "I retired this horse in June and here it is again" is worth one line.
+  // The collapsed band counts only what is live, so the two totals differ and
+  // the toggle has to say which one it is about to show.
+  const toggle = el('button', 'band-toggle', state.bbOpen ? 'COLLAPSE ▴'
+    : `ALL ${declared.length}${closed.length ? ` · ${closed.length} CLOSED` : ''} ▾`);
   toggle.addEventListener('click', () => { state.bbOpen = !state.bbOpen; render(); });
   row.append(toggle);
   host.replaceChildren(row);
 
-  if (!state.bbOpen || !all.length) return;
+  if (!state.bbOpen || !declared.length) return;
   const grid = el('div', 'bb-grid');
-  all.forEach((e) => {
+  // Live first, then the closed ones. Sorting them back is what stops a
+  // retired horse in race 2 pushing a live one in race 8 off the first screen.
+  [...all, ...closed].forEach((e) => {
+    const live = isLiveBooking(e);
     const cell = el('button', 'bb-cell');
     if (e.race_no === state.race) cell.classList.add('here');
     if (!e.booked_before_race) cell.classList.add('bb-stale');
+    else if (!live) cell.classList.add('bb-closed');
     const line = el('div', 'line');
     line.append(el('span', 'r', `R${e.race_no}`));
     line.append(el('span', 'off', e.off_time ?? DASH));
     line.append(el('span', 'name', `${e.horse_no} ${e.horse_name}`));
+    if (!live) line.append(el('span', 'shut', bookingStatus(e)));
     line.append(el('span', 'odds', num(e.win_odds)));
     const mv = bbMove(e);
     line.append(el('span', `mv pct ${mv.cls}`, mv.text));
     cell.append(line);
-    cell.append(el('div', 'note', bbNote(e)));
+    cell.append(el('div', 'note', (live ? null : closedNote(e)) || bbNote(e)));
     cell.addEventListener('click', () => selectRace(e.race_no));
     grid.append(cell);
   });
@@ -894,7 +911,10 @@ function cardRow(r, index) {
   const name = el('td');
   const box = el('div', 'horse');
   const nm = el('span', 'nm', r.horse_name);
-  if (r.blackbook) nm.classList.add('booked');
+  // The book colour means "a thesis I am following into this race". A horse
+  // retired in June is not that, and colouring it anyway is what made the mark
+  // stop being worth looking for.
+  if (isLiveBooking(r.blackbook)) nm.classList.add('booked');
   box.append(nm);
   // The FIRST tag in the array was an arbitrary pick — the order the deriver
   // happened to write them in — so a horse that bled last start showed
@@ -1018,13 +1038,17 @@ function cardRow(r, index) {
   const bb = el('td', 'c-num');
   if (r.blackbook) {
     const dot = el('span', 'bb-dot');
-    // A booking made after this race was never a live thesis over it. The dot
-    // is hollow in that case rather than absent, so an archived card does not
-    // silently under-report what is in the book.
+    // A booking made after this race was never a live thesis over it, and one
+    // closed before it is no longer a live thesis now. The dot is hollow in
+    // both cases rather than absent, so an archived card does not silently
+    // under-report what is in the book — it just stops claiming the entry is
+    // being followed.
     if (r.blackbook.booked_before_race === false) dot.classList.add('later');
+    else if (!isLiveBooking(r.blackbook)) dot.classList.add('closed');
     dot.title = [r.blackbook.reasoning,
                  r.blackbook.tags?.join(' · ').replace(/_/g, ' '),
-                 `booked ${r.blackbook.added_date} · ${r.blackbook.status}`]
+                 `booked ${r.blackbook.added_date} · ${r.blackbook.status}`,
+                 closedNote(r.blackbook)]
       .filter(Boolean).join('\n');
     bb.append(dot);
   }
@@ -1063,8 +1087,13 @@ function renderDetail() {
     const bb = el('section', 'bb-note');
     bb.append(el('h6', null, 'BLACKBOOK NOTE'));
     bb.append(el('p', null, r.blackbook.reasoning));
+    // A thesis that was abandoned is the more recent fact about the horse and
+    // usually the more useful one, so the panel says so in its own line rather
+    // than leaving a status word to carry it.
+    const gone = closedNote(r.blackbook);
+    if (gone) bb.append(el('p', 'closed', gone));
     const meta = el('div', 'bb-meta');
-    meta.append(el('span', 'k', r.blackbook.status?.toUpperCase() ?? ''));
+    meta.append(el('span', 'k', bookingStatus(r.blackbook)));
     if (r.blackbook.added_date) {
       meta.append(el('span', null, `since ${compactDate(r.blackbook.added_date)}`));
     }

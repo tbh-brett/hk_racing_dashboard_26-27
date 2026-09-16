@@ -71,6 +71,8 @@ def meeting_blackbook(date: str, *, conn: Connection | None = None
                 "off_time": off.get(e["race_no"]),
                 "status": e["status"], "confidence": e["confidence"],
                 "added_date": e["added_date"],
+                "closed_date": e["closed_date"],
+                "closed_reason": e["closed_reason"],
                 "reasoning": e["reasoning"],
                 "live_at_race": bool(e["live_at_race"]),
                 "booked_before_race": bool(e["booked_before_race"]),

@@ -129,14 +129,18 @@ def promote_to_blackbook(horse_name: str, *, reasoning: str,
                          source_trial_no: int | None = None,
                          tags: list[str] | None = None,
                          confidence: str = "medium",
-                         expiry_days: int = 90,
                          db: Path | None = None) -> dict:
     """Create a blackbook entry from a run the user was looking at.
 
     The deliberate step. It is a separate call from save_note precisely so that
     writing an observation cannot quietly become a judgement.
+
+    Nothing is stamped with an end date. An entry runs until it is retired or
+    won out, both of which are decisions somebody takes; the 90-day expiry this
+    used to write was a decision nobody took, and it closed entries quietly
+    while the row still read ACTIVE everywhere the date was not checked.
     """
-    from datetime import date, timedelta
+    from datetime import date
 
     horse = horse_name.strip().upper()
     reason = (reasoning or "").strip()
@@ -146,7 +150,6 @@ def promote_to_blackbook(horse_name: str, *, reasoning: str,
     conn = get_conn(db if db is not None else db_path())
     try:
         added = date.today().isoformat()
-        expiry = (date.today() + timedelta(days=expiry_days)).isoformat()
         # A trial is a T, not an R. Writing "2026-08-21 R1" for a trial would
         # point the entry at a race that was never run, and every later reader
         # of `source_race` would believe it.
@@ -160,11 +163,11 @@ def promote_to_blackbook(horse_name: str, *, reasoning: str,
         with transaction(conn):
             entry_id = next_entry_id(conn)
             conn.execute(
-                "INSERT INTO blackbook (id, horse_name, added_date, expiry_date, "
+                "INSERT INTO blackbook (id, horse_name, added_date, "
                 "status, reasoning, confidence, source_race, source_date, "
                 "source_race_no, source_date_from) "
-                "VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)",
-                (entry_id, horse, added, expiry, reason, confidence, source,
+                "VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)",
+                (entry_id, horse, added, reason, confidence, source,
                  source_date,
                  # Only a real race number goes in the race column. A trial's
                  # batch number left here would make the Blackbook link back
@@ -175,37 +178,92 @@ def promote_to_blackbook(horse_name: str, *, reasoning: str,
                 "INSERT INTO blackbook_tags (id, tag) VALUES (?, ?) "
                 "ON CONFLICT (id, tag) DO NOTHING",
                 [(entry_id, t.strip()) for t in (tags or []) if t.strip()])
+            _log_status(conn, entry_id, None, "active", reason, None)
         return {"id": entry_id, "horse_name": horse, "added_date": added,
-                "expiry_date": expiry, "status": "active", "reasoning": reason,
+                "closed_date": None, "status": "active", "reasoning": reason,
                 "confidence": confidence, "source_race": source,
                 "tags": sorted({t.strip() for t in (tags or []) if t.strip()})}
     finally:
         conn.close()
 
 
-# The three ways a thesis ends, plus the one way it lives.
-STATUSES = ("active", "won_out", "retired", "expired")
+# The two ways a thesis ends, and the one way it lives. EXPIRED is gone: a
+# ninety-day clock closed entries nobody had decided anything about and then
+# sat beside RETIRE on the row as though it were a different outcome. Retiring
+# is the decision; there is now one word for it.
+STATUSES = ("active", "won_out", "retired")
+CLOSED = ("won_out", "retired")
 
 
-def set_status(entry_id: str, status: str, *, db: Path | None = None) -> dict:
-    """Resolve an entry — or put it back to active.
+def _log_status(conn, entry_id: str, from_status: str | None, to_status: str,
+                reason: str | None, reasoning: str | None) -> None:
+    """One line of an entry's history. `reasoning` is the thesis as it STOOD."""
+    conn.execute(
+        "INSERT INTO blackbook_status_log (id, changed_at, from_status, "
+        "to_status, reason, reasoning) VALUES (?, ?, ?, ?, ?, ?)",
+        (entry_id, _now(), from_status, to_status, reason, reasoning))
+
+
+def set_status(entry_id: str, status: str, *, reason: str | None = None,
+               reasoning: str | None = None, db: Path | None = None) -> dict:
+    """Close an entry, or reopen it on a new thesis.
 
     "Retiring an entry must be as easy as creating one. A blackbook that only
     ever grows becomes unusable within a season." — design brief 06. So this is
-    one call with no ceremony, and the page puts it one click from the row.
+    still one call with no ceremony, and the page still puts it one click from
+    the row.
+
+    Two things it now records that it did not:
+
+    **WHEN it closed.** `closed_date` is what an archived card reads to answer
+    "was I watching this horse THAT day", which is a different question from
+    "am I watching it now" and used to be answered by the expiry date. Without
+    it, retiring a horse in December would rewrite every September card to say
+    the thesis had never been live.
+
+    **WHY, and what the last one said.** Reopening a horse on a fresh reason
+    overwrote the reason it was booked for in the first place — and a thesis
+    that failed is the most useful thing in the book. The old text goes to
+    `blackbook_status_log` before the new one replaces it, so an entry reads as
+    a sequence of theses rather than one field that has been typed over.
+
+    `reasoning` is only meaningful when reopening; passing it on a close would
+    be rewriting history rather than recording it, so it is refused there.
     """
     if status not in STATUSES:
         raise ValueError(f"status must be one of {', '.join(STATUSES)}")
+    reason = (reason or "").strip() or None
+    reasoning = (reasoning or "").strip() or None
+    if reasoning and status != "active":
+        raise ValueError("a new thesis belongs to reopening an entry, not to "
+                         "closing one; use `reason` to say why it closed")
+
     conn = get_conn(db if db is not None else db_path())
     try:
         with transaction(conn):
-            cur = conn.execute(
-                "UPDATE blackbook SET status = ? WHERE id = ?", (status, entry_id))
-        if not cur.rowcount:
-            raise KeyError(entry_id)
+            was = conn.execute(
+                "SELECT status, reasoning FROM blackbook WHERE id = ?",
+                (entry_id,)).fetchone()
+            if was is None:
+                raise KeyError(entry_id)
+            if status in CLOSED:
+                # `date.today()`, not the run that prompted it: the decision was
+                # taken today whatever it was taken about.
+                conn.execute(
+                    "UPDATE blackbook SET status = ?, closed_date = date('now'), "
+                    "closed_reason = ? WHERE id = ?", (status, reason, entry_id))
+            else:
+                # Reopening clears the close. A date left behind would make the
+                # entry read as live now and closed then at the same time.
+                conn.execute(
+                    "UPDATE blackbook SET status = 'active', closed_date = NULL, "
+                    "closed_reason = NULL, reasoning = coalesce(?, reasoning) "
+                    "WHERE id = ?", (reasoning, entry_id))
+            _log_status(conn, entry_id, was["status"], status,
+                        reason or reasoning, was["reasoning"])
         row = conn.execute(
-            "SELECT id, horse_name, status FROM blackbook WHERE id = ?",
-            (entry_id,)).fetchone()
+            "SELECT id, horse_name, status, closed_date, closed_reason, "
+            "reasoning FROM blackbook WHERE id = ?", (entry_id,)).fetchone()
         return dict(row)
     finally:
         conn.close()

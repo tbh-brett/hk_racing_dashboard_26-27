@@ -329,13 +329,20 @@ CREATE TABLE IF NOT EXISTS bet_statement_rows (
 -- this horse will run better than its public form suggests, for a stated
 -- reason. The page's job is to show whether those claims pay off.
 
+-- A thesis ENDS when it is retired, and only then. There is no expiry date:
+-- a 90-day clock closed entries nobody had decided anything about, and read on
+-- screen as a second way of saying "retired" beside the button that says it.
+-- `closed_date` is the day the decision was taken, which is what an archived
+-- card needs to answer "was I watching this horse THAT day" — the one job the
+-- expiry date was actually doing.
 CREATE TABLE IF NOT EXISTS blackbook (
   id           TEXT PRIMARY KEY,     -- bb_0001 in the legacy export
   horse_name   TEXT NOT NULL,        -- the join key, as everywhere else
   added_date   TEXT NOT NULL,
-  expiry_date  TEXT,
-  status       TEXT NOT NULL,        -- active | expired | won_out | retired
-  reasoning    TEXT,
+  closed_date  TEXT,                 -- NULL while the thesis is still running
+  closed_reason TEXT,                -- why it was closed, in the owner's words
+  status       TEXT NOT NULL,        -- active | won_out | retired
+  reasoning    TEXT,                 -- the thesis STANDING NOW
   confidence   TEXT,                 -- low | medium | high
   source_race  TEXT,                 -- 'YYYY-MM-DD Rn', the run that prompted it
   source_date  TEXT,
@@ -347,6 +354,30 @@ CREATE TABLE IF NOT EXISTS blackbook (
   pref_surface  TEXT,
   pref_jockey   TEXT
 );
+
+-- Every time an entry opened, closed or reopened, and what was said about it.
+--
+-- `blackbook.reasoning` is the thesis standing NOW, which is the right thing
+-- for the row to print and the wrong thing to keep the only copy of: reopening
+-- a horse on a new reason overwrote the reason it was booked for in the first
+-- place, and the record of a thesis that failed is the most useful thing the
+-- book holds. The current reasoning is the head of this list, not a substitute
+-- for it.
+-- Its own key, like `bet_edits`, and NOT (id, changed_at): retiring an entry
+-- and reopening it in the same second are two decisions, and a composite key
+-- on the timestamp silently kept only the first of them.
+CREATE TABLE IF NOT EXISTS blackbook_status_log (
+  log_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+  id          TEXT    NOT NULL,
+  changed_at  TEXT    NOT NULL,      -- ISO timestamp, UTC
+  from_status TEXT,                  -- NULL for the row that opened the entry
+  to_status   TEXT    NOT NULL,
+  reason      TEXT,                  -- why it closed, or the NEW thesis on reopen
+  reasoning   TEXT,                  -- the thesis that was standing at the time
+  FOREIGN KEY (id) REFERENCES blackbook(id)
+);
+
+CREATE INDEX IF NOT EXISTS ix_blackbook_log ON blackbook_status_log(id, changed_at);
 
 CREATE TABLE IF NOT EXISTS blackbook_tags (
   id  TEXT NOT NULL,

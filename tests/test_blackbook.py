@@ -188,14 +188,19 @@ def _bet(conn, bet_id, date, race_no, *horses, stake=100.0, returned=0.0,
 
 @pytest.fixture()
 def booked(tmp_path, db):
-    """FAST ONE booked 2026-04-10, expiring 2026-06-15 — two runs before the
-    booking, three after, and the expiry falling between two of the archived
+    """FAST ONE booked 2026-04-10, closed 2026-06-15 — two runs before the
+    booking, three after, and the close falling between two of the archived
     races so `live_at_race` has something to separate.
 
-    That expiry is in the PAST, which is what the historical tests need and
-    what the "is it live now" tests must not silently inherit: an entry is
-    expired once its date passes, so any test about an ACTIVE entry extends the
-    date itself and says so.
+    The export still carries `expiry_date`, because that is what the legacy
+    file holds and the importer's translation of it is worth exercising. The
+    entry therefore arrives RETIRED, closed on that date: expiry was only ever
+    a second word for "no longer followed", and the date is read as the day the
+    decision landed.
+
+    That date is in the PAST, which is what the historical tests need and what
+    the "is it live now" tests must not silently inherit: any test about an
+    OPEN entry reopens it and says so.
     """
     src = _write(tmp_path, _export([
         {"id": "bb_1", "horse_name": "FAST ONE", "added_date": "2026-04-10",
@@ -266,11 +271,10 @@ def test_an_entry_with_no_runs_since_reports_zero_not_absent(booked):
 def test_review_is_prompted_after_four_unresolved_runs(booked):
     conn = get_conn(booked)
     # Review is only prompted on a LIVE entry, so this test needs one: the
-    # fixture's expiry is in the past, and an expired entry is not awaiting a
-    # verdict.
+    # fixture arrives closed, and a closed entry is not awaiting a verdict.
     with transaction(conn):
-        conn.execute("UPDATE blackbook SET expiry_date = ? WHERE id = 'bb_1'",
-                     ((dt.date.today() + dt.timedelta(days=30)).isoformat(),))
+        conn.execute("UPDATE blackbook SET status = 'active', "
+                     "closed_date = NULL WHERE id = 'bb_1'")
     entry = bb.entry_detail("bb_1", conn=conn)
     assert entry["review_due"] is False              # three runs
     with transaction(conn):
@@ -370,14 +374,15 @@ def test_filters_are_applied_not_ignored(booked):
     conn = get_conn(booked)
     assert len(bb.list_entries(tag="traffic", conn=conn)) == 1
     assert bb.list_entries(tag="no_such_tag", conn=conn) == []
-    # The fixture's entry is past its expiry, so "active" must not return it
-    # and "expired" must — the status filter reads the date, not the flag the
-    # export happened to write.
+    # The fixture's entry arrives closed, so "active" must not return it and
+    # "retired" must. There is no "expired" to ask for any more: the two words
+    # named one outcome and only one of them was ever a decision.
     assert bb.list_entries(status="active", conn=conn) == []
-    assert len(bb.list_entries(status="expired", conn=conn)) == 1
+    assert len(bb.list_entries(status="retired", conn=conn)) == 1
+    assert len(bb.list_entries(status="closed", conn=conn)) == 1
     with transaction(conn):
-        conn.execute("UPDATE blackbook SET expiry_date = ? WHERE id = 'bb_1'",
-                     ((dt.date.today() + dt.timedelta(days=30)).isoformat(),))
+        conn.execute("UPDATE blackbook SET status = 'active', "
+                     "closed_date = NULL WHERE id = 'bb_1'")
     assert len(bb.list_entries(status="active", conn=conn)) == 1
     assert bb.list_entries(status="retired", conn=conn) == []
     conn.close()
@@ -441,6 +446,10 @@ def test_the_book_summary_counts_resolution_not_size(booked):
     the health metric is how many entries were settled."""
     conn = get_conn(booked)
     with transaction(conn):
+        # The fixture's own entry arrives closed, so this test supplies the
+        # open one rather than assuming it.
+        conn.execute("UPDATE blackbook SET status = 'active', "
+                     "closed_date = NULL WHERE id = 'bb_1'")
         conn.execute("INSERT INTO blackbook (id, horse_name, added_date, status) "
                      "VALUES ('bb_2', 'FAST ONE', '2026-01-01', 'won_out')")
         conn.execute("INSERT INTO blackbook (id, horse_name, added_date, status) "
@@ -619,39 +628,219 @@ def test_a_missing_entry_gives_nothing_not_an_empty_ledger(booked):
     conn.close()
 
 
-# ── an expiry date is a fact; the status flag is a cache of it ───────────────
+# ── retiring is the only way a thesis ends ──────────────────────────────────
 
 
-def test_an_entry_past_its_expiry_reads_expired(tmp_path):
-    """`status` is a snapshot taken when the JSON was last exported, and
-    nothing recomputes it on the way in. Without deriving it on read, the book
-    claims a horse is live because a file is stale."""
+def test_an_expiry_that_has_passed_becomes_a_retirement(tmp_path):
+    """The two words named one outcome and only RETIRE was ever a decision.
+
+    A ninety-day clock closed entries nobody had decided anything about, then
+    printed EXPIRED beside RETIRED as though they were different endings. The
+    date survives as the day the entry closed, which is the one job it was
+    really doing; the second word does not.
+    """
     import datetime as dt
-    from hkrd.query import blackbook as bb
-    from hkrd.store.connect import get_conn, init_db, transaction
+    import sqlite3
+    from pathlib import Path
 
-    conn = get_conn(tmp_path / "t.db")
+    from hkrd.store.connect import get_conn, init_db
+
+    old_schema = (Path(__file__).resolve().parents[1]
+                  / "hkrd/store/schema.sql").read_text(encoding="utf-8")
+    # The shape as it stood before the column was replaced.
+    old_schema = old_schema.replace(
+        "  closed_date  TEXT,                 -- NULL while the thesis is still running\n"
+        "  closed_reason TEXT,                -- why it was closed, in the owner's words\n",
+        "  expiry_date  TEXT,\n")
+
+    target = tmp_path / "old.db"
+    raw = sqlite3.connect(target)
+    raw.executescript(old_schema)
+    past = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    future = (dt.date.today() + dt.timedelta(days=30)).isoformat()
+    raw.executemany(
+        "INSERT INTO blackbook (id, horse_name, added_date, expiry_date, "
+        "status, reasoning, confidence) VALUES (?,?,?,?,?,?,?)",
+        [("x1", "LAPSED", "2026-01-01", past, "active", "blocked", "medium"),
+         ("x2", "LIVE", "2026-01-01", future, "active", "sharp trial", "medium"),
+         ("x3", "FLAGGED", "2026-01-01", None, "expired", "went wrong", "low"),
+         ("x4", "PAID", "2026-01-01", past, "won_out", "duly won", "high")])
+    raw.commit()
+    raw.close()
+
+    conn = get_conn(target)
     init_db(conn)
-    yesterday = (dt.date.today() - dt.timedelta(days=1)).isoformat()
-    tomorrow = (dt.date.today() + dt.timedelta(days=1)).isoformat()
-    with transaction(conn):
-        conn.executemany(
-            "INSERT INTO blackbook (id, horse_name, added_date, expiry_date, "
-            "status, reasoning, confidence) VALUES (?,?,?,?,?,?,?)",
-            [("x1", "LAPSED", "2026-01-01", yesterday, "active", "", "medium"),
-             ("x2", "LIVE", "2026-01-01", tomorrow, "active", "", "medium")])
+    rows = {e["horse_name"]: e for e in bb.list_entries(conn=conn)}
 
-    by_name = {e["horse_name"]: e for e in bb.list_entries(conn=conn)}
-    assert by_name["LAPSED"]["status"] == "expired"
-    assert by_name["LIVE"]["status"] == "active"
+    # The clock ran out, so the entry is closed — on the day it ran out.
+    assert rows["LAPSED"]["status"] == "retired"
+    assert rows["LAPSED"]["closed_date"] == past
+    # Still inside its window, so nobody has closed it and nothing does it for
+    # them. This is the entry the old rule would have retired in a month's time
+    # without being asked.
+    assert rows["LIVE"]["status"] == "active"
+    assert rows["LIVE"]["closed_date"] is None
+    # A status with no date behind it is the same decision with the evidence
+    # missing. It reads as closed, and no reason is invented for it.
+    assert rows["FLAGGED"]["status"] == "retired"
+    assert (rows["FLAGGED"]["closed_date"], rows["FLAGGED"]["closed_reason"]) == (None, None)
+    # WON OUT is closed because the thesis PAID. Rewriting it as retired would
+    # throw away the one outcome the book exists to count, and its expiry date
+    # is not when it was won out either.
+    assert rows["PAID"]["status"] == "won_out"
+    assert rows["PAID"]["closed_date"] is None
 
-    # The filter must agree with the rows, or asking for "active" hands back an
-    # entry the row itself then prints as expired.
-    active = {e["horse_name"] for e in bb.list_entries(status="active", conn=conn)}
-    assert active == {"LIVE"}
-    expired = {e["horse_name"] for e in bb.list_entries(status="expired", conn=conn)}
-    assert expired == {"LAPSED"}
+    # Nothing left to find on a second pass, and no second history row for it.
+    init_db(conn)
+    assert "expiry_date" not in {
+        r["name"] for r in conn.execute("PRAGMA table_info(blackbook)")}
+    assert conn.execute("SELECT count(*) FROM blackbook_status_log "
+                        "WHERE id = 'x1'").fetchone()[0] == 1
     conn.close()
+
+
+def test_promoting_a_run_no_longer_stamps_an_end_date(tmp_path, db):
+    """An entry runs until somebody closes it. Nothing closes it for them."""
+    from hkrd.jobs import write_notes
+
+    out = write_notes.promote_to_blackbook(
+        "FAST ONE", reasoning="blocked at the 300", db=db)
+    assert out["status"] == "active" and out["closed_date"] is None
+
+    conn = get_conn(db)
+    entry = bb.entry_detail(out["id"], conn=conn)
+    conn.close()
+    assert entry["closed_date"] is None and entry["closed"] is False
+
+
+def test_a_retired_entry_is_not_live_over_today_but_still_was_over_june(booked):
+    """The bug this replaces: nothing read `status`, so an entry retired by
+    hand went on reading as a live thesis everywhere except the Blackbook page.
+
+    Both halves matter. A horse retired in June must stop lighting up today's
+    card; it must NOT retroactively stop having been followed in May.
+    """
+    conn = get_conn(booked)
+    during = bb.for_race("2026-05-01", 1, conn=conn)[0]   # before the close
+    after = bb.for_race("2026-07-01", 1, conn=conn)[0]    # after it
+    conn.close()
+    assert during["status"] == "retired"                  # closed NOW
+    assert during["live_at_race"] == 1                    # and live THEN
+    assert after["live_at_race"] == 0
+
+
+def test_a_close_with_no_recorded_day_is_read_as_closed_today(db):
+    """Entries retired before there was a column to record it in.
+
+    Reading the unknown day as today is the only reading that satisfies both
+    things at once: it is certainly not live over a card being looked at now,
+    and over an archived card it does not erase a thesis that was, as far as
+    anything here knows, standing at the time.
+    """
+    import datetime as dt
+
+    conn = get_conn(db)
+    today = dt.date.today().isoformat()
+    with transaction(conn):
+        conn.execute("INSERT INTO blackbook (id, horse_name, added_date, "
+                     "status, reasoning) VALUES ('bb_x', 'FAST ONE', "
+                     "'2026-01-01', 'retired', 'gave up on it')")
+        upsert.upsert_races(conn, [
+            {"race_date": today, "race_no": 1, "venue": "HV", "course": "C",
+             "surface": "Turf", "going": "G", "distance": 1650}])
+        upsert.upsert_runners(conn, [
+            {"race_date": today, "race_no": 1, "horse_no": 1,
+             "horse_name": "FAST ONE", "draw": 1}])
+    now = bb.for_race(today, 1, conn=conn)[0]
+    old = bb.for_race("2026-05-01", 1, conn=conn)[0]
+    conn.close()
+    assert now["live_at_race"] == 0        # not a thesis I hold
+    assert old["live_at_race"] == 1        # but one I held then
+
+
+# ── reopening, on a new reason ──────────────────────────────────────────────
+
+
+def test_retiring_stamps_the_day_and_the_reason(booked):
+    """"Was I watching this horse THAT day" is a different question from "am I
+    watching it now", and the closing date is the only thing that answers it."""
+    import datetime as dt
+
+    from hkrd.jobs import write_notes
+
+    conn = get_conn(booked)
+    with transaction(conn):
+        conn.execute("UPDATE blackbook SET status = 'active', "
+                     "closed_date = NULL WHERE id = 'bb_1'")
+    conn.close()
+
+    out = write_notes.set_status("bb_1", "retired",
+                                 reason="beaten four times, thesis is dead",
+                                 db=booked)
+    assert out["status"] == "retired"
+    assert out["closed_date"] == dt.date.today().isoformat()
+    assert out["closed_reason"] == "beaten four times, thesis is dead"
+
+
+def test_reopening_takes_a_new_thesis_and_keeps_the_old_one(booked):
+    """Reopening on a fresh reason used to type over the reason the horse was
+    booked for — and a thesis that failed is the most useful thing in the book.
+    """
+    from hkrd.jobs import write_notes
+
+    conn = get_conn(booked)
+    before = bb.entry_detail("bb_1", conn=conn)
+    conn.close()
+    assert before["reasoning"] == "blocked at the 300"
+
+    out = write_notes.set_status(
+        "bb_1", "active", reason="new trainer, first-up off a trial",
+        reasoning="handles the going and is 8lb below its last winning mark",
+        db=booked)
+    assert out["status"] == "active"
+    # The close is cleared, or the entry reads as live now and closed then at
+    # the same time.
+    assert out["closed_date"] is None and out["closed_reason"] is None
+    assert out["reasoning"] == ("handles the going and is 8lb below its last "
+                                "winning mark")
+
+    conn = get_conn(booked)
+    entry = bb.entry_detail("bb_1", conn=conn)
+    conn.close()
+    assert entry["reopened"] == 1
+    # The thesis that was standing when it was reopened is on the history, not
+    # lost to the field it was typed over.
+    assert entry["history"][0]["to_status"] == "active"
+    assert entry["history"][0]["reasoning"] == "blocked at the 300"
+    assert entry["history"][0]["reason"] == "new trainer, first-up off a trial"
+
+
+def test_reopening_without_a_new_thesis_keeps_the_one_it_had(booked):
+    """The reason is optional. Reopening on the ORIGINAL thesis is a real
+    thing to want — the horse was right and the timing was wrong — and it must
+    not blank the field."""
+    from hkrd.jobs import write_notes
+
+    out = write_notes.set_status("bb_1", "active", db=booked)
+    assert out["reasoning"] == "blocked at the 300"
+
+
+def test_a_new_thesis_cannot_be_smuggled_into_a_closure(booked):
+    """Closing an entry records what happened; it does not rewrite what was
+    claimed. Otherwise the book can be made to look right after the fact."""
+    from hkrd.jobs import write_notes
+
+    with pytest.raises(ValueError, match="reopening"):
+        write_notes.set_status("bb_1", "retired", reasoning="actually I meant",
+                               db=booked)
+
+
+def test_expired_is_no_longer_a_status_anything_can_be_set_to(booked):
+    from hkrd.jobs import write_notes
+
+    assert "expired" not in write_notes.STATUSES
+    with pytest.raises(ValueError, match="status must be one of"):
+        write_notes.set_status("bb_1", "expired", db=booked)
 
 
 def test_a_run_on_the_day_it_was_booked_counts(db):

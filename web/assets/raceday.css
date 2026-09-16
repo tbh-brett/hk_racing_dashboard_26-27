@@ -78,6 +78,11 @@
   display: inline-block; width: 6px; height: 6px; background: var(--book);
 }
 .bb-dot.later { background: none; box-shadow: inset 0 0 0 1px var(--book-dim); }
+/* Closed, not absent. The horse is in the book and the dot says so; what it
+   stops saying is that the thesis is still being followed. Hollow for the same
+   reason `.later` is — the mark is worth finding on a card, and it is only
+   worth finding if a filled one means one thing. */
+.bb-dot.closed { background: none; box-shadow: inset 0 0 0 1px var(--text-faint); }
 
 /* The chips for OTHER races. These are the reason the band is worth keeping on
    screen — the entries in the race you are already looking at are on the card
@@ -127,6 +132,18 @@
    that day. It is still listed, but it must not read like one. */
 .bb-stale { opacity: .55; }
 .bb-stale .name { font-weight: 400; }
+
+/* Retired or won out: a thesis I held and no longer do. Same treatment as
+   `.bb-stale` for the same reason, plus the word for which it is — "RETIRED
+   2026-06-15" is a fact about the horse in front of you, and leaving it to a
+   dimmer grey to imply was how a closed entry went on reading as an open one. */
+.bb-closed { opacity: .55; }
+.bb-closed .name { font-weight: 400; text-decoration: line-through;
+                   text-decoration-color: var(--text-faint); }
+.bb-cell .shut {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em;
+  color: var(--text-faint); white-space: nowrap;
+}
 
 /* EVERY pair, scrolled sideways. Four of twenty-two used to render and the
    rest were simply gone. Cards keep a fixed width so a wide field reads as a
@@ -430,6 +447,11 @@ table.card td { padding: 6px 8px; }
 #detail .bb-note p {
   margin: 0; color: var(--text-2); font-size: var(--fs-sm);
   line-height: 1.45; font-family: var(--font-sans);
+}
+/* Why it was closed, under the thesis it closed on. */
+#detail .bb-note p.closed {
+  margin-top: 5px; color: var(--text-faint); font-family: var(--font-mono);
+  font-size: var(--fs-xs); letter-spacing: .04em;
 }
 #detail .bb-meta {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);

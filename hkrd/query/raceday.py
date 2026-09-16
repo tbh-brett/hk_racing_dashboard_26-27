@@ -268,6 +268,13 @@ def build_card(date: str, race_no: int, *,
                     "confidence": book["confidence"],
                     "added_date": book["added_date"],
                     "reasoning": book["reasoning"],
+                    # A closed thesis is still worth knowing about when the
+                    # horse turns up — it is just not a live one. The row
+                    # carries both so the page can say "you followed this and
+                    # gave up on it in June" without lighting it up as though
+                    # you still were.
+                    "closed_date": book["closed_date"],
+                    "closed_reason": book["closed_reason"],
                     "live_at_race": bool(book["live_at_race"]),
                     "booked_before_race": bool(book["booked_before_race"]),
                     "tags": sorted((book["tag_csv"] or "").split(","))

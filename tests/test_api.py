@@ -168,6 +168,72 @@ def test_the_race_card_flags_its_booked_runners(booked):
             == [r["horse_name"] for r in booked_rows])
 
 
+def test_retiring_an_entry_stops_it_reading_as_live_on_the_card(booked):
+    """The complaint this answers: a retired horse went on being highlighted.
+
+    Race Day and the Form Guide both light a name up on `live_at_race`, so this
+    is the one flag that has to change. The entry stays ON the card — the horse
+    IS in the book and that is worth seeing when it turns up — it just stops
+    claiming to be a thesis still being followed.
+    """
+    import datetime as dt
+
+    out = booked.post("/api/blackbook/bb_1/status",
+                      json={"status": "retired",
+                            "reason": "beaten four times off this"})
+    assert out.status_code == 200
+    assert out.json()["closed_date"] == dt.date.today().isoformat()
+
+    card = booked.get("/api/raceday/2025-06-13/1").json()
+    row = next(r for r in card["runners"] if r["horse_name"] == "HORSE 0")
+    # Still on the card, with the reason it was dropped...
+    assert row["blackbook"]["status"] == "retired"
+    assert row["blackbook"]["closed_reason"] == "beaten four times off this"
+    # ...and no longer a live thesis over a race run before it was closed?
+    # It IS one: the close is today, the race is 2025-06-13, and a horse
+    # retired now was being followed then. That is the half that must not be
+    # rewritten.
+    assert row["blackbook"]["live_at_race"] is True
+
+    # A card from today is the other half, and the one that was wrong.
+    today = dt.date.today().isoformat()
+    band = booked.get(f"/api/blackbook/declared/{today}").json()
+    for entry in band["entries"]:
+        if entry["id"] == "bb_1":
+            assert entry["live_at_race"] == 0
+
+
+def test_reopening_takes_a_new_thesis_and_keeps_the_old_one(booked):
+    """The old reasoning was typed over. It is the record of a thesis that
+    failed, which is the most useful thing the book holds."""
+    booked.post("/api/blackbook/bb_1/status",
+                json={"status": "retired", "reason": "gave up"})
+    out = booked.post("/api/blackbook/bb_1/status",
+                      json={"status": "active",
+                            "reason": "new stable",
+                            "reasoning": "8lb below its last winning mark"})
+    assert out.status_code == 200
+    body = out.json()
+    assert body["status"] == "active"
+    assert body["closed_date"] is None and body["closed_reason"] is None
+    assert body["reasoning"] == "8lb below its last winning mark"
+
+    entry = booked.get("/api/blackbook/bb_1").json()
+    assert entry["reopened"] == 1
+    moves = [(h["to_status"], h["reason"]) for h in entry["history"]]
+    assert ("active", "new stable") in moves
+    assert ("retired", "gave up") in moves
+    # The thesis it was booked on survives the overwrite.
+    assert any(h["reasoning"] == "blocked at the 300" for h in entry["history"])
+
+
+def test_a_new_thesis_cannot_be_smuggled_into_a_closure(booked):
+    """Closing records what happened; it does not rewrite what was claimed."""
+    out = booked.post("/api/blackbook/bb_1/status",
+                      json={"status": "retired", "reasoning": "I meant this"})
+    assert out.status_code == 422
+
+
 def test_the_meeting_band_reports_no_movement_rather_than_zero(booked):
     """The fixture has no odds snapshots. A 0% would read as a steady market."""
     body = booked.get("/api/raceday/2025-06-13/blackbook").json()

@@ -156,7 +156,9 @@ def test_promotion_records_the_run_it_came_from(db):
     tags = [r["tag"] for r in conn.execute("SELECT tag FROM blackbook_tags")]
     conn.close()
     assert row["source_date"] == "2026-05-01" and row["source_race_no"] == 1
-    assert row["expiry_date"] > row["added_date"]
+    # No end date is stamped. The entry runs until somebody retires it; the
+    # ninety-day clock that used to close it was a decision nobody took.
+    assert row["closed_date"] is None
     assert sorted(tags) == ["bad_draw", "traffic"]
 
 

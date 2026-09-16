@@ -188,8 +188,12 @@ export const api = {
     + (limit ? `&limit=${limit}` : '')),
   blackbookSummary: (today) => get(
     `/blackbook/summary${today ? `?today=${today}` : ''}`),
-  setBlackbookStatus: (id, status) => post(
-    `/blackbook/${encodeURIComponent(id)}/status`, { status }),
+  // `body` carries `reason` (why the decision was taken) and, on a reopen,
+  // `reasoning` (the new thesis). Both optional; the route refuses a new
+  // thesis on a CLOSE, which would be rewriting history rather than recording
+  // it.
+  setBlackbookStatus: (id, status, body = {}) => post(
+    `/blackbook/${encodeURIComponent(id)}/status`, { status, ...body }),
   concentration: (date, no) => get(`/market/concentration/${date}/${no}`),
   coverage: () => get('/market/coverage'),
   formGuide: (date, no, history = 6) =>

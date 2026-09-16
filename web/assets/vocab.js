@@ -510,3 +510,37 @@ export function accountPicker(current, onPick, { label = 'LEDGER' } = {}) {
   });
   return bar;
 }
+
+/* ── the blackbook, as the other pages read it ─────────────────────────────
+ *
+ * Race Day and the Form Guide both light a horse's name up in the book colour,
+ * and both used to do it on the mere EXISTENCE of an entry. So a horse booked
+ * in March and retired in June went on reading as a live thesis on every card
+ * after it — which is the one thing the colour is supposed to mean, and the
+ * reason the book stopped being worth glancing at.
+ *
+ * `live_at_race` is the server's answer and it is race-relative: over an
+ * archived card it says whether the entry was standing THAT DAY, not whether
+ * it is standing now. So a retired horse stops lighting up today's card
+ * without its history being rewritten behind it.
+ */
+export function isLiveBooking(bb) {
+  return Boolean(bb && bb.live_at_race);
+}
+
+/** What a booking says about itself NOW — which on an archived card is a
+ *  different fact from whether it was live over that race. */
+export function bookingStatus(bb) {
+  if (!bb) return '';
+  if (bb.status === 'won_out') return 'WON OUT';
+  if (bb.status === 'retired') {
+    return bb.closed_date ? `RETIRED ${bb.closed_date}` : 'RETIRED';
+  }
+  return 'ACTIVE';
+}
+
+/** The one-line "and this is why it was closed", when there is one. */
+export function closedNote(bb) {
+  if (!bb || bb.status === 'active') return null;
+  return [bookingStatus(bb), bb.closed_reason].filter(Boolean).join(' — ');
+}
