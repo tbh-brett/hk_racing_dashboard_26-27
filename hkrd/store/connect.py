@@ -72,9 +72,31 @@ def get_conn(path: str | Path | None = None) -> sqlite3.Connection:
 
 
 @contextmanager
-def transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
-    """One atomic unit. Rolls back and re-raises — never swallows."""
-    conn.execute("BEGIN")
+def transaction(conn: sqlite3.Connection, *, immediate: bool = False
+                ) -> Iterator[sqlite3.Connection]:
+    """One atomic unit. Rolls back and re-raises — never swallows.
+
+    `immediate` takes the write lock UP FRONT instead of on the first write,
+    and it is the answer to a specific deadlock rather than a tuning knob.
+
+    A plain `BEGIN` is deferred. A transaction that READS and then writes takes
+    a read lock first and tries to upgrade — and in WAL mode, if another writer
+    committed in between, that upgrade fails with SQLITE_BUSY *immediately*.
+    The busy timeout does not help: SQLite refuses to wait there on purpose,
+    because both holders would be waiting on each other. So the losing side
+    gets "database is locked" no matter how long it is willing to wait.
+
+    Measured, because it is the difference between a deploy and an outage: two
+    processes calling `init_db` on the same un-migrated database failed 12 times
+    out of 12. That is not a hypothetical — `ops/entrypoint.sh` starts cron
+    BEFORE uvicorn, `scrape_odds` runs every minute and calls `init_db`, and so
+    does the API's startup hook. The first boot after a schema change is
+    exactly two processes racing to migrate one file.
+
+    With `immediate` the second one simply waits out `busy_timeout`, then reads
+    a schema the first has already migrated and does nothing.
+    """
+    conn.execute("BEGIN IMMEDIATE" if immediate else "BEGIN")
     try:
         yield conn
     except Exception:
@@ -106,7 +128,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
     one the season is being run on — and then every reader of that column fails
     on the only database that matters. These run on the way in instead.
     """
-    with transaction(conn):
+    # IMMEDIATE, because every migration below reads the schema before it
+    # changes it, and a deferred transaction cannot upgrade that read to a
+    # write once another process has committed. See `transaction`.
+    with transaction(conn, immediate=True):
         _migrate_blackbook_close(conn)
         _migrate_blackbook_prefs(conn)
 

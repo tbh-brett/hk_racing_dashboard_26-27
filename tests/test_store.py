@@ -312,3 +312,56 @@ def test_an_amended_result_marker_is_not_a_margin():
     # and something genuinely unreadable must still be loud
     with pytest.raises(coerce.CoerceError):
         coerce.parse_lbw("-WHAT")
+
+
+def test_two_processes_can_migrate_the_same_database_at_once(tmp_path):
+    """The first boot after a schema change is exactly this race.
+
+    `ops/entrypoint.sh` starts supercronic BEFORE uvicorn. `scrape_odds` runs
+    every minute from cron and calls `init_db`; so does the API's startup hook.
+    So on the first boot after a release that changes the schema, two processes
+    open the same un-migrated file and both try to migrate it.
+
+    With a deferred `BEGIN` this failed 12 times out of 12 with "database is
+    locked" — a read-to-write upgrade that SQLite refuses to wait on, so the
+    busy timeout never helps and the API's startup raises. The migration takes
+    its write lock up front instead; the loser waits, re-reads the schema, and
+    finds there is nothing left to do.
+    """
+    import multiprocessing as mp
+
+    from hkrd.store.connect import get_conn, init_db
+
+    target = tmp_path / "race.db"
+    get_conn(target).close()          # the file, with nothing in it
+
+    def migrate(path, q):
+        try:
+            conn = get_conn(path)
+            init_db(conn)
+            conn.close()
+            q.put("ok")
+        except Exception as exc:                        # noqa: BLE001
+            q.put(f"{type(exc).__name__}: {exc}")
+
+    ctx = mp.get_context("fork")
+    q = ctx.Queue()
+    workers = [ctx.Process(target=migrate, args=(target, q)) for _ in range(2)]
+    for w in workers:
+        w.start()
+    for w in workers:
+        w.join(timeout=60)
+    results = [q.get() for _ in workers]
+    assert results == ["ok", "ok"], results
+
+
+def test_an_immediate_transaction_takes_its_write_lock_up_front():
+    """The distinction the migration depends on, asserted rather than assumed:
+    a deferred BEGIN does not lock, an IMMEDIATE one does."""
+    import inspect
+
+    from hkrd.store import connect
+
+    source = inspect.getsource(connect.transaction)
+    assert 'BEGIN IMMEDIATE' in source and 'else "BEGIN"' in source
+    assert "immediate=True" in inspect.getsource(connect._migrate)

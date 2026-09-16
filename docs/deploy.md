@@ -539,3 +539,61 @@ every race:
 ```powershell
 .\.venv\Scripts\python -m hkrd.jobs.scrape_odds --date 2026-09-06 --venue ST
 ```
+
+---
+
+## Deploying a release that changes the schema
+
+The Blackbook release (`closed_date`, `blackbook_trigger`) is the first one
+that does. Two things about it are worth knowing before pressing deploy, and
+both were found by measurement rather than reasoning.
+
+### The migration runs on the machine, not on your laptop
+
+`ops/entrypoint.sh` starts `uvicorn`, which runs `api.app._warm`, which calls
+`init_store.run()` → `store/connect.init_db` → `_migrate`. `fly.toml` sets
+`HKRD_DB=/data/hkrd.db`, so it migrates the real file on the volume.
+
+Nothing needs to be run by hand, and the database does **not** need to be
+rebuilt or re-uploaded. `ops/install-db.sh` is for replacing a database, which
+this is not.
+
+### `init_store` is no longer a no-op
+
+It used to be only `CREATE ... IF NOT EXISTS`, and its own docstring said so.
+A release that REPLACES a column cannot be additive: `_migrate` moves the
+meaning across and then `ALTER TABLE ... DROP COLUMN`. It is idempotent — every
+step checks the schema before touching it — but the first boot after such a
+release is the moment the production file changes shape.
+
+### The concurrency, which nearly broke this deploy
+
+`ops/entrypoint.sh` starts **supercronic before uvicorn**, and `scrape_odds`
+runs every minute and also calls `init_db`. So the first boot after a schema
+change is two processes racing to migrate one file.
+
+With a deferred `BEGIN` that fails. A transaction that reads the schema and
+then writes takes a read lock and tries to upgrade it, and in WAL mode SQLite
+refuses to WAIT on that upgrade — it returns `SQLITE_BUSY` immediately, so
+`busy_timeout = 30000` never gets a chance. Measured: **12 failures in 12
+attempts**, and the failing side would have been the API's startup hook, so the
+machine would have failed its health check and the deploy would have rolled.
+
+`_migrate` now runs under `BEGIN IMMEDIATE`, which takes the write lock before
+the read. The loser waits out the busy timeout, re-reads a schema the winner
+has already migrated, and does nothing. 0 failures in 12.
+`tests/test_store.py` pins it.
+
+### What to do if it goes wrong
+
+Litestream replicates within `sync-interval: 10s`, so the migrated schema
+reaches R2 almost immediately — the pre-migration state is recoverable only
+from the retention window, which is **168h (7 days)**. That is the real safety
+net and it is not indefinite.
+
+```powershell
+fly logs -a hkrd                    # the startup hook reports what it did
+```
+
+A restore to a point in time before the release is
+`litestream restore -timestamp <RFC3339>`; see the restore section above.
