@@ -896,3 +896,82 @@ The log is keyed on its own autoincrement id, like `bet_edits`, and not on
 `(id, changed_at)`: retiring an entry and reopening it in the same second are
 two decisions, and a composite key on a second-resolution timestamp silently
 kept only the first.
+
+---
+
+## Blackbook — a thesis is a condition, not just a sentence. **Settled**
+
+`docs/proposal-blackbook.md` §2.1, built. The complaint it answers: the module
+*"really only functions as a reminder module for myself when manually screening
+through races."*
+
+It read that way because it was one. An entry said a horse would run better than
+its form suggested, and almost always that claim came with circumstances — at a
+trip, on a surface, from a draw. The prose said so and nothing could read it, so
+**every run counted equally against the thesis**. A horse booked for 1200m and
+beaten four times at 1650m looked like a failed idea. It is an untested one, and
+those are different facts.
+
+**The first attempt at this was already in the schema and was write-only.**
+`pref_distance`, `pref_surface` and `pref_jockey` were filled by the legacy
+import and read by nothing — the only two lines in the codebase that named them
+were the two that wrote them. They migrate into `blackbook_trigger`, which is
+read by the record, both bands and the Form Guide.
+
+**No new data.** Every `kind` in `query/triggers.KINDS` is a column the archive
+already holds and `query/slices.DIMENSIONS` already groups by, so a condition
+means the same thing here as it does on Lookup, and nothing has to be derived,
+scraped or guessed to check one.
+
+**The record is reported both ways.** `runs_since` over every run, and
+`runs_on_conditions` over the runs that asked the question. The difference
+between them is itself the finding: a thesis that never gets its race is a
+different problem from one that gets it and loses. An entry stating no
+conditions is met by every run, which is what the whole book was before this,
+and is the right default — a claim with no stated circumstances is a claim about
+the horse.
+
+**Three rules worth naming, each with a test that fails without it:**
+
+- **NULL is a failure, not a pass.** A race whose distance was never scraped
+  cannot be shown to be the 1200m the entry asked for. `query/gear` draws the
+  same line: a NULL column is "this scrape did not carry it", never "there was
+  none". Crediting an unknown would quietly hand a thesis runs it never had.
+- **A list is comma-wrapped on both sides.** `',11,12,' LIKE '%,1,%'` is false;
+  `'11,12' LIKE '%1%'` is true. Without the wrapping a horse drawn 1 satisfies
+  "drawn 11 or 12", and every list condition silently widens to anything whose
+  text appears inside it. Caught by mutating the SQL and watching the test go
+  red — the first version of that test passed against the broken code.
+- **Text compares case-folded and trimmed.** "Turf" typed into a form and
+  "TURF" off the scrape are one condition. A trigger failing on capitalisation
+  would be the worst kind of bug available here: silent, and the horse simply
+  stops appearing.
+
+**A condition nothing can evaluate is refused at the point it is written**
+(`query/triggers.validate`), and the vocabulary is served from
+`/api/blackbook/conditions` rather than copied into the page — a form offering
+something the band cannot check would never match, and the book would look empty
+rather than broken.
+
+**Cost, measured** on a synthetic archive at the real one's size (1,712 races,
+20,544 runners, 196 entries, two thirds of them carrying two conditions each):
+
+| | |
+|---|---|
+| `list_entries` | 36.7 ms |
+| `book_summary` | 23.6 ms |
+| `tag_performance` | 24.0 ms |
+| `declared_on` / `for_race` | 0.1 ms |
+
+Against a 500 ms budget. The shape is pinned in `tests/test_performance.py`:
+one `NOT EXISTS` per run whatever the number of conditions, one query for the
+whole book's conditions rather than one per entry, and an index on
+`blackbook_trigger(id)`.
+
+**`query/blackbook.py` was split at 628 of the 600-line cap.** `for_race` and
+`declared_on` moved to `query/blackbook_band.py` — the same seam `query/meeting`
+was carved on. They are the only two functions in the module that take a DATE
+rather than an entry, and the only ones that answer "as at that race" rather
+than "as it stands". Both are re-exported from `query/blackbook`, because they
+ARE the blackbook to every caller outside it and a split in that module is not a
+reason for `query/raceday` to learn a second import path.

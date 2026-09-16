@@ -889,3 +889,221 @@ def test_the_run_the_entry_was_written_off_is_still_not_evidence(db):
 
     assert "2026-05-01" not in [r["race_date"] for r in entry["runs"]]
     assert entry["runs_since"] == 2       # only June and July
+
+
+# ── the conditions a thesis depends on ──────────────────────────────────────
+
+
+def _condition(conn, entry_id, kind, op, value):
+    with transaction(conn):
+        conn.execute("INSERT INTO blackbook_trigger (id, kind, op, value) "
+                     "VALUES (?, ?, ?, ?)", (entry_id, kind, op, value))
+
+
+def test_a_run_that_missed_the_conditions_is_not_a_failed_thesis(booked):
+    """The point of the whole feature.
+
+    FAST ONE is booked and runs five times at 1650m. Book it for 1200m and the
+    three runs since are no longer a test of anything — the record over EVERY
+    run is unchanged, and the record over the runs that asked the question is
+    empty. "Not tested" and "tested and lost" are different facts and the book
+    used to print them as the same one.
+    """
+    conn = get_conn(booked)
+    before = bb.entry_detail("bb_1", conn=conn)
+    assert (before["runs_since"], before["runs_on_conditions"]) == (3, 3)
+
+    _condition(conn, "bb_1", "distance", "is", "1200")
+    after = bb.entry_detail("bb_1", conn=conn)
+    conn.close()
+    assert after["runs_since"] == 3              # unchanged: it still ran
+    assert after["runs_on_conditions"] == 0      # but never at the trip
+    assert after["wins_on_conditions"] == 0
+    assert [r["on_conditions"] for r in after["runs"]] == [0, 0, 0]
+
+
+def test_conditions_that_are_met_leave_the_record_alone(booked):
+    """The fixture runs at 1650m on Turf, so these two are satisfied by every
+    run. A condition that matches must not quietly cost the entry its record."""
+    conn = get_conn(booked)
+    _condition(conn, "bb_1", "distance", "between", "1600-1700")
+    _condition(conn, "bb_1", "surface", "is", "turf")   # stored as "Turf"
+    e = bb.entry_detail("bb_1", conn=conn)
+    conn.close()
+    assert e["runs_on_conditions"] == e["runs_since"] == 3
+    assert e["wins_on_conditions"] == e["wins_since"] == 1
+
+
+def test_conditions_are_anded_not_ored(booked):
+    """"1200m on Turf" is one claim, not two chances to match."""
+    conn = get_conn(booked)
+    _condition(conn, "bb_1", "surface", "is", "Turf")     # every run
+    _condition(conn, "bb_1", "distance", "is", "1200")    # no run
+    e = bb.entry_detail("bb_1", conn=conn)
+    conn.close()
+    assert e["runs_on_conditions"] == 0
+
+
+def test_a_list_condition_matches_any_of_its_values(booked):
+    conn = get_conn(booked)
+    _condition(conn, "bb_1", "distance", "in", "1200,1650,1800")
+    assert bb.entry_detail("bb_1", conn=conn)["runs_on_conditions"] == 3
+    conn.close()
+
+
+def test_a_list_condition_does_not_match_inside_another_value(booked):
+    """A horse drawn 1 must not satisfy "drawn 11 or 12".
+
+    Both sides are comma-wrapped for exactly this. Without it the test is a
+    bare substring — '11,12' contains '1' — and every list condition silently
+    widens to anything whose text appears inside it. The fixture draws FAST ONE
+    in gate 1, which is the case.
+    """
+    conn = get_conn(booked)
+    _condition(conn, "bb_1", "draw", "in", "11,12")
+    assert bb.entry_detail("bb_1", conn=conn)["runs_on_conditions"] == 0
+    # And the same list with the real draw in it does match, so the assertion
+    # above is about the wrapping and not about the list being broken.
+    with transaction(conn):
+        conn.execute("UPDATE blackbook_trigger SET value = '1,11,12' "
+                     "WHERE id = 'bb_1'")
+    assert bb.entry_detail("bb_1", conn=conn)["runs_on_conditions"] == 3
+    conn.close()
+
+
+def test_a_text_condition_ignores_capitalisation(booked):
+    """"Turf" typed into a form and "TURF" off the scrape are one condition. A
+    trigger that failed on case would be the worst kind of bug here: silent,
+    and the horse just stops appearing."""
+    conn = get_conn(booked)
+    _condition(conn, "bb_1", "surface", "is", "  tUrF ")
+    assert bb.entry_detail("bb_1", conn=conn)["runs_on_conditions"] == 3
+    conn.close()
+
+
+def test_an_unknown_condition_value_fails_rather_than_passes(booked):
+    """A race whose distance was never scraped cannot be shown to be the
+    1200m the entry asked for. `query/gear` draws the same line: a NULL column
+    is "this scrape did not carry it", never "there was none"."""
+    conn = get_conn(booked)
+    with transaction(conn):
+        conn.execute("UPDATE races SET distance = NULL")
+    _condition(conn, "bb_1", "distance", "between", "1600-1700")
+    assert bb.entry_detail("bb_1", conn=conn)["runs_on_conditions"] == 0
+    conn.close()
+
+
+def test_an_entry_with_no_conditions_is_met_by_every_run(booked):
+    """Which is what the whole book was before this existed, and is the right
+    default: a thesis with no stated circumstances is a claim about the horse.
+    """
+    conn = get_conn(booked)
+    e = bb.entry_detail("bb_1", conn=conn)
+    conn.close()
+    assert e["conditions"] == [] and e["conditions_text"] == ""
+    assert e["runs_on_conditions"] == e["runs_since"]
+
+
+def test_the_band_says_whether_today_is_the_race_the_entry_wanted(db):
+    """Not "AMAZING KIDS runs today" but "runs today, AT THE TRIP YOU BOOKED
+    IT FOR". That is the difference between a reminder and a trigger."""
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.execute("INSERT INTO blackbook (id, horse_name, added_date, "
+                     "status, reasoning) VALUES ('bb_t', 'FAST ONE', "
+                     "'2026-01-01', 'active', 'wants a sprint')")
+    _condition(conn, "bb_t", "distance", "is", "1200")
+
+    row = bb.for_race("2026-05-01", 1, conn=conn)[0]      # run at 1650m
+    assert row["on_conditions"] == 0
+    with transaction(conn):
+        conn.execute("UPDATE races SET distance = 1200 "
+                     "WHERE race_date = '2026-05-01'")
+    row = bb.for_race("2026-05-01", 1, conn=conn)[0]
+    assert row["on_conditions"] == 1
+    # And the whole meeting, which is what the sticky band reads.
+    assert bb.declared_on("2026-05-01", conn=conn)[0]["on_conditions"] == 1
+    conn.close()
+
+
+def test_the_preferred_columns_became_conditions_and_then_went(tmp_path):
+    """pref_distance, pref_surface and pref_jockey were written by the legacy
+    import and read by NOTHING — the only two lines naming them were the two
+    that wrote them. They move to the table something reads."""
+    import sqlite3
+    from pathlib import Path as _Path
+
+    from hkrd.store.connect import get_conn as _get_conn, init_db as _init
+
+    schema = (_Path(__file__).resolve().parents[1]
+              / "hkrd/store/schema.sql").read_text(encoding="utf-8")
+    schema = schema.replace("  source_date_from TEXT\n);",
+                            "  source_date_from TEXT,\n  pref_distance TEXT,\n"
+                            "  pref_surface  TEXT,\n  pref_jockey   TEXT\n);")
+    target = tmp_path / "prefs.db"
+    raw = sqlite3.connect(target)
+    raw.executescript(schema)
+    raw.execute("INSERT INTO blackbook (id, horse_name, added_date, status, "
+                "pref_distance, pref_surface, pref_jockey) VALUES "
+                "('p1', 'FAST ONE', '2026-01-01', 'active', '1200,1400', "
+                "'Dirt', 'Z Purton')")
+    raw.execute("INSERT INTO blackbook (id, horse_name, added_date, status, "
+                "pref_distance) VALUES ('p2', 'OTHER', '2026-01-01', "
+                "'active', '1650')")
+    raw.commit()
+    raw.close()
+
+    conn = _get_conn(target)
+    _init(conn)
+    rows = {e["id"]: e for e in bb.list_entries(conn=conn)}
+    p1 = {(c["kind"], c["op"], c["value"]) for c in rows["p1"]["conditions"]}
+    assert p1 == {("distance", "in", "1200,1400"), ("surface", "is", "Dirt"),
+                  ("jockey", "is", "Z Purton")}
+    # A single-valued list is `is` said the long way, and prints better for it.
+    assert rows["p2"]["conditions"][0]["op"] == "is"
+    assert "1200/1400" in rows["p1"]["conditions_text"]
+
+    assert "pref_distance" not in {
+        r["name"] for r in conn.execute("PRAGMA table_info(blackbook)")}
+    _init(conn)      # idempotent: no second copy of the conditions
+    assert len(bb.list_entries(conn=conn)[0]["conditions"]) in (1, 3)
+    conn.close()
+
+
+def test_a_condition_nothing_can_evaluate_is_refused(booked):
+    """A trigger that never matches is worse than no trigger: the horse
+    silently stops appearing and the book looks empty rather than broken."""
+    from hkrd.jobs import write_notes
+
+    with pytest.raises(ValueError, match="kind must be one of"):
+        write_notes.set_triggers("bb_1", [{"kind": "vibes", "op": "is",
+                                           "value": "good"}], db=booked)
+    with pytest.raises(ValueError, match="compares numbers"):
+        write_notes.set_triggers("bb_1", [{"kind": "distance", "op": ">=",
+                                           "value": "sprint"}], db=booked)
+    with pytest.raises(ValueError, match="needs a numeric condition"):
+        write_notes.set_triggers("bb_1", [{"kind": "going", "op": ">=",
+                                           "value": "3"}], db=booked)
+    with pytest.raises(ValueError, match="needs a value"):
+        write_notes.set_triggers("bb_1", [{"kind": "going", "op": "is",
+                                           "value": "  "}], db=booked)
+    # Nothing was written by any of the four.
+    conn = get_conn(booked)
+    assert bb.entry_detail("bb_1", conn=conn)["conditions"] == []
+    conn.close()
+
+
+def test_setting_conditions_replaces_them_rather_than_appending(booked):
+    """Editing 1200m to 1200-1400m has to leave ONE condition. Two would
+    contradict each other and match nothing between them."""
+    from hkrd.jobs import write_notes
+
+    write_notes.set_triggers("bb_1", [{"kind": "distance", "op": "is",
+                                       "value": "1200"}], db=booked)
+    out = write_notes.set_triggers(
+        "bb_1", [{"kind": "distance", "op": "between", "value": "1200-1400"}],
+        db=booked)
+    assert out["conditions"] == [{"kind": "distance", "op": "between",
+                                  "value": "1200-1400"}]
+    # And an empty list clears them, which says the claim is about the horse.
+    assert write_notes.set_triggers("bb_1", [], db=booked)["conditions"] == []

@@ -192,6 +192,11 @@ export const api = {
   // `reasoning` (the new thesis). Both optional; the route refuses a new
   // thesis on a CLOSE, which would be rewriting history rather than recording
   // it.
+  blackbookConditionVocabulary: () => get('/blackbook/conditions'),
+  // Replace, not append: editing "1200m" to "1200-1400m" has to leave one
+  // condition, not two that contradict each other and match nothing between.
+  setBlackbookConditions: (id, conditions) => post(
+    `/blackbook/${encodeURIComponent(id)}/conditions`, { conditions }),
   setBlackbookStatus: (id, status, body = {}) => post(
     `/blackbook/${encodeURIComponent(id)}/status`, { status, ...body }),
   concentration: (date, no) => get(`/market/concentration/${date}/${no}`),

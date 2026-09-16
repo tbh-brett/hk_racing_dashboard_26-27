@@ -275,6 +275,8 @@ def build_card(date: str, race_no: int, *,
                     # you still were.
                     "closed_date": book["closed_date"],
                     "closed_reason": book["closed_reason"],
+                    "on_conditions": book["on_conditions"],
+                    "conditions_text": book["conditions_text"],
                     "live_at_race": bool(book["live_at_race"]),
                     "booked_before_race": bool(book["booked_before_race"]),
                     "tags": sorted((book["tag_csv"] or "").split(","))

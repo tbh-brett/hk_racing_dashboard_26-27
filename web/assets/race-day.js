@@ -163,6 +163,21 @@ function bbNote(e) {
   return 'no reason recorded';
 }
 
+/** Is today the race this thesis was actually written for?
+ *
+ *  This is the difference between a reminder and a trigger. "AMAZING KIDS runs
+ *  today" is something the card already told you; "runs today, at the trip you
+ *  booked it for" is the reason to stop and look.
+ *
+ *  `null` when the entry states no conditions — which is not the same as
+ *  failing them, and must render as neither a tick nor a cross. Most of the
+ *  book is in that state and always will be.
+ */
+function bbConditions(e) {
+  if (!e.conditions_text) return null;
+  return { met: Boolean(e.on_conditions), text: e.conditions_text };
+}
+
 function renderBlackbookBand() {
   const host = $('band-bb');
   const declared = state.blackbook?.entries ?? [];
@@ -210,6 +225,16 @@ function renderBlackbookBand() {
       item.append(el('span', 'od', num(e.win_odds)));
       const mv = bbMove(e);
       item.append(el('span', `pct ${mv.cls}`, mv.text));
+      const cond = bbConditions(e);
+      if (cond) {
+        // The conditions themselves, not the word "conditions": "1200-1400m"
+        // is something you can act on and "meets its conditions" is not.
+        const chip = el('span', `bb-cond${cond.met ? ' met' : ''}`, cond.text);
+        chip.title = cond.met
+          ? `today meets what this entry was booked for: ${cond.text}`
+          : `booked for ${cond.text} — today is not that race`;
+        item.append(chip);
+      }
       if (roomy) item.append(el('span', 'note', bbNote(e)));
       else item.title = bbNote(e);
       body.append(item);
@@ -246,7 +271,15 @@ function renderBlackbookBand() {
   const grid = el('div', 'bb-grid');
   // Live first, then the closed ones. Sorting them back is what stops a
   // retired horse in race 2 pushing a live one in race 8 off the first screen.
-  [...all, ...closed].forEach((e) => {
+  //
+  // And inside the live ones, the entries whose conditions TODAY MEETS come
+  // first. On a card with eight booked horses that is the ordering that
+  // matters: two of them are having the race they were booked for and six are
+  // merely present. `sort` on a copy — `all` is read again below it.
+  const firstToday = (x, y) =>
+    (y.conditions_text && y.on_conditions ? 1 : 0)
+    - (x.conditions_text && x.on_conditions ? 1 : 0);
+  [...[...all].sort(firstToday), ...closed].forEach((e) => {
     const live = isLiveBooking(e);
     const cell = el('button', 'bb-cell');
     if (e.race_no === state.race) cell.classList.add('here');
@@ -260,6 +293,8 @@ function renderBlackbookBand() {
     line.append(el('span', 'odds', num(e.win_odds)));
     const mv = bbMove(e);
     line.append(el('span', `mv pct ${mv.cls}`, mv.text));
+    const cond = bbConditions(e);
+    if (cond) line.append(el('span', `bb-cond${cond.met ? ' met' : ''}`, cond.text));
     cell.append(line);
     cell.append(el('div', 'note', (live ? null : closedNote(e)) || bbNote(e)));
     cell.addEventListener('click', () => selectRace(e.race_no));

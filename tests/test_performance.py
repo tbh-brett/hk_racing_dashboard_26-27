@@ -183,3 +183,48 @@ def test_the_join_picker_reads_the_clause_it_is_given() -> None:
     assert "runner_sarr" in _joins("1 = 1 AND s.sarr_rank <= ?")
     # The by-style query groups on pace whether or not a filter mentions it.
     assert "runner_pace" in _joins("1 = 1", always="ep")
+
+
+def test_the_blackbook_reads_every_entrys_conditions_in_one_query() -> None:
+    """Not one query per entry. The book is 196 rows and growing, and a lookup
+    per row is the same shape as the insight panel above — the cost is invisible
+    on the fixture and linear on the real thing.
+
+    `query/triggers.for_entries` takes a LIST of ids and returns them keyed, so
+    both callers (`_entry_rows` and the band) pay one round trip whatever the
+    size of the book.
+    """
+    import inspect
+
+    from hkrd.query import blackbook, blackbook_band, triggers
+
+    source = inspect.getsource(triggers.for_entries)
+    assert "IN ({','.join('?' * len(ids))})" in source, (
+        "the ids go into one IN clause; a loop here is a query per entry")
+
+    for module in (blackbook, blackbook_band):
+        body = inspect.getsource(module)
+        assert "for_entries" in body
+        # The giveaway shape: fetching conditions inside a loop over rows.
+        assert "for_entries([r[" in body or "for_entries([row[" in body, (
+            f"{module.__name__} must hand the whole id list over at once")
+
+
+def test_the_trigger_table_is_indexed_on_the_entry_it_belongs_to() -> None:
+    """The condition check is a correlated NOT EXISTS, run once per RUN of a
+    booked horse — 355 times over the real book. Without the index each of
+    those scans the whole trigger table.
+    """
+    schema = (ROOT / "hkrd/store/schema.sql").read_text(encoding="utf-8")
+    assert "ix_blackbook_trigger ON blackbook_trigger(id)" in schema
+
+
+def test_one_condition_check_covers_every_condition_on_an_entry() -> None:
+    """A NOT EXISTS over the whole trigger table, not one subquery per row of
+    it. An entry with four conditions must cost what an entry with one costs.
+    """
+    from hkrd.query import triggers
+
+    sql = triggers.met_sql()
+    assert sql.count("NOT EXISTS") == 1
+    assert sql.count("SELECT") == 1

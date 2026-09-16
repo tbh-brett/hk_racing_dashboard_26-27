@@ -108,6 +108,50 @@ def _migrate(conn: sqlite3.Connection) -> None:
     """
     with transaction(conn):
         _migrate_blackbook_close(conn)
+        _migrate_blackbook_prefs(conn)
+
+
+def _migrate_blackbook_prefs(conn: sqlite3.Connection) -> None:
+    """`pref_distance`, `pref_surface` and `pref_jockey` become conditions.
+
+    They were the first attempt at saying what a thesis depends on, and they
+    were write-only: the legacy import filled them and not one line anywhere
+    else in the codebase ever read one back. So an entry could record that a
+    horse wants 1200m on Dirt and nothing was ever going to check whether
+    today's race was that race.
+
+    `blackbook_trigger` is read — by the band, the record and the Form Guide —
+    so the values move there and the dead columns go. `pref_distance` is a csv
+    in the export ("1200,1400"), which is exactly the `in` operator.
+
+    Safe to re-run: after the first pass the columns are gone, and the guard
+    below stops a second copy of the rows if they are not.
+    """
+    cols = _columns(conn, "blackbook")
+    if not cols or "pref_distance" not in cols:
+        return
+
+    for kind, column, op in (("distance", "pref_distance", "in"),
+                             ("surface", "pref_surface", "is"),
+                             ("jockey", "pref_jockey", "is")):
+        conn.execute(f"""
+            INSERT INTO blackbook_trigger (id, kind, op, value)
+            SELECT b.id, ?, ?, trim(b.{column})
+              FROM blackbook b
+             WHERE b.{column} IS NOT NULL AND trim(b.{column}) != ''
+               AND NOT EXISTS (SELECT 1 FROM blackbook_trigger g
+                                WHERE g.id = b.id AND g.kind = ?)
+        """, (kind, op, kind))
+
+    # A single-valued `in` is an `is` said the long way. Both work, but the
+    # page prints the operator and "distance 1200" reads better than
+    # "distance in 1200".
+    conn.execute("UPDATE blackbook_trigger SET op = 'is' "
+                 "WHERE op = 'in' AND instr(value, ',') = 0")
+
+    if sqlite3.sqlite_version_info >= (3, 35):
+        for column in ("pref_distance", "pref_surface", "pref_jockey"):
+            conn.execute(f"ALTER TABLE blackbook DROP COLUMN {column}")
 
 
 def _migrate_blackbook_close(conn: sqlite3.Connection) -> None:

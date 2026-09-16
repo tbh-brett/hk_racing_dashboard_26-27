@@ -27,9 +27,15 @@ from __future__ import annotations
 from typing import Any
 
 from hkrd.derive.probability import actual_over_expected
-from hkrd.query import period
+from hkrd.query import period, triggers as trig_q
 from hkrd.query.period import Window
 from hkrd.store.connect import Connection, get_conn
+
+# `for_race` and `declared_on` moved to `query/blackbook_band` at the
+# 600-line cap. They are re-exported here because they ARE the blackbook
+# to every caller outside it, and a split in this module is not a reason
+# for `query/raceday` to learn a second import path.
+from hkrd.query.blackbook_band import declared_on, for_race  # noqa: F401
 
 __all__ = ["list_entries", "entry_detail", "for_race", "declared_on",
            "tag_performance", "tag_definitions", "book_summary",
@@ -74,7 +80,13 @@ _RUNS_SINCE_FROM = """
                  sum(CASE WHEN win_odds > 0 THEN 1.0 / win_odds END) book,
                  count(win_odds) priced
             FROM runners GROUP BY race_date, race_no) f
-      ON f.race_date = r.race_date AND f.race_no = r.race_no"""
+      ON f.race_date = r.race_date AND f.race_no = r.race_no
+    -- The race header, for the conditions an entry's triggers are written
+    -- against. LEFT, not inner: five races in the archive lost their distance
+    -- and class, and an inner join would drop those runs out of `runs_since`
+    -- entirely — changing a count that has nothing to do with conditions. A
+    -- missing header fails every trigger instead, which is `met_sql`'s rule.
+    LEFT JOIN races a ON a.race_date = r.race_date AND a.race_no = r.race_no"""
 
 # The market's own estimate that THIS runner wins, with the overround divided
 # out. NULL when the race is not fully priced -- a book summed over part of a
@@ -83,26 +95,19 @@ _IMPLIED_SQL = """
     CASE WHEN r.win_odds > 0 AND f.book > 0 AND f.priced = f.field_size
          THEN (1.0 / r.win_odds) / f.book END"""
 
-# Was this entry a LIVE thesis over that race — as opposed to one I hold now?
+# Did this run ask the question the thesis was about?
 #
-# Two different questions, and the band over an archived card asks the second
-# one. A horse retired in December must not rewrite every September card to say
-# the thesis had never been standing; equally, a horse retired in June must not
-# go on lighting up today's card as though it were still being followed. That
-# is the bug this replaces: nothing here read `status` at all, so an entry
-# retired by hand stayed live everywhere except the Blackbook page itself.
+# A horse booked for 1200m and beaten four times at 1650m has not failed; it
+# has not been TESTED, and counting those four against it is how a good reason
+# comes to look like a bad one. The record is reported both ways — over every
+# run, and over the runs that met the conditions — because the difference
+# between them is itself the finding: a thesis that never gets its race is a
+# different problem from one that gets it and loses.
 #
-# An entry closed on a day nobody recorded reads as closed TODAY. It is
-# certainly not live over a card being looked at now, which is the complaint;
-# and over an archived card the honest default is the one that does not erase a
-# thesis that was, as far as anything here knows, standing at the time. Every
-# close from now on carries its date, so this fallback only ever covers entries
-# retired before there was a column to record it in.
-_LIVE_AT_RACE_SQL = """
-    (b.added_date <= r.race_date
-     AND (b.status = 'active'
-          OR coalesce(b.closed_date, date('now')) > r.race_date))"""
-
+# An entry with no conditions is met by every run, which is what the whole book
+# was before `blackbook_trigger` existed.
+_TRIGGER_MET_SQL = trig_q.met_sql(entry="b", runner="r", race="a",
+                                  field_size="f.field_size")
 
 def _entry_rows(conn: Connection, where: str = "", params: Any = ()) -> list[dict]:
     """Entries with their derived record. One query, not one per entry."""
@@ -112,6 +117,11 @@ def _entry_rows(conn: Connection, where: str = "", params: Any = ()) -> list[dic
                    count(*) runs,
                    sum(CASE WHEN r.place = 1 THEN 1 ELSE 0 END) wins,
                    sum({_PLACES_SQL}) places,
+                   sum(CASE WHEN {_TRIGGER_MET_SQL} THEN 1 ELSE 0 END) on_runs,
+                   sum(CASE WHEN {_TRIGGER_MET_SQL} AND r.place = 1
+                            THEN 1 ELSE 0 END) on_wins,
+                   sum(CASE WHEN {_TRIGGER_MET_SQL} THEN {_PLACES_SQL}
+                            ELSE 0 END) on_places,
                    min(r.race_date) first_run,
                    max(r.race_date) last_run
             {_RUNS_SINCE_FROM}
@@ -122,6 +132,9 @@ def _entry_rows(conn: Connection, where: str = "", params: Any = ()) -> list[dic
                coalesce(s.runs, 0) runs_since,
                coalesce(s.wins, 0) wins_since,
                coalesce(s.places, 0) places_since,
+               coalesce(s.on_runs, 0) runs_on_conditions,
+               coalesce(s.on_wins, 0) wins_on_conditions,
+               coalesce(s.on_places, 0) places_on_conditions,
                s.first_run, s.last_run,
                (SELECT group_concat(t.tag) FROM blackbook_tags t
                  WHERE t.id = b.id) tag_csv,
@@ -135,10 +148,17 @@ def _entry_rows(conn: Connection, where: str = "", params: Any = ()) -> list[dic
         ORDER BY b.added_date DESC, b.id
     """, params).fetchall()
 
+    conditions = trig_q.for_entries([r["id"] for r in rows], conn=conn)
     out = []
     for row in rows:
         d = dict(row)
         d["tags"] = sorted((d.pop("tag_csv") or "").split(",")) if d["tag_csv"] else []
+        # The conditions, and the one sentence for them. Written once in
+        # `query/triggers` because the Blackbook row, the Race Day band and the
+        # Form Guide all print it, and three copies is three chances for one of
+        # them to describe a condition it is not filtering on.
+        d["conditions"] = conditions.get(d["id"], [])
+        d["conditions_text"] = trig_q.describe(d["conditions"])
         # `status` is now the whole answer. It used to be half of one: an entry
         # could also be closed by an expiry date the page had to notice for
         # itself, so the row recomputed the flag on every read and the two
@@ -196,9 +216,9 @@ def entry_detail(entry_id: str, *, conn: Connection | None = None
                    a.venue, a.distance, a.going, a.surface, a.course,
                    a.race_class,
                    f.field_size, e.figure et_figure, e.confidence et_confidence,
-                   p.pace_style, {_PLACES_SQL} placed
+                   p.pace_style, {_PLACES_SQL} placed,
+                   {_TRIGGER_MET_SQL} AS on_conditions
             {_RUNS_SINCE_FROM}
-            JOIN races a ON a.race_date = r.race_date AND a.race_no = r.race_no
             LEFT JOIN runner_et e USING (race_date, race_no, horse_no)
             LEFT JOIN runner_pace p USING (race_date, race_no, horse_no)
             WHERE b.id = ?
@@ -248,73 +268,6 @@ def entry_detail(entry_id: str, *, conn: Connection | None = None
             "ORDER BY changed_at DESC, log_id DESC",
             (entry_id,)).fetchall()]
         return entry
-    finally:
-        if own:
-            conn.close()
-
-
-def for_race(date: str, race_no: int, *, conn: Connection | None = None
-             ) -> list[dict[str, Any]]:
-    """Booked horses declared in one race — the Race Day blackbook band.
-
-    Closed entries are returned too, flagged: a horse I once followed and gave
-    up on is worth knowing about when it turns up, and dropping it is how the
-    band silently under-reports. What it must NOT do is read as a live thesis —
-    see `_LIVE_AT_RACE_SQL`, which is what every caller gates its highlight on.
-
-    `status` is the entry's state NOW. On an archived race that is not the same
-    question as "was I watching this horse that day", so `live_at_race` is
-    returned alongside it — a booking made in July must not render as a live
-    thesis over a race run in May.
-    """
-    own = conn is None
-    conn = conn or get_conn()
-    try:
-        return [dict(r) for r in conn.execute(f"""
-            SELECT b.id, b.horse_name, b.status, b.confidence, b.reasoning,
-                   b.added_date, b.closed_date, b.closed_reason, b.source_race,
-                   r.horse_no, r.draw, r.jockey, r.win_odds,
-                   b.added_date <= r.race_date AS booked_before_race,
-                   {_LIVE_AT_RACE_SQL} AS live_at_race,
-                   (SELECT group_concat(t.tag) FROM blackbook_tags t
-                     WHERE t.id = b.id) tag_csv
-            FROM blackbook b
-            JOIN runners r ON r.horse_name = b.horse_name
-            WHERE r.race_date = ? AND r.race_no = ?
-            ORDER BY r.horse_no
-        """, (date, race_no)).fetchall()]
-    finally:
-        if own:
-            conn.close()
-
-
-def declared_on(date: str, *, conn: Connection | None = None
-                ) -> list[dict[str, Any]]:
-    """Every booked horse declared across one meeting.
-
-    "Highlight prominently: entries with a horse declared to run today. That's
-    the moment the page earns its keep." — design brief 06.
-
-    Carries the same `live_at_race` flag as `for_race`, and for the same
-    reason: over an archived meeting a booking made months later is not a live
-    thesis, and the band must be able to show that rather than imply it was.
-    """
-    own = conn is None
-    conn = conn or get_conn()
-    try:
-        return [dict(r) for r in conn.execute(f"""
-            SELECT b.id, b.horse_name, b.status, b.confidence, b.added_date,
-                   b.closed_date, b.closed_reason, b.reasoning,
-                   r.race_no, r.horse_no, r.draw, r.win_odds,
-                   b.added_date <= r.race_date AS booked_before_race,
-                   {_LIVE_AT_RACE_SQL} AS live_at_race,
-                   (SELECT group_concat(t.tag) FROM blackbook_tags t
-                     WHERE t.id = b.id) tag_csv
-            FROM blackbook b
-            JOIN runners r ON r.horse_name = b.horse_name
-            WHERE r.race_date = ?
-            ORDER BY r.race_no, r.horse_no
-        """, (date,)).fetchall()]
     finally:
         if own:
             conn.close()

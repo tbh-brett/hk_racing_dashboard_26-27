@@ -349,11 +349,31 @@ CREATE TABLE IF NOT EXISTS blackbook (
   source_race_no INTEGER,
   -- 'memo' when the user typed a date, 'matched' when it was recovered from the
   -- horse's own runs. The page must be able to tell the two apart.
-  source_date_from TEXT,
-  pref_distance TEXT,
-  pref_surface  TEXT,
-  pref_jockey   TEXT
+  source_date_from TEXT
 );
+
+-- The circumstances a thesis depends on: "1200-1400m, on Turf, drawn 6 or
+-- lower". Rows are ANDed; an entry with none is met by every run, which is
+-- what the whole book was before this existed.
+--
+-- Every `kind` is a column the archive already holds and `query/slices` already
+-- groups by, so a condition means the same thing here as it does on Lookup and
+-- nothing new has to be derived to check one.
+--
+-- This replaces `pref_distance`, `pref_surface` and `pref_jockey`, which the
+-- legacy import wrote and NOTHING read — the only two lines in the codebase
+-- that named those columns were the two that wrote them. So an entry could say
+-- what it wanted and no page ever asked whether today was that day.
+CREATE TABLE IF NOT EXISTS blackbook_trigger (
+  trigger_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id         TEXT    NOT NULL,
+  kind       TEXT    NOT NULL,   -- query/triggers.KINDS
+  op         TEXT    NOT NULL,   -- is | in | <= | >= | between
+  value      TEXT    NOT NULL,
+  FOREIGN KEY (id) REFERENCES blackbook(id)
+);
+
+CREATE INDEX IF NOT EXISTS ix_blackbook_trigger ON blackbook_trigger(id);
 
 -- Every time an entry opened, closed or reopened, and what was said about it.
 --

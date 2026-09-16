@@ -366,6 +366,10 @@ def create_blackbook_entry(body: dict = Body(...)) -> dict:
             source_trial_no=(int(body["source_trial_no"])
                              if body.get("source_trial_no") is not None else None),
             tags=body.get("tags") or [],
+            # The circumstances the thesis depends on, written with the entry
+            # rather than added later — the moment you know them is the moment
+            # you are writing down why the horse is interesting.
+            conditions=body.get("conditions") or [],
             confidence=body.get("confidence", "medium"))
     except KeyError as exc:
         raise HTTPException(422, f"missing field: {exc.args[0]}") from exc

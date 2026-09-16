@@ -5,9 +5,17 @@ useful and practical) seems to be outdated and does not match with the dashboard
 completely — it currently really only functions as a reminder module for myself
 when manually screening through races."*
 
-This proposes what it should become. Nothing here is built. The
-expiry/retire fix shipped separately (`docs/decisions.md`, "an entry ends when
-it is retired") and is assumed below.
+This proposes what it should become.
+
+> **BUILT 2026-09-16: §2.1, triggers.** The record now splits into "every run
+> since" and "the runs that asked the question", the bands say whether today is
+> the race the entry was written for, and `pref_distance` / `pref_surface` /
+> `pref_jockey` stopped being write-only columns. `docs/decisions.md` has the
+> outcome, the three rules that needed tests, and the measured cost. §2.2–§2.5
+> are unbuilt and unchanged.
+
+The expiry/retire fix shipped separately (`docs/decisions.md`, "an entry ends
+when it is retired") and is assumed below.
 
 The artboard — `web/design-source/Blackbook.dc.html` — stays the foundation, as
 asked. Everything proposed is an addition to its grammar rather than a

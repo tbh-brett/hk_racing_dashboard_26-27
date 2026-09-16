@@ -234,6 +234,64 @@ def test_a_new_thesis_cannot_be_smuggled_into_a_closure(booked):
     assert out.status_code == 422
 
 
+def test_conditions_decide_which_runs_count_as_a_test(booked):
+    """The whole point of the feature, over the API.
+
+    HORSE 0 always wins, so the book shows a perfect record. Book it for a trip
+    it never runs and the record over EVERY run is unchanged while the record
+    over the runs that asked the question empties out — "not tested" and
+    "tested and lost" are different facts.
+    """
+    before = booked.get("/api/blackbook").json()["entries"][0]
+    assert before["runs_on_conditions"] == before["runs_since"] > 0
+
+    out = booked.post("/api/blackbook/bb_1/conditions", json={"conditions": [
+        {"kind": "distance", "op": "is", "value": "9999"}]})
+    assert out.status_code == 200
+    assert out.json()["conditions"][0]["value"] == "9999"
+
+    after = booked.get("/api/blackbook").json()["entries"][0]
+    assert after["runs_since"] == before["runs_since"]    # it still ran
+    assert after["runs_on_conditions"] == 0               # never at the trip
+    assert after["conditions_text"] == "distance 9999m"
+
+
+def test_the_card_says_whether_today_meets_the_entrys_conditions(booked):
+    """"Runs today" is a reminder. "Runs today at the trip you booked it for"
+    is a reason to look, and it is the flag the band sorts on."""
+    distance = booked.get("/api/raceday/2025-06-13/1").json()["distance"]
+
+    # A condition today satisfies.
+    booked.post("/api/blackbook/bb_1/conditions", json={"conditions": [
+        {"kind": "distance", "op": "is", "value": str(distance)}]})
+    card = booked.get("/api/raceday/2025-06-13/1").json()
+    row = next(r for r in card["runners"] if r["horse_name"] == "HORSE 0")
+    assert row["blackbook"]["on_conditions"] is True
+    band = booked.get("/api/raceday/2025-06-13/blackbook").json()
+    assert band["entries"][0]["on_conditions"] is True
+
+    # And one it does not.
+    booked.post("/api/blackbook/bb_1/conditions", json={"conditions": [
+        {"kind": "distance", "op": "is", "value": str(distance + 200)}]})
+    band = booked.get("/api/raceday/2025-06-13/blackbook").json()
+    assert band["entries"][0]["on_conditions"] is False
+    # Still listed, with what it wanted — the band can say why it is dim.
+    assert band["entries"][0]["conditions_text"] == f"distance {distance + 200}m"
+
+
+def test_a_condition_the_band_could_not_evaluate_is_refused(booked):
+    """It would never match, so the horse would silently stop appearing and the
+    book would look empty rather than broken."""
+    out = booked.post("/api/blackbook/bb_1/conditions", json={"conditions": [
+        {"kind": "vibes", "op": "is", "value": "good"}]})
+    assert out.status_code == 422
+    assert "kind must be one of" in out.json()["detail"]
+    # And the page is told what IS allowed, rather than keeping its own copy.
+    vocab = booked.get("/api/blackbook/conditions").json()
+    assert "distance" in vocab["kinds"] and "between" in vocab["ops"]
+    assert "vibes" not in vocab["kinds"]
+
+
 def test_the_meeting_band_reports_no_movement_rather_than_zero(booked):
     """The fixture has no odds snapshots. A 0% would read as a steady market."""
     body = booked.get("/api/raceday/2025-06-13/blackbook").json()

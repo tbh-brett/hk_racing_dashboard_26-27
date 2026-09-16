@@ -128,6 +128,20 @@
   font-size: var(--fs-sm); color: var(--text-muted); margin-top: 2px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* The circumstances the thesis asked for. Dim when today is not that race —
+   the entry is still worth listing, it is simply not having its day — and lit
+   in the book colour when it is, because that is the one line on this band
+   that says something the card did not already tell you. */
+.bb-cond {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .04em;
+  padding: 1px 5px; white-space: nowrap; color: var(--text-faint);
+  border: 1px solid var(--line-2);
+}
+.bb-cond.met {
+  color: var(--book); border-color: var(--book-ground);
+  background: var(--book-here);
+}
+
 /* A booking made after the race it is shown against was never a live thesis
    that day. It is still listed, but it must not read like one. */
 .bb-stale { opacity: .55; }

@@ -621,6 +621,13 @@ select:hover, .btn:hover { background: var(--line-2); color: var(--text); }
   box-shadow: 0 8px 22px rgba(0, 0, 0, .65);
 }
 
+/* The conditions on a booking, in the popover that explains it. */
+.popover > .body.cond {
+  margin-top: 6px; font-family: var(--font-mono); font-size: var(--fs-xs);
+  letter-spacing: .04em; color: var(--text-muted);
+}
+.popover > .body.cond.met { color: var(--edge); }
+
 /* Why a booking was closed, in the popover that explains why it was made.
    Set apart from the thesis above it, because it is the later fact and it
    contradicts the one it sits under. */

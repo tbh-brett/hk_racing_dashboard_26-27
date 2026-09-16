@@ -87,6 +87,40 @@ def set_blackbook_status(entry_id: str, body: dict = Body(...)) -> dict:
         raise HTTPException(422, str(exc)) from exc
 
 
+@router.get("/api/blackbook/conditions")
+def blackbook_condition_vocabulary() -> dict:
+    """What a condition can be about, and how it can be compared.
+
+    Served rather than hard-coded into the page, because the page building a
+    second copy of this list is how a form comes to offer a condition the band
+    cannot evaluate — which never matches, so the horse silently stops
+    appearing.
+    """
+    from hkrd.query import triggers as trig_q
+
+    return {"kinds": list(trig_q.KINDS),
+            "numeric": sorted(trig_q.NUMERIC_KINDS),
+            "ops": list(trig_q.OPS)}
+
+
+@router.post("/api/blackbook/{entry_id}/conditions")
+def set_blackbook_conditions(entry_id: str, body: dict = Body(...)) -> dict:
+    """Replace the circumstances this thesis depends on.
+
+    Replace, not append: editing "1200m" to "1200-1400m" must leave one
+    condition, not two that contradict each other. An empty list clears them,
+    which says the claim is about the horse rather than about a race.
+    """
+    from hkrd.jobs import write_notes
+
+    try:
+        return write_notes.set_triggers(entry_id, body.get("conditions") or [])
+    except KeyError as exc:
+        raise HTTPException(404, f"no blackbook entry {exc.args[0]}") from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
 @router.get("/api/blackbook/backed-vs-missed")
 def blackbook_backed_vs_missed(entry_id: str | None = None,
                                account: str | None = None,

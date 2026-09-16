@@ -242,8 +242,18 @@ function flagsFor(runner) {
   // second one.
   const bb = state.guide?.blackbook?.[runner.horse_name];
   if (bb) {
-    out.push(isLiveBooking(bb)
-      ? { kind: 'bb', text: 'BLACKBOOK', bb }
+    // A live entry whose conditions TODAY MEETS says so on the chip. That is
+    // the whole difference between the book reminding you a horse is in it and
+    // the book telling you this is the race it was written for.
+    const live = isLiveBooking(bb);
+    const onDay = live && bb.conditions_text && bb.on_conditions;
+    out.push(live
+      ? { kind: onDay ? 'bb on-cond' : 'bb',
+          text: onDay ? bb.conditions_text.toUpperCase() : 'BLACKBOOK',
+          title: onDay
+            ? `booked for ${bb.conditions_text}, and today is that race`
+            : null,
+          bb }
       : { kind: 'bb closed', text: bookingStatus(bb), bb });
   }
 
@@ -1092,6 +1102,17 @@ function showBlackbookNote(event, bb) {
   hd.append(el('span', 'meta', `ADDED ${bb.added_date}`));
   pop.replaceChildren(hd);
   pop.append(el('div', 'body', bb.reasoning || 'no reason recorded'));
+  // The circumstances the thesis depends on, and whether today is one of them.
+  // The reason for a booking without the conditions on it is the half of the
+  // claim that cannot be checked.
+  if (bb.conditions_text) {
+    const cond = el('div', `body cond${bb.on_conditions ? ' met' : ''}`,
+      bb.on_conditions
+        ? `TODAY MEETS THIS — ${bb.conditions_text}`
+        : `BOOKED FOR ${bb.conditions_text} — NOT TODAY`);
+    pop.append(cond);
+  }
+
   // Why it was CLOSED, when it was. Without it the popover shows the reason a
   // horse was booked and nothing about the decision to stop following it,
   // which is the more recent and usually the more useful of the two.

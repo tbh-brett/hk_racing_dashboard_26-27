@@ -57,6 +57,10 @@ const state = {
   // how it is PERFORMING is a question about the season being bet.
   period: 'season', season: null, seasons: [], window: null,
   sort: 'added', sortDir: -1, busy: new Set(),
+  // Fetched once, on the first edit. The page must not hold its own copy of
+  // what a condition can be — a form offering something the band cannot
+  // evaluate would never match, and the horse would silently stop appearing.
+  conditionVocab: null,
 };
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
@@ -290,6 +294,29 @@ function recordLabel(e) {
   return `${e.wins_since}W-${e.places_since}P`;
 }
 
+/** The record over the runs that actually asked the thesis's question.
+ *
+ *  A horse booked for 1200m and beaten four times at 1650m has not failed; it
+ *  has not been tested, and the whole-record figure says the opposite. Only
+ *  shown for an entry that STATES conditions — for the rest the two numbers are
+ *  identical and a second column would be noise on every row in the book.
+ */
+function conditionRecord(e) {
+  if (!e.conditions?.length) return null;
+  if (!e.runs_on_conditions) {
+    return { text: 'NOT YET TESTED', cls: 'untested',
+             title: `${e.runs_since} runs since booking, none of them `
+                    + `${e.conditions_text} — the claim has not been asked yet` };
+  }
+  return {
+    text: `${e.wins_on_conditions}W-${e.places_on_conditions}P `
+          + `/ ${e.runs_on_conditions}`,
+    cls: e.wins_on_conditions ? 'hit' : 'miss',
+    title: `over the ${e.runs_on_conditions} of ${e.runs_since} runs since `
+           + `booking that met ${e.conditions_text}`,
+  };
+}
+
 function entryRow(e) {
   const open = state.open.has(e.id);
   const today = state.declared.has(e.horse_name);
@@ -312,6 +339,15 @@ function entryRow(e) {
     pill.title = state.tagMeta?.[t] ?? 'no definition written for this tag';
     tags.append(pill);
   });
+  // The circumstances the claim depends on, beside the reason for it. They
+  // belong together: "traffic" is why, "1200-1400m" is when, and an entry
+  // showing only the first is the one the book could never test.
+  if (e.conditions_text) {
+    const cond = el('span', 'cond-pill', e.conditions_text);
+    cond.title = `booked for ${e.conditions_text} — runs outside that are not `
+      + 'a test of this thesis';
+    tags.append(cond);
+  }
   row.append(tags);
 
   const booked = el('div', 'booked', e.added_date);
@@ -329,11 +365,18 @@ function entryRow(e) {
   row.append(el('div', `runs${e.runs_since ? '' : ' none'}`,
     String(e.runs_since)));
 
-  const rec = el('div', `record ${e.wins_since ? 'hit' : 'miss'}`, recordLabel(e));
+  const rec = el('div', `record ${e.wins_since ? 'hit' : 'miss'}`);
+  rec.append(el('span', 'all', recordLabel(e)));
   rec.title = e.runs_since
     ? `${e.wins_since} wins and ${e.places_since} places from ${e.runs_since} runs `
       + `since ${e.added_date}, derived from the runners table`
     : 'no runs since booking';
+  const on = conditionRecord(e);
+  if (on) {
+    const sub = el('span', `on-cond ${on.cls}`, on.text);
+    sub.title = on.title;
+    rec.append(sub);
+  }
   row.append(rec);
 
   const next = el('div');
@@ -376,6 +419,83 @@ const PROMPTS = {
     reason: 'Why is it worth following again? (optional)',
   },
 };
+
+/** Re-read the list. Narrower than the whole page load, and used where a
+ *  write has changed something DERIVED from the rows rather than on them —
+ *  setting a condition changes which runs count as a test, so every record
+ *  column in the book can move. Patching the one row would leave the others
+ *  stating a figure the server no longer agrees with. */
+async function reloadEntries() {
+  const list = await api.blackbook();
+  // The open panels are keyed by id and their detail is refetched separately,
+  // so replacing the rows wholesale keeps whatever is expanded expanded.
+  state.entries = list.entries;
+}
+
+/* Editing the circumstances a thesis depends on.
+ *
+ * One line per condition, typed as `kind op value` — "distance between
+ * 1200-1400", "surface is Turf", "draw <= 6". A text form rather than a row of
+ * pickers because this is edited rarely and read constantly, and because the
+ * same three words are what the API takes and what `query/triggers.describe`
+ * prints back.
+ *
+ * The VOCABULARY is fetched, never hard-coded here: a page holding its own copy
+ * of the list is how a form comes to offer a condition the band cannot
+ * evaluate, which then never matches and makes the horse silently disappear.
+ */
+async function editConditions(e) {
+  let vocab = state.conditionVocab;
+  if (!vocab) {
+    try {
+      vocab = await api.blackbookConditionVocabulary();
+      state.conditionVocab = vocab;
+    } catch (err) {
+      window.alert(`cannot read the condition vocabulary — ${err.message}`);
+      return;
+    }
+  }
+
+  const current = (e.conditions ?? [])
+    .map((c) => `${c.kind} ${c.op} ${c.value}`).join('\n');
+  const typed = window.prompt(
+    'One condition per line, as "what how value".\n\n'
+    + `WHAT: ${vocab.kinds.join(', ')}\n`
+    + `HOW:  ${vocab.ops.join(', ')}  (<=, >= and between need a number)\n\n`
+    + 'distance between 1200-1400\nsurface is Turf\ndraw <= 6\n\n'
+    + 'Lines are ANDed. Leave it empty to clear them, which says the claim is '
+    + 'about the horse rather than about a race.',
+    current);
+  if (typed === null) return;
+
+  const conditions = [];
+  for (const line of typed.split('\n').map((l) => l.trim()).filter(Boolean)) {
+    // Three parts, and the value keeps its spaces — a jockey is "Z Purton".
+    const [kind, op, ...rest] = line.split(/\s+/);
+    if (!rest.length) {
+      window.alert(`"${line}" needs three parts: what, how, and a value.`);
+      return;
+    }
+    conditions.push({ kind, op, value: rest.join(' ') });
+  }
+
+  state.busy.add(e.id);
+  render();
+  try {
+    const out = await api.setBlackbookConditions(e.id, conditions);
+    e.conditions = out.conditions;
+    // The record is measured against these, so it has to be re-read rather
+    // than patched — which runs count as a test has just changed.
+    delete state.details[e.id];
+    await reloadEntries();
+    if (state.open.has(e.id)) await loadDetail(e.id);
+  } catch (err) {
+    window.alert(err.message);
+  } finally {
+    state.busy.delete(e.id);
+    render();
+  }
+}
 
 function statusButton(e, status, label, extra) {
   const b = el('button', `act-btn${extra ? ` ${extra}` : ''}`, label);
@@ -458,6 +578,14 @@ function runLine(r, cls) {
   trail.append(el('span', 'pos', `${r.field_size ?? DASH} RAN`));
   trail.append(el('span', 'trip', r.placed ? 'placed' : ''));
   line.append(trail);
+  // `on_conditions` is 1 for an entry with no conditions at all, so the mark
+  // is drawn from the ENTRY having some — otherwise every run in the book
+  // would carry a tick that meant nothing.
+  if (cls !== 'source' && r.on_conditions === 0) {
+    line.classList.add('off-cond');
+    line.title = 'this run did not meet the conditions on the entry, so it is '
+      + 'not a test of the thesis';
+  }
   return line;
 }
 
@@ -478,6 +606,21 @@ function entryDetail(e) {
     + `${e.confidence ? ` · ${e.confidence.toUpperCase()} CONFIDENCE` : ''}`));
   thesis.append(cap);
   thesis.append(el('div', 'body', e.reasoning || 'no reason was recorded'));
+  // The conditions, and a way to change them. On the panel rather than the
+  // row because writing one is a considered act — it decides which runs count
+  // as evidence — and because the row has no space for a form.
+  const cond = el('div', 'cond-line');
+  cond.append(el('span', 'k', 'ONLY COUNTS AT'));
+  cond.append(el('span', 'v', e.conditions_text
+    || 'no conditions — every run tests this thesis'));
+  const editBtn = el('button', 'act-btn', e.conditions_text ? 'EDIT' : 'SET');
+  editBtn.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    editConditions(e);
+  });
+  cond.append(editBtn);
+  thesis.append(cond);
+
   if (e.closed) {
     // The close, under the thesis it closed on. An entry that reads only as
     // its claim, with a status word somewhere else on the row, is how a

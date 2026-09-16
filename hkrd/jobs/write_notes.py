@@ -23,7 +23,7 @@ from hkrd.store.connect import db_path, get_conn, transaction
 
 __all__ = ["save_note", "delete_note", "save_trial_note",
            "delete_trial_note", "promote_to_blackbook",
-           "next_entry_id", "set_status"]
+           "next_entry_id", "set_status", "set_triggers"]
 
 
 def _now() -> str:
@@ -128,6 +128,7 @@ def promote_to_blackbook(horse_name: str, *, reasoning: str,
                          source_race_no: int | None = None,
                          source_trial_no: int | None = None,
                          tags: list[str] | None = None,
+                         conditions: list[dict] | None = None,
                          confidence: str = "medium",
                          db: Path | None = None) -> dict:
     """Create a blackbook entry from a run the user was looking at.
@@ -146,6 +147,10 @@ def promote_to_blackbook(horse_name: str, *, reasoning: str,
     reason = (reasoning or "").strip()
     if not reason:
         raise ValueError("an entry needs a reason; that is what makes it a thesis")
+    # Checked BEFORE the entry is written, so a condition nothing can evaluate
+    # cannot be saved. One that never matches is worse than none at all: the
+    # horse silently stops appearing and the book looks empty rather than wrong.
+    rows = _condition_rows(conditions)
 
     conn = get_conn(db if db is not None else db_path())
     try:
@@ -178,11 +183,64 @@ def promote_to_blackbook(horse_name: str, *, reasoning: str,
                 "INSERT INTO blackbook_tags (id, tag) VALUES (?, ?) "
                 "ON CONFLICT (id, tag) DO NOTHING",
                 [(entry_id, t.strip()) for t in (tags or []) if t.strip()])
+            conn.executemany(
+                "INSERT INTO blackbook_trigger (id, kind, op, value) "
+                "VALUES (?, ?, ?, ?)",
+                [(entry_id, *row) for row in rows])
             _log_status(conn, entry_id, None, "active", reason, None)
         return {"id": entry_id, "horse_name": horse, "added_date": added,
                 "closed_date": None, "status": "active", "reasoning": reason,
                 "confidence": confidence, "source_race": source,
-                "tags": sorted({t.strip() for t in (tags or []) if t.strip()})}
+                "tags": sorted({t.strip() for t in (tags or []) if t.strip()}),
+                "conditions": [{"kind": k, "op": o, "value": v}
+                               for k, o, v in rows]}
+    finally:
+        conn.close()
+
+
+def _condition_rows(conditions: list[dict] | None
+                    ) -> list[tuple[str, str, str]]:
+    """(kind, op, value) triples, every one checked before anything is written.
+
+    `query/triggers.validate` is the rule, not a copy of it: a condition the
+    band cannot evaluate would never match, so the horse would stop appearing
+    and the book would look empty rather than broken.
+    """
+    from hkrd.query import triggers as trig_q
+
+    out = []
+    for c in conditions or []:
+        kind = (c.get("kind") or "").strip().lower()
+        op = (c.get("op") or "is").strip()
+        value = str(c.get("value") or "").strip()
+        trig_q.validate(kind, op, value)
+        out.append((kind, op, value))
+    return out
+
+
+def set_triggers(entry_id: str, conditions: list[dict] | None, *,
+                 db: Path | None = None) -> dict:
+    """Replace the circumstances an entry's thesis depends on.
+
+    Replace rather than append: editing "1200m" to "1200-1400m" has to be one
+    condition afterwards, not two that contradict each other and match nothing
+    between them. An empty list clears them, which is a real thing to want —
+    it says the claim is about the horse rather than about a race.
+    """
+    rows = _condition_rows(conditions)
+    conn = get_conn(db if db is not None else db_path())
+    try:
+        with transaction(conn):
+            if not conn.execute("SELECT 1 FROM blackbook WHERE id = ?",
+                                (entry_id,)).fetchone():
+                raise KeyError(entry_id)
+            conn.execute("DELETE FROM blackbook_trigger WHERE id = ?", (entry_id,))
+            conn.executemany(
+                "INSERT INTO blackbook_trigger (id, kind, op, value) "
+                "VALUES (?, ?, ?, ?)", [(entry_id, *row) for row in rows])
+        return {"id": entry_id,
+                "conditions": [{"kind": k, "op": o, "value": v}
+                               for k, o, v in rows]}
     finally:
         conn.close()
 
