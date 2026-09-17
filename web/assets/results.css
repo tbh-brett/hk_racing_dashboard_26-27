@@ -66,6 +66,53 @@
 .race-line .big { color: var(--text); font-weight: 600; }
 .race-line .right { margin-left: auto; color: var(--text-faint); font-size: var(--fs-xs); }
 
+/* ── the replay ──────────────────────────────────────────────────────────── */
+
+/* The control borrows the race picker's button, because it is the same kind of
+   thing — a choice about what this page is showing — and lit the same way. */
+.race-line .replay-toggle {
+  align-self: center; background: none; border: 1px solid var(--page-accent);
+  cursor: pointer; padding: 3px 9px; font-family: var(--font-mono);
+  font-size: var(--fs-xs); letter-spacing: .08em; color: var(--page-accent);
+}
+.race-line .replay-toggle:hover { background: var(--page-hover); }
+.race-line .replay-toggle.on {
+  border-color: var(--line-3); color: var(--text-muted);
+}
+
+.replay { padding: 10px 14px 14px; border-bottom: 1px solid var(--line-2); }
+.replay-hd {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  max-width: 960px; margin-bottom: 8px; font-family: var(--font-mono);
+}
+.replay-hd .t { font-size: var(--fs-xs); letter-spacing: .1em; color: var(--text); }
+.replay-hd .n { font-size: var(--fs-xs); color: var(--text-faint); }
+.replay-hd .replay-out {
+  margin-left: auto; font-size: var(--fs-xs); letter-spacing: .08em;
+  color: var(--page-accent); text-decoration: none;
+}
+.replay-hd .replay-out:hover { text-decoration: underline; }
+.replay-hd .replay-close {
+  background: none; border: 1px solid var(--line-3); cursor: pointer;
+  padding: 1px 7px; font-family: var(--font-mono); font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+.replay-hd .replay-close:hover { color: var(--text); background: var(--page-hover); }
+
+/* Sized to HKJC's player exactly, not to a guess. Measured: a 30px tab bar
+   (Multi Angle / Passthrough) above a 1920×1080 video that fills whatever is
+   left — so a frame of width × 9/16 + 30px is the picture with no letterbox
+   and no controls cut off. `cqw` is the frame's own width, which is what the
+   ratio has to follow on a phone as much as on a wide screen. Capped at 960px:
+   past that the finishing order the video is for drops below the fold. */
+.replay-frame {
+  max-width: 960px; container-type: inline-size; background: var(--bg-deep);
+}
+.replay-frame iframe {
+  display: block; width: 100%; border: 0;
+  height: calc(100cqw * 9 / 16 + 30px);
+}
+
 .not-run {
   padding: 40px 14px; font-family: var(--font-mono); font-size: var(--fs-md);
   color: var(--text-dim); line-height: 1.7;

@@ -19,7 +19,7 @@
  */
 import { api, num } from './api.js';
 import { el, $, DASH, MINUS, renderNav, paceCell, styleBadge,
-         tripTagChips, drawText } from './vocab.js';
+         tripTagChips, drawText, replayUrl, externalLink } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 import { loadTags, renderReview } from './review.js';
@@ -46,7 +46,99 @@ const COLS = [
 const state = {
   meeting: null, result: null, loading: false,
   open: new Set(), notes: {},
+  // Whether the replay is showing. Remembered per browser, because reviewing a
+  // meeting is stepping R1, R2, R3 with the video open — closing it on every
+  // race would make the reader ask for it eight times. Read at boot, not here:
+  // the key it reads is declared below this object.
+  replay: false,
 };
+
+/* ── the replay ──────────────────────────────────────────────────────────────
+ *
+ * HKJC's own player, embedded. Measured before building on it: the player page
+ * sends no X-Frame-Options and no frame-ancestors policy, and framed on this
+ * dashboard's origin it streams the same MP4 from HKJC's CDN that it streams on
+ * racing.hkjc.com — 16 Sep 2026 R1, 98 s. It carries every angle HKJC publishes
+ * (race, patrol, leading horse, drone) and Passthrough Analysis in its own tab,
+ * so one frame is the whole of what the results page offers. A replay from a
+ * year back (10 Sep 2025 R3) plays too, without the drone angle it predates.
+ *
+ * NOTHING IS STORED OR SCRAPED. The race identifies the video, exactly as it
+ * does for every play control elsewhere, and the URL comes from `replayUrl` —
+ * the one place it is built. A replay URL written a second time is how every
+ * trial link in this dashboard came to play nothing (see `trialReplayUrl`).
+ *
+ * The frame is built once and only RE-POINTED when the race changes. This page
+ * re-renders on every row it expands and every note it saves; rebuilding the
+ * frame each time would restart the race under the reader's eyes.
+ */
+const REPLAY_KEY = 'hkrd:results-replay';
+
+function loadReplayPref() {
+  try {
+    return localStorage.getItem(REPLAY_KEY) === 'open';
+  } catch {
+    return false;       // site data blocked: the replay simply starts closed
+  }
+}
+
+function saveReplayPref(open) {
+  try {
+    localStorage.setItem(REPLAY_KEY, open ? 'open' : 'closed');
+  } catch { /* nothing to remember on is not a failure */ }
+}
+
+function toggleReplay() {
+  state.replay = !state.replay;
+  saveReplayPref(state.replay);
+  renderRaceLine();
+  renderReplay();
+  // Opening it is asking to watch it: bring it into view rather than leaving it
+  // to load above a grid the reader has scrolled past.
+  if (state.replay) $('replay').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function renderReplay() {
+  const host = $('replay');
+  const r = state.result;
+  const url = r && r.run ? replayUrl(r.race.race_date, r.race.race_no) : null;
+  if (!state.replay || !url) {
+    // Emptied, not just hidden: a hidden frame keeps playing the sound.
+    host.hidden = true;
+    host.replaceChildren();
+    return;
+  }
+  host.hidden = false;
+
+  const frame = host.querySelector('iframe');
+  if (frame && frame.dataset.src === url) return;   // same race: leave it playing
+
+  const head = el('div', 'replay-hd');
+  head.append(el('span', 't', `REPLAY · ${r.race.race_date} R${r.race.race_no}`));
+  head.append(el('span', 'n',
+    "HKJC's player — every camera angle, and Passthrough Analysis in its tab"));
+  const out = externalLink(url, 'OPEN ON HKJC ↗', 'replay-out');
+  out.title = 'the same replay in its own tab, full size';
+  head.append(out);
+  const close = el('button', 'replay-close', '✕');
+  close.type = 'button';
+  close.title = 'close the replay';
+  close.setAttribute('aria-label', 'close the replay');
+  close.addEventListener('click', toggleReplay);
+  head.append(close);
+
+  const box = el('div', 'replay-frame');
+  const iframe = document.createElement('iframe');
+  iframe.src = url;
+  iframe.dataset.src = url;
+  iframe.title = `Race replay, ${r.race.race_date} race ${r.race.race_no}`;
+  iframe.allow = 'autoplay; fullscreen';
+  iframe.allowFullscreen = true;
+  iframe.loading = 'lazy';
+  box.append(iframe);
+
+  host.replaceChildren(head, box);
+}
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
 
@@ -125,6 +217,20 @@ function renderRaceLine() {
       }
       bit('RACE PACE', cell);
     }
+  }
+  // The replay control, only on a race that has been run — there is no video of
+  // a race that has not, and a button that opens an empty player is a bug that
+  // looks like HKJC's.
+  if (r.run && replayUrl(race.race_date, race.race_no)) {
+    const play = el('button', `replay-toggle${state.replay ? ' on' : ''}`,
+      state.replay ? '✕ HIDE REPLAY' : '▶ REPLAY');
+    play.type = 'button';
+    play.setAttribute('aria-expanded', String(state.replay));
+    play.setAttribute('aria-controls', 'replay');
+    play.title = state.replay ? 'close the replay'
+      : `watch race ${race.race_no} — stays open as you step through the meeting`;
+    play.addEventListener('click', toggleReplay);
+    host.append(play);
   }
   host.append(el('span', 'right',
     r.run ? 'every figure on this page is computed once, in query/'
@@ -588,6 +694,7 @@ function renderPanels() {
 function render() {
   renderPicker();
   renderRaceLine();
+  renderReplay();
   renderResult();
   renderPanels();
 }
@@ -630,6 +737,7 @@ async function onContext(_ctx, what) {
 }
 
 async function boot() {
+  state.replay = loadReplayPref();
   renderNav($('nav'), 'results.html');
   installPalette();
   await loadTags();
