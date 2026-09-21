@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from hkrd.store.coerce import parse_running_positions, parse_section_times
+from hkrd.store.coerce import (is_no_comment, parse_running_positions,
+                               parse_section_times)
 from hkrd.store.connect import Connection, get_conn
 from hkrd.derive.pace import STYLE_WINDOW, habitual_style
 from hkrd.derive.tags import VET_TAGS
@@ -231,7 +232,14 @@ def _comments(conn: Connection, date: str, race_no: int,
         "SELECT source, comment_text FROM runner_comments "
         "WHERE race_date=? AND race_no=? AND horse_no=?",
         (date, race_no, horse_no)).fetchall()
-    by_source = {r["source"]: r["comment_text"] for r in rows}
+    # HKJC's "not written up yet" sentence is stored on purpose and is never a
+    # comment (`coerce.NO_COMMENT_PREFIX`). `query/results` already dropped it;
+    # this did not, so every September run reached the Form Guide and Race Day
+    # with "No Comments on Running information for this horse." as its running
+    # comment -- a sentence that reads as HKJC having nothing to say, when it
+    # means HKJC has not said it YET.
+    by_source = {r["source"]: r["comment_text"] for r in rows
+                 if not is_no_comment(r["comment_text"])}
     return by_source.get("corunning"), by_source.get("incident")
 
 

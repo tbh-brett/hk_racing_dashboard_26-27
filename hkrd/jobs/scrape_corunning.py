@@ -19,8 +19,26 @@ from pathlib import Path
 
 from hkrd.ingest import corunning
 from hkrd.ingest._client import FetchError, NotFound
-from hkrd.store import upsert
+from hkrd.store import coerce, upsert
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
+
+
+def published(rows: list[dict]) -> bool:
+    """Has HKJC written this race up yet?
+
+    The comments on running are published DAYS after a meeting. Until then the
+    page is live, parses cleanly, and gives every horse `coerce.NO_COMMENT_
+    PREFIX`'s sentence. Measured on 2026-09-21 against HKJC's own page: 6, 9 and
+    13 September were written up by then and 16 September, five days old, was
+    not.
+
+    All or nothing per meeting -- a meeting that has its comments carries none
+    of the placeholder and one that has not carries nothing else -- so one race
+    answers for the card, which is what lets the scheduler ask with a single
+    request instead of eleven.
+    """
+    return any(r.get("comment") and not coerce.is_no_comment(r["comment"])
+               for r in rows)
 
 
 @dataclass
@@ -28,12 +46,17 @@ class CoRunningReport:
     races: int = 0
     comments: int = 0
     lane_tags: int = 0
+    # Races HKJC has not written up yet: every horse still reads the
+    # placeholder. Not an error -- that is every meeting's first week -- but a
+    # count, so a run that stored no real comment says why.
+    pending: int = 0
     errors: list[str] = field(default_factory=list)
 
     def render(self) -> str:
         lines = [f"  races scraped    {self.races:>6}",
                  f"  comments stored  {self.comments:>6}",
-                 f"  lane tags        {self.lane_tags:>6}"]
+                 f"  lane tags        {self.lane_tags:>6}",
+                 f"  not yet written  {self.pending:>6}"]
         if self.errors:
             lines.append(f"  ERRORS           {len(self.errors):>6}")
             lines += [f"    {e}" for e in self.errors[:10]]
@@ -55,6 +78,16 @@ def scrape(date: str, *, db: Path | None = None,
         with transaction(conn):
             for race_no, rows in meeting.items():
                 report.races += 1
+                # The placeholder rows are still stored, as they always were --
+                # see `coerce.NO_COMMENT_PREFIX` -- and the real text replaces
+                # them on the same key when HKJC writes the race up. They are
+                # just not COUNTED as comments: a run that stored eleven races
+                # of "nothing yet" stored nothing.
+                if not published(rows):
+                    report.pending += 1
+                    upsert.upsert_comments(
+                        conn, corunning.comment_rows(date, race_no, rows))
+                    continue
                 report.comments += upsert.upsert_comments(
                     conn, corunning.comment_rows(date, race_no, rows))
                 tags = corunning.lane_tag_rows(date, race_no, rows)

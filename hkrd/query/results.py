@@ -111,8 +111,9 @@ def stewards(date: str, race_no: int, *,
     `query/race` already applies to the same two rows.
 
     And the placeholder is never shown. It means the comments have not been
-    published; it is stored because the nightly planner reads its presence to
-    know the meeting is not settled, and it is a sentence about nothing.
+    published -- HKJC writes them up days after the meeting -- and it is a
+    sentence about nothing. `query/race` drops it the same way, so the Form
+    Guide and this page agree about which runs have a running comment.
     """
     own = conn is None
     conn = conn or get_conn()

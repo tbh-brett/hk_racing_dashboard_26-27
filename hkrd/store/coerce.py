@@ -281,10 +281,12 @@ def is_absent(token: object) -> bool:
 # as long as the stewards' comments are unpublished. It is the same kind of
 # thing as a row of dashes: a marker meaning "there is none", not a comment.
 #
-# It is STORED rather than discarded, because its presence is what tells the
-# nightly planner the comments have not landed yet and the meeting is not
-# settled. It is never DISPLAYED, because a stewards' panel that prints it
-# beside the real report shows every horse twice.
+# It is STORED rather than discarded, so the record shows HKJC was asked and
+# answered "not yet" -- and the real text replaces it on the same key when the
+# race is written up, which is DAYS after the meeting, not with the result.
+# It is never DISPLAYED (`query/race`, `query/results`), and it never counts
+# as a comment: `jobs/nightly` asks for the comments until real text is here,
+# and `jobs/scrape_corunning.published` is how it tells the two apart.
 NO_COMMENT_PREFIX = "No Comments on Running"
 
 

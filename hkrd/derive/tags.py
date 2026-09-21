@@ -21,7 +21,7 @@ from typing import Any
 __all__ = ["DERIVE_VERSION", "Tag", "TAG_RULES", "NAMED_VET", "VET_TAGS",
            "VET_CATEGORY", "tag_comment", "tag_rows"]
 
-DERIVE_VERSION = "tags-1.0"
+DERIVE_VERSION = "tags-1.1"      # 1.1: `disappointing`
 
 
 @dataclass(frozen=True)
@@ -60,6 +60,14 @@ TAG_RULES: tuple[tuple[str, str, int, str], ...] = (
     ("stumbled",        "trouble", +1, r"\bstumbl(ed|ing)\b|\bclipped heels\b"),
     ("greenly",         "trouble",  0, r"\braced greenly\b|\bgreen\b"),
     ("weakened",        "trouble", -1, r"\bweakened\b|\bone[- ]paced\b"),
+    # The stewards' own verdict that a run was below the horse's form, and the
+    # one they question the rider about: "could offer no explanation for the
+    # horse's disappointing performance", "did not respond to his riding and
+    # was disappointing". 405 of 19,102 incident texts (2.1%). It had no tag,
+    # so a run whose only other note was the routine examination that follows
+    # it -- which is most of them -- read as a clean trip on every page, when
+    # it is the one run in the row the stewards stopped to ask about.
+    ("disappointing",   "trouble", -1, r"\bdisappointing\b"),
 
     # ── routine: common, and deliberately not trouble ────────────────────────
     ("sampling",        "routine",  0, r"\bsent for sampling\b|\bsampling\b"), # 20.0%

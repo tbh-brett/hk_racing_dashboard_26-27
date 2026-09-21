@@ -28,9 +28,9 @@ import datetime as dt
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from hkrd.ingest import racecard
+from hkrd.ingest import corunning, racecard
 from hkrd.ingest._client import FetchError, NotFound
-from hkrd.jobs import derive_all, scrape_meeting as scrape_job
+from hkrd.jobs import derive_all, scrape_corunning, scrape_meeting as scrape_job
 from hkrd.store import job_log
 from hkrd.store.connect import db_path, get_conn, init_db
 
@@ -44,6 +44,23 @@ VENUES = ("ST", "HV")
 DEFAULT_BACK = 4
 DEFAULT_AHEAD = 1
 
+# HOW LONG TO KEEP ASKING FOR THE COMMENTS ON RUNNING, which is not the window
+# above and must not be. Results, dividends and sectionals land within hours;
+# the comments are written up DAYS later. Measured on 2026-09-21 against HKJC's
+# own page: 6, 9 and 13 September were published by then and 16 September,
+# five days old, was not -- so the lag is past five days and inside eight.
+#
+# The four-day window was shorter than the lag, so every meeting fell out of it
+# before HKJC had written a word, and September's four meetings never got their
+# comments at all: 446 runners, no running comment, no lane notes, and no tag
+# from either on any page.
+#
+# Twenty-one days is the measured lag with room to spare. It is cheap to be
+# generous: a meeting still waiting costs ONE request a run -- race 1 answers
+# for the card, see `scrape_corunning.published` -- and a meeting HKJC never
+# writes up falls out of range on its own.
+COMMENTS_BACK = 21
+
 
 @dataclass
 class Plan:
@@ -54,6 +71,10 @@ class Plan:
     venue: str | None          # known from the database, else None (probe both)
     reason: str                # settled | results outstanding | unknown
     act: bool
+    # Everything landed except HKJC's comments on running. Asked for on their
+    # own -- one request to see whether they exist yet -- rather than by
+    # re-scraping a settled meeting five times a day for three weeks.
+    comments_only: bool = False
 
 
 @dataclass
@@ -66,6 +87,10 @@ class NightlyReport:
     # so an upcoming card was fetched here five times a day and ranked by
     # nobody. A run that scored one says so.
     scored_cards: list[str] = field(default_factory=list)
+    # Meetings whose comments on running HKJC has not written yet. Not an
+    # error and not a warning -- it is the normal state of a meeting for its
+    # first week -- but said, so a quiet night explains itself.
+    pending_comments: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -88,6 +113,10 @@ class NightlyReport:
         lines.append(f"  cards scored       {len(self.scored_cards):>6}")
         for c in self.scored_cards:
             lines.append(f"    {c}")
+        if self.pending_comments:
+            lines.append(f"  comments pending   {len(self.pending_comments):>6}"
+                         "   (HKJC writes these up days after the meeting)")
+            lines += [f"    {d}" for d in self.pending_comments]
         if self.warnings:
             lines.append(f"  not available      {len(self.warnings):>6}")
             lines += [f"    {w}" for w in self.warnings[:8]]
@@ -102,18 +131,30 @@ class NightlyReport:
             return f"{len(self.errors)} error(s): {self.errors[0][:160]}"
         if self.scraped or self.scored_cards:
             return "; ".join([*self.scraped, *self.scored_cards])
+        if self.pending_comments:
+            return ("waiting on HKJC's comments on running for "
+                    + ", ".join(self.pending_comments))
         return "nothing outstanding"
 
 
 def plan_window(db: Path | None = None, *, today: dt.date | None = None,
-                back: int = DEFAULT_BACK, ahead: int = DEFAULT_AHEAD
-                ) -> list[Plan]:
+                back: int = DEFAULT_BACK, ahead: int = DEFAULT_AHEAD,
+                comments_back: int = COMMENTS_BACK) -> list[Plan]:
     """Decide what to touch, using only the database. Makes no requests."""
     today = today or dt.date.today()
     conn = get_conn(db if db is not None else db_path())
     try:
         init_db(conn)
         plans = []
+        # Past the main window, only one question is still worth asking: have
+        # the comments on running been written yet. A meeting that is missing
+        # anything ELSE this late is a repair job, not a nightly one, and is
+        # left to `jobs/repair` as before.
+        for offset in range(-comments_back, -back):
+            date = (today + dt.timedelta(days=offset)).isoformat()
+            plan = _decide(conn, date, future=False)
+            if plan.comments_only:
+                plans.append(plan)
         for offset in range(-back, ahead + 1):
             date = (today + dt.timedelta(days=offset)).isoformat()
             plans.append(_decide(conn, date, future=offset > 0))
@@ -151,14 +192,21 @@ def _decide(conn, date: str, *, future: bool) -> Plan:
         "                  AND rs.race_no = ra.race_no"
         "                  AND rs.section_times IS NOT NULL AND rs.section_times != '')"
         "           AS timed,"
-        # A race whose every comment is HKJC's "No Comments on Running
-        # information for this horse." has not been commented on yet. Measured:
-        # a meeting that HAS them carries none of that placeholder at all, and
-        # one that has not carries nothing else — it is all or nothing per
-        # meeting, which is what makes this test reliable.
+        # A race is commented when HKJC's COMMENTS ON RUNNING for it are in.
+        #
+        # The source matters, and it was missing. The stewards' incident report
+        # is scraped off the results page and lands the same night, so once it
+        # was being stored, "any comment for this race" was true within the
+        # hour of every race -- every meeting read as commented, and settled,
+        # before HKJC had written a word of the running comments. They were
+        # never asked for again.
+        #
+        # The placeholder is stored on purpose (`coerce.NO_COMMENT_PREFIX`)
+        # and means the opposite of a comment, so it does not count.
         "         EXISTS (SELECT 1 FROM runner_comments rc"
         "                  WHERE rc.race_date = ra.race_date"
         "                    AND rc.race_no = ra.race_no"
+        "                    AND rc.source = 'corunning'"
         "                    AND rc.comment_text IS NOT NULL"
         "                    AND rc.comment_text NOT LIKE 'No Comments on Running%')"
         "           AS commented"
@@ -177,6 +225,14 @@ def _decide(conn, date: str, *, future: bool) -> Plan:
                    for k in ("finished", "paid", "timed", "commented"))
     if complete:
         return Plan(date, venue, f"settled, {races} races", act=False)
+    if all(row[k] == races for k in ("finished", "paid", "timed")):
+        # Only the comments are missing, and they are late by design. Ask for
+        # them alone; re-scraping the results to get them would be ten
+        # requests to re-read a page that has not changed since race night.
+        waiting = races - (row["commented"] or 0)
+        return Plan(date, venue,
+                    f"{waiting} races without comments on running",
+                    act=True, comments_only=True)
     missing = []
     for key, label in (("finished", "without results"),
                        ("paid", "without dividends"),
@@ -222,20 +278,26 @@ def probe(date: str, venue: str, *, session=None) -> tuple[str, str]:
 
 def run(db: Path | None = None, *, today: dt.date | None = None,
         back: int = DEFAULT_BACK, ahead: int = DEFAULT_AHEAD,
+        comments_back: int = COMMENTS_BACK,
         dry_run: bool = False, derive: bool = True,
         session=None) -> NightlyReport:
     """Scrape everything the window says is outstanding, then re-derive."""
     today = today or dt.date.today()
     report = NightlyReport(plans=plan_window(db, today=today, back=back,
-                                             ahead=ahead))
+                                             ahead=ahead,
+                                             comments_back=comments_back))
     if dry_run:
         return report
 
     touched = False
+    commented = False              # comments on running landed this run
     cards: list[str] = []          # dates whose card landed this run
     probes = unparsed = 0
     for plan in report.plans:
         if not plan.act:
+            continue
+        if plan.comments_only:
+            commented |= _comments(report, plan.date, db=db, session=session)
             continue
         past = dt.date.fromisoformat(plan.date) <= today
 
@@ -281,12 +343,60 @@ def run(db: Path | None = None, *, today: dt.date | None = None,
         out = derive_all.run(db)
         report.derived = out.render()
         report.errors.extend(out.errors)
+    elif derive and commented:
+        # New comments change the tags and nothing else. The tags are what
+        # every page reads -- Form Guide, Results, Race Day, Lookup, the
+        # Blackbook -- so this is what makes the comments visible anywhere.
+        out = derive_all.run(db, only=("tags",))
+        report.derived = out.render()
+        report.errors.extend(out.errors)
 
     if derive:
         # After the full derive, so a card is ranked against any results that
         # landed earlier in this same run.
         _score_cards(report, cards, db=db)
     return report
+
+
+def _comments(report: NightlyReport, date: str, *, db: Path | None,
+              session) -> bool:
+    """Ask for one meeting's comments on running. True if any landed.
+
+    One request first: race 1 answers for the card, because HKJC writes a
+    meeting up all at once (`scrape_corunning.published`). While it is still
+    the placeholder that is the whole cost of the night for this meeting.
+    """
+    try:
+        first = corunning.fetch(date, 1, session=session)
+    except (FetchError, corunning.CoRunningError) as exc:
+        # Transport or layout. Worth seeing, not worth failing the night over:
+        # the comments are retried every run for three weeks.
+        report.warnings.append(f"{date}: comments on running — {exc}")
+        return False
+    if not scrape_corunning.published(first):
+        report.pending_comments.append(date)
+        return False
+
+    races = _race_count(db, date)
+    got = scrape_corunning.scrape(date, db=db, max_races=races or 11,
+                                  session=session)
+    report.errors.extend(f"{date} comments on running: {e}" for e in got.errors)
+    if got.comments:
+        report.scraped.append(
+            f"{date}: comments on running, {got.comments} runners, "
+            f"{got.lane_tags} lane notes")
+    if got.pending:
+        report.pending_comments.append(f"{date} ({got.pending} races)")
+    return got.comments > 0
+
+
+def _race_count(db: Path | None, date: str) -> int:
+    conn = get_conn(db if db is not None else db_path())
+    try:
+        return conn.execute("SELECT count(*) FROM races WHERE race_date = ?",
+                            (date,)).fetchone()[0]
+    finally:
+        conn.close()
 
 
 def _unrun(db: Path | None, date: str) -> bool:
@@ -391,19 +501,22 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--db", type=Path, default=None)
     ap.add_argument("--back", type=int, default=DEFAULT_BACK)
     ap.add_argument("--ahead", type=int, default=DEFAULT_AHEAD)
+    ap.add_argument("--comments-back", type=int, default=COMMENTS_BACK,
+                    help="days back to keep asking for comments on running")
     ap.add_argument("--dry-run", action="store_true",
                     help="print the plan and make no requests")
     ap.add_argument("--no-derive", action="store_true")
     a = ap.parse_args(argv)
 
     if a.dry_run:
-        report = run(a.db, back=a.back, ahead=a.ahead, dry_run=True)
+        report = run(a.db, back=a.back, ahead=a.ahead,
+                     comments_back=a.comments_back, dry_run=True)
         print(report.render())
         return 0
 
     with job_log.running("nightly", a.db) as outcome:
         report = run(a.db, back=a.back, ahead=a.ahead,
-                     derive=not a.no_derive)
+                     comments_back=a.comments_back, derive=not a.no_derive)
         outcome["ok"] = report.ok
         outcome["detail"] = report.one_line()
     print(report.render())
