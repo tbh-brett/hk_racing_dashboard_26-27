@@ -34,6 +34,8 @@ class urls:
     sectional = f"{BASE_URL}/en-us/local/information/displaysectionaltime"
     corunning = f"{BASE_URL}/en-us/local/information/corunning"
     racecard = f"{BASE_URL}/en-us/local/information/racecard"
+    # The same card in Chinese, read for one column: the horse's Chinese name.
+    racecard_zh = f"{BASE_URL}/zh-hk/local/information/racecard"
     vet = f"{BASE_URL}/en-us/local/information/veterinaryrecord"
     trials = f"{BASE_URL}/en-us/local/information/btresult"
     # Odds, and only odds. A different host from everything above because it

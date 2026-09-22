@@ -1,0 +1,143 @@
+{
+ "_fixture_note": "Excerpt of the harvested record for https://www.youtube.com/watch?v=-yNB49esPsI (賽馬Fact Check, 賽前Highlights 9.23), fetched 2026-09-22 by tools/harvest_youtube.py. Segments are verbatim: the human zh-HK subtitles from 1:05 to 2:11, and the speech-to-text tail where the analyst gives and repeats her race-2 picks. Trimmed to what the extractor tests need; the description is its one line naming the analyst.",
+ "video_id": "-yNB49esPsI",
+ "title": "賽前Highlights｜9.23谷草9場夜馬 周日跑唔成拎保護權再報名！ 中秋前谷草夜觀星 希廐天星方廐富心星轉場有根據 伍鵬志撐華將開季四連勝！片尾有彩蛋 CC中文字幕#賽馬FactCheck",
+ "kind": "preview_zh",
+ "race_date": "2026-09-23",
+ "venue": "HV",
+ "published": "2026-09-21T05:00:09-07:00",
+ "duration_sec": 601,
+ "caption_lang": "zh-HK",
+ "caption_kind": "manual",
+ "caption_coverage": 0.617,
+ "description": "剛周日(9.20）沙田賽事要取消，20匹正選馬拎住優先出賽權心急轉爭周三(9.23）谷戰，希廐「天星」和方廐「富心星」皆曾勝同程有好無壞！片尾有賽馬分析師譚朗蔚精選推介，想知撳條片睇！",
+ "segments": [
+  {
+   "t": 65.36,
+   "text": "馬上轉戰星期三谷草"
+  },
+  {
+   "t": 67.92,
+   "text": "當中希斯嘅天星同方嘉柏嘅富心星"
+  },
+  {
+   "t": 71.96,
+   "text": "都曾經贏過谷草嘅今仗路程"
+  },
+  {
+   "t": 74.64,
+   "text": "今次臨時轉場可以話有好冇壞"
+  },
+  {
+   "t": 77.56,
+   "text": "隨時直闖凱旋門"
+  },
+  {
+   "t": 80.04,
+   "text": "天星原定星期日配艾道拿跑田草千二"
+  },
+  {
+   "t": 84.08,
+   "text": "賽事取消之後就改跑谷草千二"
+  },
+  {
+   "t": 87.52,
+   "text": "仲要搵番潘頓操刀"
+  },
+  {
+   "t": 89.52,
+   "text": "上季人馬第一次合作"
+  },
+  {
+   "t": 91.56,
+   "text": "初跑呢個路程就已經即刻贏馬"
+  },
+  {
+   "t": 94.2,
+   "text": "今次因緣際會故劍重逢"
+  },
+  {
+   "t": 96.92,
+   "text": "有力重開勝利之門"
+  },
+  {
+   "t": 99.04,
+   "text": "富心星四場頭馬全部係谷草短途"
+  },
+  {
+   "t": 102.36,
+   "text": "包括一場一千米同三場千二米"
+  },
+  {
+   "t": 105.68,
+   "text": "原本星期日係跑六戰全負嘅田草"
+  },
+  {
+   "t": 109.0,
+   "text": "依家拎住優先出賽權"
+  },
+  {
+   "t": 111.08,
+   "text": "轉跑最拿手嘅谷草千二"
+  },
+  {
+   "t": 113.72,
+   "text": "爭勝機會簡直係差天共地"
+  },
+  {
+   "t": 116.36,
+   "text": "今次隨時可以效法廐侶福進同舞林寶典"
+  },
+  {
+   "t": 120.68,
+   "text": "喺谷草攞到跨季連捷"
+  },
+  {
+   "t": 123.04,
+   "text": "值得一提神駒馬靈轉投廖康銘之後"
+  },
+  {
+   "t": 126.64,
+   "text": "兩次谷草一哩取得一冠一亞"
+  },
+  {
+   "t": 129.56,
+   "text": "演出非常準繩"
+  },
+  {
+   "t": 386.08,
+   "text": "3晚",
+   "src": "asr"
+  },
+  {
+   "t": 389.4,
+   "text": "tips呢？就系第二場啊，場四班督千二",
+   "src": "asr"
+  },
+  {
+   "t": 393.44,
+   "text": "米嘅圖情啵，我嘅推介啦，先減咗7號嘅銀",
+   "src": "asr"
+  },
+  {
+   "t": 398.88,
+   "text": "次勇士啦，跟住3號嘅路呀，仲有呢一號嘅",
+   "src": "asr"
+  },
+  {
+   "t": 403.56,
+   "text": "紅外嚇，揀咗啲馬先最喜歡七號呢就係王之",
+   "src": "asr"
+  },
+  {
+   "t": 569.44,
+   "text": "佐就系7號嘅銀次勇士啦，3號嘅路奴啦，",
+   "src": "asr"
+  },
+  {
+   "t": 573.4,
+   "text": "同埋一號嘅紅外嚇，大家都可以試啦嚇買下",
+   "src": "asr"
+  }
+ ]
+}

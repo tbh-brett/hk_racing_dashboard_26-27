@@ -1,0 +1,218 @@
+{
+  "_fixture_note": {
+    "what_is_real": "Every `quote` string from source `factcheck` is verbatim from the human-written zh-HK subtitle track of https://www.youtube.com/watch?v=-yNB49esPsI (賽馬Fact Check, 賽前Highlights for the 23 Sep 2026 Happy Valley meeting), pulled 2026-09-21. The `quote_en` values are translations. The single `rtw_interview` quote is verbatim English ASR from https://www.youtube.com/watch?v=6pYy-AOsnh8 (Racing To Win Interviews, Meeting 87) — its TEXT is real but it belongs to the 12 Jul meeting, and it appears here only to show the shape of an interview row. The `oncc` and `threads` selections are shaped on real formats (on.cc publishes `4[良駒好友]`; Horse Detective publishes `R10 10 金勝名駒` signed `[王子]`) but these particular rows are illustrative.",
+    "what_is_illustrative": "EVERY race_no and horse_no in this file. The 23 Sep card was not in hand when this was written, so no number here is a real declaration. Do not use them to check anything but the validator's plumbing — and note that acceptance criterion 3 depends on a bad number quarantining rather than writing, so a fixture full of numbers that do not exist in your test DB is a feature, not a bug: seed the test races and runners explicitly.",
+    "convention": "The validator ignores every top-level key beginning with an underscore, so a fixture can carry its own provenance without breaking the contract."
+  },
+
+  "payload_version": 1,
+  "race_date": "2026-09-23",
+  "generated_at": "2026-09-22T03:00:00Z",
+  "extractor": "llm:claude-opus-5@tips-v1",
+
+  "quotes": [
+    {
+      "source": "factcheck",
+      "video_id": "-yNB49esPsI",
+      "t_start": 108.0,
+      "url": "https://www.youtube.com/watch?v=-yNB49esPsI&t=108s",
+      "race_no": 4,
+      "horse_no": 7,
+      "horse_said": "富心星",
+      "speaker": "賽馬Fact Check",
+      "role": "analyst",
+      "caption_kind": "manual",
+      "quote": "富心星四場頭馬全部係谷草短途，包括一場一千米同三場千二米。原本星期日係跑六戰全負嘅田草，依家拎住優先出賽權，轉跑最拿手嘅谷草千二，爭勝機會簡直係差天共地。",
+      "quote_en": "All four of its wins have come at Happy Valley sprints — one at 1000m and three at 1200m. It was entered on Sunday for Sha Tin turf, where it is 0 from 6. Holding a priority entry it now switches to its best trip, Happy Valley 1200m; the difference in its chance is night and day.",
+      "topic": "class",
+      "stance": "positive",
+      "confidence": 0.94,
+      "extracted_by": "llm:claude-opus-5@tips-v1"
+    },
+    {
+      "source": "factcheck",
+      "video_id": "-yNB49esPsI",
+      "t_start": 92.0,
+      "url": "https://www.youtube.com/watch?v=-yNB49esPsI&t=92s",
+      "race_no": 4,
+      "horse_no": 2,
+      "horse_said": "天星",
+      "speaker": "賽馬Fact Check",
+      "role": "analyst",
+      "caption_kind": "manual",
+      "quote": "天星原定星期日配艾道拿跑田草千二，賽事取消之後就改跑谷草千二，仲要搵番潘頓操刀。上季人馬第一次合作，初跑呢個路程就已經即刻贏馬，今次因緣際會故劍重逢，有力重開勝利之門。",
+      "quote_en": "Tin Sing was to run Sha Tin 1200m with Atzeni on Sunday. With that meeting cancelled it switches to Happy Valley 1200m and Purton comes back on. The first time that pairing happened last season the horse won first time over this trip; reunited now, it can win again.",
+      "topic": "plan",
+      "stance": "positive",
+      "confidence": 0.91,
+      "extracted_by": "llm:claude-opus-5@tips-v1"
+    },
+    {
+      "source": "factcheck",
+      "video_id": "-yNB49esPsI",
+      "t_start": 281.0,
+      "url": "https://www.youtube.com/watch?v=-yNB49esPsI&t=281s",
+      "race_no": 6,
+      "horse_no": 11,
+      "horse_said": "震撼人心",
+      "speaker": "賽馬Fact Check",
+      "role": "analyst",
+      "caption_kind": "manual",
+      "quote": "震撼人心今季喺開鑼日上陣，隻馬抽四檔但全程兜大彎蝕位無數，布文同蔡約翰賽後雙雙被問話，明顯未有完全發揮應有水準。經過一場熱身，狀態應該起得更好，今次改由艾兆禮接手。",
+      "quote_en": "It ran on opening day off barrier 4 but raced wide the whole way and lost ground everywhere. Bowman and Tsui were both questioned by the stewards afterwards; it plainly never showed its real level. With that run behind it the condition should be sharper, and Eriksson takes over.",
+      "topic": "doubt",
+      "stance": "positive",
+      "confidence": 0.88,
+      "extracted_by": "llm:claude-opus-5@tips-v1"
+    },
+    {
+      "source": "factcheck",
+      "video_id": "-yNB49esPsI",
+      "t_start": 322.0,
+      "url": "https://www.youtube.com/watch?v=-yNB49esPsI&t=322s",
+      "race_no": 8,
+      "horse_no": 5,
+      "horse_said": "金駒永騰",
+      "speaker": "賽馬Fact Check",
+      "role": "analyst",
+      "caption_kind": "manual",
+      "quote": "金駒永騰上場跑田草千六，由頭帶到尾一放到底，爆出32倍冷門開齋。馬匹明顯已經開竅，贏馬之後只係加7分，阻力唔算太大，今次繼續由黃智弘操刀，有機會成為首匹今季兩捷馬。",
+      "quote_en": "Last start over Sha Tin 1600m it led all the way and won at 32/1 for its first win. The penny has clearly dropped, and it went up only 7 points, so the rise is manageable. Wong stays on, and it could be the season's first dual winner.",
+      "topic": "class",
+      "stance": "positive",
+      "confidence": 0.9,
+      "extracted_by": "llm:claude-opus-5@tips-v1"
+    },
+    {
+      "source": "factcheck",
+      "video_id": "-yNB49esPsI",
+      "t_start": 349.0,
+      "url": "https://www.youtube.com/watch?v=-yNB49esPsI&t=349s",
+      "race_no": 9,
+      "horse_no": 3,
+      "horse_said": "紫荊傳令",
+      "speaker": "賽馬Fact Check",
+      "role": "analyst",
+      "caption_kind": "manual",
+      "quote": "今次又搵番潘頓騎，仲要親身試埋課泥閘先嚟跑，有可能係出擊訊號。潘頓省完呢課閘唔放手，今次都好大機會可以打開勝門。",
+      "quote_en": "Purton is engaged again, and he schooled the horse himself in an all-weather barrier trial before this run — possibly a signal of intent. Having ridden that trial he keeps the ride, and it has a strong chance of opening its account.",
+      "topic": "trial",
+      "stance": "positive",
+      "confidence": 0.87,
+      "extracted_by": "llm:claude-opus-5@tips-v1"
+    },
+    {
+      "source": "rtw_interview",
+      "video_id": "6pYy-AOsnh8",
+      "t_start": 214.0,
+      "url": "https://www.youtube.com/watch?v=6pYy-AOsnh8&t=214s",
+      "race_no": 7,
+      "horse_no": 4,
+      "horse_said": "Massive Sovereign",
+      "speaker": "Frankie Lor",
+      "role": "trainer",
+      "caption_kind": "asr",
+      "quote": "I try two times — the first trial, you know, I have a few months off, and the second trial he looks better. And he drawn barrier 12 for his return. Where do you expect him to be in the run? I think we just jump and make him relax.",
+      "quote_en": null,
+      "topic": "plan",
+      "stance": "neutral",
+      "confidence": 0.72,
+      "extracted_by": "llm:claude-opus-5@tips-v1"
+    },
+    {
+      "source": "factcheck",
+      "video_id": "-yNB49esPsI",
+      "t_start": 249.0,
+      "url": "https://www.youtube.com/watch?v=-yNB49esPsI&t=249s",
+      "race_no": null,
+      "horse_no": null,
+      "horse_said": "紅愛舍",
+      "speaker": "賽馬Fact Check",
+      "role": "analyst",
+      "caption_kind": "manual",
+      "quote": "紅愛舍轉投韋達馬房之後，兩場頭馬全部喺谷草千二配布文所得，加上隻馬上季首仗亦喺布文胯下只輸頭位得第二，證明本身特別擅長跑新鮮。今仗雖然冇咗OK哥都唔好睇小呀。",
+      "quote_en": "Since joining Whyte's stable both of its wins have come at Happy Valley 1200m with Bowman, and its first start last season was also a second, beaten only by the winner, under him — proof it goes particularly well fresh. Bowman is missing this time, but do not underrate it.",
+      "topic": "fitness",
+      "stance": "positive",
+      "confidence": 0.85,
+      "extracted_by": "llm:claude-opus-5@tips-v1"
+    }
+  ],
+
+  "selections": [
+    {
+      "source": "oncc",
+      "tipster": "西門獨",
+      "race_no": 1,
+      "horse_no": 4,
+      "pick_rank": 1,
+      "name_seen": "良駒好友",
+      "note": null,
+      "url": "https://racing.on.cc/racing/fav/20260923/rjfavf0201x0.html",
+      "published_at": "2026-09-22T04:00:00Z"
+    },
+    {
+      "source": "oncc",
+      "tipster": "諸葛數",
+      "race_no": 1,
+      "horse_no": 9,
+      "pick_rank": 2,
+      "name_seen": "勝利雄心",
+      "note": null,
+      "url": "https://racing.on.cc/racing/fav/20260923/rjfavf0201x0.html",
+      "published_at": "2026-09-22T04:00:00Z"
+    },
+    {
+      "source": "oncc",
+      "tipster": "兆文",
+      "race_no": 4,
+      "horse_no": 7,
+      "pick_rank": 1,
+      "name_seen": "富心星",
+      "note": null,
+      "url": "https://racing.on.cc/racing/fav/20260923/rjfavf0201x0.html",
+      "published_at": "2026-09-22T04:00:00Z"
+    },
+    {
+      "source": "threads",
+      "tipster": "王子",
+      "race_no": 9,
+      "horse_no": 3,
+      "pick_rank": 1,
+      "name_seen": "紫荊傳令",
+      "note": "潘頓親自試閘，出擊訊號明顯。",
+      "url": "https://www.threads.com/@horsedetective/post/DdV2Fmsj7FT",
+      "published_at": "2026-09-22T09:12:00Z"
+    },
+    {
+      "source": "threads",
+      "tipster": "分析師",
+      "race_no": 6,
+      "horse_no": 11,
+      "pick_rank": 1,
+      "name_seen": "震撼人心",
+      "note": "開鑼日兜大彎蝕位，今仗有得補償。",
+      "url": "https://www.threads.com/@horsedetective/post/DdVlf0_j7YJ",
+      "published_at": "2026-09-22T09:40:00Z"
+    }
+  ],
+
+  "quarantine": [
+    {
+      "source": "factcheck",
+      "race_date": "2026-09-23",
+      "race_no": null,
+      "raw": "馬靈轉投廖康銘之後，兩次谷草一哩取得一冠一亞，演出非常準繩。",
+      "reason": "name_unknown",
+      "url": "https://www.youtube.com/watch?v=-yNB49esPsI&t=196s"
+    },
+    {
+      "source": "bryan",
+      "race_date": "2026-09-23",
+      "race_no": null,
+      "raw": "喺金呢總山優城特別金嘅嗰五呢",
+      "reason": "unparsed",
+      "url": "https://www.youtube.com/watch?v=QXn4RZA22N0"
+    }
+  ]
+}

@@ -29,9 +29,16 @@ __all__ = ["repair", "clear_results", "RepairReport"]
 
 # Every table keyed by (race_date, race_no). Derived rows go first so nothing
 # is left pointing at a race that no longer exists.
+#
+# The tips tables too, and not only because their foreign keys would refuse
+# the delete. A tip was resolved to a horse NUMBER against the card that was
+# stored, and that card was the wrong one — keeping the tip would hang a
+# trainer's quote on whichever horse the right card gives that number. The
+# raw transcripts stay on the PC, so re-pushing the payload restores them.
 _TABLES = ("runner_tags", "runner_comments", "runner_et", "runner_pace",
-           "runner_sarr", "runner_sarr_component", "dividends", "runners",
-           "races")
+           "runner_sarr", "runner_sarr_component", "dividends",
+           "connections_quote", "tipster_selection", "tips_quarantine",
+           "runners", "races")
 
 
 @dataclass

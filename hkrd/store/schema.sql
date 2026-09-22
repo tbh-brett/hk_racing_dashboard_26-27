@@ -630,3 +630,105 @@ CREATE INDEX IF NOT EXISTS ix_runners_date  ON runners(race_date);
 CREATE INDEX IF NOT EXISTS ix_snap_race     ON odds_snapshots(race_date, race_no, captured_at);
 CREATE INDEX IF NOT EXISTS ix_dbl_leg       ON odds_doubles(race_date, leg_no, captured_at);
 CREATE INDEX IF NOT EXISTS ix_turnover_race ON odds_pool_turnover(race_date, race_no, captured_at);
+
+-- ── the tips layer ───────────────────────────────────────────────────────────
+-- What other people SAID about a runner: its trainer and jockey, and the
+-- tipsters. Raw, because none of it can be rebuilt from anything here, but
+-- not scraped truth either -- which is why it is four tables of its own and
+-- not columns on `runners`, the table every derived figure is rebuilt from.
+-- docs/handover/tips-layer/SPEC.md has the rest.
+
+-- English <-> Chinese horse names. LOAD-BEARING: 賽馬Fact Check names horses
+-- in Chinese and never gives a number, so without this there is no path from
+-- its transcripts to `runners`. The legacy `horsename_zh` died in May.
+--
+-- Paired on the BRAND NUMBER read off the English and Chinese cards together,
+-- never on horse_no against whatever `runners` holds: a meeting stored from
+-- the wrong page (jobs/repair_meeting) would pair one horse's English name
+-- with another's Chinese one, and this table only grows.
+CREATE TABLE IF NOT EXISTS horse_name_zh (
+  horse_name TEXT PRIMARY KEY,         -- the English name, the join key
+  name_zh    TEXT NOT NULL,
+  brand_no   TEXT,
+  source     TEXT NOT NULL,            -- racecard_zh | odds_changes | manual
+  seen_at    TEXT NOT NULL             -- the latest card it was read off
+);
+CREATE INDEX IF NOT EXISTS ix_hnz_zh ON horse_name_zh(name_zh);
+
+-- What the connections said. Not filed with the tipsters: a trainer has
+-- information nobody else has and a reason to be optimistic, so "he might
+-- find it a little bit tough" from the man who trains the horse outweighs the
+-- same sentence from a columnist. Filed together they average out.
+--
+-- race_no and horse_no are NULLABLE ON PURPOSE. A quote nobody could pin to a
+-- runner is still worth showing at race level; a NOT NULL here is how a wrong
+-- horse ends up carrying a trainer's endorsement. The foreign keys only bite
+-- when the number is there, which is exactly when it has to be real.
+CREATE TABLE IF NOT EXISTS connections_quote (
+  quote_id     TEXT    PRIMARY KEY,   -- '<video_id>:<int(t_start)>'
+  race_date    TEXT    NOT NULL,
+  race_no      INTEGER,               -- NULL when unresolved
+  horse_no     INTEGER,               -- NULL when unresolved
+  horse_said   TEXT,                  -- the name as the source gave it
+  speaker      TEXT,
+  role         TEXT    NOT NULL,      -- trainer | jockey | presenter | analyst
+  quote        TEXT    NOT NULL,      -- verbatim, in its original language
+  quote_en     TEXT,                  -- translation when the original is Chinese
+  topic        TEXT,                  -- fitness|draw|plan|trial|class|doubt|gear
+  stance       TEXT,                  -- positive | negative | neutral
+  source       TEXT    NOT NULL,      -- rtw_interview | rtw_preview | factcheck | bryan
+  video_id     TEXT,
+  t_start      REAL,                  -- seconds, so the link jumps to the answer
+  caption_kind TEXT,                  -- manual | asr: a quality tier, never averaged
+  confidence   REAL,                  -- the resolver's own 0..1
+  extracted_by TEXT    NOT NULL,      -- 'llm:<model>@<prompt>' | 'rule:<name>'
+  url          TEXT    NOT NULL,
+  fetched_at   TEXT    NOT NULL,
+  FOREIGN KEY (race_date, race_no) REFERENCES races(race_date, race_no),
+  FOREIGN KEY (race_date, race_no, horse_no)
+    REFERENCES runners(race_date, race_no, horse_no)
+);
+CREATE INDEX IF NOT EXISTS ix_cq_runner
+  ON connections_quote(race_date, race_no, horse_no);
+
+-- Who tipped what. A selection is always a runner -- there is no such thing
+-- as a pick of nothing -- so here the numbers are required.
+--
+-- `caption_kind` is 'asr' for a pick HEARD through speech-to-text: the number
+-- was spoken and the name came out mangled (紅外嚇 for 紅愛舍). Recorded, on
+-- the owner's say-so, and marked so the card can say how it was obtained.
+CREATE TABLE IF NOT EXISTS tipster_selection (
+  source       TEXT    NOT NULL,      -- oncc | stheadline | threads | factcheck
+  tipster      TEXT    NOT NULL,      -- 西門獨 | 諸葛數 | 王子 | 分析師 | 譚朗蔚
+  race_date    TEXT    NOT NULL,
+  race_no      INTEGER NOT NULL,
+  horse_no     INTEGER NOT NULL,
+  pick_rank    INTEGER,               -- 1 = top pick; NULL if unranked
+  note         TEXT,                  -- the tipster's own words, where any
+  name_seen    TEXT,                  -- published name, a checksum only
+  caption_kind TEXT,                  -- NULL (printed) | manual | asr (heard)
+  url          TEXT,
+  published_at TEXT,
+  fetched_at   TEXT    NOT NULL,
+  PRIMARY KEY (source, tipster, race_date, race_no, horse_no),
+  FOREIGN KEY (race_date, race_no, horse_no)
+    REFERENCES runners(race_date, race_no, horse_no)
+);
+CREATE INDEX IF NOT EXISTS ix_ts_runner
+  ON tipster_selection(race_date, race_no, horse_no);
+
+-- What did not resolve, and why. Read as a count on the ops page: a climbing
+-- count is a layout or caption change announcing itself, where a silent best
+-- guess would have been a wrong horse with a trainer's quote under it.
+CREATE TABLE IF NOT EXISTS tips_quarantine (
+  quarantine_id TEXT PRIMARY KEY,     -- sha1 of source + raw, so a re-push dedups
+  source        TEXT NOT NULL,
+  race_date     TEXT,
+  race_no       INTEGER,
+  raw           TEXT NOT NULL,
+  reason        TEXT NOT NULL,        -- no_runner | no_race | name_unknown
+                                      -- | name_mismatch | low_confidence | unparsed
+  url           TEXT,
+  fetched_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_tq_date ON tips_quarantine(race_date, source);

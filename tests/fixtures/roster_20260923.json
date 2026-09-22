@@ -1,0 +1,810 @@
+{
+ "_fixture_note": "GET /api/tips/roster/2026-09-23 as served on 2026-09-22 by a dashboard holding the real HKJC card for that meeting and the Chinese names jobs/sync_horse_names paired from the zh-hk card: 9 races, 108 runners.",
+ "race_date": "2026-09-23",
+ "venue": "HV",
+ "races": [
+  {
+   "race_no": 1,
+   "runners": [
+    {
+     "horse_no": 1,
+     "horse_name": "SUPER SICARIO",
+     "name_zh": "堅多福",
+     "jockey": "C Y Ho",
+     "trainer": "C Fownes"
+    },
+    {
+     "horse_no": 2,
+     "horse_name": "SMILING ONE",
+     "name_zh": "一風雲",
+     "jockey": "R Kingscote",
+     "trainer": "K H Ting"
+    },
+    {
+     "horse_no": 3,
+     "horse_name": "SOARING BRONCO",
+     "name_zh": "神駒馬靈",
+     "jockey": "L Ferraris",
+     "trainer": "M Newnham"
+    },
+    {
+     "horse_no": 4,
+     "horse_name": "RED BRICK WARRIOR",
+     "name_zh": "紅磚戰士",
+     "jockey": "C L Chau (-2)",
+     "trainer": "D Eustace"
+    },
+    {
+     "horse_no": 5,
+     "horse_name": "TO INFINITY",
+     "name_zh": "極速滿貫",
+     "jockey": "J Orman",
+     "trainer": "J Richards"
+    },
+    {
+     "horse_no": 6,
+     "horse_name": "ALL ARE MINE",
+     "name_zh": "開心三多",
+     "jockey": "L Hewitson",
+     "trainer": "B Crawford"
+    },
+    {
+     "horse_no": 7,
+     "horse_name": "CIRCUIT DUFFY",
+     "name_zh": "綫路達飛",
+     "jockey": "M L Yeung",
+     "trainer": "W Y So"
+    },
+    {
+     "horse_no": 8,
+     "horse_name": "TELECOM POWER",
+     "name_zh": "電訊驕陽",
+     "jockey": "H Y Yuen (-10)",
+     "trainer": "Y S Tsui"
+    },
+    {
+     "horse_no": 9,
+     "horse_name": "KOLACHI",
+     "name_zh": "至高心得",
+     "jockey": "K C Leung",
+     "trainer": "D J Whyte"
+    },
+    {
+     "horse_no": 10,
+     "horse_name": "WINDICATOR FAMILY",
+     "name_zh": "威威父子",
+     "jockey": "K Teetan",
+     "trainer": "W K Mo"
+    },
+    {
+     "horse_no": 11,
+     "horse_name": "ORIENTAL SURPRISE",
+     "name_zh": "東方魅影",
+     "jockey": "Z Purton",
+     "trainer": "D A Hayes"
+    },
+    {
+     "horse_no": 12,
+     "horse_name": "PERFECT PAIRING",
+     "name_zh": "幸運同行",
+     "jockey": "A Atzeni",
+     "trainer": "J Size"
+    }
+   ]
+  },
+  {
+   "race_no": 2,
+   "runners": [
+    {
+     "horse_no": 1,
+     "horse_name": "FIND MY LOVE",
+     "name_zh": "紅愛舍",
+     "jockey": "M L Yeung",
+     "trainer": "D J Whyte"
+    },
+    {
+     "horse_no": 2,
+     "horse_name": "VIGOR HAPPINESS",
+     "name_zh": "銳喜",
+     "jockey": "M Chadwick",
+     "trainer": "Y S Tsui"
+    },
+    {
+     "horse_no": 3,
+     "horse_name": "LOOKING BRIGHT",
+     "name_zh": "路路勁",
+     "jockey": "K Teetan",
+     "trainer": "F C Lor"
+    },
+    {
+     "horse_no": 4,
+     "horse_name": "MATZDEN",
+     "name_zh": "馬馳登",
+     "jockey": "A Atzeni",
+     "trainer": "J Richards"
+    },
+    {
+     "horse_no": 5,
+     "horse_name": "TOURBILLON GOLFER",
+     "name_zh": "飛輪霸",
+     "jockey": "M F Poon",
+     "trainer": "P F Yiu"
+    },
+    {
+     "horse_no": 6,
+     "horse_name": "GOLDEN ELITE",
+     "name_zh": "金珀尖子",
+     "jockey": "R Kingscote",
+     "trainer": "D A Hayes"
+    },
+    {
+     "horse_no": 7,
+     "horse_name": "SILVER SPURS",
+     "name_zh": "銀刺勇士",
+     "jockey": "E C W Wong (-3)",
+     "trainer": "C Fownes"
+    },
+    {
+     "horse_no": 8,
+     "horse_name": "COUNTRY PRIDE",
+     "name_zh": "鄉村威龍",
+     "jockey": "B Avdulla",
+     "trainer": "J Size"
+    },
+    {
+     "horse_no": 9,
+     "horse_name": "GOOD LUCK BABE",
+     "name_zh": "開心五月",
+     "jockey": "Y L Chung (-2)",
+     "trainer": "A S Cruz"
+    },
+    {
+     "horse_no": 10,
+     "horse_name": "BITS SUPERSTAR",
+     "name_zh": "比特星",
+     "jockey": "Z Purton",
+     "trainer": "D J Hall"
+    },
+    {
+     "horse_no": 11,
+     "horse_name": "LEGEND STAR",
+     "name_zh": "有盈勇士",
+     "jockey": "L Hewitson",
+     "trainer": "C S Shum"
+    },
+    {
+     "horse_no": 12,
+     "horse_name": "MAJESTIC DELIGHT",
+     "name_zh": "首駿",
+     "jockey": "H Bentley",
+     "trainer": "D Eustace"
+    }
+   ]
+  },
+  {
+   "race_no": 3,
+   "runners": [
+    {
+     "horse_no": 1,
+     "horse_name": "EXCEED THE LIMIT",
+     "name_zh": "星願無限",
+     "jockey": "L Hewitson",
+     "trainer": "C S Shum"
+    },
+    {
+     "horse_no": 2,
+     "horse_name": "SHOOTING TO TOP",
+     "name_zh": "贏玥",
+     "jockey": "Z Purton",
+     "trainer": "W K Mo"
+    },
+    {
+     "horse_no": 3,
+     "horse_name": "RAINBOW SEVEN",
+     "name_zh": "彩虹七色",
+     "jockey": "C Y Ho",
+     "trainer": "K W Lui"
+    },
+    {
+     "horse_no": 4,
+     "horse_name": "MEGA MASTERMIND",
+     "name_zh": "睿智多寶",
+     "jockey": "B Avdulla",
+     "trainer": "J Richards"
+    },
+    {
+     "horse_no": 5,
+     "horse_name": "AMAZING GAZE",
+     "name_zh": "凝妙星",
+     "jockey": "J Orman",
+     "trainer": "D A Hayes"
+    },
+    {
+     "horse_no": 6,
+     "horse_name": "CASA ROCHESTER",
+     "name_zh": "領航天子",
+     "jockey": "L Ferraris",
+     "trainer": "M Newnham"
+    },
+    {
+     "horse_no": 7,
+     "horse_name": "DECISION LINK",
+     "name_zh": "有情有義",
+     "jockey": "E C W Wong (-3)",
+     "trainer": "C Fownes"
+    },
+    {
+     "horse_no": 8,
+     "horse_name": "AKERMANIS GOLD",
+     "name_zh": "蹺妙",
+     "jockey": "C L Chau (-2)",
+     "trainer": "D Eustace"
+    },
+    {
+     "horse_no": 9,
+     "horse_name": "LUCKY TOGETHER",
+     "name_zh": "越駿齊歡",
+     "jockey": "K C Leung",
+     "trainer": "F C Lor"
+    },
+    {
+     "horse_no": 10,
+     "horse_name": "CALIFORNIA MOXIE",
+     "name_zh": "加州活力",
+     "jockey": "A Atzeni",
+     "trainer": "A S Cruz"
+    },
+    {
+     "horse_no": 11,
+     "horse_name": "BRIGHT INHERITANCE",
+     "name_zh": "光明傳承",
+     "jockey": "H Bentley",
+     "trainer": "C H Yip"
+    },
+    {
+     "horse_no": 12,
+     "horse_name": "SURE JOYFUL",
+     "name_zh": "得意佳作",
+     "jockey": "K Teetan",
+     "trainer": "P F Yiu"
+    }
+   ]
+  },
+  {
+   "race_no": 4,
+   "runners": [
+    {
+     "horse_no": 1,
+     "horse_name": "FRIENDS OF SHAJING",
+     "name_zh": "沙井之友",
+     "jockey": "C L Chau (-2)",
+     "trainer": "W K Mo"
+    },
+    {
+     "horse_no": 2,
+     "horse_name": "TACTICAL ACE",
+     "name_zh": "智勝一籌",
+     "jockey": "M Chadwick",
+     "trainer": "W Y So"
+    },
+    {
+     "horse_no": 3,
+     "horse_name": "LEADING DRAGON",
+     "name_zh": "應龍飛影",
+     "jockey": "H Y Yuen (-10)",
+     "trainer": "P C Ng"
+    },
+    {
+     "horse_no": 4,
+     "horse_name": "BROWNNEEDSFURTHER",
+     "name_zh": "星辰千帥",
+     "jockey": "B Avdulla",
+     "trainer": "D J Hall"
+    },
+    {
+     "horse_no": 5,
+     "horse_name": "JOKER ORBIT",
+     "name_zh": "莊家班",
+     "jockey": "E C W Wong (-3)",
+     "trainer": "C S Shum"
+    },
+    {
+     "horse_no": 6,
+     "horse_name": "CLOUD NINE",
+     "name_zh": "快樂神駒",
+     "jockey": "Z Purton",
+     "trainer": "M Newnham"
+    },
+    {
+     "horse_no": 7,
+     "horse_name": "STUNNING BUNDLE",
+     "name_zh": "震撼人心",
+     "jockey": "A Atzeni",
+     "trainer": "J Size"
+    },
+    {
+     "horse_no": 8,
+     "horse_name": "CHANCHENG SPARKLE",
+     "name_zh": "禪勝閃亮",
+     "jockey": "L Hewitson",
+     "trainer": "K W Lui"
+    },
+    {
+     "horse_no": 9,
+     "horse_name": "INVICTUS",
+     "name_zh": "將傲",
+     "jockey": "J Orman",
+     "trainer": "D J Whyte"
+    },
+    {
+     "horse_no": 10,
+     "horse_name": "LUCKY XANDER",
+     "name_zh": "平天雄",
+     "jockey": "M F Poon",
+     "trainer": "K H Ting"
+    },
+    {
+     "horse_no": 11,
+     "horse_name": "PODIUM",
+     "name_zh": "焦點",
+     "jockey": "K Teetan",
+     "trainer": "D Eustace"
+    },
+    {
+     "horse_no": 12,
+     "horse_name": "FREE PONY",
+     "name_zh": "三強",
+     "jockey": "M L Yeung",
+     "trainer": "C W Chang"
+    }
+   ]
+  },
+  {
+   "race_no": 5,
+   "runners": [
+    {
+     "horse_no": 1,
+     "horse_name": "GLORIOUS JOURNEY",
+     "name_zh": "本領非凡",
+     "jockey": "C Y Ho",
+     "trainer": "F C Lor"
+    },
+    {
+     "horse_no": 2,
+     "horse_name": "CLASS",
+     "name_zh": "大文豪",
+     "jockey": "J Orman",
+     "trainer": "P F Yiu"
+    },
+    {
+     "horse_no": 3,
+     "horse_name": "IVY LEAGUE",
+     "name_zh": "大學生",
+     "jockey": "R Kingscote",
+     "trainer": "D J Whyte"
+    },
+    {
+     "horse_no": 4,
+     "horse_name": "VERMILION TEMPEST",
+     "name_zh": "赤風驪",
+     "jockey": "L Ferraris",
+     "trainer": "C Fownes"
+    },
+    {
+     "horse_no": 5,
+     "horse_name": "INNO SUPER",
+     "name_zh": "創科群英",
+     "jockey": "C L Chau (-2)",
+     "trainer": "D Eustace"
+    },
+    {
+     "horse_no": 6,
+     "horse_name": "HAPPY SMILE",
+     "name_zh": "越駿聯歡",
+     "jockey": "K C Leung",
+     "trainer": "J Richards"
+    },
+    {
+     "horse_no": 7,
+     "horse_name": "DASHING MAURISON",
+     "name_zh": "滿洛城",
+     "jockey": "H Bentley",
+     "trainer": "D A Hayes"
+    },
+    {
+     "horse_no": 8,
+     "horse_name": "LUCK IS BACK",
+     "name_zh": "金駒永騰",
+     "jockey": "E C W Wong (-3)",
+     "trainer": "P C Ng"
+    },
+    {
+     "horse_no": 9,
+     "horse_name": "VIVA FIRECRACKER",
+     "name_zh": "爆竹",
+     "jockey": "K Teetan",
+     "trainer": "A S Cruz"
+    },
+    {
+     "horse_no": 10,
+     "horse_name": "KING OF SELECTION",
+     "name_zh": "揀馬之皇",
+     "jockey": "M F Poon",
+     "trainer": "D J Hall"
+    },
+    {
+     "horse_no": 11,
+     "horse_name": "HEALTHY PONY",
+     "name_zh": "健康小馬",
+     "jockey": "M L Yeung",
+     "trainer": "C W Chang"
+    },
+    {
+     "horse_no": 12,
+     "horse_name": "GAZELEY",
+     "name_zh": "同心",
+     "jockey": "M Chadwick",
+     "trainer": "K W Lui"
+    }
+   ]
+  },
+  {
+   "race_no": 6,
+   "runners": [
+    {
+     "horse_no": 1,
+     "horse_name": "JUMBO BLESSING",
+     "name_zh": "福進",
+     "jockey": "C Y Ho",
+     "trainer": "C Fownes"
+    },
+    {
+     "horse_no": 2,
+     "horse_name": "COPPER CORE",
+     "name_zh": "友駿同心",
+     "jockey": "K C Leung",
+     "trainer": "W Y So"
+    },
+    {
+     "horse_no": 3,
+     "horse_name": "BLUE ILLUSION",
+     "name_zh": "藍地球",
+     "jockey": "J Orman",
+     "trainer": "P C Ng"
+    },
+    {
+     "horse_no": 4,
+     "horse_name": "SUPERB KING",
+     "name_zh": "巴閉王",
+     "jockey": "C L Chau (-2)",
+     "trainer": "K W Lui"
+    },
+    {
+     "horse_no": 5,
+     "horse_name": "GEORGIAN SIGMA",
+     "name_zh": "佐治傳奇",
+     "jockey": "A Atzeni",
+     "trainer": "A S Cruz"
+    },
+    {
+     "horse_no": 6,
+     "horse_name": "DOUBLE ALPHA",
+     "name_zh": "升升雙息",
+     "jockey": "M F Poon",
+     "trainer": "C S Shum"
+    },
+    {
+     "horse_no": 7,
+     "horse_name": "SECRET INGREDIENT",
+     "name_zh": "雙劍合璧",
+     "jockey": "H Bentley",
+     "trainer": "D A Hayes"
+    },
+    {
+     "horse_no": 8,
+     "horse_name": "FLYING TING LOK",
+     "name_zh": "螢影飛馳",
+     "jockey": "H Y Yuen (-10)",
+     "trainer": "Y S Tsui"
+    },
+    {
+     "horse_no": 9,
+     "horse_name": "HARMONY FIRE",
+     "name_zh": "天火同人",
+     "jockey": "P N Wong (-7)",
+     "trainer": "D J Whyte"
+    },
+    {
+     "horse_no": 10,
+     "horse_name": "CASA BUDDY",
+     "name_zh": "領航多財",
+     "jockey": "H T Mo (-2)",
+     "trainer": "C W Chang"
+    },
+    {
+     "horse_no": 11,
+     "horse_name": "HAPPY UNITED",
+     "name_zh": "萬眾開心",
+     "jockey": "M Chadwick",
+     "trainer": "J Richards"
+    },
+    {
+     "horse_no": 12,
+     "horse_name": "MAPOGO",
+     "name_zh": "馬運高",
+     "jockey": "K Teetan",
+     "trainer": "K L Man"
+    }
+   ]
+  },
+  {
+   "race_no": 7,
+   "runners": [
+    {
+     "horse_no": 1,
+     "horse_name": "FLYING WROTE",
+     "name_zh": "東來欣賞",
+     "jockey": "C L Chau (-2)",
+     "trainer": "A S Cruz"
+    },
+    {
+     "horse_no": 2,
+     "horse_name": "SYMBOL OF STRENGTH",
+     "name_zh": "乘數表",
+     "jockey": "B Avdulla",
+     "trainer": "F C Lor"
+    },
+    {
+     "horse_no": 3,
+     "horse_name": "AKASHVANI",
+     "name_zh": "天星",
+     "jockey": "Z Purton",
+     "trainer": "D A Hayes"
+    },
+    {
+     "horse_no": 4,
+     "horse_name": "YOUNG EMPEROR",
+     "name_zh": "競駿皇者",
+     "jockey": "L Ferraris",
+     "trainer": "D Eustace"
+    },
+    {
+     "horse_no": 5,
+     "horse_name": "PASS LINE",
+     "name_zh": "傲聖",
+     "jockey": "M F Poon",
+     "trainer": "D J Hall"
+    },
+    {
+     "horse_no": 6,
+     "horse_name": "POWER KOEPP",
+     "name_zh": "電源之駒",
+     "jockey": "K C Leung",
+     "trainer": "M Newnham"
+    },
+    {
+     "horse_no": 7,
+     "horse_name": "CALIFORNIA BLITZ",
+     "name_zh": "加州本事",
+     "jockey": "M Chadwick",
+     "trainer": "W K Mo"
+    },
+    {
+     "horse_no": 8,
+     "horse_name": "WUKONG JEWELLERY",
+     "name_zh": "首飾悟空",
+     "jockey": "A Atzeni",
+     "trainer": "J Size"
+    },
+    {
+     "horse_no": 9,
+     "horse_name": "KING MILES",
+     "name_zh": "安康萬里",
+     "jockey": "H Bentley",
+     "trainer": "K W Lui"
+    },
+    {
+     "horse_no": 10,
+     "horse_name": "ANODE",
+     "name_zh": "正極",
+     "jockey": "E C W Wong (-3)",
+     "trainer": "C S Shum"
+    },
+    {
+     "horse_no": 11,
+     "horse_name": "PRESTIGE ALWAYS",
+     "name_zh": "盈妍威楓",
+     "jockey": "H Y Yuen (-10)",
+     "trainer": "P C Ng"
+    },
+    {
+     "horse_no": 12,
+     "horse_name": "DARYL FLASH",
+     "name_zh": "丞匡掠影",
+     "jockey": "Y L Chung (-2)",
+     "trainer": "Y S Tsui"
+    }
+   ]
+  },
+  {
+   "race_no": 8,
+   "runners": [
+    {
+     "horse_no": 1,
+     "horse_name": "HARMONY N BLESSED",
+     "name_zh": "人和家興",
+     "jockey": "L Ferraris",
+     "trainer": "D A Hayes"
+    },
+    {
+     "horse_no": 2,
+     "horse_name": "STRAIGHT TO GLORY",
+     "name_zh": "團結勇士",
+     "jockey": "K C Leung",
+     "trainer": "C W Chang"
+    },
+    {
+     "horse_no": 3,
+     "horse_name": "SKY CAP",
+     "name_zh": "富心星",
+     "jockey": "C Y Ho",
+     "trainer": "C Fownes"
+    },
+    {
+     "horse_no": 4,
+     "horse_name": "STAR RISE",
+     "name_zh": "久久為昇",
+     "jockey": "J Orman",
+     "trainer": "D J Hall"
+    },
+    {
+     "horse_no": 5,
+     "horse_name": "PEGAS",
+     "name_zh": "飛馬座",
+     "jockey": "C L Chau (-2)",
+     "trainer": "Y S Tsui"
+    },
+    {
+     "horse_no": 6,
+     "horse_name": "THRIVING BROTHERS",
+     "name_zh": "富國兄弟",
+     "jockey": "K Teetan",
+     "trainer": "C H Yip"
+    },
+    {
+     "horse_no": 7,
+     "horse_name": "STORMING DRAGON",
+     "name_zh": "勇霸龍",
+     "jockey": "B Avdulla",
+     "trainer": "J Richards"
+    },
+    {
+     "horse_no": 8,
+     "horse_name": "DANICA'S CHOICE",
+     "name_zh": "繼往開來",
+     "jockey": "A Atzeni",
+     "trainer": "K L Man"
+    },
+    {
+     "horse_no": 9,
+     "horse_name": "KING LOTUS",
+     "name_zh": "蓮冠皇",
+     "jockey": "L Hewitson",
+     "trainer": "M Newnham"
+    },
+    {
+     "horse_no": 10,
+     "horse_name": "MEOWTH",
+     "name_zh": "喵喵怪",
+     "jockey": "H Y Yuen (-10)",
+     "trainer": "W K Mo"
+    },
+    {
+     "horse_no": 11,
+     "horse_name": "LEADING AGILITY",
+     "name_zh": "驕陽雄心",
+     "jockey": "E C W Wong (-3)",
+     "trainer": "C S Shum"
+    },
+    {
+     "horse_no": 12,
+     "horse_name": "OUTGATE",
+     "name_zh": "亞機拉",
+     "jockey": "Y L Chung (-2)",
+     "trainer": "A S Cruz"
+    }
+   ]
+  },
+  {
+   "race_no": 9,
+   "runners": [
+    {
+     "horse_no": 1,
+     "horse_name": "KA YING GENERATION",
+     "name_zh": "嘉應傳承",
+     "jockey": "A Atzeni",
+     "trainer": "P C Ng"
+    },
+    {
+     "horse_no": 2,
+     "horse_name": "SERAPH GABRIEL",
+     "name_zh": "紫荊傳令",
+     "jockey": "Z Purton",
+     "trainer": "D Eustace"
+    },
+    {
+     "horse_no": 3,
+     "horse_name": "WITHOUT COMPARE",
+     "name_zh": "凌登",
+     "jockey": "J Orman",
+     "trainer": "C S Shum"
+    },
+    {
+     "horse_no": 4,
+     "horse_name": "LO RIDER",
+     "name_zh": "平凡騎士",
+     "jockey": "L Ferraris",
+     "trainer": "C Fownes"
+    },
+    {
+     "horse_no": 5,
+     "horse_name": "FIVEFORTWO",
+     "name_zh": "好實力",
+     "jockey": "C L Chau (-2)",
+     "trainer": "K W Lui"
+    },
+    {
+     "horse_no": 6,
+     "horse_name": "FORTUNATE SON",
+     "name_zh": "將義",
+     "jockey": "C Y Ho",
+     "trainer": "W K Mo"
+    },
+    {
+     "horse_no": 7,
+     "horse_name": "ROMANTIC GLADIATOR",
+     "name_zh": "浪漫鬥士",
+     "jockey": "E C W Wong (-3)",
+     "trainer": "C S Shum"
+    },
+    {
+     "horse_no": 8,
+     "horse_name": "THE AUSPICIOUS",
+     "name_zh": "豐辰",
+     "jockey": "K Teetan",
+     "trainer": "Y S Tsui"
+    },
+    {
+     "horse_no": 9,
+     "horse_name": "CHINA WIN",
+     "name_zh": "中國心",
+     "jockey": "M L Yeung",
+     "trainer": "D A Hayes"
+    },
+    {
+     "horse_no": 10,
+     "horse_name": "WINDLORD",
+     "name_zh": "風將",
+     "jockey": "M Chadwick",
+     "trainer": "A S Cruz"
+    },
+    {
+     "horse_no": 11,
+     "horse_name": "KEEFY",
+     "name_zh": "瑪瑙",
+     "jockey": "M F Poon",
+     "trainer": "F C Lor"
+    },
+    {
+     "horse_no": 12,
+     "horse_name": "FLYING FORTUNE",
+     "name_zh": "財富非凡",
+     "jockey": "H Bentley",
+     "trainer": "W K Mo"
+    }
+   ]
+  }
+ ],
+ "runners": 108,
+ "named": 108
+}

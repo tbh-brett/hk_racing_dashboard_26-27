@@ -61,6 +61,13 @@
 0  12 * * *   python -m hkrd.jobs.scrape_trials --db /data/hkrd.db
 0  20 * * *   python -m hkrd.jobs.scrape_trials --db /data/hkrd.db
 
+# Chinese horse names, for the tips layer. Half an hour behind the two nightly
+# runs that fetch a card — a card published at noon is stored by 13:00 and
+# named by 13:30. `--pending` makes the quiet days free: it only asks HKJC
+# about stored cards from today on that still have a horse it cannot name.
+30 7  * * *   python -m hkrd.jobs.sync_horse_names --pending --db /data/hkrd.db
+30 13 * * *   python -m hkrd.jobs.sync_horse_names --pending --db /data/hkrd.db
+
 # Live odds. A different cadence again, because odds are the only signal here
 # that moves minute to minute — the favourite changes between morning and post
 # time in 44% of races, and every odds-dependent figure on the dashboard is

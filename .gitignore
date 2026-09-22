@@ -48,3 +48,8 @@ Thumbs.db
 
 # Personal permission overrides. Machine-specific, and this repo is public.
 .claude/settings.local.json
+
+# Tips layer, PC side: harvested transcripts (third-party subtitles, and this
+# repo is public) and the payloads built from them. Both stay on the PC.
+raw/
+out/

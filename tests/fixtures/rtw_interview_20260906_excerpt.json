@@ -1,0 +1,141 @@
+{
+ "_fixture_note": "Excerpt of the harvested record for https://www.youtube.com/watch?v=NpsY_zPIWE0 ([Racing To Win Interviews]: Season 26/27 | Meeting 01 | 6 Sep), fetched 2026-09-22 by tools/harvest_youtube.py. The description is HKJC's interview index, verbatim; the segments are the English speech-to-text of the first 50 seconds, where Zac Purton's interview on KA YING RISING opens and the recogniser writes the horse as 'Ying Star'.",
+ "video_id": "NpsY_zPIWE0",
+ "title": "[Racing To Win Interviews]: Season 26/27 | Meeting 01 | 6 Sep",
+ "kind": "interview",
+ "race_date": "2026-09-06",
+ "published": "2026-09-04T03:33:42-07:00",
+ "caption_lang": "en",
+ "caption_kind": "asr",
+ "description": "[Racing To Win Interviews]\n\nRace 3\nINTERVIEW: Zac Purton (1.KA YING RISING)\n\nRace 7\nINTERVIEW: Karis Teetan (4. SIX PACK)\n \nRace 9\nINTERVIEW : Harry Bentley (8. FLYING FORTRESS)\n\nRace 10\nINTERVIEW : Vincent Ho (6. GOLD PATCH)",
+ "segments": [
+  {
+   "t": 0.52,
+   "text": "Zac, a new Hong Kong season is upon us"
+  },
+  {
+   "t": 2.56,
+   "text": "and you hop aboard the the joint high"
+  },
+  {
+   "t": 4.56,
+   "text": "highest rated horse in the world, Ying"
+  },
+  {
+   "t": 6.56,
+   "text": "Star."
+  },
+  {
+   "t": 7.2,
+   "text": "Must always make getting out of bed that"
+  },
+  {
+   "t": 8.44,
+   "text": "little bit easier."
+  },
+  {
+   "t": 9.56,
+   "text": ">> Yeah, it certainly does and it gives me"
+  },
+  {
+   "t": 11.04,
+   "text": "something to look forward to very early"
+  },
+  {
+   "t": 12.56,
+   "text": "in the season as well and and everyone"
+  },
+  {
+   "t": 14.44,
+   "text": "else I suppose, but"
+  },
+  {
+   "t": 16.36,
+   "text": "he's trialed well twice now and"
+  },
+  {
+   "t": 19.72,
+   "text": "we know he runs well fresh. He's he's"
+  },
+  {
+   "t": 21.4,
+   "text": "acquitted himself well in this race"
+  },
+  {
+   "t": 22.64,
+   "text": "before."
+  },
+  {
+   "t": 24.12,
+   "text": "Obviously he gives a lot of weight away,"
+  },
+  {
+   "t": 25.24,
+   "text": "but those horses would generally be out"
+  },
+  {
+   "t": 26.92,
+   "text": "of the handicap."
+  },
+  {
+   "t": 28.8,
+   "text": "Um"
+  },
+  {
+   "t": 30.24,
+   "text": "small field, good gate."
+  },
+  {
+   "t": 32.44,
+   "text": "Just roll him around there and let him"
+  },
+  {
+   "t": 33.4,
+   "text": "do his thing."
+  },
+  {
+   "t": 34.28,
+   "text": ">> And if you rewind to to 12 months ago at"
+  },
+  {
+   "t": 36.52,
+   "text": "this point of the season before the"
+  },
+  {
+   "t": 37.52,
+   "text": "season began, if you're going to compare"
+  },
+  {
+   "t": 39.32,
+   "text": "him to to to an individual or specimen"
+  },
+  {
+   "t": 41.2,
+   "text": "as he was then?"
+  },
+  {
+   "t": 42.36,
+   "text": ">> He's a bigger, heavier, stronger horse"
+  },
+  {
+   "t": 43.72,
+   "text": "now than what he was back then."
+  },
+  {
+   "t": 45.6,
+   "text": "Um we've seen that when he went to"
+  },
+  {
+   "t": 46.8,
+   "text": "Australia. He"
+  },
+  {
+   "t": 48.48,
+   "text": "put on weight and developed down there."
+  },
+  {
+   "t": 50.0,
+   "text": "He enjoyed the quarantine facility and"
+  }
+ ]
+}
