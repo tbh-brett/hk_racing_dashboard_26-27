@@ -346,3 +346,104 @@ def test_the_trials_index_orders_by_most_recent_trial(tmp_path):
     found = [h["horse_name"] for h in trials_q.list_horses(conn=conn)]
     conn.close()
     assert found == ["RECENT ONE", "OLD ONE"]
+
+
+# ── the search by name: the same next start as the batch ─────────────────────
+#
+# Searching TEAM HAPPY by name showed "no start since" on its 24 Aug trial,
+# while the same trial opened by date showed its win on 9 Sep. The search went
+# through `for_horses`, which never computed a next start; the batch view went
+# through `_next_starts`. One page, two answers about one run.
+
+def test_searching_a_horse_by_name_shows_the_same_next_start_as_its_batch(db):
+    conn = get_conn(db)
+    found = trials_q.for_horses(["BAD ONE"], limit=200, next_start=True,
+                                conn=conn)["BAD ONE"][0]
+    in_batch = next(r for r in trials_q.batch("2026-05-01", 1, conn=conn)["runners"]
+                    if r["horse_name"] == "BAD ONE")
+    conn.close()
+    assert found["next_start"] is not None, "the search said no start since"
+    assert found["next_start"] == in_batch["next_start"]
+    assert (found["next_start"]["race_date"], found["next_start"]["place"]) == (
+        "2026-05-20", 8)
+
+
+def test_every_trial_in_a_search_gets_its_own_next_start(db):
+    """A horse searched by name lists all its trials; each one's next start is
+    the first race AFTER that trial, not the horse's latest run."""
+    conn = get_conn(db)
+    found = trials_q.for_horses(["FAST ONE"], limit=200, next_start=True,
+                                conn=conn)["FAST ONE"]
+    conn.close()
+    assert [t["trial_date"] for t in found] == ["2026-05-01", "2026-04-01"]
+    assert all(t["next_start"]["race_date"] == "2026-05-20" for t in found)
+
+
+def test_a_horse_that_has_not_raced_since_still_reads_none(db):
+    conn = get_conn(db)
+    held = trials_q.for_horses(["HELD ONE"], next_start=True,
+                               conn=conn)["HELD ONE"][0]
+    conn.close()
+    assert held["next_start"] is None
+
+
+def test_the_form_guide_band_is_unchanged_and_pays_nothing_for_it(db):
+    """The band is the other caller of the same endpoint. It shows no next
+    start, so it neither asks for one nor gets one."""
+    conn = get_conn(db)
+    band = trials_q.for_horses(["FAST ONE"], conn=conn)["FAST ONE"]
+    conn.close()
+    assert all("next_start" not in t for t in band)
+
+
+def test_a_next_start_after_the_race_being_reviewed_is_hindsight(db):
+    """The same rule `before` already applies to the trials themselves."""
+    conn = get_conn(db)
+    then = trials_q.for_horses(["FAST ONE"], before="2026-05-10",
+                               next_start=True, conn=conn)["FAST ONE"]
+    conn.close()
+    assert all(t["next_start"] is None for t in then)
+
+
+def test_the_next_starts_comment_is_the_stewards_and_never_the_placeholder(db):
+    """With both accounts stored, and HKJC's "not written up yet" sentence on
+    the running comment, the next-start cell must read the stewards' report."""
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.executemany(
+            "INSERT INTO runner_comments (race_date, race_no, horse_no, "
+            "comment_text, source) VALUES ('2026-05-20', 1, 2, ?, ?)",
+            [("No Comments on Running information for this horse.", "corunning"),
+             ("Bumped at the start; weakened.", "incident")])
+    nxt = trials_q.for_horses(["BAD ONE"], next_start=True,
+                              conn=conn)["BAD ONE"][0]["next_start"]
+    batch_nxt = next(r for r in trials_q.batch("2026-05-01", 1, conn=conn)["runners"]
+                     if r["horse_name"] == "BAD ONE")["next_start"]
+    conn.close()
+    assert nxt["comment"] == "Bumped at the start; weakened."
+    assert batch_nxt["comment"] == nxt["comment"]
+
+
+def test_the_api_passes_the_request_through(db, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from hkrd.api.app import app
+
+    monkeypatch.setenv("HKRD_DB", str(db))
+    monkeypatch.setenv("HKRD_ALLOW_NO_AUTH", "1")
+    client = TestClient(app)
+    asked = client.get("/api/trials/horses",
+                       params={"horses": "BAD ONE", "next": "true"}).json()
+    band = client.get("/api/trials/horses", params={"horses": "BAD ONE"}).json()
+    assert asked["trials"]["BAD ONE"][0]["next_start"]["race_date"] == "2026-05-20"
+    assert "next_start" not in band["trials"]["BAD ONE"][0]
+
+
+def test_the_trials_page_asks_for_the_next_start_when_it_searches():
+    """The fault was the page not asking. A search that drops the flag goes
+    straight back to "no start since" on every row."""
+    from pathlib import Path
+
+    js = (Path(__file__).resolve().parents[1] / "web/assets/trials.js"
+          ).read_text(encoding="utf-8")
+    assert "trialsForHorses([name], null, 200, { next: true })" in js
