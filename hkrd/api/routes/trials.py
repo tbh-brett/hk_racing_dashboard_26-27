@@ -62,14 +62,18 @@ def trials_batch(date: str, trial_no: int, venue: str | None = None) -> dict:
 
 @router.get("/api/trials/horses")
 def trials_for_horses(horses: str, before: str | None = None,
-                      limit: int = 2) -> dict:
-    """Each named horse's most recent trials — the Form Guide's inline band.
+                      limit: int = 2, next: bool = False) -> dict:
+    """Each named horse's most recent trials — the Form Guide's inline band,
+    and the Trials page's search by name.
 
     `before` keeps it honest on a past race: a trial run after the race being
-    reviewed was not available when the race was run.
+    reviewed was not available when the race was run. `next` adds each
+    trial's next race start, which the Trials search shows and the band does
+    not.
     """
     names = [h.strip() for h in horses.split(",") if h.strip()]
-    return {"trials": trials_q.for_horses(names, before=before, limit=limit)}
+    return {"trials": trials_q.for_horses(names, before=before, limit=limit,
+                                          next_start=next)}
 
 
 @router.get("/api/trials/horse-search")

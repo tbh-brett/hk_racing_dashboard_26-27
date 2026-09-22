@@ -30,6 +30,7 @@ from typing import Any
 
 from hkrd.derive.trial_quality import BANDS, rate
 from hkrd.query.types import format_race_time
+from hkrd.store.coerce import NO_COMMENT_PREFIX
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["recent_batches", "batch", "for_horses", "list_horses", "standouts",
@@ -156,10 +157,18 @@ def _next_starts(conn: Connection, pairs: list[tuple[str, str]]
                 "SELECT tag FROM runner_tags WHERE race_date = ? AND race_no = ? "
                 "AND horse_no = ? ORDER BY tag",
                 (row["race_date"], row["race_no"], row["horse_no"]))]
+        # The stewards' account first, as everywhere a single comment stands
+        # for a run (`query/race`), and never HKJC's "not written up yet"
+        # sentence. With no order this took whichever row came back first --
+        # for a September run that could be the placeholder, which reads as
+        # HKJC having nothing to say about a run it simply had not got to.
         comment = conn.execute(
             "SELECT comment_text FROM runner_comments WHERE race_date = ? "
-            "AND race_no = ? AND horse_no = ?",
-            (row["race_date"], row["race_no"], row["horse_no"])).fetchone()
+            "AND race_no = ? AND horse_no = ? AND comment_text IS NOT NULL "
+            "AND comment_text NOT LIKE ? "
+            "ORDER BY (source = 'incident') DESC LIMIT 1",
+            (row["race_date"], row["race_no"], row["horse_no"],
+             NO_COMMENT_PREFIX + "%")).fetchone()
         start["comment"] = comment["comment_text"] if comment else None
         out[(horse, after)] = start
     return out
@@ -372,12 +381,22 @@ def batch(date: str, trial_no: int, *, venue: str | None = None,
 
 
 def for_horses(names: list[str], *, before: str | None = None, limit: int = 2,
-               conn: Connection | None = None) -> dict[str, list[dict[str, Any]]]:
-    """Each horse's most recent trials, rated — the Form Guide's inline band.
+               next_start: bool = False, conn: Connection | None = None
+               ) -> dict[str, list[dict[str, Any]]]:
+    """Each horse's most recent trials, rated — the Form Guide's inline band,
+    and the Trials page's search.
 
     `before` keeps the band honest on a past race: a trial run AFTER the race
     being reviewed was not available when the race was run, and showing it
     would let hindsight into a form guide.
+
+    `next_start` attaches what the horse did at the races after each trial,
+    from the same `_next_starts` the batch view uses. The Trials search needs
+    it and the Form Guide does not: searching a horse by name reached this
+    function, which never computed one, so every trial read "no start since"
+    -- TEAM HAPPY's 24 Aug trial among them, while the same trial opened by
+    date showed its win on 9 Sep. One page, two answers about one run. Off by
+    default so the Form Guide's band costs what it always did.
     """
     if not names:
         return {}
@@ -403,9 +422,11 @@ def for_horses(names: list[str], *, before: str | None = None, limit: int = 2,
                      f"SELECT horse_name, trial_date, trial_no, note, written_at "
                      f"FROM trial_notes WHERE horse_name IN ({marks})",
                      [n.strip().upper() for n in names])}
+        kept = []
         for row in rows:
             bucket = out.setdefault(row["horse_name"], [])
             if len(bucket) < limit:
+                kept.append(row)
                 r = _runner(row, row["field_size"], row["best_time"])
                 r["note"] = notes.get(
                     (r["horse_name"], r["trial_date"], r["trial_no"]))
@@ -414,6 +435,17 @@ def for_horses(names: list[str], *, before: str | None = None, limit: int = 2,
                 # calendar otherwise.
                 r["archived"] = bool(latest and str(r["trial_date"]) < str(latest))
                 bucket.append(r)
+        if next_start:
+            nxt = _next_starts(conn, [(r["horse_name"], r["trial_date"])
+                                      for r in kept])
+            for trials in out.values():
+                for r in trials:
+                    start = nxt.get((r["horse_name"], r["trial_date"]))
+                    # The same hindsight rule as `before` itself: a start on
+                    # or after the race being reviewed had not happened yet.
+                    if start and before and str(start["race_date"]) >= before:
+                        start = None
+                    r["next_start"] = start
         return out
     finally:
         if own:

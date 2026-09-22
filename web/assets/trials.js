@@ -579,7 +579,10 @@ async function showHorse(name) {
   state.open.clear();
   render();
   try {
-    const body = await api.trialsForHorses([name], null, 200);
+    // With the next start, as the batch view has it. Without it every trial
+    // in a search read "no start since" -- a claim about the horse that was
+    // really a gap in what this request asked for.
+    const body = await api.trialsForHorses([name], null, 200, { next: true });
     state.horseTrials = body.trials?.[name] ?? [];
   } catch {
     state.horseTrials = [];

@@ -182,10 +182,13 @@ export const api = {
   // the Trials page asking for one horse's whole record wants all of them, and
   // silently dropped the argument before this parameter existed -- so a horse
   // with three trials showed two and looked complete.
-  trialsForHorses: (horses, before, limit) => get(
+  // `next` asks for each trial's next race start as well. The Trials search
+  // shows it; the Form Guide's band does not, so it is not paid for there.
+  trialsForHorses: (horses, before, limit, { next = false } = {}) => get(
     `/trials/horses?horses=${encodeURIComponent(horses.join(','))}`
     + (before ? `&before=${before}` : '')
-    + (limit ? `&limit=${limit}` : '')),
+    + (limit ? `&limit=${limit}` : '')
+    + (next ? '&next=true' : '')),
   blackbookSummary: (today) => get(
     `/blackbook/summary${today ? `?today=${today}` : ''}`),
   // `body` carries `reason` (why the decision was taken) and, on a reopen,
