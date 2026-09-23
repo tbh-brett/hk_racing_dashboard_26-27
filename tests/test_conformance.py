@@ -38,6 +38,7 @@ ASSETS = ROOT / "web" / "assets"
 
 # design artboard -> the page module that ports it
 PAGES = {
+    "Briefing": "briefing.js",
     "Race Day": "race-day.js",
     "Form Guide": "form-guide.js",
     "Lookup": "lookup.js",
@@ -51,6 +52,7 @@ PAGES = {
 # The page each module drives. A column header may live in the static markup
 # rather than be appended by script, and both are equally rendered.
 PAGE_HTML = {
+    "briefing.js": "briefing.html",
     "race-day.js": "raceday.html",
     "form-guide.js": "form-guide.html",
     "lookup.js": "lookup.html",
@@ -74,6 +76,7 @@ SERVER_LABELS = {
 # A page's own module plus anything it imports for rendering. A header may be
 # ported into a helper rather than the page file itself.
 EXTRA_SOURCES = {
+    "briefing.js": ["briefing-race.js", "briefing-model.js"],
     "bets.js": ["bets-entry.js"],
     "form-guide.js": ["review.js"],
     "results.js": ["review.js"],
@@ -233,11 +236,12 @@ def test_no_page_redeclares_the_shared_vocabulary() -> None:
 
 
 def test_the_navigation_is_defined_once_and_in_order() -> None:
-    """Design note 11 §4, plus Model Analysis last — the owner's decision."""
+    """Design note 11 §4, plus Model Analysis last — the owner's decision —
+    and the Briefing first, as the front page the owner asked for."""
     text = VOCAB.read_text(encoding="utf-8")
     order = re.findall(r"\['([^']+)', '([^']+\.html)'\]", text)
     assert [name for name, _ in order] == [
-        "Race Day", "Speed Map", "Form Guide", "Bets", "Blackbook",
+        "Briefing", "Race Day", "Speed Map", "Form Guide", "Bets", "Blackbook",
         "Results", "Lookup", "Trials", "Model Analysis"]
 
 

@@ -26,3 +26,9 @@ separated from the markup — that maps cleanly onto the JSON `hkrd/api/` will s
 Eight artboards: Race Day, Form Guide, Lookup, Bets, Blackbook, Results, Trials,
 Model Analysis. Model Analysis is the Lab content from design brief 05 §5, which
 settles where it lives — it is its own nav item, making the nav eight, not seven.
+
+`Briefing.dc.html` came later (2026-09-23), as the front page: what the tipsters
+back, what was said, and the tote against the bookmakers' fixed odds. It was
+exported as one self-contained file; this copy is that file unpacked, with its
+runtime reference pointed at `./support.js` like the others and nothing else
+changed. It proposed two tokens, `--tip` and `--voice`, now in `tokens.css`.

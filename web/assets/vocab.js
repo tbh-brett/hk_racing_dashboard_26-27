@@ -33,6 +33,7 @@ export const $ = (id) => document.getElementById(id);
  * out later which one was missed.
  */
 export const NAV = [
+  ['Briefing', 'briefing.html'],
   ['Race Day', 'raceday.html'],
   ['Speed Map', 'speed-map.html'],
   ['Form Guide', 'form-guide.html'],

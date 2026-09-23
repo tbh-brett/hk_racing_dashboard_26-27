@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<style>/* cyrillic-ext */
+
+/* cyrillic */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* cyrillic-ext */
+
+/* cyrillic */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* cyrillic-ext */
+
+/* cyrillic */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* cyrillic-ext */
+
+/* cyrillic */
+
+/* greek */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* cyrillic-ext */
+
+/* cyrillic */
+
+/* greek */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+/* cyrillic-ext */
+
+/* cyrillic */
+
+/* greek */
+
+/* vietnamese */
+
+/* latin-ext */
+
+/* latin */
+
+</style>
+<style>/* tokens.css — the single colour and spacing vocabulary.
+
+ *
+
+ * Extracted from the Claude Design export in web/design-source/. That export
+
+ * carried 126 distinct hex values across 1,823 inline style attributes and no
+
+ * classes: 71 neutrals that collapse to 12 real steps, and 55 chromatic values
+
+ * of which 14 carry ten or more uses. The --surface step alone merged 29
+
+ * visually indistinguishable variants.
+
+ *
+
+ * The design brief's rule is "one colour, one meaning, everywhere". That is
+
+ * enforceable only if colours have names, so every colour lives here and
+
+ * nowhere else. A raw hex literal in a page file is a bug.
+
+ *
+
+ * CONFIDENCE: mappings marked (named) came from a const in the design source
+
+ * or from an explicit statement in a brief. Mappings marked (inferred) were
+
+ * read from usage context and are the ones worth checking.
+
+ */
+
+
+
+:root {
+
+  /* ── surfaces, darkest to lightest ─────────────────────────────────── */
+
+  --bg-deep:      #0b0e13;   /* top chrome strip                          */
+
+  --bg:           #0e1117;   /* page background            (brief: named) */
+
+  --surface:      #12151b;   /* nav, panels, table chrome                 */
+
+  --surface-2:    #1a1d23;   /* raised surface             (brief: named) */
+
+  --line:         #1c202a;   /* subtle divider; merges #1e232c            */
+
+  --line-2:       #262a33;   /* standard border                           */
+
+  --line-3:       #2b303a;   /* strong border                             */
+
+
+
+  /* ── text, dimmest to brightest ────────────────────────────────────── */
+
+  --text-faint:   #4c525c;   /* merges #5b616b                            */
+
+  --text-dim:     #6f757f;
+
+  --text-muted:   #8b929e;   /* the workhorse: 237 uses                   */
+
+  --text-2:       #cfd3da;
+
+  --text:         #fafafa;   /* primary                    (brief: named) */
+
+
+
+  /* ── semantic signals ──────────────────────────────────────────────────
+
+   * Brief 03 lists eight signals that must stay visually distinct. Each
+
+   * gets a foreground and, where it renders as a badge, a dark ground.     */
+
+  --edge:         #f0a824;   /* model edge                 (named: AMBER) */
+
+  --edge-wash:    rgba(240, 168, 36, .04);  /* top-3 row tint, off the artboard */
+
+  --cool:         #5b7a94;   /* a NEGATIVE fitted coefficient              */
+
+  --cool-dim:     #3a4552;   /* the market's share of a blend              */
+
+  --edge-ground:  #3d2a14;
+
+  --edge-ground-2:#4a3a18;
+
+
+
+  --book:         #2ec4b6;   /* blackbook                   (brief: teal) */
+
+  --book-ground:  #1e4a45;
+
+  --book-dim:     #5f7a78;
+
+
+
+  --alert:        #e63946;   /* accent; odds firming        (named: UP)   */
+
+  --win:          #35b37e;   /* a win / positive result     (named: WIN)  */
+
+  --loss:         #e0637f;   /* a losing result            (inferred)     */
+
+  --loss-dim:     #c9748f;   /* quieter loss tone          (inferred)     */
+
+  --incident:     #c8792f;   /* stewards / trip trouble  (named: COPPER)  */
+
+  --violet:       #b7a2e8;   /* trainer change (confirmed by the artboard) */
+
+  --violet-ground:#191626;
+
+  --gear:         #9b8cd0;   /* gear carried again        (named: GEAR_C)  */
+
+  --gear-first:   #cbbcf5;   /* gear applied for the first time            */
+
+
+
+  /* ── running style, front of the field to the back ──────────────────────
+
+   * Warm at the front, cool at the back, so the chips read as an order rather
+
+   * than four unrelated labels. Off the Form Guide artboard.
+
+   */
+
+  --style-leader:   #e8975c;
+
+  --style-leader-g: #2a1a10;
+
+  --style-onpace:   #e8c04a;
+
+  --style-onpace-g: #2a2410;
+
+  --style-mid:      #8fb8d8;
+
+  --style-mid-g:    #16222b;
+
+  --style-closer:   #7fc8a9;
+
+  --style-closer-g: #142520;
+
+
+
+  /* ── Form Guide surfaces, off the artboard ───────────────────────────── */
+
+  --cond:           #7fa7c9;   /* a condition change: distance, going       */
+
+  --cond-rule:      #25384a;
+
+  --detail:         #0e131a;   /* ground under an expanded horse            */
+
+  --detail-rule:    #2b3a4a;
+
+  --run-hover:      #151a21;
+
+  --run-open:       #131820;
+
+  --box:            #12171f;   /* a sectional cell                          */
+
+  --box-rule:       #232a34;
+
+  --meter:          #1c2129;   /* the ground behind a small bar             */
+
+  --ci:             #24313d;   /* a confidence interval                     */
+
+  --pop:            #101a1a;   /* popover ground                            */
+
+  --pop-rule:       #1b2b2b;
+
+  --pop-field:      #24323a;
+
+  --pop-act:        #12211f;
+
+
+
+  /* ── Blackbook surfaces, off the artboard ────────────────────────────── */
+
+  --thesis:         #0e1518;   /* the ground under a thesis or a ledger     */
+
+  --source-run:     #101820;   /* the run that prompted a booking           */
+
+  --miss-ground:    #241419;   /* a review prompt, a missed engagement      */
+
+  --market-tick:    #3a4150;   /* the 1.00 mark on an A/E interval          */
+
+
+
+  /* ── race pace, blue → red ───────────────────────────────────────────────
+
+   * Design note 03 §7: pace is a CONTINUOUS scale for the whole race, and is
+
+   * deliberately unrelated to the style badges — those are a 4-way ordinal for
+
+   * a horse. Sharing a hue family would merge two axes the brief spends a page
+
+   * separating.
+
+   */
+
+  --pace-1:         #5b8dd6;   /* Very Slow                                 */
+
+  --pace-2:         #7fa7c9;   /* Slow                                      */
+
+  --pace-3:         #8b929e;   /* Neutral                                   */
+
+  --pace-4:         #d98b5c;   /* Fast                                      */
+
+  --pace-5:         #d95c5c;   /* Very Fast                                 */
+
+
+
+  /* ── race class ─────────────────────────────────────────────────────────
+
+   * A LADDER, so one ramp at five steps rather than five hues: the eye reads
+
+   * a ramp as an ordering and a palette as a set of unrelated labels, and a
+
+   * class is an ordering. Held low in saturation on purpose — a form row
+
+   * already spends its strong colour on the result, the figure and the trip,
+
+   * and class is context for those, not a competitor to them.
+
+   *
+
+   * Two values are not rungs and carry the only strong marks. Group is the
+
+   * grade above the ladder; Griffin is beside it, a series for horses with no
+
+   * rating, whose form cannot be read against a class at all. Both are given
+
+   * a ground so they read as categorically different rather than as a sixth
+
+   * and seventh step.
+
+   */
+
+  --cls-1:          #dba07a;   /* Class 1 — warm end of the ramp            */
+
+  --cls-2:          #c2a68d;
+
+  --cls-3:          #a4aaa8;
+
+  --cls-4:          #8998a8;
+
+  --cls-5:          #6f8296;   /* Class 5 — cool end                        */
+
+  --cls-group:      #e6c260;   /* Group — above the ladder                  */
+
+  --cls-group-g:    #2b2313;
+
+  --cls-griffin:    #c9a888;   /* Griffin — beside the ladder               */
+
+  --cls-griffin-g:  #2a2018;
+
+
+
+  /* Band grounds, read off the Race Day artboard. */
+
+  --book-band:    #12181a;   /* blackbook band                             */
+
+  --book-rule:    #1e2a2a;
+
+  --book-rule-2:  #1a2423;   /* the quieter rule inside the expanded grid  */
+
+  --book-hover:   #16211f;
+
+  --book-here:    #16211f;   /* the race currently on screen               */
+
+  /* Bets band. The page's accent is AMBER, which is already the model-edge
+
+     hue -- the two never appear on the same page, and the alternative was a
+
+     ninth colour for a page whose subject is the money the edge was bet at. */
+
+  /* Account identity on the Bets page. Design brief 07 §3.1 keeps a persistent
+
+     colour band per account because "logging a bet to the wrong account is a
+
+     real and costly error" and a dropdown alone is not loud enough. Two hues
+
+     rather than two brightnesses, for the reason brief 05 §2 gives about
+
+     running style: a brightness step reads as intensity of one thing, not as
+
+     two different things. Blue and orchid are far apart at a glance.
+
+     Both hue families are claimed elsewhere -- pace and trainer-change -- and
+
+     neither of those renders on this page, the same trade the bet band below
+
+     already makes. */
+
+  --acct-1:       #5aa9e6;   /* Brett                                      */
+
+  --acct-1-band:  #101a24;
+
+  --acct-1-rule:  #1d3348;
+
+  --acct-2:       #c78ad9;   /* Kelvin                                     */
+
+  --acct-2-band:  #1d1524;
+
+  --acct-2-rule:  #2e2140;
+
+
+
+  --bet-band:     #171410;
+
+  --bet-rule:     #2a2419;
+
+  --bet-rule-2:   #231e16;
+
+  --bet-hover:    #1f1a12;
+
+  --bet-dim:      #8a7550;
+
+  /* Lookup band. Slate: the page is the neutral one, the whole archive with
+
+     no editorial position, and giving it a hue would imply one. */
+
+  --lk-band:      #12151a;
+
+  --lk-rule:      #232932;
+
+  --lk-rule-2:    #1e232b;
+
+  --lk-hover:     #191e26;
+
+  --lk-dim:       #6f7b8c;
+
+  --lk-accent:    #93a4bb;
+
+  /* Trials band. Green-grey: the trial ground is not the racecourse, and the
+
+     page should not read as one. */
+
+  --tr-band:      #111714;
+
+  --tr-rule:      #202a25;
+
+  --tr-rule-2:    #1b231f;
+
+  --tr-hover:     #172018;
+
+  --tr-dim:       #6c8578;
+
+  --tr-accent:    #8fbfa4;
+
+  /* Results band. Deep blue-grey: the race is over and the page is a record,
+
+     so it sits quieter than Race Day's live card. */
+
+  --re-band:      #101419;
+
+  --re-rule:      #1f262f;
+
+  --re-rule-2:    #1a2028;
+
+  --re-hover:     #161c24;
+
+  --re-dim:       #6b7688;
+
+  --re-accent:    #7e9cc4;
+
+  --h2h-band:     #131218;   /* head-to-head band                          */
+
+  --h2h-rule:     #2a2333;
+
+  --h2h-dim:      #7a6470;
+
+  --row-hover:    #1c212a;
+
+
+
+  /* ── running style: four DISTINCT hues, never brightness steps ─────────
+
+   * Brief 05 §2. The test is that Leader reads as different from Closer at
+
+   * six feet without reading the word. Ordinal order is positional:
+
+   * leader -> on-pace -> midfield -> closer. Never sort these alphabetically. */
+
+  --style-leader:        #ff8a5c;
+
+  --style-leader-ground: #3a2013;
+
+  --style-onpace:        #e8c04a;
+
+  --style-onpace-ground: #3a3012;
+
+  --style-midfield:      #9aa7b8;
+
+  --style-midfield-ground:#1f2630;
+
+  --style-closer:        #4fb3e0;
+
+  --style-closer-ground: #12283a;
+
+
+
+  /* ── how quickly a horse gets away, on the speed map's AWAY bar ─────────
+
+   * Its own four steps rather than the style badge's, because the bar is a
+
+   * CONTINUOUS rank inside one race and the badge is a four-way ordinal for a
+
+   * horse across its career — a horse can be the quickest away in a weak
+
+   * field and still be a Closer by habit.
+
+   * Fast end takes the Leader hue so the bar and the badge agree where they
+
+   * mean the same thing; the slow end is red at the owner's request, which is
+
+   * why the Closer badge (blue) and a slow AWAY bar (red) do not match.
+
+   */
+
+  --away-fast:      #ff8a5c;
+
+  --away-quick:     #e8c04a;
+
+  --away-steady:    #9aa7b8;
+
+  --away-slow:      #e0637f;
+
+
+
+  /* ── type ──────────────────────────────────────────────────────────── */
+
+  --font: 'IBM Plex Sans', system-ui, sans-serif;
+
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Raised one step across the board. The pages lean hard on --fs-xs, and at
+
+     9px a dense grid is compact and unreadable — which is the wrong half of
+
+     the trade the density was made for. One scale, so a page cannot quietly
+
+     grow a second one. */
+
+  --fs-xs: 10px; --fs-sm: 12px; --fs: 13px;  --fs-md: 14px;
+
+
+
+  /* ── spacing: one scale ────────────────────────────────────────────── */
+
+  --sp-1: 4px; --sp-2: 6px; --sp-3: 9px; --sp-4: 14px; --sp-5: 16px; --sp-6: 24px;
+
+
+
+  /* ── elevation, for the overlay layer ──────────────────────────────── */
+
+  --z-scrim: 24;
+
+  --z-panel: 26;
+
+  --shadow-panel: 0 26px 70px rgba(0, 0, 0, .7);
+
+}
+
+
+
+/* Numeric columns must align. Applied globally, as the briefs require. */
+
+html, body {
+
+  margin: 0;
+
+  padding: 0;
+
+  background: var(--bg);
+
+  color: var(--text);
+
+  font-family: var(--font);
+
+  font-size: var(--fs-md);
+
+  font-variant-numeric: tabular-nums;
+
+  -webkit-font-smoothing: antialiased;
+
+}
+
+* { box-sizing: border-box; }
+
+
+
+a { color: var(--edge); text-decoration: none; }
+
+a:hover { color: #ffc75a; }
+
+
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+
+::-webkit-scrollbar-track { background: var(--bg); }
+
+::-webkit-scrollbar-thumb { background: var(--line-3); }
+
+
+
+@keyframes tick { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
+
+
+
+/* Overlay layer. The scrim is deliberately translucent — brief 10 wants the
+
+   table dimly visible underneath while filters are adjusted, so the row count
+
+   can be watched changing. A solid blackout defeats the point. */
+
+.scrim { background: rgba(0, 0, 0, .45); }
+
+.panel {
+
+  background: var(--surface-2);
+
+  border: 1px solid var(--line-3);
+
+  box-shadow: var(--shadow-panel);
+
+}
+
+
+/* ── Briefing page: proposed tokens (review before merge) ─────────────────
+ * Two, not three. Market value stays uncoloured: a signed number in full
+ * --text when it clears +5%, --text-dim when negative. Every free hue on the
+ * wheel is already claimed, and a value colour would read as "back this".  */
+:root {
+  --tip:   #e3d9c2;   /* tipster support: a pick or featured mark, a source count */
+  --voice: #c9dc6e;   /* jockey or trainer interview: the highlight and its mark  */
+}
+</style>
+<style>
+  html, body { margin:0; padding:0; background:var(--bg-deep); }
+  * { box-sizing:border-box; }
+  a { color:var(--edge); text-decoration:none; }
+  a:hover { color:var(--text); }
+  @keyframes tick { 0%,100% { opacity:1 } 50% { opacity:.35 } }
+</style>
+</helmet>
+<div style="display:flex;gap:40px;padding:40px;align-items:flex-start;width:max-content;min-height:100vh;background:var(--bg-deep);color:var(--text);font-family:var(--font);font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased">
+
+<sc-if value="{{ showDesktop }}" hint-placeholder-val="{{ true }}">
+<div style="flex:none">
+  <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;color:var(--text-dim);margin-bottom:8px">DESKTOP · 1440 · {{ momentLabel }}</div>
+  <div style="width:1440px;min-height:900px;background:var(--bg);border:1px solid var(--line-2);font-size:13px">
+
+    <div style="display:flex;align-items:stretch;height:32px;border-bottom:1px solid var(--line);background:var(--bg-deep)">
+      <div style="display:flex;align-items:center;gap:9px;padding:0 14px;border-right:1px solid var(--line)">
+        <div style="width:9px;height:9px;background:var(--alert)"></div>
+        <div style="font-family:var(--font-mono);font-weight:600;font-size:12px;letter-spacing:.16em">RACEDAY</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;padding:0 16px;font-family:var(--font-mono);font-size:12px;white-space:nowrap">
+        <span style="font-weight:600">HV</span>
+        <span style="color:var(--text-2)">23 Sep 2026</span>
+        <span style="color:var(--text-muted)">9 races</span>
+        <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted)"><span style="width:6px;height:6px;border-radius:50%;background:{{ clockDot }};flex:none"></span>{{ clock }}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;padding:0 14px;border-left:1px solid var(--line);margin-left:auto;font-family:var(--font-mono);font-size:11px">
+        <span style="color:var(--text-dim);letter-spacing:.1em">DATA</span>
+        <sc-for list="{{ freshness }}" as="f" hint-placeholder-count="5">
+          <span style="display:flex;align-items:baseline;gap:4px;padding:1px 5px;border:1px solid {{ f.border }};white-space:nowrap">
+            <span style="color:var(--text-muted)">{{ f.name }}</span>
+            <span style="color:{{ f.color }};font-weight:600">{{ f.mark }}</span>
+            <span style="color:{{ f.color }}">{{ f.age }}</span>
+          </span>
+        </sc-for>
+      </div>
+    </div>
+
+    <nav style="display:flex;align-items:stretch;height:34px;border-bottom:1px solid var(--line-2);background:var(--surface)">
+      <sc-for list="{{ pages }}" as="p" hint-placeholder-count="9">
+        <a href="{{ p.href }}" style="display:flex;align-items:center;padding:0 16px;font-size:12px;font-weight:500;letter-spacing:.03em;color:var(--text-muted);border-right:1px solid var(--line)" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.06)">
+          <span style="color:{{ p.color }};border-bottom:2px solid {{ p.mark }};padding-bottom:1px">{{ p.name }}</span>
+        </a>
+      </sc-for>
+    </nav>
+
+    <div style="display:flex;align-items:center;height:36px;border-bottom:1px solid var(--line-2);font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">
+      <div style="display:flex;align-items:center;height:100%;padding:0 14px;border-right:1px solid var(--line-2);font-size:12px;font-weight:600;letter-spacing:.12em;color:var(--text)">BRIEFING</div>
+      <div style="display:flex;gap:18px;padding:0 14px;white-space:nowrap">
+        <span><span style="color:var(--text-dim)">PRICES · </span>TOTE <span style="color:{{ capTote.color }}">{{ capTote.v }}</span></span>
+        <span>LADBROKES <span style="color:{{ capLb.color }}">{{ capLb.v }}</span></span>
+        <span><span style="color:var(--text-dim)">SOURCES IN </span><span style="color:var(--text)">{{ srcInCount }}</span></span>
+        <span><span style="color:var(--text-dim)">ALL POOLS · MEETING </span><span style="color:var(--text)">{{ meetingPool }}</span></span>
+      </div>
+      <div style="margin-left:auto;padding:0 14px;color:var(--text-dim);white-space:nowrap">ORDERED BY NUMBER OF SOURCES · NOTHING HERE RE-RANKS THE RACE DAY CARD</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 352px;align-items:start">
+      <div style="min-width:0;border-right:1px solid var(--line-2)">
+        <div style="display:grid;grid-template-columns:44px 52px 58px 30px 78px minmax(0,1fr) minmax(0,1.35fr) 88px minmax(0,1.1fr) 104px 96px;background:var(--surface);border-bottom:1px solid var(--line-3);font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--text-muted)">
+          <div style="padding:7px 8px">R</div>
+          <div style="padding:7px 4px">OFF</div>
+          <div style="padding:7px 4px">RACE</div>
+          <div style="padding:7px 4px;text-align:center">FLD</div>
+          <div style="padding:7px 6px">MARKET</div>
+          <div style="padding:7px 8px">FAVOURITE</div>
+          <div style="padding:7px 8px">MOST BACKED</div>
+          <div style="padding:7px 8px">ITS PRICE</div>
+          <div style="padding:7px 8px">BIGGEST PRICE GAP</div>
+          <div style="padding:7px 6px">SIGNALS</div>
+          <div style="padding:7px 6px">SOURCES</div>
+        </div>
+
+        <sc-for list="{{ races }}" as="r" hint-placeholder-count="9">
+          <div>
+            <sc-if value="{{ r.isRun }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:14px;height:26px;padding:0 8px;border-bottom:1px solid var(--line);font-family:var(--font-mono);font-size:11px;color:var(--text-faint)">
+                <span style="width:28px;font-weight:600">{{ r.label }}</span>
+                <span style="width:40px">{{ r.off }}</span>
+                <span style="width:120px">{{ r.distCls }}</span>
+                <span style="letter-spacing:.08em">RAN · BRIEFING CLOSED</span>
+                <a href="Results.dc.html" style="margin-left:auto;color:var(--text-dim)">RESULT ▸</a>
+              </div>
+            </sc-if>
+            <sc-if value="{{ r.live }}" hint-placeholder-val="{{ true }}">
+              <div sc-camel-on-click="{{ r.toggle }}" style="display:grid;grid-template-columns:44px 52px 58px 30px 78px minmax(0,1fr) minmax(0,1.35fr) 88px minmax(0,1.1fr) 104px 96px;align-items:center;min-height:46px;border-bottom:1px solid var(--line);background:{{ r.bg }};cursor:pointer;font-family:var(--font-mono)" style-hover="background:var(--row-hover)">
+                <div style="align-self:stretch;display:flex;align-items:center;padding:0 8px;border-left:3px solid {{ r.mark }};font-size:14px;font-weight:600">{{ r.label }}</div>
+                <div style="padding:0 4px">
+                  <div style="font-size:12px;color:var(--text-2)">{{ r.off }}</div>
+                  <div style="font-size:10px;color:var(--edge)">{{ r.offSub }}</div>
+                </div>
+                <div style="padding:0 4px;font-size:11px;color:var(--text-2);line-height:1.35">
+                  <div>{{ r.dist }}</div>
+                  <div style="color:var(--text-muted)">{{ r.cls }}</div>
+                </div>
+                <div style="padding:0 4px;text-align:center;font-size:12px;color:var(--text-2)">{{ r.field }}</div>
+                <div style="padding:0 6px">
+                  <div style="display:flex;gap:2px;align-items:flex-end;height:14px">
+                    <sc-for list="{{ r.bars }}" as="b" hint-placeholder-count="3"><div style="width:5px;height:{{ b.h }};background:{{ b.bg }}"></div></sc-for>
+                  </div>
+                  <div style="font-size:10px;letter-spacing:.08em;color:var(--text-muted);margin-top:2px">{{ r.band }}</div>
+                </div>
+                <div style="padding:0 8px;min-width:0">
+                  <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ r.fav.color }}">{{ r.fav.no }} {{ r.fav.name }}</div>
+                  <div style="font-size:11px;color:var(--text-muted);white-space:nowrap">TOTE <span style="color:var(--text)">{{ r.fav.price }}</span></div>
+                </div>
+                <div style="padding:4px 8px;min-width:0">
+                  <sc-if value="{{ r.hasTips }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;align-items:baseline;gap:7px;min-width:0">
+                      <span style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ r.top.nameColor }}">{{ r.top.no }} {{ r.top.name }}</span>
+                      <span style="flex:none;font-size:11px;color:var(--tip)">{{ r.top.countLabel }}</span>
+                      <span style="flex:none;font-size:10px;color:var(--text-dim)">{{ r.top.tie }}</span>
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px">
+                      <sc-for list="{{ r.top.marks }}" as="m" hint-placeholder-count="3">
+                        <span style="font-size:10px;line-height:14px;padding:0 4px;white-space:nowrap;color:{{ m.color }};border:1px {{ m.bstyle }} {{ m.bcolor }};background:{{ m.bg }}">{{ m.t }}<sc-if value="{{ m.heard }}" hint-placeholder-val="{{ false }}"><span style="color:var(--text-dim);margin-left:2px">~</span></sc-if></span>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.noTips }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-size:11px;color:var(--text-dim);line-height:1.35">{{ r.noTipsMsg }}</div>
+                  </sc-if>
+                </div>
+                <div style="padding:0 8px">
+                  <sc-for list="{{ r.topPrices }}" as="x" hint-placeholder-count="2">
+                    <div style="display:flex;justify-content:space-between;gap:6px;white-space:nowrap;line-height:1.35">
+                      <span style="font-size:10px;color:var(--text-muted);letter-spacing:.06em">{{ x.l }}</span>
+                      <span style="font-size:{{ x.size }};font-weight:{{ x.weight }};color:{{ x.color }}">{{ x.v }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="padding:0 8px;min-width:0">
+                  <sc-if value="{{ r.hasGap }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;align-items:baseline;gap:7px;min-width:0">
+                      <span style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.gap.no }} {{ r.gap.name }}</span>
+                    </div>
+                    <div style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-muted)"><span style="color:{{ r.gap.color }};font-weight:{{ r.gap.weight }}">{{ r.gap.val }}</span> {{ r.gap.line }}</div>
+                  </sc-if>
+                  <sc-if value="{{ r.noGap }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-size:11px;color:var(--text-dim)">{{ r.noGapMsg }}</div>
+                  </sc-if>
+                </div>
+                <div style="padding:0 6px;display:flex;flex-wrap:wrap;gap:3px">
+                  <sc-for list="{{ r.flags }}" as="c" hint-placeholder-count="1">
+                    <span style="font-size:10px;line-height:14px;padding:0 4px;white-space:nowrap;letter-spacing:.04em;color:{{ c.c }};border:1px solid {{ c.b }}">{{ c.t }}</span>
+                  </sc-for>
+                </div>
+                <div style="padding:0 6px;display:flex;gap:5px;font-size:10px;letter-spacing:.04em">
+                  <sc-for list="{{ r.srcIn }}" as="s" hint-placeholder-count="4"><span style="color:{{ s.c }}">{{ s.t }}</span></sc-for>
+                </div>
+              </div>
+
+              <sc-if value="{{ r.open }}" hint-placeholder-val="{{ false }}">
+                <div style="background:var(--detail);border-bottom:1px solid var(--detail-rule);padding:10px 14px 12px 47px">
+                  <div style="display:flex;gap:18px;font-family:var(--font-mono);font-size:11px;color:var(--text-muted);white-space:nowrap">
+                    <span>WIN POOL <span style="color:var(--text)">{{ r.pool }}</span></span>
+                    <span>MARGIN · TOTE <span style="color:var(--text)">{{ r.mTote }}</span> · LADBROKES <span style="color:var(--text)">{{ r.mLb }}</span></span>
+                    <span>CONCENTRATION <span style="color:var(--text)">{{ r.conc }}</span> {{ r.band }}</span>
+                    <span>{{ r.course }}</span>
+                    <a href="Race Day.dc.html" style="margin-left:auto;color:var(--text-muted)">RACE DAY CARD ▸</a>
+                  </div>
+
+                  <sc-for list="{{ r.interviews }}" as="iv" hint-placeholder-count="1">
+                    <div style="margin-top:9px;padding:8px 11px 7px;border-top:2px solid var(--voice);background:color-mix(in srgb, var(--voice) 7%, transparent)">
+                      <div style="display:flex;align-items:baseline;gap:9px;font-family:var(--font-mono);font-size:11px;margin-bottom:4px">
+                        <span style="font-size:10px;letter-spacing:.1em;color:var(--voice);font-weight:600">{{ iv.role }}</span>
+                        <span style="font-size:12px;font-weight:600;font-family:var(--font)">{{ iv.speaker }}</span>
+                        <span style="color:var(--text-muted)">on</span>
+                        <span style="font-weight:600;color:{{ iv.nameColor }}">{{ iv.horse }}</span>
+                        <span style="margin-left:auto;color:var(--text-dim);letter-spacing:.06em">RACING TO WIN INTERVIEW</span>
+                      </div>
+                      <sc-for list="{{ iv.words }}" as="w" hint-placeholder-count="2">
+                        <div style="display:flex;gap:8px;align-items:baseline;padding:1px 0">
+                          <span sc-camel-on-click="{{ w.toggle }}" style="flex:none;width:10px;font-family:var(--font-mono);font-size:10px;color:var(--text-dim);cursor:pointer">{{ w.caret }}</span>
+                          <span sc-camel-on-click="{{ w.toggle }}" style="flex:1;min-width:0;font-size:13px;line-height:1.5;color:var(--text);cursor:pointer;white-space:{{ w.ws }};overflow:hidden;text-overflow:ellipsis">“{{ w.text }}”</span>
+                          <a href="{{ w.url }}" target="_blank" style="flex:none;font-family:var(--font-mono);font-size:11px;color:var(--voice)">▸ {{ w.tl }}</a>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-for>
+                  <sc-if value="{{ r.noInterview }}" hint-placeholder-val="{{ false }}">
+                    <div style="margin-top:8px;font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">{{ r.noInterviewMsg }}</div>
+                  </sc-if>
+
+                  <div style="margin-top:11px;font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--text-muted)">BACKED · MOST SOURCES FIRST</div>
+                  <sc-if value="{{ r.noTips }}" hint-placeholder-val="{{ false }}">
+                    <div style="padding:7px 0;border-top:1px solid var(--line);margin-top:4px;font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">{{ r.noTipsMsg }}</div>
+                  </sc-if>
+                  <sc-for list="{{ r.picks }}" as="p" hint-placeholder-count="3">
+                    <div style="display:grid;grid-template-columns:220px minmax(0,1fr) 276px;gap:16px;padding:9px 0;border-top:1px solid var(--line);margin-top:4px">
+                      <div style="min-width:0">
+                        <div style="display:flex;align-items:baseline;gap:7px;font-family:var(--font-mono)">
+                          <span style="font-size:13px;font-weight:600;width:20px;flex:none">{{ p.no }}</span>
+                          <span style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ p.nameColor }}">{{ p.name }}</span>
+                          <span style="font-family:var(--font);font-size:12px;color:var(--text-muted);white-space:nowrap">{{ p.zh }}</span>
+                        </div>
+                        <div style="margin:3px 0 0 27px;font-family:var(--font-mono);font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.jt }}</div>
+                        <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:5px 0 0 27px;font-family:var(--font-mono)">
+                          <span style="font-size:11px;font-weight:600;color:var(--tip)">{{ p.countLabel }}</span>
+                          <sc-for list="{{ p.chips }}" as="c" hint-placeholder-count="0">
+                            <span style="font-size:10px;line-height:14px;padding:0 4px;white-space:nowrap;letter-spacing:.04em;color:{{ c.c }};border:1px solid {{ c.b }}">{{ c.t }}</span>
+                          </sc-for>
+                        </div>
+                      </div>
+                      <div style="min-width:0">
+                        <sc-for list="{{ p.srcs }}" as="b" hint-placeholder-count="2">
+                          <div style="display:flex;gap:8px;align-items:baseline;padding:2px 0">
+                            <span style="flex:none;width:84px;font-family:var(--font-mono)">
+                              <span style="font-size:10px;line-height:14px;padding:0 4px;white-space:nowrap;color:{{ b.m.color }};border:1px {{ b.m.bstyle }} {{ b.m.bcolor }};background:{{ b.m.bg }}">{{ b.m.t }}<sc-if value="{{ b.m.heard }}" hint-placeholder-val="{{ false }}"><span style="color:var(--text-dim);margin-left:2px">~</span></sc-if></span>
+                            </span>
+                            <span style="flex:none;width:96px;font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ b.who }}</span>
+                            <div style="flex:1;min-width:0">
+                              <sc-for list="{{ b.words }}" as="w" hint-placeholder-count="1">
+                                <div style="display:flex;gap:7px;align-items:baseline">
+                                  <span sc-camel-on-click="{{ w.toggle }}" style="flex:none;width:10px;font-family:var(--font-mono);font-size:10px;color:var(--text-dim);cursor:pointer">{{ w.caret }}</span>
+                                  <span sc-camel-on-click="{{ w.toggle }}" style="flex:1;min-width:0;font-size:12px;line-height:1.5;color:var(--text-2);cursor:pointer;white-space:{{ w.ws }};overflow:hidden;text-overflow:ellipsis">“{{ w.text }}”</span>
+                                  <a href="{{ w.url }}" target="_blank" style="flex:none;font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">▸ {{ w.tl }}</a>
+                                </div>
+                                <sc-if value="{{ w.hasEn }}" hint-placeholder-val="{{ false }}">
+                                  <div style="margin-left:17px;font-size:11px;line-height:1.45;color:var(--text-muted)">{{ w.en }}</div>
+                                </sc-if>
+                              </sc-for>
+                              <sc-if value="{{ b.noWords }}" hint-placeholder-val="{{ false }}">
+                                <div style="display:flex;gap:7px;align-items:baseline">
+                                  <span style="flex:1;min-width:0;margin-left:17px;font-size:11px;color:var(--text-dim)">{{ b.noWordsMsg }}</span>
+                                  <a href="{{ b.url }}" target="_blank" style="flex:none;font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">▸ {{ b.tl }}</a>
+                                </div>
+                              </sc-if>
+                            </div>
+                          </div>
+                        </sc-for>
+                      </div>
+                      <div style="display:grid;grid-template-columns:{{ p.pt.cols }};align-self:start;font-family:var(--font-mono);border:1px solid var(--line-2)">
+                        <div style="background:var(--surface);border-bottom:1px solid var(--line-2)"></div>
+                        <sc-for list="{{ p.pt.head }}" as="h" hint-placeholder-count="2">
+                          <div style="padding:3px 7px;text-align:right;background:var(--surface);border-bottom:1px solid var(--line-2);white-space:nowrap">
+                            <div style="font-size:10px;letter-spacing:.08em;color:var(--text-muted)">{{ h.label }}</div>
+                            <div style="font-size:10px;color:{{ h.color }}">{{ h.sub }}</div>
+                          </div>
+                        </sc-for>
+                        <sc-for list="{{ p.pt.cells }}" as="c" hint-placeholder-count="12">
+                          <div style="padding:2px 7px;text-align:{{ c.align }};font-size:{{ c.size }};letter-spacing:{{ c.ls }};line-height:1.25;color:{{ c.color }};font-weight:{{ c.weight }};white-space:{{ c.ws }}">{{ c.v }}</div>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-for>
+
+                  <div style="margin-top:10px;font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--text-muted)">REST OF FIELD · ONLY RUNNERS WITH A SIGNAL OR A PRICE GAP</div>
+                  <div style="margin-top:4px">
+                    <sc-for list="{{ r.rest }}" as="x" hint-placeholder-count="2">
+                      <div style="display:flex;align-items:baseline;gap:10px;padding:4px 0;border-top:1px solid var(--line);font-family:var(--font-mono);font-size:11px">
+                        <span style="width:20px;font-size:12px;font-weight:600">{{ x.no }}</span>
+                        <span style="width:170px;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ x.nameColor }}">{{ x.name }}</span>
+                        <span style="width:96px;white-space:nowrap;color:var(--text-2)">{{ x.price }}</span>
+                        <span style="display:flex;gap:4px">
+                          <sc-for list="{{ x.chips }}" as="c" hint-placeholder-count="1"><span style="font-size:10px;line-height:14px;padding:0 4px;white-space:nowrap;color:{{ c.c }};border:1px solid {{ c.b }}">{{ c.t }}</span></sc-for>
+                        </span>
+                        <span style="white-space:nowrap;color:var(--text-muted)"><span style="color:{{ x.gapColor }};font-weight:{{ x.gapWeight }}">{{ x.gap }}</span> {{ x.gapLine }}</span>
+                        <span style="margin-left:auto;white-space:nowrap;color:var(--text-dim)">{{ x.src }}</span>
+                      </div>
+                    </sc-for>
+                    <sc-if value="{{ r.noRest }}" hint-placeholder-val="{{ false }}">
+                      <div style="padding:5px 0;border-top:1px solid var(--line);font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">NO OTHER RUNNER CARRIES A SIGNAL OR A PRICE GAP OF +5% OR MORE</div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-if>
+            </sc-if>
+          </div>
+        </sc-for>
+
+        <div style="display:flex;flex-wrap:wrap;gap:6px 18px;padding:9px 14px;border-top:1px solid var(--line-2);background:var(--surface);font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">
+          <span><span style="color:var(--tip);border:1px solid color-mix(in srgb, var(--tip) 40%, transparent);padding:0 4px">LB #1</span> pick, with the tipster's rank</span>
+          <span><span style="color:var(--tip);border:1px dashed color-mix(in srgb, var(--tip) 50%, transparent);padding:0 4px">FC FEAT</span> featured segment</span>
+          <span><span style="color:var(--voice);border:1px solid color-mix(in srgb, var(--voice) 45%, transparent);background:color-mix(in srgb, var(--voice) 12%, transparent);padding:0 4px">INT J</span> jockey or trainer interviewed</span>
+          <span><span style="color:var(--text-dim)">~</span> heard: name came through speech-to-text</span>
+          <span>VALUE = price × the other market's fair chance − 1</span>
+          <span style="margin-left:auto;color:var(--text-dim)">click a race to open it</span>
+        </div>
+      </div>
+
+      <aside style="background:var(--surface);min-width:0">
+        <div style="display:flex;align-items:baseline;gap:8px;padding:9px 12px 7px;border-bottom:1px solid var(--line-2)">
+          <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--text-muted)">WHERE THE MARKETS DISAGREE</span>
+          <span style="margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--text-dim)">VALUE ≥ +5%</span>
+        </div>
+        <sc-if value="{{ hasEdges }}" hint-placeholder-val="{{ true }}">
+          <div style="display:grid;grid-template-columns:28px minmax(0,1fr) 66px 58px 56px;padding:4px 12px;font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;color:var(--text-dim);border-bottom:1px solid var(--line)">
+            <span>R</span><span>HORSE</span><span style="text-align:right">BETTER AT</span><span style="text-align:right">OTHER FAIR</span><span style="text-align:right">VALUE</span>
+          </div>
+          <sc-for list="{{ edges }}" as="e" hint-placeholder-count="6">
+            <div sc-camel-on-click="{{ e.go }}" style="display:grid;grid-template-columns:28px minmax(0,1fr) 66px 58px 56px;align-items:baseline;padding:5px 12px;border-bottom:1px solid var(--line);font-family:var(--font-mono);font-size:11px;cursor:pointer;opacity:{{ e.op }}" style-hover="background:var(--row-hover)">
+              <span style="color:var(--text-muted)">{{ e.race }}</span>
+              <span style="min-width:0">
+                <span style="display:block;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ e.nameColor }}">{{ e.no }} {{ e.name }}</span>
+                <span style="display:block;font-size:10px;color:{{ e.srcColor }}">{{ e.src }}</span>
+              </span>
+              <span style="text-align:right;white-space:nowrap"><span style="font-size:10px;color:var(--text-muted)">{{ e.at }} </span>{{ e.price }}</span>
+              <span style="text-align:right;color:var(--text-2)">{{ e.fair }}</span>
+              <span style="text-align:right;font-size:12px;font-weight:600">{{ e.ev }}</span>
+            </div>
+          </sc-for>
+        </sc-if>
+        <sc-if value="{{ noEdges }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:12px;font-family:var(--font-mono);font-size:11px;line-height:1.55;color:var(--text-dim);border-bottom:1px solid var(--line)">{{ noEdgesMsg }}</div>
+        </sc-if>
+
+        <div style="padding:9px 12px 7px;border-bottom:1px solid var(--line-2);border-top:1px solid var(--line-2);margin-top:14px;font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--text-muted)">SOURCES FOR THIS MEETING</div>
+        <sc-for list="{{ sources }}" as="s" hint-placeholder-count="4">
+          <div style="padding:7px 12px;border-bottom:1px solid var(--line)">
+            <div style="display:flex;align-items:baseline;gap:8px;font-family:var(--font-mono);font-size:11px">
+              <span style="width:34px;font-size:10px;color:{{ s.abColor }}">{{ s.ab }}</span>
+              <span style="font-family:var(--font);font-size:12px;font-weight:500;color:{{ s.nameColor }}">{{ s.name }}</span>
+              <span style="margin-left:auto;color:{{ s.timeColor }};white-space:nowrap">{{ s.time }}</span>
+            </div>
+            <div style="margin:2px 0 0 42px;font-family:var(--font-mono);font-size:10px;line-height:1.5;color:var(--text-muted)">{{ s.line }}</div>
+            <sc-if value="{{ s.held }}" hint-placeholder-val="{{ false }}">
+              <div style="margin:2px 0 0 42px;font-family:var(--font-mono);font-size:10px;color:var(--incident)">HELD FOR REVIEW · {{ s.held }}</div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </aside>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ showPhone }}" hint-placeholder-val="{{ true }}">
+<div style="flex:none">
+  <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;color:var(--text-dim);margin-bottom:8px">PHONE · 390 · {{ momentLabel }}</div>
+  <div style="width:390px;background:var(--bg);border:1px solid var(--line-2);font-size:13px">
+    <div style="position:sticky;top:0;z-index:2;background:var(--surface);border-bottom:1px solid var(--line-2)">
+      <div style="display:flex;align-items:center;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">
+        <span style="font-weight:600;color:var(--text);letter-spacing:.1em">BRIEFING · HV 23 SEP</span>
+        <span style="margin-left:auto;display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:50%;background:{{ clockDot }}"></span>{{ clockShort }}</span>
+      </div>
+      <div style="display:flex;gap:12px;padding:5px 12px 7px;border-top:1px solid var(--line);font-family:var(--font-mono);font-size:10px;color:var(--text-muted);white-space:nowrap">
+        <span>TOTE <span style="color:{{ capTote.color }}">{{ capTote.v }}</span></span>
+        <span>LB <span style="color:{{ capLb.color }}">{{ capLb.v }}</span></span>
+        <span style="margin-left:auto">SOURCES <span style="color:var(--text)">{{ srcInCount }}</span></span>
+      </div>
+    </div>
+
+    <sc-for list="{{ races }}" as="r" hint-placeholder-count="9">
+      <div>
+        <sc-if value="{{ r.isRun }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:10px;height:30px;padding:0 12px;border-bottom:1px solid var(--line);font-family:var(--font-mono);font-size:11px;color:var(--text-faint)">
+            <span style="font-weight:600;width:26px">{{ r.label }}</span><span>{{ r.off }}</span><span>RAN</span>
+            <a href="Results.dc.html" style="margin-left:auto;color:var(--text-dim)">RESULT ▸</a>
+          </div>
+        </sc-if>
+        <sc-if value="{{ r.live }}" hint-placeholder-val="{{ true }}">
+          <div sc-camel-on-click="{{ r.mToggle }}" style="padding:8px 12px 8px 9px;border-bottom:1px solid var(--line);border-left:3px solid {{ r.mMark }};background:{{ r.mBg }};font-family:var(--font-mono);cursor:pointer">
+            <div style="display:flex;align-items:baseline;gap:8px;white-space:nowrap">
+              <span style="font-size:15px;font-weight:600">{{ r.label }}</span>
+              <span style="font-size:12px;color:var(--text-2)">{{ r.off }}</span>
+              <span style="font-size:10px;color:var(--edge)">{{ r.offSub }}</span>
+              <span style="font-size:11px;color:var(--text-muted)">{{ r.dist }} {{ r.cls }}</span>
+              <span style="display:flex;gap:2px;align-items:flex-end;height:11px"><sc-for list="{{ r.bars }}" as="b" hint-placeholder-count="3"><span style="width:4px;height:{{ b.hs }};background:{{ b.bg }}"></span></sc-for></span>
+              <span style="margin-left:auto;font-size:10px;color:var(--text-muted)">FAV <span style="color:var(--text)">{{ r.fav.no }}</span> <span style="font-size:12px;color:var(--text);font-weight:600">{{ r.fav.price }}</span></span>
+            </div>
+            <sc-if value="{{ r.hasTips }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;align-items:baseline;gap:8px;margin-top:5px">
+                <span style="flex:1;min-width:0;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ r.top.nameColor }}">{{ r.top.no }} {{ r.top.name }}</span>
+                <sc-for list="{{ r.topPrices }}" as="x" hint-placeholder-count="2">
+                  <span style="flex:none;white-space:nowrap;font-size:10px;color:var(--text-muted)">{{ x.l }} <span style="font-size:{{ x.size }};font-weight:{{ x.weight }};color:{{ x.color }}">{{ x.v }}</span></span>
+                </sc-for>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center;margin-top:4px">
+                <span style="font-size:11px;color:var(--tip);margin-right:3px">{{ r.top.countLabel }}</span>
+                <sc-for list="{{ r.top.marks }}" as="m" hint-placeholder-count="3">
+                  <span style="font-size:10px;line-height:14px;padding:0 4px;white-space:nowrap;color:{{ m.color }};border:1px {{ m.bstyle }} {{ m.bcolor }};background:{{ m.bg }}">{{ m.t }}<sc-if value="{{ m.heard }}" hint-placeholder-val="{{ false }}"><span style="color:var(--text-dim);margin-left:2px">~</span></sc-if></span>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ r.noTips }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:5px;font-size:11px;color:var(--text-dim)">{{ r.noTipsMsg }}</div>
+            </sc-if>
+            <sc-if value="{{ r.hasMobileExtras }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:5px">
+                <sc-for list="{{ r.flags }}" as="c" hint-placeholder-count="1"><span style="font-size:10px;line-height:14px;padding:0 4px;white-space:nowrap;color:{{ c.c }};border:1px solid {{ c.b }}">{{ c.t }}</span></sc-for>
+                <sc-if value="{{ r.gapStrong }}" hint-placeholder-val="{{ false }}">
+                  <span style="margin-left:auto;font-size:10px;color:var(--text-muted);white-space:nowrap">GAP <span style="color:var(--text);font-weight:600">{{ r.gap.val }}</span> #{{ r.gap.no }} {{ r.gap.atShort }}</span>
+                </sc-if>
+              </div>
+            </sc-if>
+          </div>
+
+          <sc-if value="{{ r.mOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="background:var(--detail);border-bottom:1px solid var(--detail-rule);padding:8px 12px 10px">
+              <sc-for list="{{ r.interviews }}" as="iv" hint-placeholder-count="1">
+                <div style="margin-bottom:8px;padding:7px 9px;border-top:2px solid var(--voice);background:color-mix(in srgb, var(--voice) 7%, transparent)">
+                  <div style="display:flex;align-items:baseline;gap:7px;font-family:var(--font-mono);font-size:10px;margin-bottom:3px;white-space:nowrap">
+                    <span style="letter-spacing:.1em;color:var(--voice);font-weight:600">{{ iv.role }}</span>
+                    <span style="font-family:var(--font);font-size:12px;font-weight:600">{{ iv.speaker }}</span>
+                    <span style="margin-left:auto;font-size:11px;font-weight:600;color:{{ iv.nameColor }}">{{ iv.horse }}</span>
+                  </div>
+                  <sc-for list="{{ iv.words }}" as="w" hint-placeholder-count="2">
+                    <div style="display:flex;gap:6px;align-items:baseline;padding:1px 0">
+                      <span sc-camel-on-click="{{ w.toggle }}" style="flex:1;min-width:0;font-size:13px;line-height:1.5;cursor:pointer;white-space:{{ w.ws }};overflow:hidden;text-overflow:ellipsis">“{{ w.text }}”</span>
+                      <a href="{{ w.url }}" target="_blank" style="flex:none;font-family:var(--font-mono);font-size:11px;color:var(--voice)">▸ {{ w.tl }}</a>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-for>
+              <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);white-space:nowrap">POOL <span style="color:var(--text)">{{ r.pool }}</span> · MARGIN T <span style="color:var(--text)">{{ r.mTote }}</span> LB <span style="color:var(--text)">{{ r.mLb }}</span></div>
+              <sc-for list="{{ r.picks }}" as="p" hint-placeholder-count="3">
+                <div style="padding:8px 0 6px;border-top:1px solid var(--line);margin-top:6px">
+                  <div style="display:flex;align-items:baseline;gap:7px;font-family:var(--font-mono)">
+                    <span style="font-size:13px;font-weight:600;width:20px">{{ p.no }}</span>
+                    <span style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ p.nameColor }}">{{ p.name }}</span>
+                    <span style="font-family:var(--font);font-size:12px;color:var(--text-muted)">{{ p.zh }}</span>
+                    <span style="margin-left:auto;font-size:11px;color:var(--tip);white-space:nowrap">{{ p.countLabel }}</span>
+                  </div>
+                  <div style="display:flex;gap:6px;align-items:center;margin:2px 0 6px 27px;font-family:var(--font-mono);font-size:10px;color:var(--text-muted);white-space:nowrap">
+                    <span>{{ p.jt }}</span>
+                    <sc-for list="{{ p.chips }}" as="c" hint-placeholder-count="0"><span style="line-height:14px;padding:0 4px;color:{{ c.c }};border:1px solid {{ c.b }}">{{ c.t }}</span></sc-for>
+                  </div>
+                  <div style="display:grid;grid-template-columns:{{ p.pt.colsM }};font-family:var(--font-mono);border:1px solid var(--line-2);margin-bottom:6px">
+                    <div style="background:var(--surface);border-bottom:1px solid var(--line-2)"></div>
+                    <sc-for list="{{ p.pt.head }}" as="h" hint-placeholder-count="2">
+                      <div style="padding:3px 7px;text-align:right;background:var(--surface);border-bottom:1px solid var(--line-2);white-space:nowrap">
+                        <span style="font-size:10px;letter-spacing:.06em;color:var(--text-muted)">{{ h.labelShort }}</span>
+                        <span style="font-size:10px;color:{{ h.color }}"> {{ h.sub }}</span>
+                      </div>
+                    </sc-for>
+                    <sc-for list="{{ p.pt.cells }}" as="c" hint-placeholder-count="12">
+                      <div style="padding:2px 7px;text-align:{{ c.align }};font-size:{{ c.size }};letter-spacing:{{ c.ls }};line-height:1.3;color:{{ c.color }};font-weight:{{ c.weight }};white-space:nowrap">{{ c.vm }}</div>
+                    </sc-for>
+                  </div>
+                  <sc-for list="{{ p.srcs }}" as="b" hint-placeholder-count="2">
+                    <div style="padding:2px 0">
+                      <div style="display:flex;gap:6px;align-items:baseline">
+                        <span style="flex:none;font-family:var(--font-mono);font-size:10px;line-height:14px;padding:0 4px;white-space:nowrap;color:{{ b.m.color }};border:1px {{ b.m.bstyle }} {{ b.m.bcolor }};background:{{ b.m.bg }}">{{ b.m.t }}<sc-if value="{{ b.m.heard }}" hint-placeholder-val="{{ false }}"><span style="color:var(--text-dim);margin-left:2px">~</span></sc-if></span>
+                        <span style="font-size:11px;color:var(--text-muted);white-space:nowrap">{{ b.who }}</span>
+                        <sc-if value="{{ b.noWords }}" hint-placeholder-val="{{ false }}">
+                          <a href="{{ b.url }}" target="_blank" style="margin-left:auto;flex:none;font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">▸ {{ b.tl }}</a>
+                        </sc-if>
+                      </div>
+                      <sc-for list="{{ b.words }}" as="w" hint-placeholder-count="1">
+                        <div style="display:flex;gap:6px;align-items:baseline;margin-top:1px">
+                          <span sc-camel-on-click="{{ w.toggle }}" style="flex:1;min-width:0;font-size:12px;line-height:1.5;color:var(--text-2);cursor:pointer;white-space:{{ w.ws }};overflow:hidden;text-overflow:ellipsis">“{{ w.text }}”</span>
+                          <a href="{{ w.url }}" target="_blank" style="flex:none;font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">▸ {{ w.tl }}</a>
+                        </div>
+                        <sc-if value="{{ w.hasEn }}" hint-placeholder-val="{{ false }}"><div style="font-size:11px;color:var(--text-muted)">{{ w.en }}</div></sc-if>
+                      </sc-for>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-for>
+              <sc-if value="{{ r.noTips }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:6px 0;border-top:1px solid var(--line);margin-top:6px;font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">{{ r.noTipsMsg }}</div>
+              </sc-if>
+              <sc-if value="{{ r.hasRest }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--line);font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--text-muted)">REST OF FIELD</div>
+                <sc-for list="{{ r.rest }}" as="x" hint-placeholder-count="2">
+                  <div style="padding:4px 0;border-top:1px solid var(--line);font-family:var(--font-mono);font-size:11px">
+                    <div style="display:flex;align-items:baseline;gap:7px;white-space:nowrap">
+                      <span style="width:20px;font-weight:600">{{ x.no }}</span>
+                      <span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;color:{{ x.nameColor }}">{{ x.name }}</span>
+                      <span style="margin-left:auto;color:var(--text-2)">{{ x.price }}</span>
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:2px 0 0 27px;font-size:10px;color:var(--text-muted)">
+                      <sc-for list="{{ x.chips }}" as="c" hint-placeholder-count="1"><span style="line-height:14px;padding:0 4px;color:{{ c.c }};border:1px solid {{ c.b }}">{{ c.t }}</span></sc-for>
+                      <span><span style="color:{{ x.gapColor }};font-weight:{{ x.gapWeight }}">{{ x.gap }}</span> {{ x.gapLine }}</span>
+                    </div>
+                  </div>
+                </sc-for>
+              </sc-if>
+            </div>
+          </sc-if>
+        </sc-if>
+      </div>
+    </sc-for>
+    <div style="padding:9px 12px;font-family:var(--font-mono);font-size:10px;line-height:1.6;color:var(--text-dim)">~ heard via speech-to-text · value = price × other market's fair chance − 1</div>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;moment&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;night&quot;,&quot;afternoon&quot;,&quot;course&quot;],&quot;default&quot;:&quot;afternoon&quot;,&quot;tsType&quot;:&quot;'night'|'afternoon'|'course'&quot;,&quot;section&quot;:&quot;Scenario&quot;},&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;both&quot;,&quot;desktop&quot;,&quot;phone&quot;],&quot;default&quot;:&quot;both&quot;,&quot;tsType&quot;:&quot;'both'|'desktop'|'phone'&quot;,&quot;section&quot;:&quot;Scenario&quot;},&quot;foldQuotes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Density&quot;}}">
+// ── sample data: field names as in sample-data-2026-09-23.json ─────────────
+// Tips exist for R2, R6, R8 only (the sample is trimmed). Items marked ILLUS are
+// illustrative stand-ins for data the sample does not carry.
+const RACEDAY = [
+  [1,1650,'5',12,.5538,'moderate'],[2,1200,'4',12,.54,'weak'],[3,1650,'4',12,.4785,'weak'],
+  [4,1200,'4',12,.618,'moderate'],[5,1650,'4',12,.391,'weak'],[6,1000,'4',12,.595,'moderate'],
+  [7,1200,'3',12,.4825,'weak'],[8,1200,'3',12,.5581,'moderate'],[9,1800,'3',12,.4134,'weak'],
+].map(([race_no,distance,race_class,field_size,concentration,band]) => ({ race_no, distance, race_class, going:'G', course:'C', field_size, concentration, band }));
+const MONEY = { 1:2273869, 2:1160241, 3:1105221, 4:989099, 5:678806, 6:678867, 7:569612, 8:563399, 9:385492 };
+const MEETING_TOTAL = 42176988;
+// off times: R2/R6/R8 from the sample; the rest ILLUS on the HV Wednesday pattern
+const OFF = { 1:'18:40', 2:'19:10', 3:'19:40', 4:'20:10', 5:'20:40', 6:'21:10', 7:'21:40', 8:'22:15', 9:'22:50' };
+// favourite per race, from /api/raceday/{date}/{race}. R2/R6/R8 consistent with the sample; others ILLUS
+const FAVS = { 1:[3,'BEAUTY RAINBOW',4.1], 2:[4,'MATZDEN',4.4], 3:[6,'HAPPY AGILITY',3.6], 4:[9,'SPEEDY LONGWAH',2.9], 5:[2,'LUCKY GOLD',4.8], 6:[4,'SUPERB KING',3.2], 7:[5,'SMART BEAT',3.4], 8:[8,"DANICA'S CHOICE",2.3], 9:[7,'CHILL CHIBI',5.0] };
+const OVERROUND = { 2:{tote:22.5,ladbrokes:30.5}, 6:{tote:22.2,ladbrokes:30.5}, 8:{tote:24.3,ladbrokes:30.7} };
+
+const YT1 = 'https://www.youtube.com/watch?v=swV08CftD_Q', FC = 'https://www.youtube.com/watch?v=-yNB49esPsI', INT = 'https://www.youtube.com/watch?v=PPJoOPyBb_4';
+const LB2 = 'https://www.ladbrokes.com.au/racing/happy-valley/b7bab23c-7e79-4923-b4eb-b3ca1483850f';
+const LB6 = 'https://www.ladbrokes.com.au/racing/happy-valley/9675a952-bedb-4527-a40f-935e641f843b';
+const LB8 = 'https://www.ladbrokes.com.au/racing/happy-valley/5356421f-153f-4206-b3ce-26f0c4b59728';
+const W = (text, url, t = null, en = null) => ({ text, en, t, url });
+const PK = (source, who, rank, url, words = [], heard = false, kind = 'pick', role = null) => ({
+  kind, source, source_label: { ladbrokes:'Ladbrokes', rtw_preview:'Racing To Win preview', rtw_interview:'Racing To Win interview', factcheck:'賽馬Fact Check' }[source],
+  who, role, rank, words, url, heard,
+});
+const OD = (tote_win,tote_place,fixed_win,fixed_place,fair_tote_pct,fair_fixed_pct,ev_fixed_pct,ev_tote_pct,pays_more) => ({ tote_win,tote_place,fixed_win,fixed_place,fair_tote_pct,fair_fixed_pct,ev_fixed_pct,ev_tote_pct,pays_more });
+const HP = (horse_no,horse_name,name_zh,jockey,trainer,draw,backed_by,odds) => ({ horse_no,horse_name,name_zh,jockey,trainer,draw,backed_by,odds });
+
+const JC = [
+  W('Yeah, last time he did a very good job with the outside draw and stay wide and still very competitive until the last last 50 m and I hope this time he will.', INT + '&t=6s', 6.4),
+  W('Yeah, look last season he always travel too well in 1200 m. So this season I think the th000 meter for him is at this stage is a best decision for him. Yeah.', INT + '&t=22s', 22.4),
+];
+const JO = [
+  W("Yeah, it was only a thousand meter trial here on on the dirt. He jumped from a wide gate and settled just off the speed which was good to see him jump a little bit better. He Yeah, I thought he trolled well enough. H he probably got a little bit tired late, so that trial would have brought him on, but he's like I said, he's not a big horse, so he doesn't take a lot of um work.", INT + '&t=204s', 204.24),
+  W("Definitely. Yep, definitely. He um the only thing that that holds him back a little bit is he's not very big, but um there's plenty of good horses that aren't very big as well in saying that. Um but yeah, like I said, he's form's great behind good horses. So that's good enough for a Happy Valley Class 3 1200, you would think. So I think if things go right, he should be right in the finish. Um and like I said, excited to to finally be able to sit on sit on him in a race. You know, I've done a bit of work with him, track work and trials like you said. Uh so good to finally get the race right and yeah be good to um see what he can do tomorrow.", INT + '&t=234s', 234.32),
+];
+
+const SUMMARY = {
+  race_date: '2026-09-23', venue: 'HV',
+  races: [
+    { race_no: 2, off_time: '19:10', tote_win_pool: 1160241, overround: OVERROUND[2], interviews: [], picks: [
+      HP(1,'FIND MY LOVE','紅愛舍','M L Yeung','D J Whyte',12,[
+        PK('rtw_preview','Paul Lally',4,YT1+'&t=372s',[W('Find my love. Nothing wrong with the trial though. That is Find My Love.',YT1+'&t=372s')]),
+        PK('factcheck','譚朗蔚',null,FC+'&t=398s',[],true),
+        PK('factcheck','賽馬Fact Check',null,FC+'&t=189s',[W('紅愛舍轉投韋達馬房之後，兩場頭馬全部喺谷草千二配布文所得，加上隻馬上季首仗亦喺布文胯下只輸頭位得第二。',FC+'&t=189s',189.52)],false,'featured','analyst'),
+      ], OD(17.0,4.2,15.0,3.9,4.8,5.1,-28.0,-13.2,'tote')),
+      HP(4,'MATZDEN','馬馳登','A Atzeni','J Richards',7,[
+        PK('ladbrokes','Ladbrokes',1,LB2,[W('MATZDEN (4) produced a strong first-up effort at Sha Tin, chasing home a smart type to finish second over 1200m. That run should have him peaking for this, and his best figures make him the runner to beat.',LB2)]),
+        PK('rtw_preview','Paul Lally',1,YT1+'&t=441s'),
+      ], OD(4.4,1.8,3.8,1.7,18.6,20.2,-29.5,-11.3,'tote')),
+      HP(7,'SILVER SPURS','銀刺勇士','E C W Wong (-3)','C Fownes',1,[
+        PK('factcheck','譚朗蔚',1,FC+'&t=393s',[],true),
+        PK('ladbrokes','Ladbrokes',3,LB2,[W('SILVER SPURS (7) gets the inside gate and he has enough early speed to make full use of his advantage. He could prove difficult to reel in if he gets the chance to dictate the pace to his liking.',LB2)]),
+      ], OD(7.5,2.7,7.0,2.4,10.9,10.9,-23.8,-17.9,'tote')),
+      HP(3,'LOOKING BRIGHT','路路勁','K Teetan','F C Lor',8,[
+        PK('rtw_preview','Paul Lally',3,YT1+'&t=421s',[W('Again, the little concern is the uh is the Happy Valley record looking bright now. He was disappointing fresh up.',YT1+'&t=421s')]),
+        PK('factcheck','譚朗蔚',null,FC+'&t=398s',[],true),
+      ], OD(9.5,3.1,9.0,2.8,8.6,8.5,-22.7,-19.1,'tote')),
+    ]},
+    { race_no: 6, off_time: '21:10', tote_win_pool: 678867, overround: OVERROUND[6],
+      interviews: [{ horse_no: 4, horse_name: 'SUPERB KING', speaker: 'Jerry Chau', role: 'jockey', words: JC }],
+      picks: [
+      HP(4,'SUPERB KING','巴閉王','C L Chau (-2)','K W Lui',3,[
+        PK('rtw_interview','Jerry Chau',null,INT+'&t=6s',JC,false,'connections','jockey'),
+        PK('ladbrokes','Ladbrokes',1,LB6,[W('SUPERB KING (4) produced a terrific first-up effort, covering ground from a wide draw before fighting on strongly for second over 1000m here a fortnight ago. With the benefit of that run and a much better draw, he gets his chance to go one better.',LB6)]),
+        PK('rtw_preview','Paul Lally',2,YT1+'&t=1330s',[W("But he's going to get pressure from Superb King. I'm going to put him on a minor line cuz he has got the lightweight coming into it at this stage. I think he can defy that 4 pound increase and beat Superb King again.",YT1+'&t=1330s')]),
+      ], OD(3.2,1.4,2.8,1.4,25.6,27.4,-28.4,-12.5,'tote')),
+      HP(1,'JUMBO BLESSING','福進','C Y Ho','C Fownes',6,[
+        PK('rtw_preview','Paul Lally',1,YT1+'&t=1372s',[W('Reliable Jumbo Blessing certainly is. He is definitely. Jumbo blessing for Paul.',YT1+'&t=1372s')]),
+        PK('ladbrokes','Ladbrokes',2,LB6,[W('JUMBO BLESSING (1) returned in excellent order, claiming a narrow win over this course and distance 2 weeks ago, and he is now chasing a hat-trick. He is thriving and should have further improvement to come, so stick with him.',LB6)]),
+      ], OD(3.6,1.8,3.5,1.55,22.7,21.9,-20.5,-21.2,'tote')),
+      HP(12,'MAPOGO','馬運高','K Teetan','K L Man',1,[
+        PK('ladbrokes','Ladbrokes',3,LB6,[W('MAPOGO (12) has shown plenty in his trials without always delivering on race day, but a break and favourable first-up conditions could help him put it all together here. Each way claims at a price.',LB6)]),
+        PK('rtw_preview','Paul Lally',4,YT1+'&t=1323s',[W('Mapogo and Mapogo is really really speedy earlier on. The thousand meters looks good for him.',YT1+'&t=1323s')]),
+      ], OD(7.3,2.4,8.5,2.6,11.2,9.0,-4.7,-34.2,'ladbrokes')),
+      HP(6,'DOUBLE ALPHA','升升雙息','M F Poon','C S Shum',10,[
+        PK('rtw_preview','Paul Lally',3,YT1+'&t=1388s',[W("Double Alpha ran on on his debut run this season. And he's only had four runs.",YT1+'&t=1388s')]),
+      ], OD(22.0,3.7,21.0,4.6,3.7,3.6,-21.9,-19.7,'tote')),
+    ]},
+    { race_no: 8, off_time: '22:15', tote_win_pool: 563399, overround: OVERROUND[8],
+      interviews: [{ horse_no: 4, horse_name: 'STAR RISE', speaker: 'James Orman', role: 'jockey', words: JO }],
+      picks: [
+      HP(8,"DANICA'S CHOICE",'繼往開來','A Atzeni','K L Man',5,[
+        PK('ladbrokes','Ladbrokes',1,LB8,[W("DANICA'S CHOICE (8) finished last season in good form on this circuit, breaking through for his first Hong Kong win before stepping into Class 3 and going down by only a nose before having a spell. He has trialled very well for his return and is the one to bea…",LB8)]),
+        PK('rtw_preview','Paul Lally',1,YT1+'&t=2012s',[W("Yeah, we'll go with him Danica's choice. I think he's a horse that uh I think we'll see him rise in the ratings this season. Andrea at Zani Manford May in the combination with Denica's choice.",YT1+'&t=2012s')]),
+      ], OD(2.3,1.5,2.8,1.45,35.0,27.3,-2.1,-37.2,'ladbrokes')),
+      HP(2,'STRAIGHT TO GLORY','團結勇士','K C Leung','C W Chang',8,[
+        PK('rtw_preview','Paul Lally',2,YT1+'&t=1968s',[W("That is good report for straight to glory. He's on top straight to glory. Four-time winner last time was mentioned.",YT1+'&t=1968s')]),
+        PK('ladbrokes','Ladbrokes',4,LB8,[W('STRAIGHT TO GLORY (2) has a big finish off a strong tempo, and he may get the run to suit him with a lot of pace engaged in this field. If the gaps come at the right time, he can have the last say here.',LB8)]),
+      ], OD(14.0,3.9,9.0,2.8,5.7,8.5,-48.3,19.0,'tote')),
+      HP(11,'LEADING AGILITY','驕陽雄心','E C W Wong (-3)','C S Shum',3,[
+        PK('ladbrokes','Ladbrokes',2,LB8,[W('LEADING AGILITY (11) thrived after joining Danny Shum, winning twice from 5 starts, including a comfortable win over this course and distance before his break. He is up in class, but should measure up, so stick with him.',LB8)]),
+        PK('rtw_preview','Paul Lally',3,YT1+'&t=1972s',[W("And two promising horses coming out of this trial, leading agility second with the winner of the trial, Denkica's choice, sitting on his outside as they turned for home. You've been with Denkica's choice. leading agility out of that same troll and horses on th…",YT1+'&t=1972s')]),
+      ], OD(9.3,2.9,7.0,2.4,8.6,10.9,-39.5,1.6,'tote')),
+      HP(5,'PEGAS','飛馬座','C L Chau (-2)','Y S Tsui',11,[
+        PK('ladbrokes','Ladbrokes',3,LB8,[W('PEGAS (5) faces a tricky task from a wide gate here, but ended his last campaign with a bold effort for second over this track and trip. If he gets across without burning too much energy, he can be right in the finish.',LB8)]),
+        PK('rtw_preview','Paul Lally',4,YT1+'&t=2041s'),
+      ], OD(25.0,6.6,21.0,5.0,3.2,3.6,-32.4,-8.9,'tote')),
+    ]},
+  ],
+  edges: [
+    { race_no:8, horse_no:3, horse_name:'SKY CAP', bet_at:'tote', price:15.0, fair_pct:10.2, ev_pct:53.0, supporters:1 },
+    { race_no:8, horse_no:2, horse_name:'STRAIGHT TO GLORY', bet_at:'tote', price:14.0, fair_pct:8.5, ev_pct:19.0, supporters:2 },
+    { race_no:5, horse_no:12, horse_name:'GAZELEY', bet_at:'ladbrokes', price:16.0, fair_pct:7.4, ev_pct:18.4, supporters:0 },
+    { race_no:3, horse_no:10, horse_name:'CALIFORNIA MOXIE', bet_at:'ladbrokes', price:18.0, fair_pct:6.3, ev_pct:12.7, supporters:0 },
+    { race_no:3, horse_no:1, horse_name:'EXCEED THE LIMIT', bet_at:'tote', price:22.0, fair_pct:5.1, ev_pct:12.3, supporters:0 },
+    { race_no:5, horse_no:1, horse_name:'GLORIOUS JOURNEY', bet_at:'tote', price:10.0, fair_pct:11.0, ev_pct:9.8, supporters:1 },
+  ],
+};
+
+// dashboard signals per runner (/api/raceday/{date}/{race}); only runners carrying one. ILLUS where the sample has none.
+const S = (horse_no, horse_name, win_odds, x = {}) => Object.assign({ horse_no, horse_name, win_odds, rank_delta:null, change_pct:0, rush_pct:0, money_arrived:0, gear_first_time:[], trainer_changed:false, blackbook:false, vet_flags:0 }, x);
+const SIGNALS = {
+  2: [S(1,'FIND MY LOVE',17,{ trainer_changed:true }), S(7,'SILVER SPURS',7.5,{ gear_first_time:['TT'] })],
+  3: [S(1,'EXCEED THE LIMIT',22,{ blackbook:true }), S(10,'CALIFORNIA MOXIE',13)],
+  5: [S(12,'GAZELEY',11,{ gear_first_time:['B'] }), S(1,'GLORIOUS JOURNEY',10,{ rank_delta:-2 })],
+  6: [S(12,'MAPOGO',7.3,{ rank_delta:-3 }), S(8,'FLYING TING LOK',33,{ vet_flags:1, change_pct:3.1, money_arrived:-163 })],
+  7: [S(5,'SMART BEAT',3.4,{ rush_pct:14, money_arrived:41200, change_pct:-11 })],
+  8: [S(3,'SKY CAP',15,{ rush_pct:18, money_arrived:22400, change_pct:-17 }), S(4,'STAR RISE',6.8,{ blackbook:true })],
+};
+
+const SRC = {
+  ladbrokes:     { ab:'LB',  name:'Ladbrokes', what:'tips + fixed odds', usual:'Ladbrokes tips and fixed odds usually arrive the morning of the meeting' },
+  rtw_preview:   { ab:'RTW', name:'Racing To Win preview', what:'picks + commentary', usual:'Racing To Win preview usually posts about 16:00 the day before' },
+  rtw_interview: { ab:'INT', name:'Racing To Win interview', what:'jockey and trainer interviews', usual:'Racing To Win interviews usually post with the preview, about 16:00 the day before' },
+  factcheck:     { ab:'FC',  name:'賽馬Fact Check', what:'picks + featured segments', usual:'Fact Check usually posts at 20:00 two days before' },
+};
+const SRC_ORDER = ['ladbrokes','rtw_preview','rtw_interview','factcheck'];
+
+const MOMENTS = {
+  night: { label:'NIGHT BEFORE · TUE 22 SEP 15:10', clock:'22 Sep 15:10 · briefing', short:'22 SEP 15:10', now:null, tote:null, lb:null,
+    pub:{ factcheck:true }, times:{ factcheck:'21 Sep 20:00' }, held:{} },
+  afternoon: { label:'AFTERNOON · WED 23 SEP 12:52', clock:'meeting day · 12:52', short:'12:52', now:772, tote:'12:47', lb:'12:47',
+    pub:{ factcheck:true, rtw_preview:true, rtw_interview:true, ladbrokes:true },
+    times:{ factcheck:'21 Sep 20:00', rtw_preview:'22 Sep 16:04', rtw_interview:'22 Sep 16:04', ladbrokes:'23 Sep 12:47' },
+    held:{ factcheck:'1 heard name not matched to a runner' } },
+  course: { label:'AT THE COURSE · WED 23 SEP 21:48', clock:'active meeting · 21:48', short:'21:48', now:1308, tote:'21:31', lb:'21:44',
+    pub:{ factcheck:true, rtw_preview:true, rtw_interview:true, ladbrokes:true },
+    times:{ factcheck:'21 Sep 20:00', rtw_preview:'22 Sep 16:04', rtw_interview:'22 Sep 16:04', ladbrokes:'23 Sep 21:44' },
+    held:{ factcheck:'1 heard name not matched to a runner' } },
+};
+
+const toMin = s => +s.slice(0, 2) * 60 + +s.slice(3, 5);
+const px = v => { if (v == null) return '—'; if (v >= 10 && v % 1 === 0) return String(v); let s = String(+v.toFixed(2)); if (!s.includes('.')) s += '.0'; return s; };
+const sgn = v => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v).toFixed(1) + '%';
+const tl = t => Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0');
+const tFromUrl = u => { const m = /[?&]t=(\d+)s/.exec(u || ''); return m ? +m[1] : null; };
+const money = v => '$' + Math.round(v).toLocaleString('en-US');
+const mix = (c, p) => 'color-mix(in srgb, ' + c + ' ' + p + '%, transparent)';
+const BAND_LVL = { strong:3, moderate:2, weak:1 };
+
+function mark(b) {
+  const ab = SRC[b.source].ab;
+  if (b.kind === 'connections') return { t: ab + ' ' + (b.role === 'trainer' ? 'T' : 'J'), color:'var(--voice)', bstyle:'solid', bcolor:mix('var(--voice)',45), bg:mix('var(--voice)',12), heard:b.heard };
+  if (b.kind === 'featured') return { t: ab + ' FEAT', color:'var(--tip)', bstyle:'dashed', bcolor:mix('var(--tip)',50), bg:'transparent', heard:b.heard };
+  return { t: ab + (b.rank ? ' #' + b.rank : ''), color:'var(--tip)', bstyle:'solid', bcolor:mix('var(--tip)',40), bg:'transparent', heard:b.heard };
+}
+function chips(s) {
+  if (!s) return [];
+  const o = [];
+  if (s.blackbook) o.push({ t:'BB', c:'var(--book)', b:mix('var(--book)',45), k:'BB' });
+  if (s.rank_delta != null && s.rank_delta <= -2) o.push({ t:'MODEL +' + (-s.rank_delta), c:'var(--edge)', b:mix('var(--edge)',40), k:'MODEL' });
+  if (s.rush_pct >= 10) o.push({ t:'LATE $ ' + s.rush_pct + '%', c:'var(--alert)', b:mix('var(--alert)',40), k:'LATE $' });
+  if (s.gear_first_time.length) o.push({ t:'1ST ' + s.gear_first_time.join(' '), c:'var(--gear-first)', b:mix('var(--gear-first)',40), k:'1ST GEAR' });
+  if (s.vet_flags) o.push({ t:'VET', c:'var(--loss-dim)', b:mix('var(--loss-dim)',40), k:'VET' });
+  if (s.trainer_changed) o.push({ t:'NEW TR', c:'var(--violet)', b:mix('var(--violet)',40), k:'NEW TR' });
+  return o;
+}
+
+class Component extends DCLogic {
+  state = { open: 6, mOpen: 8, q: {} };
+
+  words(list, key) {
+    const fold = this.props.foldQuotes ?? true;
+    return list.map((w, i) => {
+      const k = key + '-' + i;
+      const long = w.text.length > 90;
+      const folded = long && (fold ? !this.state.q[k] : !!this.state.q[k]);
+      const t = w.t != null ? w.t : tFromUrl(w.url);
+      return {
+        text: w.text, en: w.en, hasEn: !!w.en, url: w.url,
+        tl: t != null ? tl(t) : 'page',
+        ws: folded ? 'nowrap' : 'normal',
+        caret: long ? (folded ? '▸' : '▾') : '',
+        toggle: (e) => { e.stopPropagation(); if (long) this.setState(s => ({ q: Object.assign({}, s.q, { [k]: !s.q[k] }) })); },
+      };
+    });
+  }
+
+  renderVals() {
+    const M = MOMENTS[this.props.moment ?? 'afternoon'] || MOMENTS.afternoon;
+    const view = this.props.view ?? 'both';
+    const toteOn = !!M.tote, lbOn = !!(M.pub.ladbrokes && M.lb), both = toteOn && lbOn;
+    const toteAge = toteOn && M.now != null ? M.now - toMin(M.tote) : 0;
+    const toteStale = toteAge > 10;
+    const pending = SRC_ORDER.filter(k => !M.pub[k]);
+    const bbNos = {};
+    Object.keys(SIGNALS).forEach(r => SIGNALS[r].forEach(s => { if (s.blackbook) bbNos[r + '-' + s.horse_no] = true; }));
+    const nameColor = (r, no) => bbNos[r + '-' + no] ? 'var(--book)' : 'var(--text)';
+
+    const BOOKS = [
+      { k:'tote', label:'TOTE', short:'T', on:toteOn, sub: toteOn ? M.tote + (toteStale ? ' STALE ' + toteAge + 'm' : '') : 'NOT OPEN', subC: toteStale ? 'var(--incident)' : 'var(--text-dim)',
+        f:{ win:'tote_win', plc:'tote_place', fair:'fair_tote_pct', ev:'ev_tote_pct' } },
+      { k:'ladbrokes', label:'LADBROKES', short:'LB', on:lbOn, sub: lbOn ? M.lb : 'NOT YET', subC:'var(--text-dim)',
+        f:{ win:'fixed_win', plc:'fixed_place', fair:'fair_fixed_pct', ev:'ev_fixed_pct' } },
+    ];
+    const ptable = (o) => {
+      const cells = [];
+      [['WIN','win'],['PLACE','plc'],['FAIR CHANCE','fair'],['VALUE IF THE OTHER IS RIGHT','ev']].forEach(([lab, f]) => {
+        cells.push({ v:lab, vm: f === 'ev' ? 'VALUE' : lab.replace('FAIR CHANCE','FAIR %'), align:'left', size:'10px', ls:'.05em', color:'var(--text-muted)', weight:400, ws: 'normal' });
+        BOOKS.forEach(b => {
+          let v = '—', color = 'var(--text-faint)', weight = 400, size = '12px';
+          if (b.on && (f !== 'ev' || both)) {
+            const x = o[b.f[f]];
+            if (f === 'win') { v = px(x); color = 'var(--text)'; weight = both && o.pays_more === b.k ? 600 : 400; size = '13px'; }
+            else if (f === 'plc') { v = px(x); color = 'var(--text-2)'; }
+            else if (f === 'fair') { v = x.toFixed(1) + '%'; color = 'var(--text-2)'; }
+            else { v = sgn(x); color = x >= 5 ? 'var(--text)' : x < 0 ? 'var(--text-dim)' : 'var(--text-2)'; weight = x >= 5 ? 600 : 400; }
+          }
+          cells.push({ v, vm: v, align:'right', size, ls:'0', color, weight, ws:'nowrap' });
+        });
+      });
+      return {
+        cols: '98px repeat(' + BOOKS.length + ', minmax(0,1fr))',
+        colsM: '62px repeat(' + BOOKS.length + ', minmax(0,1fr))',
+        head: BOOKS.map(b => ({ label:b.label, labelShort:b.short, sub:b.sub, color:b.subC })),
+        cells,
+      };
+    };
+    const sumByRace = {};
+    SUMMARY.races.forEach(r => { sumByRace[r.race_no] = r; });
+
+    const races = RACEDAY.map(rd => {
+      const no = rd.race_no, sr = sumByRace[no];
+      const off = sr ? sr.off_time : OFF[no];
+      const isRun = M.now != null && toMin(off) <= M.now;
+      const minsTo = M.now != null ? toMin(off) - M.now : null;
+      const sig = SIGNALS[no] || [];
+      const sigBy = {}; sig.forEach(s => { sigBy[s.horse_no] = s; });
+      const ivs = sr && M.pub.rtw_interview ? sr.interviews : [];
+      const ivNos = ivs.map(i => i.horse_no);
+
+      const picks = (sr ? sr.picks : []).map(p => {
+        const bb = p.backed_by.filter(b => M.pub[b.source]);
+        if (!bb.length) return null;
+        return { p, bb, who: new Set(bb.map(b => b.who)).size, best: Math.min.apply(null, bb.map(b => b.rank || 9)) };
+      }).filter(Boolean).sort((a, b) => b.who - a.who || a.best - b.best || a.p.odds.tote_win - b.p.odds.tote_win);
+      const pickNos = picks.map(x => x.p.horse_no);
+
+      const cands = [];
+      if (both) {
+        SUMMARY.edges.filter(e => e.race_no === no).forEach(e => cands.push({ no:e.horse_no, name:e.horse_name, at:e.bet_at, price:e.price, fair:e.fair_pct, ev:e.ev_pct, sup:e.supporters }));
+        picks.forEach(({ p, who }) => {
+          const o = p.odds;
+          [['tote', o.tote_win, o.fair_fixed_pct, o.ev_tote_pct], ['ladbrokes', o.fixed_win, o.fair_tote_pct, o.ev_fixed_pct]].forEach(([at, price, fair, ev]) => {
+            if (!cands.some(c => c.no === p.horse_no && c.at === at)) cands.push({ no:p.horse_no, name:p.horse_name, at, price, fair, ev, sup:who });
+          });
+        });
+      }
+      cands.sort((a, b) => b.ev - a.ev);
+      const g = cands[0];
+      const atL = a => a === 'tote' ? 'TOTE' : 'LB', otherL = a => a === 'tote' ? 'LB' : 'TOTE';
+
+      const fv = FAVS[no];
+      const topPicks = picks.map(({ p, bb, who }) => ({
+        no: p.horse_no, name: p.horse_name, zh: p.name_zh, nameColor: nameColor(no, p.horse_no),
+        jt: p.jockey + ' · ' + p.trainer + ' · DR ' + p.draw,
+        countLabel: who + (who === 1 ? ' source' : ' sources'),
+        chips: chips(sigBy[p.horse_no]),
+        marks: bb.map(mark),
+        srcs: bb.map((b, i) => {
+          const isConn = b.kind === 'connections';
+          const ws = isConn ? [] : this.words(b.words, 'p' + no + '-' + p.horse_no + '-' + i);
+          const t = tFromUrl(b.url);
+          return {
+            m: mark(b), who: b.who + (b.role && b.kind !== 'featured' ? ' · ' + b.role : ''),
+            words: ws, noWords: ws.length === 0, url: b.url, tl: t != null ? tl(t) : 'page',
+            noWordsMsg: isConn ? 'quoted in the interview above' : (b.heard ? 'named aloud, no commentary captured' : 'pick only, no commentary captured'),
+          };
+        }),
+        pt: ptable(p.odds),
+        prices: BOOKS.map(b => ({ l:b.short === 'T' ? 'TOTE' : 'LB', v: b.on ? px(p.odds[b.f.win]) : b.sub, size: b.on ? '12px' : '10px', weight: b.on && both && p.odds.pays_more === b.k ? 600 : 400, color: b.on ? 'var(--text)' : 'var(--text-dim)' })),
+      }));
+      const top = topPicks[0];
+      const tied = picks.length ? picks.filter(x => x.who === picks[0].who).length - 1 : 0;
+      if (top) top.tie = tied ? '+' + tied + ' level' : '';
+
+      const restMap = {};
+      sig.forEach(s => { if (!pickNos.includes(s.horse_no) && chips(s).length) restMap[s.horse_no] = { no:s.horse_no, name:s.horse_name, s }; });
+      cands.filter(c => !pickNos.includes(c.no) && c.ev >= 5).forEach(c => { restMap[c.no] = Object.assign(restMap[c.no] || { no:c.no, name:c.name, s:sigBy[c.no] }, { e:c }); });
+      ivs.forEach(iv => { if (!pickNos.includes(iv.horse_no)) restMap[iv.horse_no] = Object.assign(restMap[iv.horse_no] || { no:iv.horse_no, name:iv.horse_name, s:sigBy[iv.horse_no] }, { iv:true }); });
+      const rest = Object.values(restMap).sort((a, b) => a.no - b.no).map(x => ({
+        no: x.no, name: x.name, nameColor: nameColor(no, x.no),
+        price: toteOn && x.s ? 'TOTE ' + px(x.s.win_odds) : (x.e ? atL(x.e.at) + ' ' + px(x.e.price) : (toteOn ? 'TOTE —' : 'TOTE NOT OPEN')),
+        chips: chips(x.s),
+        gap: x.e ? sgn(x.e.ev) : '', gapColor:'var(--text)', gapWeight:600,
+        gapLine: x.e ? 'value at ' + atL(x.e.at) + ' ' + px(x.e.price) + ' · ' + otherL(x.e.at) + ' fair ' + x.e.fair + '%' : '',
+        src: x.iv ? 'INTERVIEW ONLY · NO PICK' : (x.e ? (x.e.sup ? x.e.sup + ' source' + (x.e.sup > 1 ? 's' : '') : 'NO TIPS') : 'NO TIPS'),
+      }));
+
+      const flagsAgg = {};
+      sig.forEach(s => chips(s).forEach(c => { flagsAgg[c.k] = flagsAgg[c.k] ? Object.assign(flagsAgg[c.k], { n: flagsAgg[c.k].n + 1 }) : Object.assign({}, c, { n:1 }); }));
+      const flags = Object.values(flagsAgg).map(c => Object.assign({}, c, { t: c.k + (c.n > 1 ? ' ' + c.n : '') }));
+
+      const lit = {};
+      picks.forEach(x => x.bb.forEach(b => { lit[b.source] = true; }));
+      if (ivs.length) lit.rtw_interview = true;
+      const srcIn = SRC_ORDER.map(k => ({ t: SRC[k].ab, c: lit[k] ? (k === 'rtw_interview' ? 'var(--voice)' : 'var(--tip)') : (M.pub[k] ? 'var(--text-faint)' : 'var(--line-3)') }));
+
+      const lvl = BAND_LVL[rd.band] || 1;
+      const hasTips = topPicks.length > 0;
+      const open = this.state.open === no, mOpen = this.state.mOpen === no;
+      const noTipsMsg = pending.length ? 'NO TIPS YET · ' + SRC[pending[0]].usual : 'NO SOURCE HAS TIPPED THIS RACE';
+      return {
+        label: 'R' + no, off, isRun, live: !isRun,
+        offSub: minsTo != null && minsTo > 0 && minsTo <= 90 ? 'in ' + minsTo + 'm' : '',
+        dist: rd.distance + 'm', cls: 'C' + rd.race_class, distCls: rd.distance + 'm C' + rd.race_class, field: rd.field_size,
+        course: 'GOING ' + rd.going + ' · COURSE ' + rd.course + ' · FIELD ' + rd.field_size,
+        bars: [1, 2, 3].map(i => ({ h:[6, 10, 14][i - 1] + 'px', hs:[4, 7, 11][i - 1] + 'px', bg: i <= lvl ? 'var(--text-2)' : 'var(--line-3)' })),
+        band: rd.band.toUpperCase(), conc: Math.round(rd.concentration * 100) + '%',
+        fav: { no: fv[0], name: fv[1], price: toteOn ? px(fv[2]) : '—', color: nameColor(no, fv[0]) },
+        hasTips, noTips: !hasTips, noTipsMsg, top: top || { marks:[] },
+        topPrices: top ? top.prices : [],
+        hasGap: !!g, noGap: !g,
+        noGapMsg: !both ? (toteOn ? 'needs Ladbrokes prices' : 'needs both markets open') : 'no priced runner',
+        gap: g ? { no:g.no, name:g.name, val:sgn(g.ev), color: g.ev >= 5 ? 'var(--text)' : 'var(--text-dim)', weight: g.ev >= 5 ? 600 : 400,
+          line: 'at ' + atL(g.at) + ' ' + px(g.price) + ' · ' + otherL(g.at) + ' fair ' + g.fair + '%', atShort: 'at ' + atL(g.at) } : {},
+        gapStrong: !!g && g.ev >= 5,
+        hasMobileExtras: flags.length > 0 || (!!g && g.ev >= 5),
+        flags, srcIn,
+        picks: topPicks, rest, noRest: rest.length === 0, hasRest: rest.length > 0,
+        interviews: ivs.map((iv, i) => ({ role: iv.role.toUpperCase(), speaker: iv.speaker, horse: iv.horse_no + ' ' + iv.horse_name, nameColor: nameColor(no, iv.horse_no), words: this.words(iv.words, 'i' + no + '-' + i) })),
+        noInterview: ivs.length === 0,
+        noInterviewMsg: M.pub.rtw_interview ? 'NO JOCKEY OR TRAINER INTERVIEW FOR THIS RACE' : 'INTERVIEWS NOT IN YET · ' + SRC.rtw_interview.usual,
+        pool: money(sr ? sr.tote_win_pool : MONEY[no]),
+        mTote: OVERROUND[no] ? OVERROUND[no].tote + '%' : '—',
+        mLb: OVERROUND[no] && lbOn ? OVERROUND[no].ladbrokes + '%' : '—',
+        open, mOpen,
+        bg: open ? 'var(--surface-2)' : 'transparent', mark: open ? 'var(--text)' : 'transparent',
+        mBg: mOpen ? 'var(--surface-2)' : 'transparent', mMark: mOpen ? 'var(--text)' : 'transparent',
+        toggle: () => this.setState(s => ({ open: s.open === no ? null : no })),
+        mToggle: () => this.setState(s => ({ mOpen: s.mOpen === no ? null : no })),
+      };
+    });
+
+    const runSet = {}; races.forEach((r, i) => { if (r.isRun) runSet[i + 1] = true; });
+    const edges = both ? SUMMARY.edges.slice().sort((a, b) => b.ev_pct - a.ev_pct).slice(0, 8).map(e => ({
+      race: 'R' + e.race_no, no: e.horse_no, name: e.horse_name, nameColor: nameColor(e.race_no, e.horse_no),
+      at: e.bet_at === 'tote' ? 'TOTE' : 'LB', price: px(e.price), fair: e.fair_pct.toFixed(1) + '%', ev: sgn(e.ev_pct),
+      src: runSet[e.race_no] ? 'RAN' : (e.supporters ? e.supporters + (e.supporters > 1 ? ' sources' : ' source') : 'no tips'),
+      srcColor: e.supporters ? 'var(--tip)' : 'var(--text-dim)', op: runSet[e.race_no] ? 0.4 : 1,
+      go: () => this.setState({ open: e.race_no, mOpen: e.race_no }),
+    })) : [];
+
+    const sources = SRC_ORDER.map(k => {
+      const on = !!M.pub[k];
+      let picks = 0, feat = 0, quotes = 0, ivs = 0, heard = 0; const rs = new Set();
+      SUMMARY.races.forEach(r => {
+        r.picks.forEach(p => p.backed_by.forEach(b => {
+          if (b.source !== k || b.kind === 'connections') return;
+          rs.add(r.race_no); if (b.kind === 'pick') picks++; else feat++; quotes += b.words.length; if (b.heard) heard++;
+        }));
+        if (k === 'rtw_interview' && r.interviews.length) { ivs += r.interviews.length; rs.add(r.race_no); r.interviews.forEach(i => { quotes += i.words.length; }); }
+      });
+      const bits = [];
+      if (picks) bits.push(picks + ' picks'); if (feat) bits.push(feat + ' featured'); if (ivs) bits.push(ivs + ' interviews');
+      bits.push(quotes + ' quotes'); if (heard) bits.push(heard + ' heard'); bits.push(rs.size + ' races');
+      return {
+        ab: SRC[k].ab, name: SRC[k].name, abColor: on ? (k === 'rtw_interview' ? 'var(--voice)' : 'var(--tip)') : 'var(--text-faint)',
+        nameColor: on ? 'var(--text)' : 'var(--text-muted)',
+        time: on ? M.times[k] : 'NOT YET', timeColor: on ? 'var(--text-2)' : 'var(--text-dim)',
+        line: on ? bits.join(' · ') : SRC[k].usual, held: on ? (M.held[k] || '') : '',
+      };
+    });
+
+    const pageList = [['Briefing','Briefing.dc.html'],['Race Day','Race Day.dc.html'],['Form Guide','Form Guide.dc.html'],['Bets','Bets.dc.html'],['Blackbook','Blackbook.dc.html'],['Results','Results.dc.html'],['Lookup','Lookup.dc.html'],['Trials','Trials.dc.html'],['Model Analysis','Model Analysis.dc.html']];
+    const fr = (name, ok, age, stale, missing) => ({ name, mark: missing ? '—' : stale ? '⚠' : '✓', age: missing ? '' : age, color: missing ? 'var(--text-dim)' : stale ? 'var(--incident)' : 'var(--win)', border: stale ? 'var(--edge-ground)' : 'transparent' });
+    const nPub = SRC_ORDER.filter(k => M.pub[k]).length;
+
+    return {
+      showDesktop: view !== 'phone', showPhone: view !== 'desktop',
+      momentLabel: M.label, clock: M.clock, clockShort: M.short,
+      clockDot: M.now != null && M.now > 1100 ? 'var(--win)' : 'var(--text-dim)',
+      pages: pageList.map(([name, href], i) => ({ name, href, color: i === 0 ? 'var(--text)' : 'inherit', mark: i === 0 ? 'var(--alert)' : 'transparent' })),
+      freshness: [
+        fr('Card', true, '2h', false, false),
+        fr('Tote', toteOn, toteOn ? (toteAge || 5) + 'm' : '', toteStale, !toteOn),
+        fr('Ladbrokes', lbOn, lbOn ? (M.now != null ? (M.now - toMin(M.lb)) + 'm' : '') : '', false, !lbOn),
+        fr('Tips', nPub > 0, nPub + '/4', false, nPub === 0),
+        fr('Money', toteOn, toteOn ? '5m' : '', false, !toteOn),
+      ],
+      capTote: { v: toteOn ? M.tote + ' HKT' + (toteStale ? ' · STALE ' + toteAge + 'm' : '') : 'NOT OPEN', color: toteStale ? 'var(--incident)' : toteOn ? 'var(--text)' : 'var(--text-dim)' },
+      capLb: { v: lbOn ? M.lb + ' HKT' : 'NO FIXED ODDS YET', color: lbOn ? 'var(--text)' : 'var(--text-dim)' },
+      srcInCount: nPub + ' / 4',
+      meetingPool: toteOn ? '$' + (MEETING_TOTAL / 1e6).toFixed(1) + 'M' : '—',
+      races, edges, hasEdges: edges.length > 0, noEdges: edges.length === 0,
+      noEdgesMsg: !toteOn ? 'Needs both markets. The tote has not opened and Ladbrokes has not priced this meeting yet.' : 'Needs Ladbrokes fixed odds to compare against the tote.',
+      sources,
+    };
+  }
+}
+</script>
+
+
+</body></html>

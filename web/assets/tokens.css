@@ -56,6 +56,16 @@
   --gear:         #9b8cd0;   /* gear carried again        (named: GEAR_C)  */
   --gear-first:   #cbbcf5;   /* gear applied for the first time            */
 
+  /* ── the Briefing: what people said ──────────────────────────────────────
+   * Proposed with the Briefing artboard. Support is not a market signal, so
+   * it borrows none of the colours above: a warm paper tone for a tipster's
+   * pick or featured mark, and a lime for the jockey or trainer speaking —
+   * the words that matter most on that page. Market value stays uncoloured
+   * (full text when +5% or better, dim when negative) because amber is
+   * already the MODEL's edge.                                              */
+  --tip:          #e3d9c2;   /* tipster support: a pick, a featured mark   */
+  --voice:        #c9dc6e;   /* a jockey or trainer interview              */
+
   /* ── running style, front of the field to the back ──────────────────────
    * Warm at the front, cool at the back, so the chips read as an order rather
    * than four unrelated labels. Off the Form Guide artboard.

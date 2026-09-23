@@ -558,11 +558,11 @@ def status() -> dict:
 # fetches the card, the results, the dividends and the vet records in one pass,
 # so three of the five names map onto it — the strip reports them separately
 # because they can fail separately, not because they are separate fetches.
-# The root is Race Day. Landing on a directory listing, or a 404, is not a
-# useful first impression of a dashboard.
+# The root is the Briefing, the front page the owner asked for. Landing on a
+# directory listing, or a 404, is not a useful first impression of a dashboard.
 @app.get("/", include_in_schema=False)
 def root() -> RedirectResponse:
-    return RedirectResponse("/pages/raceday.html")
+    return RedirectResponse("/pages/briefing.html")
 
 
 class _RevalidatingStatic(StaticFiles):
