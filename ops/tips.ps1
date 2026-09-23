@@ -10,8 +10,8 @@
       1. harvest   the newest Fact Check previews to raw\factcheck, the
                    newest Racing To Win interviews to raw\rtw, and
                    Sportsbet's fixed odds and Racing & Sports comments
-                   for the next meeting to out\ (Sportsbet refuses the
-                   server, and answers this PC)
+                   for the next meeting to raw\sportsbet (Sportsbet
+                   refuses the server, and answers this PC)
       2. extract   quotes and picks for every upcoming meeting, to out\
       3. push      those to the dashboard, which replaces what each source
                    said before with what it says now
@@ -70,7 +70,11 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Head "1c. harvest  Sportsbet (fixed odds + Racing & Sports comments)"
-& $py tools\harvest_sportsbet.py
+# Saved to raw\sportsbet, which step 3 does not send, until the dashboard
+# that receives it has been deployed with the Briefing: the one running now
+# does not know the fixed_odds section and would reject the whole file.
+# Once deployed, drop the --out and it travels with the rest from out\.
+& $py tools\harvest_sportsbet.py --out raw\sportsbet
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  Sportsbet reported a problem; carrying on without it" -ForegroundColor Yellow
 }
