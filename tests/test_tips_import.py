@@ -98,7 +98,8 @@ def test_the_fixture_imports_and_reports_what_it_wrote(db, payload):
     assert got == {"race_date": DATE, "quotes": 7, "selections": 5,
                    "quarantined": 2,
                    "quarantine_reasons": {"name_unknown": 1, "unparsed": 1},
-                   "unplaced_quotes": 1, "removed": 0}
+                   "unplaced_quotes": 1, "removed": 0,
+                   "prices": 0, "prices_skipped": []}
     assert [len(table(db, t)) for t in TABLES] == [7, 5, 2]
 
 

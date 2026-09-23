@@ -68,7 +68,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  {path.name} -> {base}\n"
               f"    quotes {got['quotes']} ({got['unplaced_quotes']} on no "
               f"runner) · picks {got['selections']} · quarantined "
-              f"{got['quarantined']} ({reasons}) · removed {got['removed']}")
+              f"{got['quarantined']} ({reasons}) · removed {got['removed']}"
+              + (f" · prices {got['prices']} ({len(got['prices_skipped'])} "
+                 f"not stored)" if got.get("prices") or
+                 got.get("prices_skipped") else ""))
     return 1 if failed else 0
 
 

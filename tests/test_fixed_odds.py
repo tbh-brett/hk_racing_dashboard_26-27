@@ -1,7 +1,8 @@
-"""Ladbrokes fixed odds and tips, and the meeting summary built on them.
+"""Fixed odds, the Racing & Sports tips, and the meeting summary on them.
 
 Fixtures, all real, all 2026-09-23 Happy Valley race 6:
   ladbrokes_20260923_r6.json   the Ladbrokes feed's record for the race
+  sportsbet_20260923_r6.json   Sportsbet's race card, trimmed
   tote_20260923_r6.json        the HKJC tote as jobs/scrape_odds captured it
   roster_20260923.json         the card the dashboard served
 """
@@ -14,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from hkrd.derive.probability import devig
-from hkrd.ingest import ladbrokes
+from hkrd.ingest import ladbrokes, sportsbet
 from hkrd.jobs import import_tips, scrape_fixed_odds
 from hkrd.query import tips_summary
 from hkrd.store import upsert
@@ -102,8 +103,12 @@ def test_the_job_stores_prices_and_tips(db):
     assert (got.races, got.prices, got.tips, got.tips_held) == (1, 12, 4, 0)
     assert rows(db, "SELECT count(*) FROM fixed_odds") == [(12,)]
     assert rows(db, "SELECT horse_no FROM tipster_selection WHERE "
-                    "source = 'ladbrokes' ORDER BY pick_rank") == \
+                    "source = 'racing_sports' ORDER BY pick_rank") == \
         [(4,), (1,), (12,), (9,)]
+    # The whole comment, on the race rather than on a horse.
+    assert rows(db, "SELECT race_no, horse_no, substr(quote, 1, 14) FROM "
+                    "connections_quote WHERE source = 'racing_sports'") == \
+        [(6, None, "SUPERB KING (4")]
 
 
 def test_a_price_under_the_wrong_name_is_not_stored(db, lad, monkeypatch):
@@ -146,7 +151,7 @@ def test_the_summary_orders_by_support_and_prices_each_pick(db):
     order = [p["horse_no"] for p in race["picks"]]
     assert order[0] == 1                             # two sources, both #1s
     harmony = next(p for p in race["picks"] if p["horse_no"] == 9)
-    assert harmony["supporters"] == 1                # Ladbrokes, not Bryan
+    assert harmony["supporters"] == 1         # Racing & Sports, not Bryan
 
     tote = {p["horse_no"]: p["win_odds"] for p in
             load("tote_20260923_r6.json")["prices"]}
@@ -155,6 +160,107 @@ def test_the_summary_orders_by_support_and_prices_each_pick(db):
     numbers = sorted(tote)
     fair = dict(zip(numbers, devig([tote[n] for n in numbers])))
     jumbo = race["picks"][0]["odds"]
-    assert jumbo["tote_win"] == tote[1] and jumbo["fixed_win"] == fixed[1]
-    assert jumbo["ev_fixed_pct"] == pytest.approx(
+    assert jumbo["tote"]["win"] == tote[1]
+    assert jumbo["ladbrokes"]["win"] == fixed[1]
+    assert jumbo["ladbrokes"]["value_pct"] == pytest.approx(
         100 * (fair[1] * fixed[1] - 1), abs=0.1)
+
+
+# ── Sportsbet, from the PC ───────────────────────────────────────────────────
+
+@pytest.fixture()
+def sb() -> dict:
+    return load("sportsbet_20260923_r6.json")["racecardEvent"]
+
+
+def test_sportsbet_reads_the_fixed_price_not_the_mid_tote(sb):
+    got = {p["horse_no"]: p for p in sportsbet.prices(sb)}
+    assert len(got) == 12 and got[1]["name"] == "JUMBO BLESSING"
+    fixed = next(p for p in sb["markets"][0]["selections"][0]["prices"]
+                 if p["priceCode"] == "L")
+    assert (got[1]["win"], got[1]["place"]) == (fixed["winPrice"],
+                                               fixed["placePrice"])
+
+
+def test_sportsbet_and_ladbrokes_carry_the_same_racing_and_sports_tips(sb, lad):
+    """Same four, same order — which is why they are one source, not two."""
+    assert [t["horse_no"] for t in sportsbet.tips(sb)] == \
+        [t["horse_no"] for t in ladbrokes.tips(lad)]
+    assert sportsbet.comment(sb).split()[:6] == \
+        ladbrokes.comment(lad).split()[:6]
+
+
+def test_every_runner_has_a_racing_and_sports_line(sb):
+    lines = sportsbet.runner_comments(sb)
+    assert len(lines) == 12
+    assert lines[0]["comment"].startswith("Was a first-up winner")
+
+
+def _sportsbet_payload(sb: dict) -> dict:
+    """What tools/harvest_sportsbet sends for this one race."""
+    from hkrd.ingest import racing_sports as rs
+    url = sportsbet.page_url(sb)
+    return {
+        "payload_version": 1, "race_date": DATE,
+        "generated_at": "2026-09-23T09:20:00Z", "extractor": "rule:sportsbet-v1",
+        "sources": [rs.SOURCE, rs.FORM_SOURCE],
+        "selections": rs.selections(6, sportsbet.tips(sb), sportsbet.comment(sb),
+                                    url),
+        "quotes": rs.race_comment(6, sportsbet.comment(sb), url,
+                                  extractor="rule:sportsbet-v1")
+        + rs.runner_comments(6, sportsbet.runner_comments(sb), url,
+                             extractor="rule:sportsbet-v1"),
+        "fixed_odds": [{"bookmaker": "sportsbet", "race_no": 6,
+                        "horse_no": p["horse_no"], "name_seen": p["name"],
+                        "win": p["win"], "place": p["place"],
+                        "scratched": p["scratched"],
+                        "captured_at": "2026-09-23T09:20:00Z"}
+                       for p in sportsbet.prices(sb)]}
+
+
+def test_a_sportsbet_payload_lands_prices_tips_and_runner_lines(db, sb):
+    got = import_tips.run(_sportsbet_payload(sb), db=db)
+    assert (got.prices, got.selections, got.quarantined) == (12, 4, 0)
+    assert rows(db, "SELECT count(*) FROM connections_quote WHERE "
+                    "source = 'racing_sports_form'") == [(12,)]
+
+
+def test_a_sportsbet_price_under_the_wrong_name_is_not_stored(db, sb):
+    body = _sportsbet_payload(sb)
+    body["fixed_odds"][0]["name_seen"] = "SUPERB KING"      # runner #1
+    got = import_tips.run(body, db=db)
+    assert got.prices == 11
+    assert any("the card has JUMBO BLESSING" in s for s in got.prices_skipped)
+
+
+def test_an_unknown_bookmaker_rejects_the_payload(db, sb):
+    body = _sportsbet_payload(sb)
+    body["fixed_odds"][0]["bookmaker"] = "tab"
+    with pytest.raises(import_tips.PayloadError, match="bookmaker"):
+        import_tips.run(body, db=db)
+
+
+def test_both_bookmakers_leave_one_racing_and_sports(db, sb):
+    """Ladbrokes' capture and Sportsbet's write the same source: whichever
+    came last is what is stored, never both, and the runner lines Ladbrokes
+    does not have survive its capture."""
+    import_tips.run(_sportsbet_payload(sb), db=db)
+    scrape_fixed_odds.scrape(DATE, db=db)
+    assert rows(db, "SELECT count(*) FROM tipster_selection") == [(4,)]
+    assert rows(db, "SELECT count(*) FROM connections_quote WHERE "
+                    "source = 'racing_sports'") == [(1,)]
+    assert rows(db, "SELECT count(*) FROM connections_quote WHERE "
+                    "source = 'racing_sports_form'") == [(12,)]
+    conn = get_conn(db)
+    try:
+        s = tips_summary.summary(DATE, conn=conn)
+    finally:
+        conn.close()
+    assert s["books"] == ["ladbrokes", "sportsbet"]
+    superb = next(p for p in s["races"][0]["picks"] if p["horse_no"] == 4)
+    assert superb["supporters"] == 1
+    assert superb["form"]["text"]
+    assert set(superb["odds"]) >= {"tote", "ladbrokes", "sportsbet"}
+    status = {x["source"]: x for x in s["source_status"]}
+    assert status["racing_sports"]["runner_lines"] == 12
+    assert not status["factcheck"]["published"]

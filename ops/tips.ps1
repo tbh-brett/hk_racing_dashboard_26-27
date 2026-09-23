@@ -7,8 +7,11 @@
     servers use, and answers a home connection. Three steps, each of which
     prints what it did:
 
-      1. harvest   the newest Fact Check previews to raw\factcheck, and the
-                   newest Racing To Win interviews to raw\rtw
+      1. harvest   the newest Fact Check previews to raw\factcheck, the
+                   newest Racing To Win interviews to raw\rtw, and
+                   Sportsbet's fixed odds and Racing & Sports comments
+                   for the next meeting to out\ (Sportsbet refuses the
+                   server, and answers this PC)
       2. extract   quotes and picks for every upcoming meeting, to out\
       3. push      those to the dashboard, which replaces what each source
                    said before with what it says now
@@ -64,6 +67,12 @@ Head "1b. harvest  Racing To Win interviews (PLK8zYRjJwINk)"
     --pages 1 --limit 6 --out raw\rtw
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  harvest reported a problem; carrying on with what is on disk" -ForegroundColor Yellow
+}
+
+Head "1c. harvest  Sportsbet (fixed odds + Racing & Sports comments)"
+& $py tools\harvest_sportsbet.py
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "  Sportsbet reported a problem; carrying on without it" -ForegroundColor Yellow
 }
 
 Head "2. extract  upcoming meetings"

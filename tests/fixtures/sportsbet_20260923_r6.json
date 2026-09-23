@@ -1,0 +1,321 @@
+{
+ "_fixture_note": "Sportsbet RacecardWithContext for 2026-09-23 Happy Valley race 6, captured 17:20 HKT from a home connection, trimmed to the fields ingest/sportsbet reads.",
+ "racecardEvent": {
+  "id": 10967241,
+  "raceNumber": 6,
+  "competitionName": "Happy Valley",
+  "raceCommentary": "SUPERB KING (4) produced a terrific first-up effort, covering ground from a wide draw before fighting on strongly for second over 1000m here a fortnight ago. With the benefit of that run and a much better draw, he gets his chance to go one better. JUMBO BLESSING (1) returned in excellent order, claiming a narrow win over this course and distance 2 weeks ago, and he is now chasing a hat-trick. He is thriving and should have further improvement to come, so stick with him. MAPOGO (12) has shown plenty in his trials without always delivering on race day, but a break and favourable first-up conditions could help him put it all together here. Each way claims at a price. HARMONY FIRE (9) was solid fresh when finishing fourth behind the second pick in the same race last start, and she seldom puts in a poor effort. Include in all top 4 combos.",
+  "tippedSelection1": 1258062514,
+  "tippedSelection2": 1258062507,
+  "tippedSelection3": 1258062531,
+  "tippedSelection4": 1258062525,
+  "tippedSelectionProvider": "R_AND_S",
+  "markets": [
+   {
+    "name": "Win or Place",
+    "selections": [
+     {
+      "id": 1258062507,
+      "name": "Jumbo Blessing",
+      "runnerNumber": 1,
+      "isOut": false,
+      "prices": [
+       {
+        "priceCode": "MID",
+        "winPrice": 3.65
+       },
+       {
+        "priceCode": "L",
+        "placePriceNum": 2,
+        "placePriceDen": 5,
+        "winPriceNum": 12,
+        "winPriceDen": 5,
+        "winPrice": 3.4,
+        "placePrice": 1.4
+       }
+      ],
+      "statistics": {
+       "overview": "Was a first-up winner last start at this track, scoring by 0.8 lengths over 1000m. Back in great shape and should be right in the mix.",
+       "overviewProvider": "R_AND_S"
+      }
+     },
+     {
+      "id": 1258062511,
+      "name": "Copper Core",
+      "runnerNumber": 2,
+      "isOut": false,
+      "prices": [
+       {
+        "priceCode": "MID",
+        "winPrice": 41
+       },
+       {
+        "priceCode": "L",
+        "placePriceNum": 17,
+        "placePriceDen": 2,
+        "winPriceNum": 40,
+        "winPriceDen": 1,
+        "winPrice": 41,
+        "placePrice": 9.5
+       }
+      ],
+      "statistics": {
+       "overview": "Back from a break of 11 weeks. Form at the end of last prep was not flash, the most recent effort a 11th over 1000m at this track. Prefer to see how he has returned.",
+       "overviewProvider": "R_AND_S"
+      }
+     },
+     {
+      "id": 1258062512,
+      "name": "Blue Illusion",
+      "runnerNumber": 3,
+      "isOut": false,
+      "prices": [
+       {
+        "priceCode": "MID",
+        "winPrice": 19
+       },
+       {
+        "priceCode": "L",
+        "placePriceNum": 333,
+        "placePriceDen": 100,
+        "winPriceNum": 18,
+        "winPriceDen": 1,
+        "winPrice": 19,
+        "placePrice": 4.33
+       }
+      ],
+      "statistics": {
+       "overview": "Moderate effort first up when he was unwanted in the market and was easily accounted for in ninth over 1000m at this track. This looks a tough assignment.",
+       "overviewProvider": "R_AND_S"
+      }
+     },
+     {
+      "id": 1258062514,
+      "name": "Superb King",
+      "runnerNumber": 4,
+      "isOut": false,
+      "prices": [
+       {
+        "priceCode": "MID",
+        "winPrice": 3.1
+       },
+       {
+        "priceCode": "L",
+        "placePriceNum": 3,
+        "placePriceDen": 10,
+        "winPriceNum": 8,
+        "winPriceDen": 5,
+        "winPrice": 2.6,
+        "placePrice": 1.3
+       }
+      ],
+      "statistics": {
+       "overview": "Camped just off the lead at this track last start and boxed on well, finishing just second from the winner. Brings solid form to this contest. Big chance.",
+       "overviewProvider": "R_AND_S"
+      }
+     },
+     {
+      "id": 1258062517,
+      "name": "Georgian Sigma",
+      "runnerNumber": 5,
+      "isOut": false,
+      "prices": [
+       {
+        "priceCode": "MID",
+        "winPrice": 9.75
+       },
+       {
+        "priceCode": "L",
+        "placePriceNum": 6,
+        "placePriceDen": 4,
+        "winPriceNum": 7,
+        "winPriceDen": 1,
+        "winPrice": 8,
+        "placePrice": 2.5
+       }
+      ],
+      "statistics": {
+       "overview": "Returned from a spell last start with a solid third, beaten 2.25 lengths, at this track over 1000m. Fitter and is a leading contender.",
+       "overviewProvider": "R_AND_S"
+      }
+     },
+     {
+      "id": 1258062518,
+      "name": "Double Alpha",
+      "runnerNumber": 6,
+      "isOut": false,
+      "prices": [
+       {
+        "priceCode": "MID",
+        "winPrice": 23
+       },
+       {
+        "priceCode": "L",
+        "placePriceNum": 4,
+        "placePriceDen": 1,
+        "winPriceNum": 20,
+        "winPriceDen": 1,
+        "winPrice": 21,
+        "placePrice": 5
+       }
+      ],
+      "statistics": {
+       "overview": "Comes here after finishing sixth last time at this track and distance, beaten 5 lengths. Open to plenty of improvement.",
+       "overviewProvider": "R_AND_S"
+      }
+     },
+     {
+      "id": 1258062521,
+      "name": "Secret Ingredient",
+      "runnerNumber": 7,
+      "isOut": false,
+      "prices": [
+       {
+        "priceCode": "MID",
+        "winPrice": 31
+       },
+       {
+        "priceCode": "L",
+        "placePriceNum": 21,
+        "placePriceDen": 4,
+        "winPriceNum": 26,
+        "winPriceDen": 1,
+        "winPrice": 27,
+        "placePrice": 6.25
+       }
+      ],
+      "statistics": {
+       "overview": "Has not raced since finishing 8 lengths away in 12th over 1200m at Sha Tin on May 31. Managed to fill a minor placing first-up last prep at Sha Tin over 1000m. Other runners rate better.",
+       "overviewProvider": "R_AND_S"
+      }
+     },
+     {
+      "id": 1258062523,
+      "name": "Flying Ting Lok",
+      "runnerNumber": 8,
+      "isOut": false,
+      "prices": [
+       {
+        "priceCode": "MID",
+        "winPrice": 31
+       },
+       {
+        "priceCode": "L",
+        "placePriceNum": 21,
+        "placePriceDen": 4,
+        "winPriceNum": 26,
+        "winPriceDen": 1,
+        "winPrice": 27,
+        "placePrice": 6.25
+       }
+      ],
+      "statistics": {
+       "overview": "Has not appeared since he was safely held in 12th over 1200m at this track on June 10. Will improve on what he does here.",
+       "overviewProvider": "R_AND_S"
+      }
+     },
+     {
+      "id": 1258062525,
+      "name": "Harmony Fire",
+      "runnerNumber": 9,
+      "isOut": false,
+      "prices": [
+       {
+        "priceCode": "MID",
+        "winPrice": 10
+       },
+       {
+        "priceCode": "L",
+        "placePriceNum": 17,
+        "placePriceDen": 10,
+        "winPriceNum": 9,
+        "winPriceDen": 1,
+        "winPrice": 10,
+        "placePrice": 2.7
+       }
+      ],
+      "statistics": {
+       "overview": "Resumed at this track over 1000m last time out and finished fourth, beaten 3 lengths. Fitter for that run and expected to be in the finish this time.",
+       "overviewProvider": "R_AND_S"
+      }
+     },
+     {
+      "id": 1258062528,
+      "name": "Casa Buddy",
+      "runnerNumber": 10,
+      "isOut": false,
+      "prices": [
+       {
+        "priceCode": "MID",
+        "winPrice": 31
+       },
+       {
+        "priceCode": "L",
+        "placePriceNum": 17,
+        "placePriceDen": 2,
+        "winPriceNum": 40,
+        "winPriceDen": 1,
+        "winPrice": 41,
+        "placePrice": 9.5
+       }
+      ],
+      "statistics": {
+       "overview": "Lightly raced four-year-old gelding first-up after a spell of four-and-a-half months. Overlooking.",
+       "overviewProvider": "R_AND_S"
+      }
+     },
+     {
+      "id": 1258062530,
+      "name": "Happy United",
+      "runnerNumber": 11,
+      "isOut": false,
+      "prices": [
+       {
+        "priceCode": "MID",
+        "winPrice": 16.5
+       },
+       {
+        "priceCode": "L",
+        "placePriceNum": 11,
+        "placePriceDen": 5,
+        "winPriceNum": 11,
+        "winPriceDen": 1,
+        "winPrice": 12,
+        "placePrice": 3.2
+       }
+      ],
+      "statistics": {
+       "overview": "Has not raced since scoring over 1000m at this track on July 8. Anticipating a bright start to this prep.",
+       "overviewProvider": "R_AND_S"
+      }
+     },
+     {
+      "id": 1258062531,
+      "name": "Mapogo",
+      "runnerNumber": 12,
+      "isOut": false,
+      "prices": [
+       {
+        "priceCode": "MID",
+        "winPrice": 6.4
+       },
+       {
+        "priceCode": "L",
+        "placePriceNum": 6,
+        "placePriceDen": 4,
+        "winPriceNum": 15,
+        "winPriceDen": 2,
+        "winPrice": 8.5,
+        "placePrice": 2.5
+       }
+      ],
+      "statistics": {
+       "overview": "Last appeared 11 weeks ago when he finished 3.5 lengths from the winner in fifth over 1000m at this track. Certainly one to consider.",
+       "overviewProvider": "R_AND_S"
+      }
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -1,12 +1,13 @@
-"""Capture Australian fixed odds, and Ladbrokes' tips, for a stored HK card.
+"""Capture Ladbrokes' fixed odds, and the Racing & Sports tips it carries.
 
     python -m hkrd.jobs.scrape_fixed_odds --date 2026-09-23
     python -m hkrd.jobs.scrape_fixed_odds             # today's meeting
 
-Ladbrokes only, for now. Sportsbet and At The Races refuse automated access
-(403, measured 2026-09-23), and Unibet's racing prices come from an app whose
-feed has not been found. Ladbrokes answers the Fly machine directly, so unlike
-the YouTube sources this runs on the server's own schedule.
+Ladbrokes answers the Fly machine directly, so unlike the YouTube sources
+this runs on the server's own schedule. Sportsbet refuses the server (403,
+measured 2026-09-23) and is read from the PC instead, by
+`tools/harvest_sportsbet.py`; Unibet's racing prices come from an app whose
+feed has not been found.
 
 Two things per race, and both are checked against the stored HKJC card:
 
@@ -15,9 +16,12 @@ Two things per race, and both are checked against the stored HKJC card:
            horse's odds beside another's tote — the one mistake a price
            comparison cannot survive — so a runner that disagrees is left
            out and named in the report.
-  TIPS     Ladbrokes' top four in order, each with its reason, sent through
-           `import_tips` like every other source — the same checks, the same
-           quarantine, and the latest capture replacing the one before.
+  TIPS     the top four in order, each with its reason, and the race's
+           whole comment. They are Racing & Sports' words, which Sportsbet
+           carries too, so they are stored as that source and counted once
+           (`ingest.racing_sports`). Sent through `import_tips` like every
+           other source — the same checks, the same quarantine, and the
+           latest capture replacing the one before.
 """
 from __future__ import annotations
 
@@ -27,7 +31,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from hkrd.derive import names
-from hkrd.ingest import ladbrokes
+from hkrd.ingest import ladbrokes, racing_sports
 from hkrd.ingest._client import FetchError
 from hkrd.jobs import import_tips
 from hkrd.store import fixed_odds, job_log, tips
@@ -36,9 +40,7 @@ from hkrd.store.connect import db_path, get_conn, init_db, transaction
 __all__ = ["scrape", "FixedOddsReport"]
 
 _HK = dt.timezone(dt.timedelta(hours=8))
-NAME_AGREES = 0.90      # Ladbrokes spells names as HKJC does; this is slack
-                        # for punctuation ("DANICA'S CHOICE"), not for a
-                        # different horse
+EXTRACTOR = "rule:ladbrokes-v2"
 
 
 @dataclass
@@ -94,7 +96,7 @@ def scrape(date: str, *, venue: str | None = None, db: Path | None = None,
 
         now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0) \
             .isoformat()
-        rows, picks = [], []
+        rows, picks, said = [], [], []
         for race_no in sorted(card):
             if race_no not in ids:
                 report.skipped.append(f"R{race_no}: not listed by Ladbrokes")
@@ -109,18 +111,18 @@ def scrape(date: str, *, venue: str | None = None, db: Path | None = None,
             for p in ladbrokes.prices(rec):
                 ours = field_.get(p["horse_no"])
                 if ours is None or names.similarity(p["name"], ours) \
-                        < NAME_AGREES:
+                        < names.SPELLED_ALIKE:
                     report.skipped.append(
                         f"R{race_no} #{p['horse_no']} {p['name']}: the card "
                         f"has {ours or 'no such runner'}")
                     continue
                 rows.append({"bookmaker": "ladbrokes", "race_date": date,
                              "race_no": race_no, "captured_at": now, **p})
-            picks += [{"source": "ladbrokes", "tipster": "Ladbrokes",
-                       "race_no": race_no, "horse_no": t["horse_no"],
-                       "pick_rank": t["rank"], "name_seen": t["name"],
-                       "note": t["reason"], "url": t["url"]}
-                      for t in ladbrokes.tips(rec)]
+            url = ladbrokes.page_url(rec)
+            picks += racing_sports.selections(
+                race_no, ladbrokes.tips(rec), ladbrokes.comment(rec), url)
+            said += racing_sports.race_comment(
+                race_no, ladbrokes.comment(rec), url, extractor=EXTRACTOR)
 
         with transaction(conn):
             report.prices = fixed_odds.upsert_fixed_odds(conn, rows)
@@ -131,8 +133,8 @@ def scrape(date: str, *, venue: str | None = None, db: Path | None = None,
         got = import_tips.run({
             "payload_version": 1, "race_date": date,
             "generated_at": now.replace("+00:00", "Z"),
-            "extractor": "rule:ladbrokes-v1", "sources": ["ladbrokes"],
-            "selections": picks}, db=db)
+            "extractor": EXTRACTOR, "sources": [racing_sports.SOURCE],
+            "selections": picks, "quotes": said}, db=db)
         report.tips, report.tips_held = got.selections, got.quarantined
 
     conn = get_conn(db if db is not None else db_path())

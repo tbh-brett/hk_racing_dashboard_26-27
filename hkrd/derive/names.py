@@ -36,13 +36,19 @@ from collections.abc import Iterable
 from difflib import SequenceMatcher
 
 __all__ = ["normalise", "is_chinese", "similarity", "verdict", "verdict_heard",
-           "MATCH_AT"]
+           "MATCH_AT", "SPELLED_ALIKE"]
 
 # One wrong character in a three-character name scores 0.667; in a two-
 # character name it scores 0.5 and is NOT a match — two characters with one
 # wrong is one character, and HK horse names share single characters (星, 駒,
 # 勝, 利) far too often for one to identify anything.
 MATCH_AT = 0.65
+
+# A bookmaker's runner against the card's: the same horse spelled by someone
+# else ("DANICA'S CHOICE"). Slack for punctuation, not for a different horse,
+# because a price under the wrong number is the one mistake a price
+# comparison cannot survive.
+SPELLED_ALIKE = 0.90
 
 _CJK = re.compile(r"[㐀-鿿]")
 _NOISE = re.compile(r"[\s\W_]+", re.UNICODE)

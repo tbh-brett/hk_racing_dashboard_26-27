@@ -16,11 +16,11 @@ from __future__ import annotations
 import datetime as dt
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 __all__ = ["PayloadError", "Payload", "parse", "PAYLOAD_VERSION", "ROLES",
-           "CAPTION_KINDS", "STANCES", "REASONS"]
+           "CAPTION_KINDS", "STANCES", "REASONS", "BOOKMAKERS"]
 
 PAYLOAD_VERSION = 1
 
@@ -32,9 +32,13 @@ CAPTION_KINDS = frozenset({"manual", "asr"})
 STANCES = frozenset({"positive", "negative", "neutral"})
 REASONS = frozenset({"no_runner", "no_race", "name_unknown", "name_mismatch",
                      "low_confidence", "unparsed"})
+# Fixed odds a PC can reach and the server cannot (Sportsbet refuses Fly).
+# Closed, because each is a column on the Briefing page.
+BOOKMAKERS = frozenset({"ladbrokes", "sportsbet", "unibet"})
 
 _TOP = frozenset({"payload_version", "race_date", "generated_at", "extractor",
-                  "sources", "quotes", "selections", "quarantine"})
+                  "sources", "quotes", "selections", "quarantine",
+                  "fixed_odds"})
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 _QUOTE_FIELDS = ("source", "role", "quote", "url", "extracted_by", "race_no",
@@ -46,6 +50,8 @@ _SELECTION_FIELDS = ("source", "tipster", "race_no", "horse_no", "pick_rank",
                      "published_at", "fetched_at")
 _QUARANTINE_FIELDS = ("source", "race_no", "raw", "reason", "url",
                       "fetched_at")
+_FIXED_FIELDS = ("bookmaker", "race_no", "horse_no", "name_seen", "win",
+                 "place", "scratched", "captured_at")
 
 
 class PayloadError(ValueError):
@@ -72,6 +78,9 @@ class Payload:
     quotes: list[dict[str, Any]]
     selections: list[dict[str, Any]]
     quarantine: list[dict[str, Any]]
+    # Prices are not a source's answer: they are snapshots, never withdrawn
+    # (AGENTS.md: never delete odds), so `sources` says nothing about them.
+    fixed_odds: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _is_int(v: object) -> bool:
@@ -119,6 +128,16 @@ def _rows(body: Mapping, key: str, bad: list[str]) -> list[Mapping]:
         else:
             bad.append(f"{key}[{i}] must be an object, got {type(row).__name__}")
     return out
+
+
+def _timestamp(row: Mapping, key: str, where: str, bad: list[str]) -> None:
+    v = row.get(key)
+    try:
+        if not isinstance(v, str):
+            raise ValueError
+        dt.datetime.fromisoformat(v.replace("Z", "+00:00"))
+    except ValueError:
+        bad.append(f"{where}: {key} must be an ISO-8601 timestamp, got {v!r}")
 
 
 def _same_meeting(row: Mapping, race_date: str, where: str,
@@ -173,6 +192,7 @@ def parse(body: object) -> Payload:
     quotes = _rows(body, "quotes", bad)
     selections = _rows(body, "selections", bad)
     quarantine = _rows(body, "quarantine", bad)
+    fixed = _rows(body, "fixed_odds", bad)
 
     for i, q in enumerate(quotes):
         w = f"quotes[{i}]"
@@ -223,6 +243,28 @@ def parse(body: object) -> Payload:
         _text(r, "url", w, bad)
         _same_meeting(r, race_date, w, bad)
 
+    for i, f in enumerate(fixed):
+        w = f"fixed_odds[{i}]"
+        _text(f, "bookmaker", w, bad, required=True)
+        _one_of(f, "bookmaker", BOOKMAKERS, w, bad)
+        # The name is how the import knows the number means the same horse
+        # on both sides; a price without it cannot be checked.
+        _text(f, "name_seen", w, bad, required=True)
+        for key in ("race_no", "horse_no"):
+            if f.get(key) is None:
+                bad.append(f"{w}: missing {key}")
+            else:
+                _optional_int(f, key, w, bad)
+        for key in ("win", "place"):
+            v = f.get(key)
+            if v is not None and not (_is_num(v) and v > 0):
+                bad.append(f"{w}: {key} must be a price > 0 or null, got {v!r}")
+        if f.get("scratched") is not None and not isinstance(f["scratched"],
+                                                             bool):
+            bad.append(f"{w}: scratched must be true or false")
+        _timestamp(f, "captured_at", w, bad)
+        _same_meeting(f, race_date, w, bad)
+
     rows_name = sorted({r["source"] for r in (*quotes, *selections, *quarantine)
                         if isinstance(r.get("source"), str)})
     declared = body.get("sources")
@@ -254,4 +296,6 @@ def parse(body: object) -> Payload:
         extractor=body.get("extractor"), sources=sources,
         quotes=[normal(q, _QUOTE_FIELDS) for q in quotes],
         selections=[normal(s, _SELECTION_FIELDS) for s in selections],
-        quarantine=[normal(r, _QUARANTINE_FIELDS) for r in quarantine])
+        quarantine=[normal(r, _QUARANTINE_FIELDS) for r in quarantine],
+        fixed_odds=[dict({k: f.get(k) for k in _FIXED_FIELDS},
+                         race_date=race_date) for f in fixed])

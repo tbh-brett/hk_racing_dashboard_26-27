@@ -13,6 +13,11 @@ anything that does not hold — to `tips_quarantine`, with the reason. A quote
 with no number at all is kept, at race level or unplaced, because an
 unresolved quote is still true. A wrong number is not: a trainer's quote
 under the wrong horse is worse than no row.
+
+Fixed odds ride along for a bookmaker only the PC can reach. A price is kept
+only where the bookmaker's number AND its name agree with the card, and a
+price that does not is named in the report, not quarantined: it is not
+anyone's opinion to review, just a runner the two sides disagree about.
 """
 from __future__ import annotations
 
@@ -27,7 +32,7 @@ from typing import Any
 
 from hkrd.derive import names
 from hkrd.ingest.tips_payload import PayloadError, parse
-from hkrd.store import job_log, tips
+from hkrd.store import fixed_odds, job_log, tips
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
 __all__ = ["run", "ImportReport", "PayloadError", "MIN_CONFIDENCE"]
@@ -52,6 +57,8 @@ class ImportReport:
     # it, or quarantined by it. The latest push for a source replaces it.
     removed: int = 0
     reasons: Counter = field(default_factory=Counter)
+    prices: int = 0
+    prices_skipped: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
         return {"race_date": self.race_date, "quotes": self.quotes,
@@ -59,7 +66,8 @@ class ImportReport:
                 "quarantined": self.quarantined,
                 "quarantine_reasons": dict(sorted(self.reasons.items())),
                 "unplaced_quotes": self.unplaced_quotes,
-                "removed": self.removed}
+                "removed": self.removed, "prices": self.prices,
+                "prices_skipped": self.prices_skipped}
 
     def render(self) -> str:
         lines = [f"  tips               {self.race_date}",
@@ -72,6 +80,10 @@ class ImportReport:
         if self.removed:
             lines.append(f"  removed            {self.removed:>6}   "
                          f"(stored before, not in this push)")
+        if self.prices or self.prices_skipped:
+            lines.append(f"  fixed prices       {self.prices:>6}   "
+                         f"({len(self.prices_skipped)} not stored)")
+            lines += [f"    {s}" for s in self.prices_skipped[:12]]
         return "\n".join(lines)
 
 
@@ -175,7 +187,10 @@ def _import(conn, body: object) -> ImportReport:
     # Two rows on one key would store as one, and which survived would be
     # whichever came last. That is a bug in the extractor, so it is refused.
     dupes = (_duplicates(quote_ids, "quote_id")
-             + _duplicates(sel_keys, "selection"))
+             + _duplicates(sel_keys, "selection")
+             + _duplicates([(f["bookmaker"], f["race_no"], f["horse_no"],
+                             f["captured_at"]) for f in payload.fixed_odds],
+                           "price"))
     if dupes:
         raise PayloadError(dupes)
 
@@ -210,10 +225,22 @@ def _import(conn, body: object) -> ImportReport:
     for r in payload.quarantine:
         report.reasons[r["reason"]] += 1
 
+    prices = []
+    for f in payload.fixed_odds:
+        ours = races.get(f["race_no"], {}).get(f["horse_no"])
+        if ours is None or names.similarity(f["name_seen"], ours) \
+                < names.SPELLED_ALIKE:
+            report.prices_skipped.append(
+                f"{f['bookmaker']} R{f['race_no']} #{f['horse_no']} "
+                f"{f['name_seen']}: the card has {ours or 'no such runner'}")
+        else:
+            prices.append(f)
+
     with transaction(conn, immediate=True):
         report.quotes = tips.upsert_quotes(conn, quotes)
         report.selections = tips.upsert_selections(conn, sels)
         report.quarantined = tips.upsert_quarantine(conn, held)
+        report.prices = fixed_odds.upsert_fixed_odds(conn, prices)
         # The latest push is the source's whole answer for this meeting.
         report.removed = tips.replace_absent(
             conn, payload.race_date, payload.sources,
@@ -225,7 +252,7 @@ def _import(conn, body: object) -> ImportReport:
             detail=(f"{report.race_date} · {report.quotes} quotes · "
                     f"{report.selections} selections · "
                     f"{report.quarantined} quarantined · "
-                    f"{report.removed} removed"))
+                    f"{report.removed} removed · {report.prices} prices"))
     return report
 
 
