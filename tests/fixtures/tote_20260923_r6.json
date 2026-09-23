@@ -1,0 +1,66 @@
+{
+ "_fixture_note": "HKJC tote win/place odds for 2026-09-23 HV race 6 as captured by jobs/scrape_odds at 2026-09-23T12:47:48 HKT.",
+ "captured_at": "2026-09-23T12:47:48",
+ "prices": [
+  {
+   "horse_no": 1,
+   "win_odds": 3.6,
+   "place_odds": 1.8
+  },
+  {
+   "horse_no": 2,
+   "win_odds": 33.0,
+   "place_odds": 8.9
+  },
+  {
+   "horse_no": 3,
+   "win_odds": 20.0,
+   "place_odds": 5.3
+  },
+  {
+   "horse_no": 4,
+   "win_odds": 3.2,
+   "place_odds": 1.4
+  },
+  {
+   "horse_no": 5,
+   "win_odds": 9.8,
+   "place_odds": 3.3
+  },
+  {
+   "horse_no": 6,
+   "win_odds": 22.0,
+   "place_odds": 3.7
+  },
+  {
+   "horse_no": 7,
+   "win_odds": 36.0,
+   "place_odds": 7.3
+  },
+  {
+   "horse_no": 8,
+   "win_odds": 33.0,
+   "place_odds": 7.5
+  },
+  {
+   "horse_no": 9,
+   "win_odds": 9.9,
+   "place_odds": 2.4
+  },
+  {
+   "horse_no": 10,
+   "win_odds": 32.0,
+   "place_odds": 5.9
+  },
+  {
+   "horse_no": 11,
+   "win_odds": 13.0,
+   "place_odds": 4.1
+  },
+  {
+   "horse_no": 12,
+   "win_odds": 7.3,
+   "place_odds": 2.4
+  }
+ ]
+}

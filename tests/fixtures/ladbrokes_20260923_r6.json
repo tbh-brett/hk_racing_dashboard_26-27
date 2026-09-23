@@ -1,0 +1,138 @@
+{
+ "_fixture_note": "Ladbrokes affiliates feed, GET /affiliates/v1/racing/events/9675a952-bedb-4527-a40f-935e641f843b (Happy Valley race 6, 2026-09-23), fetched 2026-09-23 about 13:00 HKT. Trimmed to the fields ingest/ladbrokes reads; values verbatim.",
+ "race": {
+  "event_id": "9675a952-bedb-4527-a40f-935e641f843b",
+  "meeting_name": "Happy Valley",
+  "race_number": 6,
+  "description": "Island Hcp (C4)",
+  "comment": "SUPERB KING (4) produced a terrific first-up effort, covering ground from a wide draw before fighting on strongly for second over 1000m here a fortnight ago. With the benefit of that run and a much better draw, he gets his chance to go one better. JUMBO BLESSING (1) returned in excellent order, claiming a narrow win over this course and distance 2 weeks ago, and he is now chasing a hat-trick. He is thriving and should have further improvement to come, so stick with him. MAPOGO (12) has shown plenty in his trials without always delivering on race day, but a break and favourable first-up conditions could help him put it all together here. Each way claims at a price. HARMONY FIRE (9) was solid fresh when finishing fourth behind the second pick in the same race last start, and she seldom puts in a poor effort. Include in all top 4 combos.",
+  "tips": [
+   "9bb9b2e5-887a-4aa8-84db-487512859844",
+   "6e5e283d-b1d6-447b-bb70-0a594d3f9bb9",
+   "c77432fa-9307-49e9-8d32-a702d6453e03",
+   "13947ab2-58d7-45cc-a5b3-7d929addd9e7"
+  ]
+ },
+ "runners": [
+  {
+   "entrant_id": "6e5e283d-b1d6-447b-bb70-0a594d3f9bb9",
+   "runner_number": 1,
+   "name": "Jumbo Blessing",
+   "odds": {
+    "fixed_win": 3.5,
+    "fixed_place": 1.55
+   },
+   "is_scratched": false
+  },
+  {
+   "entrant_id": "428f9a03-1342-464d-8a89-f92c91b1dfdb",
+   "runner_number": 2,
+   "name": "Copper Core",
+   "odds": {
+    "fixed_win": 31,
+    "fixed_place": 6
+   },
+   "is_scratched": false
+  },
+  {
+   "entrant_id": "6d1f6bb0-960a-44cd-a217-dcd664120981",
+   "runner_number": 3,
+   "name": "Blue Illusion",
+   "odds": {
+    "fixed_win": 19,
+    "fixed_place": 4.4
+   },
+   "is_scratched": false
+  },
+  {
+   "entrant_id": "9bb9b2e5-887a-4aa8-84db-487512859844",
+   "runner_number": 4,
+   "name": "Superb King",
+   "odds": {
+    "fixed_win": 2.8,
+    "fixed_place": 1.4
+   },
+   "is_scratched": false
+  },
+  {
+   "entrant_id": "387186b7-3bfb-47f3-914c-0eae3d20951d",
+   "runner_number": 5,
+   "name": "Georgian Sigma",
+   "odds": {
+    "fixed_win": 8,
+    "fixed_place": 2.5
+   },
+   "is_scratched": false
+  },
+  {
+   "entrant_id": "b086b0f1-6d98-49c5-8cb6-8d5afaaf7cac",
+   "runner_number": 6,
+   "name": "Double Alpha",
+   "odds": {
+    "fixed_win": 21,
+    "fixed_place": 4.6
+   },
+   "is_scratched": false
+  },
+  {
+   "entrant_id": "28ab2a03-af75-4fe5-b691-fc79ed98ba79",
+   "runner_number": 7,
+   "name": "Secret Ingredient",
+   "odds": {
+    "fixed_win": 27,
+    "fixed_place": 5.5
+   },
+   "is_scratched": false
+  },
+  {
+   "entrant_id": "c8a658ac-3a1d-4de3-9a47-ce033e6fab08",
+   "runner_number": 8,
+   "name": "Flying Ting Lok",
+   "odds": {
+    "fixed_win": 26,
+    "fixed_place": 5.5
+   },
+   "is_scratched": false
+  },
+  {
+   "entrant_id": "13947ab2-58d7-45cc-a5b3-7d929addd9e7",
+   "runner_number": 9,
+   "name": "Harmony Fire",
+   "odds": {
+    "fixed_win": 10,
+    "fixed_place": 2.9
+   },
+   "is_scratched": false
+  },
+  {
+   "entrant_id": "dcf341c6-2875-4a1c-bd33-a33616dfbe71",
+   "runner_number": 10,
+   "name": "Casa Buddy",
+   "odds": {
+    "fixed_win": 35,
+    "fixed_place": 6.5
+   },
+   "is_scratched": false
+  },
+  {
+   "entrant_id": "8add7985-4abe-4b89-a1e4-6e644e9e014c",
+   "runner_number": 11,
+   "name": "Happy United",
+   "odds": {
+    "fixed_win": 12,
+    "fixed_place": 3.2
+   },
+   "is_scratched": false
+  },
+  {
+   "entrant_id": "c77432fa-9307-49e9-8d32-a702d6453e03",
+   "runner_number": 12,
+   "name": "Mapogo",
+   "odds": {
+    "fixed_win": 8.5,
+    "fixed_place": 2.6
+   },
+   "is_scratched": false
+  }
+ ]
+}

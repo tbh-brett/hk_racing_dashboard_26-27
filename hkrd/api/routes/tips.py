@@ -1,14 +1,15 @@
 """Tips routes — what the connections said, and who tipped what.
 
-The write, and the roster the PC-side extractor resolves against. The two
-reads the race card needs (`GET /api/tips/race` and `/api/tips/card`) arrive
-with the panels that draw them; see docs/handover/tips-layer/SPEC.md §8.
+The write, the roster the PC-side extractor resolves against, and the meeting
+summary the front page reads. The two reads the race card needs
+(`GET /api/tips/race` and `/api/tips/card`) arrive with the panels that draw
+them; see docs/handover/tips-layer/SPEC.md §8.
 """
 from __future__ import annotations
 
 from fastapi import APIRouter, Body, HTTPException
 
-from hkrd.query import tips as tips_q
+from hkrd.query import tips as tips_q, tips_summary as tips_summary_q
 
 router = APIRouter()
 
@@ -29,6 +30,19 @@ def import_tips(body: dict = Body(...)) -> dict:
         return job.run(body).as_dict()
     except job.PayloadError as exc:
         raise HTTPException(422, f"tips payload rejected — {exc}") from exc
+
+
+@router.get("/api/tips/summary/{date}")
+def summary(date: str) -> dict:
+    """One meeting summarised: per race, the horses the most sources back —
+    each source's own words under them, jockey interviews first — with the
+    HKJC tote and Ladbrokes fixed prices side by side, and the card-wide list
+    of runners where one market's price beats the other's fair value.
+    See query/tips_summary for what counts as support and how."""
+    out = tips_summary_q.summary(date)
+    if not out["races"]:
+        raise HTTPException(404, f"no card stored for {date}")
+    return out
 
 
 @router.get("/api/tips/roster/{date}")

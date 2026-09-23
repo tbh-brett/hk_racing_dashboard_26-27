@@ -732,3 +732,26 @@ CREATE TABLE IF NOT EXISTS tips_quarantine (
   fetched_at    TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_tq_date ON tips_quarantine(race_date, source);
+
+-- Fixed-odds prices from Australian bookmakers, beside the HKJC tote. Raw,
+-- and like odds_snapshots never pruned: a fixed price is only worth
+-- comparing at the moment it was on offer, and the history cannot be
+-- fetched again once the market has moved on.
+--
+-- A fixed price is LOCKED when taken; the tote pays the final dividend
+-- whatever it showed when the bet went on (AGENTS.md, Betting rules). That
+-- is the whole reason to compare them: a fixed price above the tote's fair
+-- value is value that can actually be captured.
+CREATE TABLE IF NOT EXISTS fixed_odds (
+  bookmaker   TEXT    NOT NULL,       -- ladbrokes | unibet | …
+  race_date   TEXT    NOT NULL,
+  race_no     INTEGER NOT NULL,
+  horse_no    INTEGER NOT NULL,       -- the bookmaker's number, checked
+  captured_at TEXT    NOT NULL,       --   against the card on the way in
+  win         REAL,                   -- NULL: no price offered
+  place       REAL,
+  scratched   INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (bookmaker, race_date, race_no, horse_no, captured_at)
+);
+CREATE INDEX IF NOT EXISTS ix_fixed_race
+  ON fixed_odds(race_date, race_no, bookmaker, captured_at);

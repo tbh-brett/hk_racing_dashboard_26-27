@@ -49,7 +49,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import _dashboard as dash                                  # noqa: E402
+import extract_bryan as bryan                              # noqa: E402
 import extract_rtw as rtw                                  # noqa: E402
+import extract_rtw_preview as preview                      # noqa: E402
+from _card import Card                                     # noqa: E402
 from hkrd.derive import names                              # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
@@ -60,7 +63,6 @@ HK = dt.timezone(dt.timedelta(hours=8))
 SECTION_GAP = 5.0          # seconds of silence that end a comment
 MAX_COMMENT = 75.0         # and no comment runs longer than this
 OPENS_WITHIN = 6           # a name this close to the start opens a comment
-EXACT, FRAGMENT = 0.95, 0.80
 
 _ZH_DIGITS = {"一": 1, "二": 2, "兩": 2, "三": 3, "四": 4, "五": 5, "六": 6,
               "七": 7, "八": 8, "九": 9, "十": 10}
@@ -81,42 +83,6 @@ def _number(token: str) -> int | None:
     if token.startswith("十"):                     # 十一 .. 十四
         return 10 + _ZH_DIGITS.get(token[1:], 0)
     return _ZH_DIGITS.get(token) if len(token) == 1 else None
-
-
-# ── the card ─────────────────────────────────────────────────────────────────
-
-class Card:
-    """The roster, and how to find each runner's name in running text."""
-
-    def __init__(self, roster: dict[str, Any]) -> None:
-        self.runners = [dict(x, race_no=r["race_no"])
-                        for r in roster["races"] for x in r["runners"]]
-        self.named = [x for x in self.runners if x["name_zh"]]
-        all_zh = [x["name_zh"] for x in self.named]
-        # Whole name first, then runs of 3+ characters no other runner at
-        # the meeting shares, longest first.
-        self.patterns: list[tuple[str, dict, float]] = []
-        for x in self.named:
-            n = x["name_zh"]
-            self.patterns.append((n, x, EXACT))
-            for size in range(len(n) - 1, 2, -1):
-                for i in range(len(n) - size + 1):
-                    frag = n[i:i + size]
-                    if sum(frag in m for m in all_zh) == 1:
-                        self.patterns.append((frag, x, FRAGMENT))
-
-    def race(self, race_no: int) -> list[dict]:
-        return [x for x in self.runners if x["race_no"] == race_no]
-
-    def mentions(self, text: str) -> list[tuple[int, str, dict, float]]:
-        """(position, said, runner, confidence), one per runner, earliest."""
-        found: dict[tuple[int, int], tuple[int, str, dict, float]] = {}
-        for said, x, conf in self.patterns:
-            pos = text.find(said)
-            key = (x["race_no"], x["horse_no"])
-            if pos >= 0 and (key not in found or conf > found[key][3]):
-                found[key] = (pos, said, x, conf)
-        return sorted(found.values(), key=lambda m: m[0])
 
 
 # ── quotes, from the human subtitles ─────────────────────────────────────────
@@ -328,7 +294,13 @@ def picks_from(rec: dict, card: Card, fetched_at: str
 # Where each source's harvest lands, and the kind of video in it that says
 # something about a coming meeting.
 FOLDERS = {"factcheck": ("factcheck", "preview_zh"),
-           rtw.SOURCE: ("rtw", "interview")}
+           rtw.SOURCE: ("rtw", "interview"),
+           preview.SOURCE: ("rtw", "preview")}
+
+
+def _read(folder: Path) -> list[dict]:
+    return [json.loads(p.read_text(encoding="utf-8"))
+            for p in sorted(folder.glob("*.json"))]
 
 
 def transcripts_for(date: str, raw: Path, source: str = SOURCE) -> list[dict]:
@@ -338,8 +310,7 @@ def transcripts_for(date: str, raw: Path, source: str = SOURCE) -> list[dict]:
     this season's 27th."""
     folder, kind = FOLDERS[source]
     out = []
-    for path in sorted((raw / folder).glob("*.json")):
-        rec = json.loads(path.read_text(encoding="utf-8"))
+    for rec in _read(raw / folder):
         if rec.get("kind") != kind or rec.get("race_date") != date:
             continue
         try:
@@ -385,6 +356,27 @@ def extract(date: str, raw: Path, roster: dict) -> dict | None:
         sources.append(rtw.SOURCE)
         for rec in iv:
             q, h = rtw.interview_quotes(rec, card.runners, fetched)
+            quotes += q
+            held += h
+
+    pv = transcripts_for(date, raw, preview.SOURCE)
+    print(f"  {date}: {len(pv)} Racing To Win race preview video(s)")
+    if pv:
+        sources.append(preview.SOURCE)
+        for rec in pv:
+            q, p, h = preview.preview(rec, card, fetched)
+            quotes += q
+            picks += p
+            held += h
+
+    # Bryan's titles carry no meeting, so his videos are matched by the day
+    # they were published rather than by a date in the title.
+    bry = [rec for rec in _read(raw / "bryan") if bryan.is_for(rec, date)]
+    print(f"  {date}: {len(bry)} 全方位Bryan video(s)")
+    if bry and card.named:
+        sources.append(bryan.SOURCE)
+        for rec in bry:
+            q, h = bryan.bryan_quotes(rec, card, date, fetched)
             quotes += q
             held += h
 

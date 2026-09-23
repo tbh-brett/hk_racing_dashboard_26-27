@@ -72,15 +72,25 @@ def _found(name: str, window: str) -> bool:
                for i in range(0, max(1, len(text) - n + 1)))
 
 
+def _surname(name: str) -> str:
+    """The family name, with an apprentice's claim taken off first: a race
+    card writes the rider as "C L Chau (-2)", a results page as "C L Chau"."""
+    parts = re.sub(r"\(.*?\)", " ", name or "").split()
+    return parts[-1].upper() if parts else ""
+
+
 def _role(speaker: str, runner: dict | None,
           everyone: list[dict]) -> str | None:
-    """jockey or trainer, by surname: the card says 'H Y Yuen', the index
-    says 'Nichola Yuen'. The runner's own connections first; then anyone at
-    the meeting, for a jockey interviewed about a horse he has since lost."""
-    surname = speaker.split()[-1].upper() if speaker.split() else ""
+    """jockey or trainer, by surname: the card says 'H Y Yuen (-10)', the
+    index says 'Nichola Yuen'. The runner's own connections first; then
+    anyone at the meeting, for a jockey interviewed about a horse he has
+    since lost."""
+    surname = _surname(speaker)
+    if not surname:
+        return None
     for pool in ([runner] if runner else [], everyone):
         for role in ("jockey", "trainer"):
-            if any((x.get(role) or "").upper().split()[-1:] == [surname]
+            if any(_surname(x.get(role) or "") == surname
                    for x in pool if x):
                 return role
     return None
