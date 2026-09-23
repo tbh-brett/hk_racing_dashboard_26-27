@@ -327,15 +327,22 @@
 /* The phone card exists in the DOM on a desktop too, and is not shown. */
 .bf-card { display: none; }
 
-/* ── phone ─────────────────────────────────────────────────────────────── */
+/* ── narrower than the artboard ─────────────────────────────────────────────
+ * The artboard is drawn at 1440 and 390. Between them the eleven-column table
+ * keeps its fixed columns and squeezes the names to nothing, so the rails
+ * move under the table first, and below 1000px the races become the cards.  */
 
-@media (max-width: 760px) {
+@media (max-width: 1279px) {
+  .bf-main { grid-template-columns: minmax(0, 1fr); }
+  .bf-board { border-right: none; }
+  .bf-aside { border-top: 1px solid var(--line-2); }
+  .bf-rule { display: none; }
+}
+
+@media (max-width: 999px) {
   .bf-bar { position: sticky; top: 0; z-index: 2; flex-wrap: wrap; background: var(--surface); }
   .bf-title { padding: 8px 12px; border-right: none; }
   .bf-prices { gap: 2px 12px; padding: 5px 12px 7px; font-size: 10px; }
-  .bf-rule { display: none; }
-  .bf-main { display: block; }
-  .bf-board { border-right: none; }
   .bf-head, .bf-row { display: none; }
 
   .bf-card {
@@ -368,8 +375,13 @@
 
   .bf-ran { gap: 10px; height: 30px; padding: 0 12px; }
   .bf-ran .dc { display: none; }
-
+  .bf-legend .hint { display: none; }
   .bf-detail { padding: 8px 12px 10px; }
+}
+
+/* ── phone ─────────────────────────────────────────────────────────────── */
+
+@media (max-width: 760px) {
   .bf-detail .bf-iv { order: -1; margin: 0 0 8px; padding: 7px 9px; }
   .bf-no-iv, .bf-stats .course, .bf-iv-head .on, .bf-iv-head .src { display: none; }
   .bf-iv-head .horse { margin-left: auto; }
@@ -388,5 +400,4 @@
   .bf-rest .px { width: auto; }
   .bf-rest .chips, .bf-rest .gap { margin-left: 27px; }
   .bf-rest .src { display: none; }
-  .bf-legend .hint { display: none; }
 }
