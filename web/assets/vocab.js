@@ -331,6 +331,10 @@ const CLASS_TITLE = {
 export function classLabel(raceClass) {
   if (raceClass === null || raceClass === undefined || raceClass === '') return null;
   const key = String(raceClass);
+  // The card names a Group race by its grade ("Group 1"), where the archive
+  // wrote '0'; prefixing it gave "CGroup 1".
+  const grade = /^group\s*(\d)$/i.exec(key);
+  if (grade) return `G${grade[1]}`;
   return CLASS_NAME[key] ?? `C${key}`;
 }
 

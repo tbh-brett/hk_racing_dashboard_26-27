@@ -22,7 +22,8 @@ from itertools import permutations
 
 import numpy as np
 
-__all__ = ["devig", "devig_to", "place_probability", "pair_probability",
+__all__ = ["devig", "devig_to", "place_probability", "place_from_win",
+           "pair_probability",
            "exacta_probability", "market_place_probability",
            "market_pair_probability", "pair_hits", "actual_over_expected",
            "HENERY_LAMBDA", "ProbabilityError"]
@@ -109,6 +110,46 @@ def place_probability(
     if places >= p.size:
         return np.ones_like(p)
     out = _position_probabilities(p, lam, places)
+    return np.clip(out, 0.0, 1.0)
+
+
+def place_from_win(win_p: Sequence[float], *, places: int = 3,
+                   lam: float = HENERY_LAMBDA) -> np.ndarray:
+    """P(top `places`) from a win distribution that is NOT a set of odds.
+
+    The same Harville-Henery arithmetic as `place_probability`, for a model's
+    own win chances (`model/screen`), which have no margin to remove. And
+    written as arrays rather than as a walk over orderings: the walk visits
+    2,184 orderings of a 14-runner field in Python, about 25 ms a race, and
+    a meeting's screen has eleven races inside a 500 ms budget. The two agree
+    to floating-point precision (`tests/test_screen.py`).
+
+    Up to three places, which is all HK pays.
+    """
+    p = _validate(np.asarray(win_p, dtype=float))
+    n = p.size
+    if places >= n:
+        return np.ones_like(p)
+    if not 1 <= places <= 3:
+        raise ProbabilityError(f"places must be 1, 2 or 3: {places}")
+    d = np.power(p, lam)
+    total = d.sum()
+    out = p.copy()
+    if places >= 2:
+        # a first, i second
+        second = p[:, None] * d[None, :] / (total - d[:, None])
+        np.fill_diagonal(second, 0.0)
+        out = out + second.sum(axis=0)
+    if places >= 3:
+        # a first, b second, i third
+        left = total - d[:, None, None]
+        third = (p[:, None, None] * d[None, :, None] / left
+                 * d[None, None, :] / (left - d[None, :, None]))
+        idx = np.arange(n)
+        third[idx, idx, :] = 0.0
+        third[idx, :, idx] = 0.0
+        third[:, idx, idx] = 0.0
+        out = out + third.sum(axis=(0, 1))
     return np.clip(out, 0.0, 1.0)
 
 

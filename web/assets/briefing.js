@@ -1,7 +1,9 @@
-/* briefing.js — the meeting Briefing: what the sources back, what was said,
- * and where the markets disagree, one row per race.
+/* briefing.js — the meeting Briefing: who is a chance, what the sources
+ * back, what was said, and where the markets disagree, one row per race.
  *
- * Ported from web/design-source/Briefing.dc.html. Reads five endpoints and
+ * The Screen comes first (/api/screen, briefing-screen.js): it is the half of
+ * the page that works before a price or a tip exists. Below it, ported from
+ * web/design-source/Briefing.dc.html, the board reads five more endpoints and
  * writes nothing: /api/tips/summary (support, words, every market's price),
  * /api/raceday (the meeting strip), /api/raceday/{race} (the dashboard's own
  * signals), /api/money (pool sizes) and the shared freshness strip.
@@ -18,8 +20,9 @@ import {
   countLabel, gapLine, atShort,
 } from './briefing-model.js';
 import { buildRace, raceDetail, chipEl, markEl, noTipsMsg } from './briefing-race.js';
+import { renderScreen } from './briefing-screen.js';
 
-const state = { ctx: null, open: null, error: null };
+const state = { ctx: null, open: null, error: null, screen: null };
 const firstRace = Number(new URLSearchParams(window.location.search).get('race')) || null;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
                 'Oct', 'Nov', 'Dec'];
@@ -29,10 +32,20 @@ async function load() {
   const date = context.date;
   const strip = context.summary?.races ?? [];
   state.error = null;
-  if (!date) { state.ctx = null; render(); return; }
+  if (!date) { state.ctx = null; state.screen = null; render(); return; }
   let summary;
   let money = null;
   let cards = [];
+  // Its own request and its own failure: the Screen needs nothing the board
+  // does, and a board that cannot load must not take it down, nor the reverse.
+  // A slow answer for a meeting since left must not overwrite the one on screen.
+  api.screen(date)
+    .catch((e) => ({ error: `The screen could not be read — ${e.message}` }))
+    .then((got) => {
+      if (context.date !== date) return;
+      state.screen = got;
+      renderScreenNow();
+    });
   try {
     [summary, money, cards] = await Promise.all([
       api.tipsSummary(date),
@@ -337,8 +350,22 @@ function renderSources(ctx) {
 
 /* ── the page ──────────────────────────────────────────────────────────── */
 
+/** race_no -> Map(horse_no -> how many sources back it), for the Screen. */
+function tipsByRace(ctx) {
+  const out = new Map();
+  (ctx?.summary.races ?? []).forEach((r) => {
+    out.set(r.race_no, new Map(r.picks.map((p) => [p.horse_no, p.backed_by.length])));
+  });
+  return out;
+}
+
+function renderScreenNow() {
+  renderScreen($('scr'), state.screen, tipsByRace(state.ctx));
+}
+
 function render() {
   const ctx = state.ctx;
+  renderScreenNow();
   renderBar(ctx);
   const host = $('bf-races');
   host.replaceChildren();
@@ -362,7 +389,7 @@ async function main() {
   await context.init();
   renderNav($('nav'), 'briefing.html');
   context.onChange((_c, what) => {
-    if (what === 'date') { state.ctx = null; state.open = null; render(); }
+    if (what === 'date') { state.ctx = null; state.open = null; state.screen = null; render(); }
     if (what === 'meeting') load();
   });
   await load();

@@ -116,6 +116,7 @@ export const api = {
   raceDayMeeting: (date) => get(`/raceday/${date}`),
   money: (date) => get(`/money/${date}`),
   tipsSummary: (date) => get(`/tips/summary/${date}`),
+  screen: (date) => get(`/screen/${date}`),
   meetingBlackbook: (date) => get(`/raceday/${date}/blackbook`),
   blackbook: (q = '') => get(`/blackbook${q}`),
   blackbookEntry: (id) => get(`/blackbook/${encodeURIComponent(id)}`),

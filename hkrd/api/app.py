@@ -50,7 +50,7 @@ auth.install(app)
 # One router per page's domain. Order is not significant between routers, but
 # it is WITHIN blackbook's — see the note there.
 for _module in (routes.lookup, routes.blackbook, routes.bets, routes.results,
-                routes.trials, routes.jobs, routes.tips):
+                routes.trials, routes.jobs, routes.tips, routes.screen):
     app.include_router(_module.router)
 
 

@@ -5,7 +5,8 @@ file stops being read and starts being searched. The split is by domain rather
 than by HTTP verb, so everything one page needs is in one file and adding a
 page adds a file instead of a section.
 """
-from hkrd.api.routes import (bets, blackbook, jobs, lookup, results, tips,
-                             trials)
+from hkrd.api.routes import (bets, blackbook, jobs, lookup, results, screen,
+                             tips, trials)
 
-__all__ = ["bets", "blackbook", "jobs", "lookup", "results", "tips", "trials"]
+__all__ = ["bets", "blackbook", "jobs", "lookup", "results", "screen", "tips",
+           "trials"]
