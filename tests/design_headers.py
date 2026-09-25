@@ -100,7 +100,12 @@ def _from_grid(src: str) -> set[str]:
 
     A table is a grid template that appears more than once — once for the
     header, once for the row the data repeats through. The header is the
-    occurrence whose cells are literal text; a data row is all `{{ }}`.
+    occurrence with literal cells; a data row is all `{{ }}`.
+
+    A header may carry a bound cell of its own — the Briefing's price column
+    is headed `{{ r.slPriceHead }}` because it reads TOTE only once a tote is
+    open — so the literal cells of such a row still count. Skipping the whole
+    row for one binding read the Briefing artboard as having no table at all.
     """
     tree = _Tree()
     tree.feed(src)
@@ -113,14 +118,11 @@ def _from_grid(src: str) -> set[str]:
         if len(nodes) < 2:
             continue
         for node in nodes:
-            whole = _inner(node)
-            if not whole or "{{" in whole:
-                continue
             cells = [c for k in node.kids for c in _labels(k)]
             # Two literal cells is a caption, not a table header.
             if len(cells) >= 3:
                 out |= set(cells)
-            break
+                break
     return out
 
 

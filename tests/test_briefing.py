@@ -162,3 +162,14 @@ def test_the_route_404s_without_a_card(monkeypatch, db):
 def test_every_clock_source_says_when_it_usually_lands(key):
     due = next(c for c in briefing.CLOCK if c.key == key)
     assert due.usual and due.kind in ("said", "priced")
+
+
+def test_the_route_reads_the_page_as_at_a_moment(monkeypatch, db):
+    from fastapi.testclient import TestClient
+
+    from hkrd.api.app import app
+    monkeypatch.setenv("HKRD_DB", _path(db))
+    client = TestClient(app)
+    body = client.get(f"/api/briefing/{TODAY}?as_of=2026-09-25T12:00").json()
+    assert body["as_of"] == "2026-09-25T12:00" and body["stage"] == "cold"
+    assert client.get(f"/api/briefing/{TODAY}?as_of=tuesday").status_code == 422

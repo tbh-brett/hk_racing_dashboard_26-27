@@ -1,7 +1,7 @@
 """Capture Ladbrokes' fixed odds, and the Racing & Sports tips it carries.
 
     python -m hkrd.jobs.scrape_fixed_odds --date 2026-09-23
-    python -m hkrd.jobs.scrape_fixed_odds             # today's meeting
+    python -m hkrd.jobs.scrape_fixed_odds             # today's meeting, if any
 
 Ladbrokes answers the Fly machine directly, so unlike the YouTube sources
 this runs on the server's own schedule. Sportsbet refuses the server (403,
@@ -53,6 +53,7 @@ class FixedOddsReport:
     tips_held: int = 0
     skipped: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    idle: bool = False      # asked about today, and today has no meeting
 
     @property
     def ok(self) -> bool:
@@ -73,7 +74,11 @@ class FixedOddsReport:
 
 
 def scrape(date: str, *, venue: str | None = None, db: Path | None = None,
-           session=None) -> FixedOddsReport:
+           session=None, idle_if_no_card: bool = False) -> FixedOddsReport:
+    """`idle_if_no_card`: the scheduled run asks about today every half
+    hour, and most days hold no meeting. That is a quiet day, not a failure,
+    and is neither logged as one nor sent to Ladbrokes. A date asked for by
+    name with no card stored is still an error."""
     report = FixedOddsReport(date=date)
     conn = get_conn(db if db is not None else db_path())
     try:
@@ -81,6 +86,9 @@ def scrape(date: str, *, venue: str | None = None, db: Path | None = None,
         card = tips.meeting_card(conn, date)
         report.venue = venue or tips.meeting_venue(conn, date) or ""
         if not card or not report.venue:
+            if idle_if_no_card:
+                report.idle = True
+                return report
             report.errors.append(f"{date}: no card stored — scrape the "
                                  f"meeting first")
             return report
@@ -156,7 +164,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--db", type=Path, default=None)
     a = ap.parse_args(argv)
     date = a.date or dt.datetime.now(_HK).date().isoformat()
-    report = scrape(date, venue=a.venue, db=a.db)
+    report = scrape(date, venue=a.venue, db=a.db, idle_if_no_card=not a.date)
+    if report.idle:
+        print(f"  fixed odds         {date}: no meeting stored for today")
+        return 0
     print(report.render())
     return 0 if report.ok else 1
 

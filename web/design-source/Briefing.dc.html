@@ -3,6 +3,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
+
+
+
+
 <script src="./support.js"></script>
 </head>
 <body>
@@ -12,73 +16,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
-<style>/* cyrillic-ext */
-
-/* cyrillic */
-
-/* vietnamese */
-
-/* latin-ext */
-
-/* latin */
-
-/* cyrillic-ext */
-
-/* cyrillic */
-
-/* vietnamese */
-
-/* latin-ext */
-
-/* latin */
-
-/* cyrillic-ext */
-
-/* cyrillic */
-
-/* vietnamese */
-
-/* latin-ext */
-
-/* latin */
-
-/* cyrillic-ext */
-
-/* cyrillic */
-
-/* greek */
-
-/* vietnamese */
-
-/* latin-ext */
-
-/* latin */
-
-/* cyrillic-ext */
-
-/* cyrillic */
-
-/* greek */
-
-/* vietnamese */
-
-/* latin-ext */
-
-/* latin */
-
-/* cyrillic-ext */
-
-/* cyrillic */
-
-/* greek */
-
-/* vietnamese */
-
-/* latin-ext */
-
-/* latin */
-
-</style>
+<style>/* fonts */</style>
 <style>/* tokens.css — the single colour and spacing vocabulary.
 
  *
@@ -192,6 +130,26 @@
   --gear:         #9b8cd0;   /* gear carried again        (named: GEAR_C)  */
 
   --gear-first:   #cbbcf5;   /* gear applied for the first time            */
+
+
+
+  /* ── the Briefing: what people said ──────────────────────────────────────
+
+   * Proposed with the Briefing artboard. Support is not a market signal, so
+
+   * it borrows none of the colours above: a warm paper tone for a tipster's
+
+   * pick or featured mark, and a lime for the jockey or trainer speaking —
+
+   * the words that matter most on that page. Market value stays uncoloured
+
+   * (full text when +5% or better, dim when negative) because amber is
+
+   * already the MODEL's edge.                                              */
+
+  --tip:          #e3d9c2;   /* tipster support: a pick, a featured mark   */
+
+  --voice:        #c9dc6e;   /* a jockey or trainer interview              */
 
 
 
@@ -605,29 +563,23 @@ a:hover { color: #ffc75a; }
 
 }
 
-
-/* ── Briefing page: proposed tokens (review before merge) ─────────────────
- * Two, not three. Market value stays uncoloured: a signed number in full
- * --text when it clears +5%, --text-dim when negative. Every free hue on the
- * wheel is already claimed, and a value colour would read as "back this".  */
-:root {
-  --tip:   #e3d9c2;   /* tipster support: a pick or featured mark, a source count */
-  --voice: #c9dc6e;   /* jockey or trainer interview: the highlight and its mark  */
-}
 </style>
 <style>
   html, body { margin:0; padding:0; background:var(--bg-deep); }
   * { box-sizing:border-box; }
-  a { color:var(--edge); text-decoration:none; }
+  a { color:var(--text-muted); text-decoration:none; }
   a:hover { color:var(--text); }
-  @keyframes tick { 0%,100% { opacity:1 } 50% { opacity:.35 } }
 </style>
 </helmet>
-<div style="display:flex;gap:40px;padding:40px;align-items:flex-start;width:max-content;min-height:100vh;background:var(--bg-deep);color:var(--text);font-family:var(--font);font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased">
+<div style="display:flex;gap:40px;padding:40px;align-items:flex-start;width:max-content;min-height:100vh;background:var(--bg-deep);color:var(--text);font-family:var(--font), 'Noto Sans HK';font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased">
+
+<sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+  <div style="font-family:var(--font-mono);font-size:12px;color:var(--text-dim);padding:24px">{{ loadMsg }}</div>
+</sc-if>
 
 <sc-if value="{{ showDesktop }}" hint-placeholder-val="{{ true }}">
 <div style="flex:none">
-  <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;color:var(--text-dim);margin-bottom:8px">DESKTOP · 1440 · {{ momentLabel }}</div>
+  <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--text-dim);margin-bottom:9px">DESKTOP · 1440 · {{ stageLabel }}</div>
   <div style="width:1440px;min-height:900px;background:var(--bg);border:1px solid var(--line-2);font-size:13px">
 
     <div style="display:flex;align-items:stretch;height:32px;border-bottom:1px solid var(--line);background:var(--bg-deep)">
@@ -636,307 +588,385 @@ a:hover { color: #ffc75a; }
         <div style="font-family:var(--font-mono);font-weight:600;font-size:12px;letter-spacing:.16em">RACEDAY</div>
       </div>
       <div style="display:flex;align-items:center;gap:16px;padding:0 16px;font-family:var(--font-mono);font-size:12px;white-space:nowrap">
-        <span style="font-weight:600">HV</span>
-        <span style="color:var(--text-2)">23 Sep 2026</span>
-        <span style="color:var(--text-muted)">9 races</span>
-        <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted)"><span style="width:6px;height:6px;border-radius:50%;background:{{ clockDot }};flex:none"></span>{{ clock }}</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;padding:0 14px;border-left:1px solid var(--line);margin-left:auto;font-family:var(--font-mono);font-size:11px">
-        <span style="color:var(--text-dim);letter-spacing:.1em">DATA</span>
-        <sc-for list="{{ freshness }}" as="f" hint-placeholder-count="5">
-          <span style="display:flex;align-items:baseline;gap:4px;padding:1px 5px;border:1px solid {{ f.border }};white-space:nowrap">
-            <span style="color:var(--text-muted)">{{ f.name }}</span>
-            <span style="color:{{ f.color }};font-weight:600">{{ f.mark }}</span>
-            <span style="color:{{ f.color }}">{{ f.age }}</span>
-          </span>
-        </sc-for>
+        <span style="font-weight:600">{{ venue }}</span>
+        <span style="color:var(--text-2)">{{ dateLong }}</span>
+        <span style="color:var(--text-muted)">{{ raceCount }}</span>
+        <span style="font-size:10px;color:var(--text-muted)">{{ asOfLine }}</span>
       </div>
     </div>
-
     <nav style="display:flex;align-items:stretch;height:34px;border-bottom:1px solid var(--line-2);background:var(--surface)">
       <sc-for list="{{ pages }}" as="p" hint-placeholder-count="9">
-        <a href="{{ p.href }}" style="display:flex;align-items:center;padding:0 16px;font-size:12px;font-weight:500;letter-spacing:.03em;color:var(--text-muted);border-right:1px solid var(--line)" style-hover="box-shadow:inset 0 0 0 999px rgba(255,255,255,0.06)">
+        <a href="{{ p.href }}" style="display:flex;align-items:center;padding:0 16px;font-size:12px;font-weight:500;letter-spacing:.03em;color:var(--text-muted);border-right:1px solid var(--line)" style-hover="background:var(--row-hover)">
           <span style="color:{{ p.color }};border-bottom:2px solid {{ p.mark }};padding-bottom:1px">{{ p.name }}</span>
         </a>
       </sc-for>
     </nav>
 
-    <div style="display:flex;align-items:center;height:36px;border-bottom:1px solid var(--line-2);font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">
-      <div style="display:flex;align-items:center;height:100%;padding:0 14px;border-right:1px solid var(--line-2);font-size:12px;font-weight:600;letter-spacing:.12em;color:var(--text)">BRIEFING</div>
-      <div style="display:flex;gap:18px;padding:0 14px;white-space:nowrap">
-        <span><span style="color:var(--text-dim)">PRICES · </span>TOTE <span style="color:{{ capTote.color }}">{{ capTote.v }}</span></span>
-        <span>LADBROKES <span style="color:{{ capLb.color }}">{{ capLb.v }}</span></span>
-        <span><span style="color:var(--text-dim)">SOURCES IN </span><span style="color:var(--text)">{{ srcInCount }}</span></span>
-        <span><span style="color:var(--text-dim)">ALL POOLS · MEETING </span><span style="color:var(--text)">{{ meetingPool }}</span></span>
+    <div style="display:flex;align-items:stretch;min-height:36px;border-bottom:1px solid var(--line-2);font-family:var(--font-mono);font-size:10px">
+      <div style="display:flex;align-items:center;padding:0 14px;border-right:1px solid var(--line-2);font-size:12px;font-weight:600;letter-spacing:.12em">BRIEFING</div>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;padding:6px 14px;flex:1;min-width:0">
+        <sc-for list="{{ clock }}" as="c" hint-placeholder-count="8">
+          <span style="display:flex;align-items:baseline;gap:4px;white-space:nowrap">
+            <span style="font-weight:600;color:{{ c.abColor }}">{{ c.ab }}</span>
+            <span style="color:{{ c.color }}">{{ c.txt }}</span>
+          </span>
+        </sc-for>
       </div>
-      <div style="margin-left:auto;padding:0 14px;color:var(--text-dim);white-space:nowrap">ORDERED BY NUMBER OF SOURCES · NOTHING HERE RE-RANKS THE RACE DAY CARD</div>
+      <div style="display:flex;align-items:center;gap:14px;padding:0 14px;border-left:1px solid var(--line-2);white-space:nowrap;color:var(--text-muted)">
+        <sc-for list="{{ capLine }}" as="k" hint-placeholder-count="2">
+          <span>{{ k.l }} <span style="color:{{ k.c }}">{{ k.v }}</span></span>
+        </sc-for>
+      </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:minmax(0,1fr) 352px;align-items:start">
-      <div style="min-width:0;border-right:1px solid var(--line-2)">
-        <div style="display:grid;grid-template-columns:44px 52px 58px 30px 78px minmax(0,1fr) minmax(0,1.35fr) 88px minmax(0,1.1fr) 104px 96px;background:var(--surface);border-bottom:1px solid var(--line-3);font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--text-muted)">
-          <div style="padding:7px 8px">R</div>
-          <div style="padding:7px 4px">OFF</div>
-          <div style="padding:7px 4px">RACE</div>
-          <div style="padding:7px 4px;text-align:center">FLD</div>
-          <div style="padding:7px 6px">MARKET</div>
-          <div style="padding:7px 8px">FAVOURITE</div>
-          <div style="padding:7px 8px">MOST BACKED</div>
-          <div style="padding:7px 8px">ITS PRICE</div>
-          <div style="padding:7px 8px">BIGGEST PRICE GAP</div>
-          <div style="padding:7px 6px">SIGNALS</div>
-          <div style="padding:7px 6px">SOURCES</div>
-        </div>
+    <sc-if value="{{ hasNow }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:center;gap:24px;height:30px;padding:0 14px;border-bottom:1px solid var(--line-2);background:var(--surface);font-family:var(--font-mono);font-size:12px;white-space:nowrap">
+        <sc-for list="{{ nowItems }}" as="n" hint-placeholder-count="3">
+          <span sc-camel-on-click="{{ n.go }}" style="display:flex;align-items:baseline;gap:6px;cursor:{{ n.cursor }}">
+            <span style="font-size:10px;letter-spacing:.1em;color:var(--text-muted)">{{ n.l }}</span>
+            <span style="font-weight:600;color:{{ n.c }}">{{ n.v }}</span>
+            <span style="color:var(--text-2)">{{ n.sub }}</span>
+          </span>
+        </sc-for>
+      </div>
+    </sc-if>
 
-        <sc-for list="{{ races }}" as="r" hint-placeholder-count="9">
-          <div>
-            <sc-if value="{{ r.isRun }}" hint-placeholder-val="{{ false }}">
-              <div style="display:flex;align-items:center;gap:14px;height:26px;padding:0 8px;border-bottom:1px solid var(--line);font-family:var(--font-mono);font-size:11px;color:var(--text-faint)">
-                <span style="width:28px;font-weight:600">{{ r.label }}</span>
-                <span style="width:40px">{{ r.off }}</span>
-                <span style="width:120px">{{ r.distCls }}</span>
-                <span style="letter-spacing:.08em">RAN · BRIEFING CLOSED</span>
-                <a href="Results.dc.html" style="margin-left:auto;color:var(--text-dim)">RESULT ▸</a>
+    <sc-for list="{{ deskList }}" as="r" hint-placeholder-count="10">
+      <div>
+        <sc-if value="{{ r.isHead }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:baseline;gap:14px;padding:14px 14px 6px;border-bottom:1px solid var(--line-2);font-family:var(--font-mono);font-size:10px">
+            <span style="letter-spacing:.12em;color:var(--text-2);font-weight:600">{{ r.headL }}</span>
+            <span style="color:var(--text-dim)">{{ r.headR }}</span>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ r.isRunRow }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:14px;height:26px;padding:0 14px 0 11px;border-left:3px solid transparent;border-bottom:1px solid var(--line);font-family:var(--font-mono);font-size:12px;color:var(--text-faint);white-space:nowrap">
+            <span style="width:28px;font-weight:600;color:var(--text-dim)">{{ r.label }}</span>
+            <span style="width:44px">{{ r.off }}</span>
+            <span style="font-size:10px;letter-spacing:.1em">RAN</span>
+            <span style="color:var(--text-dim)">{{ r.winner }}</span>
+            <a href="Results.dc.html" style="margin-left:auto;font-size:10px;color:var(--text-dim)">RESULT ▸</a>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ r.isFeat }}" hint-placeholder-val="{{ true }}">
+          <div sc-camel-on-click="{{ r.toggle }}" style="display:grid;grid-template-columns:156px minmax(0,1fr) 176px 392px;border-bottom:1px solid var(--line);border-left:3px solid {{ r.edgeC }};background:{{ r.bg }};cursor:pointer" style-hover="background:var(--row-hover)">
+            <div style="padding:9px 9px 9px 11px;font-family:var(--font-mono)">
+              <div style="display:flex;align-items:baseline;gap:6px;white-space:nowrap">
+                <span style="font-size:14px;font-weight:600">{{ r.label }}</span>
+                <span style="font-size:12px;color:var(--text-2)">{{ r.off }}</span>
+                <span style="font-size:12px;font-weight:{{ r.minsW }};color:{{ r.minsC }}">{{ r.mins }}</span>
               </div>
-            </sc-if>
-            <sc-if value="{{ r.live }}" hint-placeholder-val="{{ true }}">
-              <div sc-camel-on-click="{{ r.toggle }}" style="display:grid;grid-template-columns:44px 52px 58px 30px 78px minmax(0,1fr) minmax(0,1.35fr) 88px minmax(0,1.1fr) 104px 96px;align-items:center;min-height:46px;border-bottom:1px solid var(--line);background:{{ r.bg }};cursor:pointer;font-family:var(--font-mono)" style-hover="background:var(--row-hover)">
-                <div style="align-self:stretch;display:flex;align-items:center;padding:0 8px;border-left:3px solid {{ r.mark }};font-size:14px;font-weight:600">{{ r.label }}</div>
-                <div style="padding:0 4px">
-                  <div style="font-size:12px;color:var(--text-2)">{{ r.off }}</div>
-                  <div style="font-size:10px;color:var(--edge)">{{ r.offSub }}</div>
-                </div>
-                <div style="padding:0 4px;font-size:11px;color:var(--text-2);line-height:1.35">
-                  <div>{{ r.dist }}</div>
-                  <div style="color:var(--text-muted)">{{ r.cls }}</div>
-                </div>
-                <div style="padding:0 4px;text-align:center;font-size:12px;color:var(--text-2)">{{ r.field }}</div>
-                <div style="padding:0 6px">
-                  <div style="display:flex;gap:2px;align-items:flex-end;height:14px">
-                    <sc-for list="{{ r.bars }}" as="b" hint-placeholder-count="3"><div style="width:5px;height:{{ b.h }};background:{{ b.bg }}"></div></sc-for>
-                  </div>
-                  <div style="font-size:10px;letter-spacing:.08em;color:var(--text-muted);margin-top:2px">{{ r.band }}</div>
-                </div>
-                <div style="padding:0 8px;min-width:0">
-                  <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ r.fav.color }}">{{ r.fav.no }} {{ r.fav.name }}</div>
-                  <div style="font-size:11px;color:var(--text-muted);white-space:nowrap">TOTE <span style="color:var(--text)">{{ r.fav.price }}</span></div>
-                </div>
-                <div style="padding:4px 8px;min-width:0">
-                  <sc-if value="{{ r.hasTips }}" hint-placeholder-val="{{ true }}">
-                    <div style="display:flex;align-items:baseline;gap:7px;min-width:0">
-                      <span style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ r.top.nameColor }}">{{ r.top.no }} {{ r.top.name }}</span>
-                      <span style="flex:none;font-size:11px;color:var(--tip)">{{ r.top.countLabel }}</span>
-                      <span style="flex:none;font-size:10px;color:var(--text-dim)">{{ r.top.tie }}</span>
-                    </div>
-                    <div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px">
-                      <sc-for list="{{ r.top.marks }}" as="m" hint-placeholder-count="3">
-                        <span style="font-size:10px;line-height:14px;padding:0 4px;white-space:nowrap;color:{{ m.color }};border:1px {{ m.bstyle }} {{ m.bcolor }};background:{{ m.bg }}">{{ m.t }}<sc-if value="{{ m.heard }}" hint-placeholder-val="{{ false }}"><span style="color:var(--text-dim);margin-left:2px">~</span></sc-if></span>
-                      </sc-for>
-                    </div>
-                  </sc-if>
-                  <sc-if value="{{ r.noTips }}" hint-placeholder-val="{{ false }}">
-                    <div style="font-size:11px;color:var(--text-dim);line-height:1.35">{{ r.noTipsMsg }}</div>
-                  </sc-if>
-                </div>
-                <div style="padding:0 8px">
-                  <sc-for list="{{ r.topPrices }}" as="x" hint-placeholder-count="2">
-                    <div style="display:flex;justify-content:space-between;gap:6px;white-space:nowrap;line-height:1.35">
-                      <span style="font-size:10px;color:var(--text-muted);letter-spacing:.06em">{{ x.l }}</span>
-                      <span style="font-size:{{ x.size }};font-weight:{{ x.weight }};color:{{ x.color }}">{{ x.v }}</span>
-                    </div>
-                  </sc-for>
-                </div>
-                <div style="padding:0 8px;min-width:0">
-                  <sc-if value="{{ r.hasGap }}" hint-placeholder-val="{{ true }}">
-                    <div style="display:flex;align-items:baseline;gap:7px;min-width:0">
-                      <span style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.gap.no }} {{ r.gap.name }}</span>
-                    </div>
-                    <div style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-muted)"><span style="color:{{ r.gap.color }};font-weight:{{ r.gap.weight }}">{{ r.gap.val }}</span> {{ r.gap.line }}</div>
-                  </sc-if>
-                  <sc-if value="{{ r.noGap }}" hint-placeholder-val="{{ false }}">
-                    <div style="font-size:11px;color:var(--text-dim)">{{ r.noGapMsg }}</div>
-                  </sc-if>
-                </div>
-                <div style="padding:0 6px;display:flex;flex-wrap:wrap;gap:3px">
-                  <sc-for list="{{ r.flags }}" as="c" hint-placeholder-count="1">
-                    <span style="font-size:10px;line-height:14px;padding:0 4px;white-space:nowrap;letter-spacing:.04em;color:{{ c.c }};border:1px solid {{ c.b }}">{{ c.t }}</span>
-                  </sc-for>
-                </div>
-                <div style="padding:0 6px;display:flex;gap:5px;font-size:10px;letter-spacing:.04em">
-                  <sc-for list="{{ r.srcIn }}" as="s" hint-placeholder-count="4"><span style="color:{{ s.c }}">{{ s.t }}</span></sc-for>
-                </div>
+              <div style="display:flex;gap:6px;margin-top:4px;font-size:10px;color:var(--text-muted);white-space:nowrap">
+                <span>{{ r.dist }}</span>
+                <span style="color:{{ r.clsC }};background:{{ r.clsBg }};padding:0 3px">{{ r.cls }}</span>
+                <span>{{ r.course }}</span>
+                <span>{{ r.field }}</span>
               </div>
-
-              <sc-if value="{{ r.open }}" hint-placeholder-val="{{ false }}">
-                <div style="background:var(--detail);border-bottom:1px solid var(--detail-rule);padding:10px 14px 12px 47px">
-                  <div style="display:flex;gap:18px;font-family:var(--font-mono);font-size:11px;color:var(--text-muted);white-space:nowrap">
-                    <span>WIN POOL <span style="color:var(--text)">{{ r.pool }}</span></span>
-                    <span>MARGIN · TOTE <span style="color:var(--text)">{{ r.mTote }}</span> · LADBROKES <span style="color:var(--text)">{{ r.mLb }}</span></span>
-                    <span>CONCENTRATION <span style="color:var(--text)">{{ r.conc }}</span> {{ r.band }}</span>
-                    <span>{{ r.course }}</span>
-                    <a href="Race Day.dc.html" style="margin-left:auto;color:var(--text-muted)">RACE DAY CARD ▸</a>
-                  </div>
-
-                  <sc-for list="{{ r.interviews }}" as="iv" hint-placeholder-count="1">
-                    <div style="margin-top:9px;padding:8px 11px 7px;border-top:2px solid var(--voice);background:color-mix(in srgb, var(--voice) 7%, transparent)">
-                      <div style="display:flex;align-items:baseline;gap:9px;font-family:var(--font-mono);font-size:11px;margin-bottom:4px">
-                        <span style="font-size:10px;letter-spacing:.1em;color:var(--voice);font-weight:600">{{ iv.role }}</span>
-                        <span style="font-size:12px;font-weight:600;font-family:var(--font)">{{ iv.speaker }}</span>
-                        <span style="color:var(--text-muted)">on</span>
-                        <span style="font-weight:600;color:{{ iv.nameColor }}">{{ iv.horse }}</span>
-                        <span style="margin-left:auto;color:var(--text-dim);letter-spacing:.06em">RACING TO WIN INTERVIEW</span>
-                      </div>
-                      <sc-for list="{{ iv.words }}" as="w" hint-placeholder-count="2">
-                        <div style="display:flex;gap:8px;align-items:baseline;padding:1px 0">
-                          <span sc-camel-on-click="{{ w.toggle }}" style="flex:none;width:10px;font-family:var(--font-mono);font-size:10px;color:var(--text-dim);cursor:pointer">{{ w.caret }}</span>
-                          <span sc-camel-on-click="{{ w.toggle }}" style="flex:1;min-width:0;font-size:13px;line-height:1.5;color:var(--text);cursor:pointer;white-space:{{ w.ws }};overflow:hidden;text-overflow:ellipsis">“{{ w.text }}”</span>
-                          <a href="{{ w.url }}" target="_blank" style="flex:none;font-family:var(--font-mono);font-size:11px;color:var(--voice)">▸ {{ w.tl }}</a>
-                        </div>
-                      </sc-for>
-                    </div>
-                  </sc-for>
-                  <sc-if value="{{ r.noInterview }}" hint-placeholder-val="{{ false }}">
-                    <div style="margin-top:8px;font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">{{ r.noInterviewMsg }}</div>
-                  </sc-if>
-
-                  <div style="margin-top:11px;font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--text-muted)">BACKED · MOST SOURCES FIRST</div>
-                  <sc-if value="{{ r.noTips }}" hint-placeholder-val="{{ false }}">
-                    <div style="padding:7px 0;border-top:1px solid var(--line);margin-top:4px;font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">{{ r.noTipsMsg }}</div>
-                  </sc-if>
-                  <sc-for list="{{ r.picks }}" as="p" hint-placeholder-count="3">
-                    <div style="display:grid;grid-template-columns:220px minmax(0,1fr) 276px;gap:16px;padding:9px 0;border-top:1px solid var(--line);margin-top:4px">
-                      <div style="min-width:0">
-                        <div style="display:flex;align-items:baseline;gap:7px;font-family:var(--font-mono)">
-                          <span style="font-size:13px;font-weight:600;width:20px;flex:none">{{ p.no }}</span>
-                          <span style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ p.nameColor }}">{{ p.name }}</span>
-                          <span style="font-family:var(--font);font-size:12px;color:var(--text-muted);white-space:nowrap">{{ p.zh }}</span>
-                        </div>
-                        <div style="margin:3px 0 0 27px;font-family:var(--font-mono);font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.jt }}</div>
-                        <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:5px 0 0 27px;font-family:var(--font-mono)">
-                          <span style="font-size:11px;font-weight:600;color:var(--tip)">{{ p.countLabel }}</span>
-                          <sc-for list="{{ p.chips }}" as="c" hint-placeholder-count="0">
-                            <span style="font-size:10px;line-height:14px;padding:0 4px;white-space:nowrap;letter-spacing:.04em;color:{{ c.c }};border:1px solid {{ c.b }}">{{ c.t }}</span>
-                          </sc-for>
-                        </div>
-                      </div>
-                      <div style="min-width:0">
-                        <sc-for list="{{ p.srcs }}" as="b" hint-placeholder-count="2">
-                          <div style="display:flex;gap:8px;align-items:baseline;padding:2px 0">
-                            <span style="flex:none;width:84px;font-family:var(--font-mono)">
-                              <span style="font-size:10px;line-height:14px;padding:0 4px;white-space:nowrap;color:{{ b.m.color }};border:1px {{ b.m.bstyle }} {{ b.m.bcolor }};background:{{ b.m.bg }}">{{ b.m.t }}<sc-if value="{{ b.m.heard }}" hint-placeholder-val="{{ false }}"><span style="color:var(--text-dim);margin-left:2px">~</span></sc-if></span>
-                            </span>
-                            <span style="flex:none;width:96px;font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ b.who }}</span>
-                            <div style="flex:1;min-width:0">
-                              <sc-for list="{{ b.words }}" as="w" hint-placeholder-count="1">
-                                <div style="display:flex;gap:7px;align-items:baseline">
-                                  <span sc-camel-on-click="{{ w.toggle }}" style="flex:none;width:10px;font-family:var(--font-mono);font-size:10px;color:var(--text-dim);cursor:pointer">{{ w.caret }}</span>
-                                  <span sc-camel-on-click="{{ w.toggle }}" style="flex:1;min-width:0;font-size:12px;line-height:1.5;color:var(--text-2);cursor:pointer;white-space:{{ w.ws }};overflow:hidden;text-overflow:ellipsis">“{{ w.text }}”</span>
-                                  <a href="{{ w.url }}" target="_blank" style="flex:none;font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">▸ {{ w.tl }}</a>
-                                </div>
-                                <sc-if value="{{ w.hasEn }}" hint-placeholder-val="{{ false }}">
-                                  <div style="margin-left:17px;font-size:11px;line-height:1.45;color:var(--text-muted)">{{ w.en }}</div>
-                                </sc-if>
-                              </sc-for>
-                              <sc-if value="{{ b.noWords }}" hint-placeholder-val="{{ false }}">
-                                <div style="display:flex;gap:7px;align-items:baseline">
-                                  <span style="flex:1;min-width:0;margin-left:17px;font-size:11px;color:var(--text-dim)">{{ b.noWordsMsg }}</span>
-                                  <a href="{{ b.url }}" target="_blank" style="flex:none;font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">▸ {{ b.tl }}</a>
-                                </div>
-                              </sc-if>
-                            </div>
-                          </div>
-                        </sc-for>
-                      </div>
-                      <div style="display:grid;grid-template-columns:{{ p.pt.cols }};align-self:start;font-family:var(--font-mono);border:1px solid var(--line-2)">
-                        <div style="background:var(--surface);border-bottom:1px solid var(--line-2)"></div>
-                        <sc-for list="{{ p.pt.head }}" as="h" hint-placeholder-count="2">
-                          <div style="padding:3px 7px;text-align:right;background:var(--surface);border-bottom:1px solid var(--line-2);white-space:nowrap">
-                            <div style="font-size:10px;letter-spacing:.08em;color:var(--text-muted)">{{ h.label }}</div>
-                            <div style="font-size:10px;color:{{ h.color }}">{{ h.sub }}</div>
-                          </div>
-                        </sc-for>
-                        <sc-for list="{{ p.pt.cells }}" as="c" hint-placeholder-count="12">
-                          <div style="padding:2px 7px;text-align:{{ c.align }};font-size:{{ c.size }};letter-spacing:{{ c.ls }};line-height:1.25;color:{{ c.color }};font-weight:{{ c.weight }};white-space:{{ c.ws }}">{{ c.v }}</div>
-                        </sc-for>
-                      </div>
-                    </div>
-                  </sc-for>
-
-                  <div style="margin-top:10px;font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--text-muted)">REST OF FIELD · ONLY RUNNERS WITH A SIGNAL OR A PRICE GAP</div>
-                  <div style="margin-top:4px">
-                    <sc-for list="{{ r.rest }}" as="x" hint-placeholder-count="2">
-                      <div style="display:flex;align-items:baseline;gap:10px;padding:4px 0;border-top:1px solid var(--line);font-family:var(--font-mono);font-size:11px">
-                        <span style="width:20px;font-size:12px;font-weight:600">{{ x.no }}</span>
-                        <span style="width:170px;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ x.nameColor }}">{{ x.name }}</span>
-                        <span style="width:96px;white-space:nowrap;color:var(--text-2)">{{ x.price }}</span>
-                        <span style="display:flex;gap:4px">
-                          <sc-for list="{{ x.chips }}" as="c" hint-placeholder-count="1"><span style="font-size:10px;line-height:14px;padding:0 4px;white-space:nowrap;color:{{ c.c }};border:1px solid {{ c.b }}">{{ c.t }}</span></sc-for>
-                        </span>
-                        <span style="white-space:nowrap;color:var(--text-muted)"><span style="color:{{ x.gapColor }};font-weight:{{ x.gapWeight }}">{{ x.gap }}</span> {{ x.gapLine }}</span>
-                        <span style="margin-left:auto;white-space:nowrap;color:var(--text-dim)">{{ x.src }}</span>
-                      </div>
-                    </sc-for>
-                    <sc-if value="{{ r.noRest }}" hint-placeholder-val="{{ false }}">
-                      <div style="padding:5px 0;border-top:1px solid var(--line);font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">NO OTHER RUNNER CARRIES A SIGNAL OR A PRICE GAP OF +5% OR MORE</div>
-                    </sc-if>
-                  </div>
+              <sc-if value="{{ r.hasMarket }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:6px;font-size:10px;color:var(--text-muted);line-height:1.5">
+                  <div style="white-space:nowrap">FAV <span style="color:var(--text)">#{{ r.fav.no }}</span> <span style="font-size:12px;color:var(--text);font-weight:600">{{ r.fav.win }}</span> <span style="color:var(--text-dim)">{{ r.fav.tag }}</span></div>
+                  <div style="white-space:nowrap">{{ r.conc }} · POOL <span style="color:var(--text-2)">{{ r.poolShort }}</span></div>
                 </div>
               </sc-if>
-            </sc-if>
+            </div>
+            <div style="padding:9px 14px 9px 9px;min-width:0;border-left:1px solid var(--line)">
+              <sc-for list="{{ r.featReasons }}" as="x" hint-placeholder-count="3">
+                <div style="display:flex;align-items:baseline;gap:9px;padding:2px 0">
+                  <span style="flex:none;width:48px;text-align:center;font-family:var(--font-mono);font-size:10px;line-height:14px;letter-spacing:.06em;color:{{ x.tc }};border:1px {{ x.ts }} {{ x.tb }};background:{{ x.tg }}">{{ x.tag }}</span>
+                  <span style="font-size:13px;line-height:1.4;color:var(--text-2);text-wrap:pretty">{{ x.text }}</span>
+                </div>
+              </sc-for>
+              <sc-if value="{{ r.hasMore }}" hint-placeholder-val="{{ false }}">
+                <div style="margin:4px 0 0 57px;font-family:var(--font-mono);font-size:10px;color:var(--text-dim)">{{ r.moreLabel }}</div>
+              </sc-if>
+            </div>
+            <div style="padding:9px;border-left:1px solid var(--line);font-family:var(--font-mono)">
+              <div style="font-size:10px;letter-spacing:.08em;color:var(--text-muted)">PACE</div>
+              <div style="font-size:12px;color:var(--text-2);margin-top:3px;line-height:1.35">{{ r.pace.head }}</div>
+              <div style="display:flex;gap:1px;height:6px;margin-top:6px;background:var(--meter)">
+                <sc-for list="{{ r.pace.segs }}" as="s" hint-placeholder-count="4"><div style="flex:{{ s.n }};background:{{ s.c }}"></div></sc-for>
+              </div>
+              <div style="display:flex;gap:6px;margin-top:4px;font-size:10px">
+                <sc-for list="{{ r.pace.segs }}" as="s" hint-placeholder-count="4"><span style="color:{{ s.c }}">{{ s.t }}</span></sc-for>
+              </div>
+            </div>
+            <div style="padding:9px 14px 9px 9px;border-left:1px solid var(--line);font-family:var(--font-mono)">
+              <div style="display:grid;grid-template-columns:18px minmax(0,1fr) 56px 34px 52px 58px;gap:0 6px;font-size:10px;letter-spacing:.06em;color:var(--text-muted);padding-bottom:3px">
+                <span></span><span>SCREEN'S FOUR</span><span>PLACE</span><span></span><span>SAID</span><span style="text-align:right">{{ r.slPriceHead }}</span>
+              </div>
+              <sc-for list="{{ r.shortlist }}" as="x" hint-placeholder-count="4">
+                <div style="display:grid;grid-template-columns:18px minmax(0,1fr) 56px 34px 52px 58px;gap:0 6px;align-items:center;height:20px;font-size:12px">
+                  <span style="font-size:10px;color:var(--text-dim)">{{ x.rank }}</span>
+                  <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;color:{{ x.nameColor }}">{{ x.no }} {{ x.name }}</span>
+                  <span style="height:5px;background:var(--meter)"><span style="display:block;height:100%;width:{{ x.bar }};background:var(--text-2)"></span></span>
+                  <span style="text-align:right;color:var(--text-2)">{{ x.place }}</span>
+                  <span style="white-space:nowrap;font-size:10px"><span style="color:{{ x.saidC }}">{{ x.said }}</span> <span style="color:var(--voice)">{{ x.int }}</span></span>
+                  <span style="text-align:right;white-space:nowrap"><span style="font-size:10px;color:var(--text-dim)">{{ x.mrank }} </span><span style="color:var(--text)">{{ x.price }}</span></span>
+                </div>
+              </sc-for>
+            </div>
           </div>
-        </sc-for>
+        </sc-if>
 
-        <div style="display:flex;flex-wrap:wrap;gap:6px 18px;padding:9px 14px;border-top:1px solid var(--line-2);background:var(--surface);font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">
-          <span><span style="color:var(--tip);border:1px solid color-mix(in srgb, var(--tip) 40%, transparent);padding:0 4px">LB #1</span> pick, with the tipster's rank</span>
-          <span><span style="color:var(--tip);border:1px dashed color-mix(in srgb, var(--tip) 50%, transparent);padding:0 4px">FC FEAT</span> featured segment</span>
-          <span><span style="color:var(--voice);border:1px solid color-mix(in srgb, var(--voice) 45%, transparent);background:color-mix(in srgb, var(--voice) 12%, transparent);padding:0 4px">INT J</span> jockey or trainer interviewed</span>
-          <span><span style="color:var(--text-dim)">~</span> heard: name came through speech-to-text</span>
-          <span>VALUE = price × the other market's fair chance − 1</span>
-          <span style="margin-left:auto;color:var(--text-dim)">click a race to open it</span>
-        </div>
+        <sc-if value="{{ r.isQuiet }}" hint-placeholder-val="{{ false }}">
+          <div sc-camel-on-click="{{ r.toggle }}" style="display:grid;grid-template-columns:156px minmax(0,1fr) 176px 392px;align-items:center;min-height:34px;border-bottom:1px solid var(--line);border-left:3px solid {{ r.edgeC }};background:{{ r.bg }};cursor:pointer;font-family:var(--font-mono)" style-hover="background:var(--row-hover)">
+            <div style="display:flex;align-items:baseline;gap:6px;padding:0 9px 0 11px;white-space:nowrap">
+              <span style="font-size:13px;font-weight:600;color:var(--text-2)">{{ r.label }}</span>
+              <span style="font-size:12px;color:var(--text-muted)">{{ r.off }}</span>
+              <span style="font-size:12px;font-weight:{{ r.minsW }};color:{{ r.minsC }}">{{ r.mins }}</span>
+              <span style="font-size:10px;color:{{ r.clsC }}">{{ r.cls }}</span>
+              <span style="font-size:10px;color:var(--text-dim)">{{ r.dist }}</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:9px;padding:0 14px 0 9px;min-width:0">
+              <span style="flex:none;font-size:10px;color:var(--text-dim);white-space:nowrap">{{ r.kindCounts }}</span>
+              <span style="flex:1;min-width:0;font-family:var(--font);font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.firstReason }}</span>
+            </div>
+            <div style="padding:0 9px">
+              <div style="display:flex;gap:1px;height:5px;background:var(--meter)">
+                <sc-for list="{{ r.pace.segs }}" as="s" hint-placeholder-count="4"><div style="flex:{{ s.n }};background:{{ s.c }}"></div></sc-for>
+              </div>
+              <div style="font-size:10px;color:var(--text-dim);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.pace.short }}</div>
+            </div>
+            <div style="padding:0 14px 0 9px;font-size:10px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">SCREEN'S FOUR · PLACE <span style="color:var(--text-2)">{{ r.slCompact }}</span></div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ r.open }}" hint-placeholder-val="{{ false }}">
+          <div style="background:var(--detail);border-bottom:1px solid var(--detail-rule);border-left:3px solid var(--text);padding:9px 14px 14px 11px">
+            <div style="display:flex;flex-wrap:wrap;gap:4px 16px;font-family:var(--font-mono);font-size:10px;color:var(--text-muted);white-space:nowrap">
+              <span>{{ r.dist }} · {{ r.cls }} · {{ r.course }} · GOING {{ r.going }} · {{ r.field }}</span>
+              <sc-for list="{{ r.poolBits }}" as="b" hint-placeholder-count="0"><span>{{ b.l }} <span style="color:var(--text-2)">{{ b.v }}</span></span></sc-for>
+              <a href="Race Day.dc.html" style="margin-left:auto">RACE DAY CARD ▸</a>
+            </div>
+
+            <sc-for list="{{ r.interviews }}" as="iv" hint-placeholder-count="1">
+              <div style="margin-top:9px;padding:9px 14px 6px;border-top:2px solid var(--voice);background:color-mix(in srgb, var(--voice) 7%, transparent)">
+                <div style="display:flex;align-items:baseline;gap:9px;font-family:var(--font-mono);font-size:12px;margin-bottom:4px">
+                  <span style="font-size:10px;letter-spacing:.1em;color:var(--voice);font-weight:600">{{ iv.role }}</span>
+                  <span style="font-family:var(--font);font-weight:600">{{ iv.speaker }}</span>
+                  <span style="color:var(--text-muted)">on</span>
+                  <span style="font-weight:600;color:{{ iv.nameColor }}">{{ iv.horse }}</span>
+                  <span style="font-size:10px;color:var(--text-dim)">{{ iv.screen }}</span>
+                  <span style="margin-left:auto;font-size:10px;color:var(--text-dim);letter-spacing:.06em">RACING TO WIN INTERVIEW</span>
+                </div>
+                <sc-for list="{{ iv.words }}" as="w" hint-placeholder-count="2">
+                  <div style="display:flex;gap:9px;align-items:baseline;padding:1px 0">
+                    <span sc-camel-on-click="{{ w.toggle }}" style="flex:none;width:9px;font-family:var(--font-mono);font-size:10px;color:var(--text-dim);cursor:pointer">{{ w.caret }}</span>
+                    <span sc-camel-on-click="{{ w.toggle }}" style="flex:1;min-width:0;font-size:13px;line-height:1.5;cursor:pointer;white-space:{{ w.ws }};overflow:hidden;text-overflow:ellipsis">“{{ w.text }}”</span>
+                    <a href="{{ w.url }}" target="_blank" style="flex:none;font-family:var(--font-mono);font-size:12px;color:var(--voice)">▸ {{ w.tl }}</a>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+
+            <sc-for list="{{ r.comments }}" as="cm" hint-placeholder-count="0">
+              <div style="display:flex;gap:9px;align-items:baseline;margin-top:9px">
+                <span style="flex:none;width:96px;font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;color:var(--text-muted)">{{ cm.who }} · RACE</span>
+                <span sc-camel-on-click="{{ cm.w.toggle }}" style="flex:none;width:9px;font-family:var(--font-mono);font-size:10px;color:var(--text-dim);cursor:pointer">{{ cm.w.caret }}</span>
+                <span sc-camel-on-click="{{ cm.w.toggle }}" style="flex:1;min-width:0;font-size:12px;line-height:1.5;color:var(--text-2);cursor:pointer;white-space:{{ cm.w.ws }};overflow:hidden;text-overflow:ellipsis">{{ cm.w.text }}</span>
+                <a href="{{ cm.w.url }}" target="_blank" style="flex:none;font-family:var(--font-mono);font-size:12px">▸ page</a>
+              </div>
+            </sc-for>
+
+            <div style="display:grid;grid-template-columns:{{ r.runGrid }};gap:0 9px;margin-top:9px;padding:4px 0;border-bottom:1px solid var(--line-3);font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;color:var(--text-muted)">
+              <span>SCR</span><span>NO</span><span>HORSE · DRAW · JOCKEY · TRAINER</span><span>STYLE</span><span>SCREEN · PLACE / WIN</span><span></span><span>BLACKBOOK</span><span>SAID · SOURCES</span>
+              <sc-if value="{{ r.hasPrices }}" hint-placeholder-val="{{ false }}">
+                <span style="display:grid;grid-template-columns:{{ r.priceCols }};gap:6px;text-align:right">
+                  <sc-for list="{{ r.priceHead }}" as="h" hint-placeholder-count="3"><span style="white-space:nowrap">{{ h.s }}<span style="display:block;font-size:10px;letter-spacing:0;color:{{ h.c }}">{{ h.sub }}</span></span></sc-for>
+                </span>
+                <span style="text-align:right">MOVE</span>
+              </sc-if>
+              <span></span>
+            </div>
+
+            <sc-for list="{{ r.runners }}" as="x" hint-placeholder-count="12">
+              <div>
+                <div sc-camel-on-click="{{ x.toggle }}" style="display:grid;grid-template-columns:{{ r.runGrid }};gap:0 9px;align-items:center;min-height:36px;padding:3px 0;border-bottom:1px solid var(--line);background:{{ x.bg }};cursor:pointer;opacity:{{ x.op }}" style-hover="background:var(--run-hover)">
+                  <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim)">{{ x.rk }}</span>
+                  <span style="font-family:var(--font-mono);font-size:13px;font-weight:600">{{ x.no }}</span>
+                  <span style="min-width:0">
+                    <span style="display:flex;align-items:baseline;gap:6px;min-width:0">
+                      <span style="font-family:var(--font-mono);font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ x.nameColor }}">{{ x.name }}</span>
+                      <span style="font-size:12px;color:var(--text-muted);white-space:nowrap">{{ x.zh }}</span>
+                    </span>
+                    <span style="display:block;font-family:var(--font-mono);font-size:10px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ x.line2 }}</span>
+                  </span>
+                  <span><span style="font-family:var(--font-mono);font-size:10px;line-height:14px;padding:0 4px;color:{{ x.style.c }};background:{{ x.style.g }}">{{ x.style.t }}</span></span>
+                  <span style="display:flex;align-items:center;gap:6px;font-family:var(--font-mono);white-space:nowrap">
+                    <span style="width:56px;height:5px;background:var(--meter);flex:none"><span style="display:block;height:100%;width:{{ x.bar }};background:{{ x.barC }}"></span></span>
+                    <span style="font-size:12px;color:var(--text)">{{ x.place }}</span>
+                    <span style="font-size:10px;color:var(--text-muted)">{{ x.win }}</span>
+                  </span>
+                  <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;color:{{ x.tierC }}">{{ x.tier }}</span>
+                  <span style="font-family:var(--font-mono);font-size:10px;white-space:nowrap">
+                    <sc-if value="{{ x.hasBB }}" hint-placeholder-val="{{ false }}">
+                      <span style="padding:0 4px;line-height:14px;color:var(--book);background:var(--book-ground)">BB</span> <span style="color:{{ x.setupC }}">{{ x.setup }}</span>
+                    </sc-if>
+                  </span>
+                  <span style="display:flex;flex-wrap:wrap;align-items:center;gap:3px;min-width:0;font-family:var(--font-mono)">
+                    <span style="font-size:12px;color:{{ x.saidC }};margin-right:3px;white-space:nowrap">{{ x.said }}</span>
+                    <sc-for list="{{ x.marks }}" as="m" hint-placeholder-count="2">
+                      <span style="font-size:10px;line-height:14px;padding:0 4px;white-space:nowrap;color:{{ m.color }};border:1px {{ m.bs }} {{ m.bc }};background:{{ m.bg }}">{{ m.t }}<sc-if value="{{ m.heard }}" hint-placeholder-val="{{ false }}"><span style="color:var(--text-dim);margin-left:2px">~</span></sc-if></span>
+                    </sc-for>
+                  </span>
+                  <sc-if value="{{ r.hasPrices }}" hint-placeholder-val="{{ false }}">
+                    <span style="display:grid;grid-template-columns:{{ r.priceCols }};gap:6px;text-align:right;font-family:var(--font-mono)">
+                      <sc-for list="{{ x.cells }}" as="p" hint-placeholder-count="3"><span style="font-size:12px;color:{{ p.c }};font-weight:{{ p.w }}">{{ p.v }}</span></sc-for>
+                    </span>
+                    <span style="text-align:right;font-family:var(--font-mono);font-size:10px;white-space:nowrap;color:{{ x.move.c }}">{{ x.move.t }}</span>
+                  </sc-if>
+                  <span style="display:flex;flex-wrap:wrap;gap:3px;justify-content:flex-end;font-family:var(--font-mono)">
+                    <sc-for list="{{ x.chips }}" as="c" hint-placeholder-count="0"><span style="font-size:10px;line-height:14px;padding:0 4px;white-space:nowrap;color:{{ c.c }};border:1px solid {{ c.b }}">{{ c.t }}</span></sc-for>
+                    <span style="font-size:10px;color:var(--text-dim);width:9px;text-align:right">{{ x.caret }}</span>
+                  </span>
+                </div>
+
+                <sc-if value="{{ x.open }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:grid;grid-template-columns:{{ x.dGrid }};gap:24px;padding:9px 14px 14px 63px;border-bottom:1px solid var(--detail-rule);background:var(--run-open)">
+                    <div style="min-width:0">
+                      <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--text-muted);margin-bottom:6px">THE SCREEN · {{ x.setupLine }}</div>
+                      <div style="display:flex;flex-wrap:wrap;gap:4px">
+                        <sc-for list="{{ x.forList }}" as="f" hint-placeholder-count="2">
+                          <span style="font-size:12px;line-height:1.35;padding:1px 6px;border:1px solid var(--line-3);color:var(--text-2)">{{ f.why }} <span style="font-family:var(--font-mono);font-size:10px;color:var(--text)">{{ f.x }}</span></span>
+                        </sc-for>
+                        <sc-for list="{{ x.againstList }}" as="f" hint-placeholder-count="1">
+                          <span style="font-size:12px;line-height:1.35;padding:1px 6px;border:1px dashed var(--line-3);color:var(--text-muted)">{{ f.why }} <span style="font-family:var(--font-mono);font-size:10px;color:var(--cool)">{{ f.x }}</span></span>
+                        </sc-for>
+                      </div>
+                      <sc-if value="{{ x.hasBB }}" hint-placeholder-val="{{ false }}">
+                        <div style="margin-top:9px;padding-left:9px;border-left:2px solid var(--book)">
+                          <div style="font-family:var(--font-mono);font-size:10px;color:var(--book)">YOUR BOOK · {{ x.bbHead }}</div>
+                          <div style="font-size:12px;line-height:1.45;color:var(--text-2)">{{ x.bbWhy }}</div>
+                        </div>
+                      </sc-if>
+                      <sc-if value="{{ x.hasLast }}" hint-placeholder-val="{{ false }}">
+                        <div style="margin-top:9px">
+                          <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:baseline;font-family:var(--font-mono);font-size:10px;color:var(--text-muted)">
+                            <span style="letter-spacing:.1em">LAST START</span><span style="color:var(--text-2)">{{ x.last.head }}</span>
+                            <sc-for list="{{ x.last.tags }}" as="t" hint-placeholder-count="0"><span style="padding:0 4px;color:var(--incident);border:1px solid color-mix(in srgb, var(--incident) 40%, transparent)">{{ t.t }}</span></sc-for>
+                          </div>
+                          <div style="font-size:12px;line-height:1.45;color:var(--text-2);margin-top:2px">{{ x.last.run }}</div>
+                          <sc-if value="{{ x.last.hasInc }}" hint-placeholder-val="{{ false }}">
+                            <div sc-camel-on-click="{{ x.last.w.toggle }}" style="display:flex;gap:6px;margin-top:3px;cursor:pointer">
+                              <span style="flex:none;font-family:var(--font-mono);font-size:10px;color:var(--incident)">STEWARDS {{ x.last.w.caret }}</span>
+                              <span style="flex:1;min-width:0;font-size:12px;line-height:1.45;color:var(--text-muted);white-space:{{ x.last.w.ws }};overflow:hidden;text-overflow:ellipsis">{{ x.last.w.text }}</span>
+                            </div>
+                          </sc-if>
+                        </div>
+                      </sc-if>
+                      <sc-if value="{{ x.hasTrial }}" hint-placeholder-val="{{ false }}">
+                        <div style="margin-top:9px;font-size:12px;line-height:1.45;color:var(--text-2)">
+                          <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--text-muted)">TRIAL </span><span style="font-family:var(--font-mono);font-size:10px;color:{{ x.trial.c }}">{{ x.trial.head }}</span> {{ x.trial.comment }}
+                        </div>
+                      </sc-if>
+                      <sc-for list="{{ x.notes }}" as="n" hint-placeholder-count="0">
+                        <div style="margin-top:6px;font-size:12px;color:var(--text-2)"><span style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted)">YOUR NOTE </span>{{ n.t }}</div>
+                      </sc-for>
+                      <sc-if value="{{ x.hasRev }}" hint-placeholder-val="{{ false }}">
+                        <div style="margin-top:9px;font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--text-muted)">COULD TURN AROUND</div>
+                        <sc-for list="{{ x.reversals }}" as="v" hint-placeholder-count="1">
+                          <div style="font-size:12px;line-height:1.45;color:var(--text-2);margin-top:2px"><span style="font-family:var(--font-mono);font-weight:600">#{{ v.no }} {{ v.name }}</span> <span style="color:var(--text-muted)">{{ v.note }} · {{ v.moved }}</span></div>
+                        </sc-for>
+                      </sc-if>
+                    </div>
+
+                    <div style="min-width:0">
+                      <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--text-muted);margin-bottom:6px">WHAT WAS SAID · {{ x.saidHead }}</div>
+                      <sc-for list="{{ x.srcs }}" as="b" hint-placeholder-count="2">
+                        <div style="padding:4px 0;border-top:1px solid var(--line)">
+                          <div style="display:flex;gap:6px;align-items:baseline">
+                            <span style="flex:none;font-family:var(--font-mono);font-size:10px;line-height:14px;padding:0 4px;white-space:nowrap;color:{{ b.m.color }};border:1px {{ b.m.bs }} {{ b.m.bc }};background:{{ b.m.bg }}">{{ b.m.t }}<sc-if value="{{ b.m.heard }}" hint-placeholder-val="{{ false }}"><span style="color:var(--text-dim);margin-left:2px">~</span></sc-if></span>
+                            <span style="font-size:12px;color:var(--text-muted)">{{ b.who }}</span>
+                            <sc-if value="{{ b.noWords }}" hint-placeholder-val="{{ false }}">
+                              <span style="font-size:12px;color:var(--text-dim)">{{ b.noWordsMsg }}</span>
+                              <a href="{{ b.url }}" target="_blank" style="margin-left:auto;font-family:var(--font-mono);font-size:12px">▸ {{ b.tl }}</a>
+                            </sc-if>
+                          </div>
+                          <sc-for list="{{ b.words }}" as="w" hint-placeholder-count="1">
+                            <div style="display:flex;gap:6px;align-items:baseline;margin-top:2px">
+                              <span sc-camel-on-click="{{ w.toggle }}" style="flex:none;width:9px;font-family:var(--font-mono);font-size:10px;color:var(--text-dim);cursor:pointer">{{ w.caret }}</span>
+                              <span sc-camel-on-click="{{ w.toggle }}" style="flex:1;min-width:0;font-size:12px;line-height:1.5;color:var(--text-2);cursor:pointer;white-space:{{ w.ws }};overflow:hidden;text-overflow:ellipsis">“{{ w.text }}”</span>
+                              <a href="{{ w.url }}" target="_blank" style="flex:none;font-family:var(--font-mono);font-size:12px;color:{{ w.lc }}">▸ {{ w.tl }}</a>
+                            </div>
+                            <sc-if value="{{ w.hasEn }}" hint-placeholder-val="{{ false }}"><div style="margin-left:15px;font-size:12px;line-height:1.45;color:var(--text-muted)">{{ w.en }}</div></sc-if>
+                          </sc-for>
+                        </div>
+                      </sc-for>
+                      <sc-if value="{{ x.noSaid }}" hint-placeholder-val="{{ false }}">
+                        <div style="padding:4px 0;border-top:1px solid var(--line);font-family:var(--font-mono);font-size:10px;line-height:1.5;color:var(--text-dim)">{{ x.noSaidMsg }}</div>
+                      </sc-if>
+                      <sc-if value="{{ x.hasForm }}" hint-placeholder-val="{{ false }}">
+                        <div style="display:flex;gap:6px;align-items:baseline;padding:4px 0;border-top:1px solid var(--line)">
+                          <span style="flex:none;font-family:var(--font-mono);font-size:10px;color:var(--text-muted)">R&amp;S FORM</span>
+                          <span style="flex:1;font-size:12px;line-height:1.45;color:var(--text-muted)">{{ x.form.text }} <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim)">form, not counted</span></span>
+                          <a href="{{ x.form.url }}" target="_blank" style="flex:none;font-family:var(--font-mono);font-size:12px">▸ page</a>
+                        </div>
+                      </sc-if>
+                    </div>
+
+                    <sc-if value="{{ x.hasPrice }}" hint-placeholder-val="{{ false }}">
+                      <div>
+                        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--text-muted);margin-bottom:6px">PRICES · {{ x.priceHead }}</div>
+                        <div style="display:grid;grid-template-columns:{{ x.pt.cols }};font-family:var(--font-mono);border:1px solid var(--line-2)">
+                          <span style="background:var(--surface);border-bottom:1px solid var(--line-2)"></span>
+                          <sc-for list="{{ x.pt.head }}" as="h" hint-placeholder-count="3"><span style="padding:3px 6px;text-align:right;font-size:10px;letter-spacing:.06em;color:var(--text-muted);background:var(--surface);border-bottom:1px solid var(--line-2)">{{ h.s }}</span></sc-for>
+                          <sc-for list="{{ x.pt.cells }}" as="c" hint-placeholder-count="12"><span style="padding:2px 6px;text-align:{{ c.al }};font-size:{{ c.fs }};line-height:1.4;color:{{ c.c }};font-weight:{{ c.w }};white-space:nowrap">{{ c.v }}</span></sc-for>
+                        </div>
+                        <div style="margin-top:4px;font-family:var(--font-mono);font-size:10px;line-height:1.5;color:var(--text-dim)">{{ x.ptNote }}</div>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
       </div>
+    </sc-for>
 
-      <aside style="background:var(--surface);min-width:0">
-        <div style="display:flex;align-items:baseline;gap:8px;padding:9px 12px 7px;border-bottom:1px solid var(--line-2)">
-          <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--text-muted)">WHERE THE MARKETS DISAGREE</span>
-          <span style="margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--text-dim)">VALUE ≥ +5%</span>
-        </div>
-        <sc-if value="{{ hasEdges }}" hint-placeholder-val="{{ true }}">
-          <div style="display:grid;grid-template-columns:28px minmax(0,1fr) 66px 58px 56px;padding:4px 12px;font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;color:var(--text-dim);border-bottom:1px solid var(--line)">
-            <span>R</span><span>HORSE</span><span style="text-align:right">BETTER AT</span><span style="text-align:right">OTHER FAIR</span><span style="text-align:right">VALUE</span>
-          </div>
-          <sc-for list="{{ edges }}" as="e" hint-placeholder-count="6">
-            <div sc-camel-on-click="{{ e.go }}" style="display:grid;grid-template-columns:28px minmax(0,1fr) 66px 58px 56px;align-items:baseline;padding:5px 12px;border-bottom:1px solid var(--line);font-family:var(--font-mono);font-size:11px;cursor:pointer;opacity:{{ e.op }}" style-hover="background:var(--row-hover)">
-              <span style="color:var(--text-muted)">{{ e.race }}</span>
-              <span style="min-width:0">
-                <span style="display:block;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ e.nameColor }}">{{ e.no }} {{ e.name }}</span>
-                <span style="display:block;font-size:10px;color:{{ e.srcColor }}">{{ e.src }}</span>
-              </span>
-              <span style="text-align:right;white-space:nowrap"><span style="font-size:10px;color:var(--text-muted)">{{ e.at }} </span>{{ e.price }}</span>
-              <span style="text-align:right;color:var(--text-2)">{{ e.fair }}</span>
-              <span style="text-align:right;font-size:12px;font-weight:600">{{ e.ev }}</span>
-            </div>
-          </sc-for>
-        </sc-if>
-        <sc-if value="{{ noEdges }}" hint-placeholder-val="{{ false }}">
-          <div style="padding:12px;font-family:var(--font-mono);font-size:11px;line-height:1.55;color:var(--text-dim);border-bottom:1px solid var(--line)">{{ noEdgesMsg }}</div>
-        </sc-if>
-
-        <div style="padding:9px 12px 7px;border-bottom:1px solid var(--line-2);border-top:1px solid var(--line-2);margin-top:14px;font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--text-muted)">SOURCES FOR THIS MEETING</div>
-        <sc-for list="{{ sources }}" as="s" hint-placeholder-count="4">
-          <div style="padding:7px 12px;border-bottom:1px solid var(--line)">
-            <div style="display:flex;align-items:baseline;gap:8px;font-family:var(--font-mono);font-size:11px">
-              <span style="width:34px;font-size:10px;color:{{ s.abColor }}">{{ s.ab }}</span>
-              <span style="font-family:var(--font);font-size:12px;font-weight:500;color:{{ s.nameColor }}">{{ s.name }}</span>
-              <span style="margin-left:auto;color:{{ s.timeColor }};white-space:nowrap">{{ s.time }}</span>
-            </div>
-            <div style="margin:2px 0 0 42px;font-family:var(--font-mono);font-size:10px;line-height:1.5;color:var(--text-muted)">{{ s.line }}</div>
-            <sc-if value="{{ s.held }}" hint-placeholder-val="{{ false }}">
-              <div style="margin:2px 0 0 42px;font-family:var(--font-mono);font-size:10px;color:var(--incident)">HELD FOR REVIEW · {{ s.held }}</div>
-            </sc-if>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);border-top:1px solid var(--line-2);margin-top:24px;background:var(--surface)">
+      <div style="padding:9px 14px 14px;border-right:1px solid var(--line-2)">
+        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;color:var(--text-muted);margin-bottom:4px">SOURCES · WHAT IS IN, WHAT IS DUE</div>
+        <sc-for list="{{ clockFull }}" as="c" hint-placeholder-count="8">
+          <div style="display:grid;grid-template-columns:40px 190px 170px minmax(0,1fr);gap:9px;align-items:baseline;padding:3px 0;border-top:1px solid var(--line);font-family:var(--font-mono);font-size:10px">
+            <span style="font-weight:600;color:{{ c.abColor }}">{{ c.ab }}</span>
+            <span style="font-family:var(--font);font-size:12px;color:var(--text-2)">{{ c.label }} <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim)">{{ c.counted }}</span></span>
+            <span style="color:{{ c.color }}">{{ c.mark }} {{ c.txt }}</span>
+            <span style="color:var(--text-dim)">{{ c.detail }}</span>
           </div>
         </sc-for>
-      </aside>
+      </div>
+      <div style="padding:9px 14px 14px">
+        <div style="display:flex;align-items:baseline;gap:9px;font-family:var(--font-mono);font-size:10px;margin-bottom:4px">
+          <span style="letter-spacing:.12em;color:var(--text-muted)">WHERE THE MARKETS DISAGREE</span>
+          <span style="color:var(--text-dim)">price × the other market's fair chance − 1 · +5% or more</span>
+        </div>
+        <sc-for list="{{ edges }}" as="e" hint-placeholder-count="0">
+          <div sc-camel-on-click="{{ e.go }}" style="display:grid;grid-template-columns:28px minmax(0,1fr) 90px 110px 56px 70px;gap:9px;align-items:baseline;padding:3px 0;border-top:1px solid var(--line);font-family:var(--font-mono);font-size:12px;cursor:pointer;opacity:{{ e.op }}" style-hover="background:var(--row-hover)">
+            <span style="font-size:10px;color:var(--text-muted)">{{ e.race }}</span>
+            <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ e.nameColor }}">{{ e.no }} {{ e.name }}</span>
+            <span style="text-align:right;white-space:nowrap"><span style="font-size:10px;color:var(--text-muted)">{{ e.at }} </span>{{ e.price }}</span>
+            <span style="text-align:right;font-size:10px;color:var(--text-muted);white-space:nowrap">{{ e.against }} <span style="color:var(--text-2)">{{ e.fair }}</span></span>
+            <span style="text-align:right;font-weight:600">{{ e.ev }}</span>
+            <span style="text-align:right;font-size:10px;color:{{ e.srcC }}">{{ e.src }}</span>
+          </div>
+        </sc-for>
+        <sc-if value="{{ noEdges }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:4px 0;border-top:1px solid var(--line);font-family:var(--font-mono);font-size:10px;color:var(--text-dim)">{{ noEdgesMsg }}</div>
+        </sc-if>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px 16px;padding:9px 14px;border-top:1px solid var(--line-2);font-family:var(--font-mono);font-size:10px;color:var(--text-muted)">
+      <span><span style="padding:0 4px;color:var(--text-2);border:1px solid var(--line-3);background:var(--meter)">SCREEN</span> computed from the card</span>
+      <span><span style="padding:0 4px;color:var(--tip);border:1px solid color-mix(in srgb, var(--tip) 40%, transparent)">SAID</span> a source said it</span>
+      <span><span style="padding:0 4px;color:var(--text);border:1px dashed var(--line-3)">PRICE</span> a market priced it</span>
+      <span><span style="padding:0 4px;color:var(--tip);border:1px solid color-mix(in srgb, var(--tip) 40%, transparent)">RTW #2</span> pick and rank</span>
+      <span><span style="padding:0 4px;color:var(--tip);border:1px dashed color-mix(in srgb, var(--tip) 50%, transparent)">FC FEAT</span> featured</span>
+      <span><span style="padding:0 4px;color:var(--voice);border:1px solid color-mix(in srgb, var(--voice) 45%, transparent);background:color-mix(in srgb, var(--voice) 12%, transparent)">INT J</span> jockey / trainer spoke</span>
+      <span>~ heard via speech-to-text</span>
+      <span style="color:var(--text-dim)">{{ fitLine }}</span>
     </div>
   </div>
 </div>
@@ -944,557 +974,538 @@ a:hover { color: #ffc75a; }
 
 <sc-if value="{{ showPhone }}" hint-placeholder-val="{{ true }}">
 <div style="flex:none">
-  <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;color:var(--text-dim);margin-bottom:8px">PHONE · 390 · {{ momentLabel }}</div>
+  <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--text-dim);margin-bottom:9px">PHONE · 390 · {{ stageLabel }}</div>
   <div style="width:390px;background:var(--bg);border:1px solid var(--line-2);font-size:13px">
-    <div style="position:sticky;top:0;z-index:2;background:var(--surface);border-bottom:1px solid var(--line-2)">
-      <div style="display:flex;align-items:center;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">
-        <span style="font-weight:600;color:var(--text);letter-spacing:.1em">BRIEFING · HV 23 SEP</span>
-        <span style="margin-left:auto;display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:50%;background:{{ clockDot }}"></span>{{ clockShort }}</span>
+    <div style="background:var(--surface);border-bottom:1px solid var(--line-2)">
+      <div style="display:flex;align-items:baseline;gap:9px;padding:9px 14px 4px;font-family:var(--font-mono)">
+        <span style="font-size:12px;font-weight:600;letter-spacing:.1em">BRIEFING</span>
+        <span style="font-size:12px;color:var(--text-2)">{{ venue }} {{ dateShort }}</span>
+        <span style="margin-left:auto;font-size:10px;color:var(--text-muted)">{{ asOfShort }}</span>
       </div>
-      <div style="display:flex;gap:12px;padding:5px 12px 7px;border-top:1px solid var(--line);font-family:var(--font-mono);font-size:10px;color:var(--text-muted);white-space:nowrap">
-        <span>TOTE <span style="color:{{ capTote.color }}">{{ capTote.v }}</span></span>
-        <span>LB <span style="color:{{ capLb.color }}">{{ capLb.v }}</span></span>
-        <span style="margin-left:auto">SOURCES <span style="color:var(--text)">{{ srcInCount }}</span></span>
+      <div style="display:flex;flex-wrap:wrap;gap:4px 9px;padding:0 14px 6px;font-family:var(--font-mono);font-size:10px">
+        <sc-for list="{{ clock }}" as="c" hint-placeholder-count="8"><span style="color:{{ c.abColor }}">{{ c.ab }}<span style="color:{{ c.color }}"> {{ c.mark }}</span></span></sc-for>
       </div>
+      <sc-if value="{{ hasNextDue }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:0 14px 6px;font-family:var(--font-mono);font-size:10px;color:var(--text-muted)">{{ nextDue }}</div>
+      </sc-if>
+      <sc-if value="{{ hasNow }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-wrap:wrap;gap:4px 14px;padding:6px 14px;border-top:1px solid var(--line-2);font-family:var(--font-mono);white-space:nowrap">
+          <sc-for list="{{ nowItems }}" as="n" hint-placeholder-count="2">
+            <span sc-camel-on-click="{{ n.go }}" style="display:flex;align-items:baseline;gap:4px">
+              <span style="font-size:10px;color:var(--text-muted)">{{ n.ls }}</span>
+              <span style="font-size:13px;font-weight:600;color:{{ n.c }}">{{ n.v }}</span>
+              <span style="font-size:12px;color:var(--text-2)">{{ n.subS }}</span>
+            </span>
+          </sc-for>
+        </div>
+      </sc-if>
     </div>
 
-    <sc-for list="{{ races }}" as="r" hint-placeholder-count="9">
+    <sc-for list="{{ phoneList }}" as="r" hint-placeholder-count="10">
       <div>
-        <sc-if value="{{ r.isRun }}" hint-placeholder-val="{{ false }}">
-          <div style="display:flex;align-items:center;gap:10px;height:30px;padding:0 12px;border-bottom:1px solid var(--line);font-family:var(--font-mono);font-size:11px;color:var(--text-faint)">
-            <span style="font-weight:600;width:26px">{{ r.label }}</span><span>{{ r.off }}</span><span>RAN</span>
-            <a href="Results.dc.html" style="margin-left:auto;color:var(--text-dim)">RESULT ▸</a>
+        <sc-if value="{{ r.isHead }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:14px 14px 4px;border-bottom:1px solid var(--line-2);font-family:var(--font-mono);font-size:10px">
+            <div style="letter-spacing:.12em;color:var(--text-2);font-weight:600">{{ r.headL }}</div>
+            <div style="color:var(--text-dim);margin-top:2px">{{ r.headRS }}</div>
           </div>
         </sc-if>
-        <sc-if value="{{ r.live }}" hint-placeholder-val="{{ true }}">
-          <div sc-camel-on-click="{{ r.mToggle }}" style="padding:8px 12px 8px 9px;border-bottom:1px solid var(--line);border-left:3px solid {{ r.mMark }};background:{{ r.mBg }};font-family:var(--font-mono);cursor:pointer">
-            <div style="display:flex;align-items:baseline;gap:8px;white-space:nowrap">
-              <span style="font-size:15px;font-weight:600">{{ r.label }}</span>
+        <sc-if value="{{ r.isRunRow }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:9px;height:30px;padding:0 14px;border-bottom:1px solid var(--line);font-family:var(--font-mono);font-size:12px;color:var(--text-faint);white-space:nowrap">
+            <span style="width:24px;font-weight:600;color:var(--text-dim)">{{ r.label }}</span><span>{{ r.off }}</span>
+            <span style="overflow:hidden;text-overflow:ellipsis;color:var(--text-dim)">{{ r.winner }}</span>
+            <a href="Results.dc.html" style="margin-left:auto;font-size:10px;color:var(--text-dim)">RESULT ▸</a>
+          </div>
+        </sc-if>
+        <sc-if value="{{ r.isLive }}" hint-placeholder-val="{{ true }}">
+          <div sc-camel-on-click="{{ r.mToggle }}" style="padding:9px 14px 9px 11px;border-bottom:1px solid var(--line);border-left:3px solid {{ r.mEdgeC }};background:{{ r.mBg }};cursor:pointer">
+            <div style="display:flex;align-items:baseline;gap:6px;font-family:var(--font-mono);white-space:nowrap">
+              <span style="font-size:14px;font-weight:600;color:{{ r.labelC }}">{{ r.label }}</span>
               <span style="font-size:12px;color:var(--text-2)">{{ r.off }}</span>
-              <span style="font-size:10px;color:var(--edge)">{{ r.offSub }}</span>
-              <span style="font-size:11px;color:var(--text-muted)">{{ r.dist }} {{ r.cls }}</span>
-              <span style="display:flex;gap:2px;align-items:flex-end;height:11px"><sc-for list="{{ r.bars }}" as="b" hint-placeholder-count="3"><span style="width:4px;height:{{ b.hs }};background:{{ b.bg }}"></span></sc-for></span>
-              <span style="margin-left:auto;font-size:10px;color:var(--text-muted)">FAV <span style="color:var(--text)">{{ r.fav.no }}</span> <span style="font-size:12px;color:var(--text);font-weight:600">{{ r.fav.price }}</span></span>
+              <span style="font-size:13px;font-weight:{{ r.minsW }};color:{{ r.minsC }}">{{ r.mins }}</span>
+              <span style="font-size:10px;color:{{ r.clsC }}">{{ r.cls }}</span>
+              <span style="font-size:10px;color:var(--text-muted)">{{ r.dist }}</span>
+              <span style="margin-left:auto;font-size:10px;color:var(--text-muted)">{{ r.favShort }}</span>
             </div>
-            <sc-if value="{{ r.hasTips }}" hint-placeholder-val="{{ true }}">
-              <div style="display:flex;align-items:baseline;gap:8px;margin-top:5px">
-                <span style="flex:1;min-width:0;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ r.top.nameColor }}">{{ r.top.no }} {{ r.top.name }}</span>
-                <sc-for list="{{ r.topPrices }}" as="x" hint-placeholder-count="2">
-                  <span style="flex:none;white-space:nowrap;font-size:10px;color:var(--text-muted)">{{ x.l }} <span style="font-size:{{ x.size }};font-weight:{{ x.weight }};color:{{ x.color }}">{{ x.v }}</span></span>
+            <sc-if value="{{ r.isFeat }}" hint-placeholder-val="{{ true }}">
+              <div style="margin-top:6px">
+                <sc-for list="{{ r.mReasons }}" as="x" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:baseline;gap:6px;padding:2px 0">
+                    <span style="flex:none;width:44px;text-align:center;font-family:var(--font-mono);font-size:10px;line-height:14px;color:{{ x.tc }};border:1px {{ x.ts }} {{ x.tb }};background:{{ x.tg }}">{{ x.tag }}</span>
+                    <span style="font-size:12px;line-height:1.4;color:var(--text-2)">{{ x.text }}</span>
+                  </div>
                 </sc-for>
-              </div>
-              <div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center;margin-top:4px">
-                <span style="font-size:11px;color:var(--tip);margin-right:3px">{{ r.top.countLabel }}</span>
-                <sc-for list="{{ r.top.marks }}" as="m" hint-placeholder-count="3">
-                  <span style="font-size:10px;line-height:14px;padding:0 4px;white-space:nowrap;color:{{ m.color }};border:1px {{ m.bstyle }} {{ m.bcolor }};background:{{ m.bg }}">{{ m.t }}<sc-if value="{{ m.heard }}" hint-placeholder-val="{{ false }}"><span style="color:var(--text-dim);margin-left:2px">~</span></sc-if></span>
-                </sc-for>
-              </div>
-            </sc-if>
-            <sc-if value="{{ r.noTips }}" hint-placeholder-val="{{ false }}">
-              <div style="margin-top:5px;font-size:11px;color:var(--text-dim)">{{ r.noTipsMsg }}</div>
-            </sc-if>
-            <sc-if value="{{ r.hasMobileExtras }}" hint-placeholder-val="{{ false }}">
-              <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:5px">
-                <sc-for list="{{ r.flags }}" as="c" hint-placeholder-count="1"><span style="font-size:10px;line-height:14px;padding:0 4px;white-space:nowrap;color:{{ c.c }};border:1px solid {{ c.b }}">{{ c.t }}</span></sc-for>
-                <sc-if value="{{ r.gapStrong }}" hint-placeholder-val="{{ false }}">
-                  <span style="margin-left:auto;font-size:10px;color:var(--text-muted);white-space:nowrap">GAP <span style="color:var(--text);font-weight:600">{{ r.gap.val }}</span> #{{ r.gap.no }} {{ r.gap.atShort }}</span>
+                <sc-if value="{{ r.mHasMore }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin:2px 0 0 50px;font-family:var(--font-mono);font-size:10px;color:var(--text-dim)">{{ r.mMoreLabel }}</div>
                 </sc-if>
+              </div>
+              <div style="display:flex;gap:1px;height:5px;margin-top:6px;background:var(--meter)">
+                <sc-for list="{{ r.pace.segs }}" as="s" hint-placeholder-count="4"><div style="flex:{{ s.n }};background:{{ s.c }}"></div></sc-for>
+              </div>
+              <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);margin-top:3px">{{ r.pace.head }}</div>
+              <div style="margin-top:6px;border-top:1px solid var(--line)">
+                <sc-for list="{{ r.shortlist }}" as="x" hint-placeholder-count="4">
+                  <div style="display:grid;grid-template-columns:minmax(0,1fr) 40px 30px 40px 44px;gap:0 6px;align-items:center;height:24px;font-family:var(--font-mono);font-size:12px">
+                    <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;color:{{ x.nameColor }}">{{ x.no }} {{ x.name }}</span>
+                    <span style="height:5px;background:var(--meter)"><span style="display:block;height:100%;width:{{ x.bar }};background:var(--text-2)"></span></span>
+                    <span style="text-align:right;font-size:10px;color:var(--text-2)">{{ x.place }}</span>
+                    <span style="font-size:10px;white-space:nowrap"><span style="color:{{ x.saidC }}">{{ x.saidS }}</span><span style="color:var(--voice)"> {{ x.intS }}</span></span>
+                    <span style="text-align:right;color:var(--text)">{{ x.price }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ r.isQuiet }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;gap:6px;margin-top:3px;font-family:var(--font-mono);font-size:10px;color:var(--text-dim);white-space:nowrap;overflow:hidden">
+                <span>{{ r.kindCounts }}</span>
+                <span style="overflow:hidden;text-overflow:ellipsis;color:var(--text-muted)">{{ r.slCompact }}</span>
               </div>
             </sc-if>
           </div>
 
           <sc-if value="{{ r.mOpen }}" hint-placeholder-val="{{ false }}">
-            <div style="background:var(--detail);border-bottom:1px solid var(--detail-rule);padding:8px 12px 10px">
+            <div style="background:var(--detail);border-bottom:1px solid var(--detail-rule);padding:9px 14px">
               <sc-for list="{{ r.interviews }}" as="iv" hint-placeholder-count="1">
-                <div style="margin-bottom:8px;padding:7px 9px;border-top:2px solid var(--voice);background:color-mix(in srgb, var(--voice) 7%, transparent)">
-                  <div style="display:flex;align-items:baseline;gap:7px;font-family:var(--font-mono);font-size:10px;margin-bottom:3px;white-space:nowrap">
+                <div style="margin-bottom:9px;padding:6px 9px;border-top:2px solid var(--voice);background:color-mix(in srgb, var(--voice) 7%, transparent)">
+                  <div style="display:flex;align-items:baseline;gap:6px;font-family:var(--font-mono);font-size:10px;margin-bottom:3px;white-space:nowrap">
                     <span style="letter-spacing:.1em;color:var(--voice);font-weight:600">{{ iv.role }}</span>
                     <span style="font-family:var(--font);font-size:12px;font-weight:600">{{ iv.speaker }}</span>
-                    <span style="margin-left:auto;font-size:11px;font-weight:600;color:{{ iv.nameColor }}">{{ iv.horse }}</span>
+                    <span style="margin-left:auto;font-size:12px;font-weight:600;color:{{ iv.nameColor }}">{{ iv.horse }}</span>
                   </div>
                   <sc-for list="{{ iv.words }}" as="w" hint-placeholder-count="2">
                     <div style="display:flex;gap:6px;align-items:baseline;padding:1px 0">
                       <span sc-camel-on-click="{{ w.toggle }}" style="flex:1;min-width:0;font-size:13px;line-height:1.5;cursor:pointer;white-space:{{ w.ws }};overflow:hidden;text-overflow:ellipsis">“{{ w.text }}”</span>
-                      <a href="{{ w.url }}" target="_blank" style="flex:none;font-family:var(--font-mono);font-size:11px;color:var(--voice)">▸ {{ w.tl }}</a>
+                      <a href="{{ w.url }}" target="_blank" style="flex:none;font-family:var(--font-mono);font-size:12px;color:var(--voice)">▸ {{ w.tl }}</a>
                     </div>
                   </sc-for>
                 </div>
               </sc-for>
-              <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);white-space:nowrap">POOL <span style="color:var(--text)">{{ r.pool }}</span> · MARGIN T <span style="color:var(--text)">{{ r.mTote }}</span> LB <span style="color:var(--text)">{{ r.mLb }}</span></div>
-              <sc-for list="{{ r.picks }}" as="p" hint-placeholder-count="3">
-                <div style="padding:8px 0 6px;border-top:1px solid var(--line);margin-top:6px">
-                  <div style="display:flex;align-items:baseline;gap:7px;font-family:var(--font-mono)">
-                    <span style="font-size:13px;font-weight:600;width:20px">{{ p.no }}</span>
-                    <span style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ p.nameColor }}">{{ p.name }}</span>
-                    <span style="font-family:var(--font);font-size:12px;color:var(--text-muted)">{{ p.zh }}</span>
-                    <span style="margin-left:auto;font-size:11px;color:var(--tip);white-space:nowrap">{{ p.countLabel }}</span>
+              <div style="display:flex;flex-wrap:wrap;gap:0 9px;font-family:var(--font-mono);font-size:10px;color:var(--text-muted);line-height:1.5">
+                <sc-for list="{{ r.poolBits }}" as="b" hint-placeholder-count="0"><span style="white-space:nowrap">{{ b.l }} <span style="color:var(--text-2)">{{ b.v }}</span></span></sc-for>
+              </div>
+              <div style="display:flex;gap:6px;margin-top:6px;padding-bottom:3px;border-bottom:1px solid var(--line-3);font-family:var(--font-mono);font-size:10px;color:var(--text-muted)">
+                <span style="flex:1">ALL {{ r.fieldN }} · SCREEN ORDER</span><span>PLACE</span><span style="width:40px;text-align:right">SAID</span><span style="width:44px;text-align:right">{{ r.mPriceHead }}</span>
+              </div>
+              <sc-for list="{{ r.runners }}" as="x" hint-placeholder-count="12">
+                <div>
+                  <div sc-camel-on-click="{{ x.mToggle }}" style="padding:6px 0;border-bottom:1px solid var(--line);cursor:pointer;background:{{ x.mBg }};opacity:{{ x.op }}">
+                    <div style="display:flex;align-items:baseline;gap:6px;font-family:var(--font-mono);white-space:nowrap">
+                      <span style="width:14px;font-size:10px;color:var(--text-dim)">{{ x.rk }}</span>
+                      <span style="width:18px;font-size:13px;font-weight:600">{{ x.no }}</span>
+                      <span style="flex:1;min-width:0;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;color:{{ x.nameColor }}">{{ x.name }}</span>
+                      <span style="font-size:12px;color:var(--text)">{{ x.place }}</span>
+                      <span style="width:40px;text-align:right;font-size:12px;color:{{ x.saidC }}">{{ x.saidS }}</span>
+                      <span style="width:44px;text-align:right;font-size:13px;font-weight:{{ x.mPriceW }};color:var(--text)">{{ x.mPrice }}</span>
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin:3px 0 0 38px;font-family:var(--font-mono);font-size:10px">
+                      <span style="line-height:14px;padding:0 4px;color:{{ x.style.c }};background:{{ x.style.g }}">{{ x.style.t }}</span>
+                      <span style="color:{{ x.tierC }}">{{ x.tier }}</span>
+                      <sc-if value="{{ x.hasBB }}" hint-placeholder-val="{{ false }}"><span style="padding:0 4px;line-height:14px;color:var(--book);background:var(--book-ground)">BB {{ x.setupS }}</span></sc-if>
+                      <sc-for list="{{ x.marks }}" as="m" hint-placeholder-count="0"><span style="line-height:14px;padding:0 4px;white-space:nowrap;color:{{ m.color }};border:1px {{ m.bs }} {{ m.bc }};background:{{ m.bg }}">{{ m.t }}<sc-if value="{{ m.heard }}" hint-placeholder-val="{{ false }}"><span style="color:var(--text-dim)">~</span></sc-if></span></sc-for>
+                      <span style="margin-left:auto;color:{{ x.move.c }}">{{ x.move.t }}</span>
+                    </div>
                   </div>
-                  <div style="display:flex;gap:6px;align-items:center;margin:2px 0 6px 27px;font-family:var(--font-mono);font-size:10px;color:var(--text-muted);white-space:nowrap">
-                    <span>{{ p.jt }}</span>
-                    <sc-for list="{{ p.chips }}" as="c" hint-placeholder-count="0"><span style="line-height:14px;padding:0 4px;color:{{ c.c }};border:1px solid {{ c.b }}">{{ c.t }}</span></sc-for>
-                  </div>
-                  <div style="display:grid;grid-template-columns:{{ p.pt.colsM }};font-family:var(--font-mono);border:1px solid var(--line-2);margin-bottom:6px">
-                    <div style="background:var(--surface);border-bottom:1px solid var(--line-2)"></div>
-                    <sc-for list="{{ p.pt.head }}" as="h" hint-placeholder-count="2">
-                      <div style="padding:3px 7px;text-align:right;background:var(--surface);border-bottom:1px solid var(--line-2);white-space:nowrap">
-                        <span style="font-size:10px;letter-spacing:.06em;color:var(--text-muted)">{{ h.labelShort }}</span>
-                        <span style="font-size:10px;color:{{ h.color }}"> {{ h.sub }}</span>
+                  <sc-if value="{{ x.mOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="padding:6px 0 9px 38px;border-bottom:1px solid var(--detail-rule);background:var(--run-open)">
+                      <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted)">{{ x.line2 }}</div>
+                      <div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:6px">
+                        <sc-for list="{{ x.forList }}" as="f" hint-placeholder-count="2"><span style="font-size:12px;line-height:1.35;padding:1px 4px;border:1px solid var(--line-3);color:var(--text-2)">{{ f.why }} <span style="font-family:var(--font-mono);font-size:10px">{{ f.x }}</span></span></sc-for>
+                        <sc-for list="{{ x.againstList }}" as="f" hint-placeholder-count="1"><span style="font-size:12px;line-height:1.35;padding:1px 4px;border:1px dashed var(--line-3);color:var(--text-muted)">{{ f.why }} <span style="font-family:var(--font-mono);font-size:10px;color:var(--cool)">{{ f.x }}</span></span></sc-for>
                       </div>
-                    </sc-for>
-                    <sc-for list="{{ p.pt.cells }}" as="c" hint-placeholder-count="12">
-                      <div style="padding:2px 7px;text-align:{{ c.align }};font-size:{{ c.size }};letter-spacing:{{ c.ls }};line-height:1.3;color:{{ c.color }};font-weight:{{ c.weight }};white-space:nowrap">{{ c.vm }}</div>
-                    </sc-for>
-                  </div>
-                  <sc-for list="{{ p.srcs }}" as="b" hint-placeholder-count="2">
-                    <div style="padding:2px 0">
-                      <div style="display:flex;gap:6px;align-items:baseline">
-                        <span style="flex:none;font-family:var(--font-mono);font-size:10px;line-height:14px;padding:0 4px;white-space:nowrap;color:{{ b.m.color }};border:1px {{ b.m.bstyle }} {{ b.m.bcolor }};background:{{ b.m.bg }}">{{ b.m.t }}<sc-if value="{{ b.m.heard }}" hint-placeholder-val="{{ false }}"><span style="color:var(--text-dim);margin-left:2px">~</span></sc-if></span>
-                        <span style="font-size:11px;color:var(--text-muted);white-space:nowrap">{{ b.who }}</span>
-                        <sc-if value="{{ b.noWords }}" hint-placeholder-val="{{ false }}">
-                          <a href="{{ b.url }}" target="_blank" style="margin-left:auto;flex:none;font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">▸ {{ b.tl }}</a>
-                        </sc-if>
-                      </div>
-                      <sc-for list="{{ b.words }}" as="w" hint-placeholder-count="1">
-                        <div style="display:flex;gap:6px;align-items:baseline;margin-top:1px">
-                          <span sc-camel-on-click="{{ w.toggle }}" style="flex:1;min-width:0;font-size:12px;line-height:1.5;color:var(--text-2);cursor:pointer;white-space:{{ w.ws }};overflow:hidden;text-overflow:ellipsis">“{{ w.text }}”</span>
-                          <a href="{{ w.url }}" target="_blank" style="flex:none;font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">▸ {{ w.tl }}</a>
+                      <sc-if value="{{ x.hasLast }}" hint-placeholder-val="{{ false }}">
+                        <div style="margin-top:6px;font-size:12px;line-height:1.45;color:var(--text-2)"><span style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted)">LAST {{ x.last.head }} </span>{{ x.last.run }}</div>
+                      </sc-if>
+                      <sc-for list="{{ x.srcs }}" as="b" hint-placeholder-count="1">
+                        <div style="margin-top:6px">
+                          <span style="font-family:var(--font-mono);font-size:10px;line-height:14px;padding:0 4px;color:{{ b.m.color }};border:1px {{ b.m.bs }} {{ b.m.bc }};background:{{ b.m.bg }}">{{ b.m.t }}</span>
+                          <span style="font-size:12px;color:var(--text-muted)"> {{ b.who }}</span>
+                          <sc-for list="{{ b.words }}" as="w" hint-placeholder-count="1">
+                            <div style="display:flex;gap:6px;align-items:baseline;margin-top:2px">
+                              <span sc-camel-on-click="{{ w.toggle }}" style="flex:1;min-width:0;font-size:12px;line-height:1.5;color:var(--text-2);cursor:pointer;white-space:{{ w.ws }};overflow:hidden;text-overflow:ellipsis">“{{ w.text }}”</span>
+                              <a href="{{ w.url }}" target="_blank" style="flex:none;font-family:var(--font-mono);font-size:12px">▸ {{ w.tl }}</a>
+                            </div>
+                            <sc-if value="{{ w.hasEn }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:var(--text-muted)">{{ w.en }}</div></sc-if>
+                          </sc-for>
                         </div>
-                        <sc-if value="{{ w.hasEn }}" hint-placeholder-val="{{ false }}"><div style="font-size:11px;color:var(--text-muted)">{{ w.en }}</div></sc-if>
                       </sc-for>
+                      <sc-if value="{{ x.hasPrice }}" hint-placeholder-val="{{ false }}">
+                        <div style="display:grid;grid-template-columns:{{ x.pt.colsM }};margin-top:9px;font-family:var(--font-mono);border:1px solid var(--line-2)">
+                          <span style="background:var(--surface);border-bottom:1px solid var(--line-2)"></span>
+                          <sc-for list="{{ x.pt.head }}" as="h" hint-placeholder-count="3"><span style="padding:2px 6px;text-align:right;font-size:10px;color:var(--text-muted);background:var(--surface);border-bottom:1px solid var(--line-2)">{{ h.s }}</span></sc-for>
+                          <sc-for list="{{ x.pt.cells }}" as="c" hint-placeholder-count="12"><span style="padding:2px 6px;text-align:{{ c.al }};font-size:{{ c.fs }};color:{{ c.c }};font-weight:{{ c.w }};white-space:nowrap">{{ c.vm }}</span></sc-for>
+                        </div>
+                      </sc-if>
                     </div>
-                  </sc-for>
+                  </sc-if>
                 </div>
               </sc-for>
-              <sc-if value="{{ r.noTips }}" hint-placeholder-val="{{ false }}">
-                <div style="padding:6px 0;border-top:1px solid var(--line);margin-top:6px;font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">{{ r.noTipsMsg }}</div>
-              </sc-if>
-              <sc-if value="{{ r.hasRest }}" hint-placeholder-val="{{ false }}">
-                <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--line);font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--text-muted)">REST OF FIELD</div>
-                <sc-for list="{{ r.rest }}" as="x" hint-placeholder-count="2">
-                  <div style="padding:4px 0;border-top:1px solid var(--line);font-family:var(--font-mono);font-size:11px">
-                    <div style="display:flex;align-items:baseline;gap:7px;white-space:nowrap">
-                      <span style="width:20px;font-weight:600">{{ x.no }}</span>
-                      <span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;color:{{ x.nameColor }}">{{ x.name }}</span>
-                      <span style="margin-left:auto;color:var(--text-2)">{{ x.price }}</span>
-                    </div>
-                    <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:2px 0 0 27px;font-size:10px;color:var(--text-muted)">
-                      <sc-for list="{{ x.chips }}" as="c" hint-placeholder-count="1"><span style="line-height:14px;padding:0 4px;color:{{ c.c }};border:1px solid {{ c.b }}">{{ c.t }}</span></sc-for>
-                      <span><span style="color:{{ x.gapColor }};font-weight:{{ x.gapWeight }}">{{ x.gap }}</span> {{ x.gapLine }}</span>
-                    </div>
-                  </div>
-                </sc-for>
-              </sc-if>
             </div>
           </sc-if>
         </sc-if>
       </div>
     </sc-for>
-    <div style="padding:9px 12px;font-family:var(--font-mono);font-size:10px;line-height:1.6;color:var(--text-dim)">~ heard via speech-to-text · value = price × other market's fair chance − 1</div>
+    <div style="padding:9px 14px;font-family:var(--font-mono);font-size:10px;line-height:1.6;color:var(--text-dim)">{{ fitLine }}</div>
   </div>
 </div>
 </sc-if>
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script="" data-props="{&quot;moment&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;night&quot;,&quot;afternoon&quot;,&quot;course&quot;],&quot;default&quot;:&quot;afternoon&quot;,&quot;tsType&quot;:&quot;'night'|'afternoon'|'course'&quot;,&quot;section&quot;:&quot;Scenario&quot;},&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;both&quot;,&quot;desktop&quot;,&quot;phone&quot;],&quot;default&quot;:&quot;both&quot;,&quot;tsType&quot;:&quot;'both'|'desktop'|'phone'&quot;,&quot;section&quot;:&quot;Scenario&quot;},&quot;foldQuotes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Density&quot;}}">
-// ── sample data: field names as in sample-data-2026-09-23.json ─────────────
-// Tips exist for R2, R6, R8 only (the sample is trimmed). Items marked ILLUS are
-// illustrative stand-ins for data the sample does not carry.
-const RACEDAY = [
-  [1,1650,'5',12,.5538,'moderate'],[2,1200,'4',12,.54,'weak'],[3,1650,'4',12,.4785,'weak'],
-  [4,1200,'4',12,.618,'moderate'],[5,1650,'4',12,.391,'weak'],[6,1000,'4',12,.595,'moderate'],
-  [7,1200,'3',12,.4825,'weak'],[8,1200,'3',12,.5581,'moderate'],[9,1800,'3',12,.4134,'weak'],
-].map(([race_no,distance,race_class,field_size,concentration,band]) => ({ race_no, distance, race_class, going:'G', course:'C', field_size, concentration, band }));
-const MONEY = { 1:2273869, 2:1160241, 3:1105221, 4:989099, 5:678806, 6:678867, 7:569612, 8:563399, 9:385492 };
-const MEETING_TOTAL = 42176988;
-// off times: R2/R6/R8 from the sample; the rest ILLUS on the HV Wednesday pattern
-const OFF = { 1:'18:40', 2:'19:10', 3:'19:40', 4:'20:10', 5:'20:40', 6:'21:10', 7:'21:40', 8:'22:15', 9:'22:50' };
-// favourite per race, from /api/raceday/{date}/{race}. R2/R6/R8 consistent with the sample; others ILLUS
-const FAVS = { 1:[3,'BEAUTY RAINBOW',4.1], 2:[4,'MATZDEN',4.4], 3:[6,'HAPPY AGILITY',3.6], 4:[9,'SPEEDY LONGWAH',2.9], 5:[2,'LUCKY GOLD',4.8], 6:[4,'SUPERB KING',3.2], 7:[5,'SMART BEAT',3.4], 8:[8,"DANICA'S CHOICE",2.3], 9:[7,'CHILL CHIBI',5.0] };
-const OVERROUND = { 2:{tote:22.5,ladbrokes:30.5}, 6:{tote:22.2,ladbrokes:30.5}, 8:{tote:24.3,ladbrokes:30.7} };
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;sample&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;cold&quot;,&quot;voices&quot;,&quot;race_day&quot;,&quot;mid&quot;],&quot;default&quot;:&quot;voices&quot;,&quot;tsType&quot;:&quot;'cold'|'voices'|'race_day'|'mid'&quot;,&quot;section&quot;:&quot;Stage (sample file)&quot;},&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;both&quot;,&quot;desktop&quot;,&quot;phone&quot;],&quot;default&quot;:&quot;both&quot;,&quot;tsType&quot;:&quot;'both'|'desktop'|'phone'&quot;,&quot;section&quot;:&quot;Stage (sample file)&quot;},&quot;foldQuotes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Density&quot;}}">
+const FILES = { cold:'briefing-1-two-days-out.json', voices:'briefing-2-night-before.json', race_day:'briefing-3-race-day.json', mid:'briefing-4-mid-meeting.json' };
+const RES_ID = { cold:'brCold', voices:'brVoices', race_day:'brRaceDay', mid:'brMid' };
+const STAGE_NAME = { cold:'TWO DAYS OUT', voices:'NIGHT BEFORE', priced:'DAY BEFORE · TOTE OPEN', race_day:'RACE DAY', settled:'SETTLED' };
+const AB = { factcheck:'FC', rtw_preview:'RTW', rtw_interview:'INT', tote:'TOTE', racing_sports:'R&S', ladbrokes:'LB', sportsbet:'SB', threads:'HD', bryan:'BRY' };
+const COUNTED = { factcheck:1, rtw_preview:1, rtw_interview:1, racing_sports:1, threads:1 };
+const BK = { tote:{ l:'TOTE', s:'T' }, ladbrokes:{ l:'LADBROKES', s:'LB' }, sportsbet:{ l:'SPORTSBET', s:'SB' } };
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const STYLE = { 'Leader':['LD','var(--style-leader)','var(--style-leader-ground)'], 'On-Pace':['OP','var(--style-onpace)','var(--style-onpace-ground)'], 'Midfield':['MF','var(--style-midfield)','var(--style-midfield-ground)'], 'Closer':['CL','var(--style-closer)','var(--style-closer-ground)'] };
+const PRI = { interview:0, screen_alone:1, talked_up:2, price_gap:3, late_money:3, market_apart:3, lone_leader:4, book:5, consensus:6, case:7, trial:8 };
 
-const YT1 = 'https://www.youtube.com/watch?v=swV08CftD_Q', FC = 'https://www.youtube.com/watch?v=-yNB49esPsI', INT = 'https://www.youtube.com/watch?v=PPJoOPyBb_4';
-const LB2 = 'https://www.ladbrokes.com.au/racing/happy-valley/b7bab23c-7e79-4923-b4eb-b3ca1483850f';
-const LB6 = 'https://www.ladbrokes.com.au/racing/happy-valley/9675a952-bedb-4527-a40f-935e641f843b';
-const LB8 = 'https://www.ladbrokes.com.au/racing/happy-valley/5356421f-153f-4206-b3ce-26f0c4b59728';
-const W = (text, url, t = null, en = null) => ({ text, en, t, url });
-const PK = (source, who, rank, url, words = [], heard = false, kind = 'pick', role = null) => ({
-  kind, source, source_label: { ladbrokes:'Ladbrokes', rtw_preview:'Racing To Win preview', rtw_interview:'Racing To Win interview', factcheck:'賽馬Fact Check' }[source],
-  who, role, rank, words, url, heard,
-});
-const OD = (tote_win,tote_place,fixed_win,fixed_place,fair_tote_pct,fair_fixed_pct,ev_fixed_pct,ev_tote_pct,pays_more) => ({ tote_win,tote_place,fixed_win,fixed_place,fair_tote_pct,fair_fixed_pct,ev_fixed_pct,ev_tote_pct,pays_more });
-const HP = (horse_no,horse_name,name_zh,jockey,trainer,draw,backed_by,odds) => ({ horse_no,horse_name,name_zh,jockey,trainer,draw,backed_by,odds });
-
-const JC = [
-  W('Yeah, last time he did a very good job with the outside draw and stay wide and still very competitive until the last last 50 m and I hope this time he will.', INT + '&t=6s', 6.4),
-  W('Yeah, look last season he always travel too well in 1200 m. So this season I think the th000 meter for him is at this stage is a best decision for him. Yeah.', INT + '&t=22s', 22.4),
-];
-const JO = [
-  W("Yeah, it was only a thousand meter trial here on on the dirt. He jumped from a wide gate and settled just off the speed which was good to see him jump a little bit better. He Yeah, I thought he trolled well enough. H he probably got a little bit tired late, so that trial would have brought him on, but he's like I said, he's not a big horse, so he doesn't take a lot of um work.", INT + '&t=204s', 204.24),
-  W("Definitely. Yep, definitely. He um the only thing that that holds him back a little bit is he's not very big, but um there's plenty of good horses that aren't very big as well in saying that. Um but yeah, like I said, he's form's great behind good horses. So that's good enough for a Happy Valley Class 3 1200, you would think. So I think if things go right, he should be right in the finish. Um and like I said, excited to to finally be able to sit on sit on him in a race. You know, I've done a bit of work with him, track work and trials like you said. Uh so good to finally get the race right and yeah be good to um see what he can do tomorrow.", INT + '&t=234s', 234.32),
-];
-
-const SUMMARY = {
-  race_date: '2026-09-23', venue: 'HV',
-  races: [
-    { race_no: 2, off_time: '19:10', tote_win_pool: 1160241, overround: OVERROUND[2], interviews: [], picks: [
-      HP(1,'FIND MY LOVE','紅愛舍','M L Yeung','D J Whyte',12,[
-        PK('rtw_preview','Paul Lally',4,YT1+'&t=372s',[W('Find my love. Nothing wrong with the trial though. That is Find My Love.',YT1+'&t=372s')]),
-        PK('factcheck','譚朗蔚',null,FC+'&t=398s',[],true),
-        PK('factcheck','賽馬Fact Check',null,FC+'&t=189s',[W('紅愛舍轉投韋達馬房之後，兩場頭馬全部喺谷草千二配布文所得，加上隻馬上季首仗亦喺布文胯下只輸頭位得第二。',FC+'&t=189s',189.52)],false,'featured','analyst'),
-      ], OD(17.0,4.2,15.0,3.9,4.8,5.1,-28.0,-13.2,'tote')),
-      HP(4,'MATZDEN','馬馳登','A Atzeni','J Richards',7,[
-        PK('ladbrokes','Ladbrokes',1,LB2,[W('MATZDEN (4) produced a strong first-up effort at Sha Tin, chasing home a smart type to finish second over 1200m. That run should have him peaking for this, and his best figures make him the runner to beat.',LB2)]),
-        PK('rtw_preview','Paul Lally',1,YT1+'&t=441s'),
-      ], OD(4.4,1.8,3.8,1.7,18.6,20.2,-29.5,-11.3,'tote')),
-      HP(7,'SILVER SPURS','銀刺勇士','E C W Wong (-3)','C Fownes',1,[
-        PK('factcheck','譚朗蔚',1,FC+'&t=393s',[],true),
-        PK('ladbrokes','Ladbrokes',3,LB2,[W('SILVER SPURS (7) gets the inside gate and he has enough early speed to make full use of his advantage. He could prove difficult to reel in if he gets the chance to dictate the pace to his liking.',LB2)]),
-      ], OD(7.5,2.7,7.0,2.4,10.9,10.9,-23.8,-17.9,'tote')),
-      HP(3,'LOOKING BRIGHT','路路勁','K Teetan','F C Lor',8,[
-        PK('rtw_preview','Paul Lally',3,YT1+'&t=421s',[W('Again, the little concern is the uh is the Happy Valley record looking bright now. He was disappointing fresh up.',YT1+'&t=421s')]),
-        PK('factcheck','譚朗蔚',null,FC+'&t=398s',[],true),
-      ], OD(9.5,3.1,9.0,2.8,8.6,8.5,-22.7,-19.1,'tote')),
-    ]},
-    { race_no: 6, off_time: '21:10', tote_win_pool: 678867, overround: OVERROUND[6],
-      interviews: [{ horse_no: 4, horse_name: 'SUPERB KING', speaker: 'Jerry Chau', role: 'jockey', words: JC }],
-      picks: [
-      HP(4,'SUPERB KING','巴閉王','C L Chau (-2)','K W Lui',3,[
-        PK('rtw_interview','Jerry Chau',null,INT+'&t=6s',JC,false,'connections','jockey'),
-        PK('ladbrokes','Ladbrokes',1,LB6,[W('SUPERB KING (4) produced a terrific first-up effort, covering ground from a wide draw before fighting on strongly for second over 1000m here a fortnight ago. With the benefit of that run and a much better draw, he gets his chance to go one better.',LB6)]),
-        PK('rtw_preview','Paul Lally',2,YT1+'&t=1330s',[W("But he's going to get pressure from Superb King. I'm going to put him on a minor line cuz he has got the lightweight coming into it at this stage. I think he can defy that 4 pound increase and beat Superb King again.",YT1+'&t=1330s')]),
-      ], OD(3.2,1.4,2.8,1.4,25.6,27.4,-28.4,-12.5,'tote')),
-      HP(1,'JUMBO BLESSING','福進','C Y Ho','C Fownes',6,[
-        PK('rtw_preview','Paul Lally',1,YT1+'&t=1372s',[W('Reliable Jumbo Blessing certainly is. He is definitely. Jumbo blessing for Paul.',YT1+'&t=1372s')]),
-        PK('ladbrokes','Ladbrokes',2,LB6,[W('JUMBO BLESSING (1) returned in excellent order, claiming a narrow win over this course and distance 2 weeks ago, and he is now chasing a hat-trick. He is thriving and should have further improvement to come, so stick with him.',LB6)]),
-      ], OD(3.6,1.8,3.5,1.55,22.7,21.9,-20.5,-21.2,'tote')),
-      HP(12,'MAPOGO','馬運高','K Teetan','K L Man',1,[
-        PK('ladbrokes','Ladbrokes',3,LB6,[W('MAPOGO (12) has shown plenty in his trials without always delivering on race day, but a break and favourable first-up conditions could help him put it all together here. Each way claims at a price.',LB6)]),
-        PK('rtw_preview','Paul Lally',4,YT1+'&t=1323s',[W('Mapogo and Mapogo is really really speedy earlier on. The thousand meters looks good for him.',YT1+'&t=1323s')]),
-      ], OD(7.3,2.4,8.5,2.6,11.2,9.0,-4.7,-34.2,'ladbrokes')),
-      HP(6,'DOUBLE ALPHA','升升雙息','M F Poon','C S Shum',10,[
-        PK('rtw_preview','Paul Lally',3,YT1+'&t=1388s',[W("Double Alpha ran on on his debut run this season. And he's only had four runs.",YT1+'&t=1388s')]),
-      ], OD(22.0,3.7,21.0,4.6,3.7,3.6,-21.9,-19.7,'tote')),
-    ]},
-    { race_no: 8, off_time: '22:15', tote_win_pool: 563399, overround: OVERROUND[8],
-      interviews: [{ horse_no: 4, horse_name: 'STAR RISE', speaker: 'James Orman', role: 'jockey', words: JO }],
-      picks: [
-      HP(8,"DANICA'S CHOICE",'繼往開來','A Atzeni','K L Man',5,[
-        PK('ladbrokes','Ladbrokes',1,LB8,[W("DANICA'S CHOICE (8) finished last season in good form on this circuit, breaking through for his first Hong Kong win before stepping into Class 3 and going down by only a nose before having a spell. He has trialled very well for his return and is the one to bea…",LB8)]),
-        PK('rtw_preview','Paul Lally',1,YT1+'&t=2012s',[W("Yeah, we'll go with him Danica's choice. I think he's a horse that uh I think we'll see him rise in the ratings this season. Andrea at Zani Manford May in the combination with Denica's choice.",YT1+'&t=2012s')]),
-      ], OD(2.3,1.5,2.8,1.45,35.0,27.3,-2.1,-37.2,'ladbrokes')),
-      HP(2,'STRAIGHT TO GLORY','團結勇士','K C Leung','C W Chang',8,[
-        PK('rtw_preview','Paul Lally',2,YT1+'&t=1968s',[W("That is good report for straight to glory. He's on top straight to glory. Four-time winner last time was mentioned.",YT1+'&t=1968s')]),
-        PK('ladbrokes','Ladbrokes',4,LB8,[W('STRAIGHT TO GLORY (2) has a big finish off a strong tempo, and he may get the run to suit him with a lot of pace engaged in this field. If the gaps come at the right time, he can have the last say here.',LB8)]),
-      ], OD(14.0,3.9,9.0,2.8,5.7,8.5,-48.3,19.0,'tote')),
-      HP(11,'LEADING AGILITY','驕陽雄心','E C W Wong (-3)','C S Shum',3,[
-        PK('ladbrokes','Ladbrokes',2,LB8,[W('LEADING AGILITY (11) thrived after joining Danny Shum, winning twice from 5 starts, including a comfortable win over this course and distance before his break. He is up in class, but should measure up, so stick with him.',LB8)]),
-        PK('rtw_preview','Paul Lally',3,YT1+'&t=1972s',[W("And two promising horses coming out of this trial, leading agility second with the winner of the trial, Denkica's choice, sitting on his outside as they turned for home. You've been with Denkica's choice. leading agility out of that same troll and horses on th…",YT1+'&t=1972s')]),
-      ], OD(9.3,2.9,7.0,2.4,8.6,10.9,-39.5,1.6,'tote')),
-      HP(5,'PEGAS','飛馬座','C L Chau (-2)','Y S Tsui',11,[
-        PK('ladbrokes','Ladbrokes',3,LB8,[W('PEGAS (5) faces a tricky task from a wide gate here, but ended his last campaign with a bold effort for second over this track and trip. If he gets across without burning too much energy, he can be right in the finish.',LB8)]),
-        PK('rtw_preview','Paul Lally',4,YT1+'&t=2041s'),
-      ], OD(25.0,6.6,21.0,5.0,3.2,3.6,-32.4,-8.9,'tote')),
-    ]},
-  ],
-  edges: [
-    { race_no:8, horse_no:3, horse_name:'SKY CAP', bet_at:'tote', price:15.0, fair_pct:10.2, ev_pct:53.0, supporters:1 },
-    { race_no:8, horse_no:2, horse_name:'STRAIGHT TO GLORY', bet_at:'tote', price:14.0, fair_pct:8.5, ev_pct:19.0, supporters:2 },
-    { race_no:5, horse_no:12, horse_name:'GAZELEY', bet_at:'ladbrokes', price:16.0, fair_pct:7.4, ev_pct:18.4, supporters:0 },
-    { race_no:3, horse_no:10, horse_name:'CALIFORNIA MOXIE', bet_at:'ladbrokes', price:18.0, fair_pct:6.3, ev_pct:12.7, supporters:0 },
-    { race_no:3, horse_no:1, horse_name:'EXCEED THE LIMIT', bet_at:'tote', price:22.0, fair_pct:5.1, ev_pct:12.3, supporters:0 },
-    { race_no:5, horse_no:1, horse_name:'GLORIOUS JOURNEY', bet_at:'tote', price:10.0, fair_pct:11.0, ev_pct:9.8, supporters:1 },
-  ],
-};
-
-// dashboard signals per runner (/api/raceday/{date}/{race}); only runners carrying one. ILLUS where the sample has none.
-const S = (horse_no, horse_name, win_odds, x = {}) => Object.assign({ horse_no, horse_name, win_odds, rank_delta:null, change_pct:0, rush_pct:0, money_arrived:0, gear_first_time:[], trainer_changed:false, blackbook:false, vet_flags:0 }, x);
-const SIGNALS = {
-  2: [S(1,'FIND MY LOVE',17,{ trainer_changed:true }), S(7,'SILVER SPURS',7.5,{ gear_first_time:['TT'] })],
-  3: [S(1,'EXCEED THE LIMIT',22,{ blackbook:true }), S(10,'CALIFORNIA MOXIE',13)],
-  5: [S(12,'GAZELEY',11,{ gear_first_time:['B'] }), S(1,'GLORIOUS JOURNEY',10,{ rank_delta:-2 })],
-  6: [S(12,'MAPOGO',7.3,{ rank_delta:-3 }), S(8,'FLYING TING LOK',33,{ vet_flags:1, change_pct:3.1, money_arrived:-163 })],
-  7: [S(5,'SMART BEAT',3.4,{ rush_pct:14, money_arrived:41200, change_pct:-11 })],
-  8: [S(3,'SKY CAP',15,{ rush_pct:18, money_arrived:22400, change_pct:-17 }), S(4,'STAR RISE',6.8,{ blackbook:true })],
-};
-
-const SRC = {
-  ladbrokes:     { ab:'LB',  name:'Ladbrokes', what:'tips + fixed odds', usual:'Ladbrokes tips and fixed odds usually arrive the morning of the meeting' },
-  rtw_preview:   { ab:'RTW', name:'Racing To Win preview', what:'picks + commentary', usual:'Racing To Win preview usually posts about 16:00 the day before' },
-  rtw_interview: { ab:'INT', name:'Racing To Win interview', what:'jockey and trainer interviews', usual:'Racing To Win interviews usually post with the preview, about 16:00 the day before' },
-  factcheck:     { ab:'FC',  name:'賽馬Fact Check', what:'picks + featured segments', usual:'Fact Check usually posts at 20:00 two days before' },
-};
-const SRC_ORDER = ['ladbrokes','rtw_preview','rtw_interview','factcheck'];
-
-const MOMENTS = {
-  night: { label:'NIGHT BEFORE · TUE 22 SEP 15:10', clock:'22 Sep 15:10 · briefing', short:'22 SEP 15:10', now:null, tote:null, lb:null,
-    pub:{ factcheck:true }, times:{ factcheck:'21 Sep 20:00' }, held:{} },
-  afternoon: { label:'AFTERNOON · WED 23 SEP 12:52', clock:'meeting day · 12:52', short:'12:52', now:772, tote:'12:47', lb:'12:47',
-    pub:{ factcheck:true, rtw_preview:true, rtw_interview:true, ladbrokes:true },
-    times:{ factcheck:'21 Sep 20:00', rtw_preview:'22 Sep 16:04', rtw_interview:'22 Sep 16:04', ladbrokes:'23 Sep 12:47' },
-    held:{ factcheck:'1 heard name not matched to a runner' } },
-  course: { label:'AT THE COURSE · WED 23 SEP 21:48', clock:'active meeting · 21:48', short:'21:48', now:1308, tote:'21:31', lb:'21:44',
-    pub:{ factcheck:true, rtw_preview:true, rtw_interview:true, ladbrokes:true },
-    times:{ factcheck:'21 Sep 20:00', rtw_preview:'22 Sep 16:04', rtw_interview:'22 Sep 16:04', ladbrokes:'23 Sep 21:44' },
-    held:{ factcheck:'1 heard name not matched to a runner' } },
-};
-
-const toMin = s => +s.slice(0, 2) * 60 + +s.slice(3, 5);
-const px = v => { if (v == null) return '—'; if (v >= 10 && v % 1 === 0) return String(v); let s = String(+v.toFixed(2)); if (!s.includes('.')) s += '.0'; return s; };
+const pd = s => new Date(s.length === 10 ? s + 'T00:00' : s);
+const hm = s => s ? s.slice(11, 16) : '';
+const dayDiff = (a, b) => Math.round((pd(a.slice(0, 10)) - pd(b.slice(0, 10))) / 864e5);
+const mins = (a, b) => Math.round((pd(a) - pd(b)) / 6e4);
+function when(iso, asOf) {
+  const dd = dayDiff(iso, asOf), t = hm(iso), h = +t.slice(0, 2);
+  if (dd === 0) return (h >= 18 ? 'tonight ' : 'today ') + t;
+  if (dd === 1) return 'tomorrow ' + t;
+  if (dd === -1) return 'yesterday ' + t;
+  return DAYS[pd(iso).getDay()] + ' ' + t;
+}
+const atShort = (iso, asOf) => dayDiff(iso, asOf) === 0 ? hm(iso) : DAYS[pd(iso).getDay()] + ' ' + hm(iso);
+const px = v => { if (v == null) return '—'; if (v >= 10) return String(Math.round(v * 10) / 10); let s = String(+v.toFixed(2)); if (!s.includes('.')) s += '.0'; return s; };
 const sgn = v => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v).toFixed(1) + '%';
 const tl = t => Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0');
 const tFromUrl = u => { const m = /[?&]t=(\d+)s/.exec(u || ''); return m ? +m[1] : null; };
 const money = v => '$' + Math.round(v).toLocaleString('en-US');
+const moneyS = v => v >= 1e6 ? '$' + (v / 1e6).toFixed(2) + 'M' : '$' + Math.round(v / 1e3) + 'K';
 const mix = (c, p) => 'color-mix(in srgb, ' + c + ' ' + p + '%, transparent)';
-const BAND_LVL = { strong:3, moderate:2, weak:1 };
+const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
 
-function mark(b) {
-  const ab = SRC[b.source].ab;
-  if (b.kind === 'connections') return { t: ab + ' ' + (b.role === 'trainer' ? 'T' : 'J'), color:'var(--voice)', bstyle:'solid', bcolor:mix('var(--voice)',45), bg:mix('var(--voice)',12), heard:b.heard };
-  if (b.kind === 'featured') return { t: ab + ' FEAT', color:'var(--tip)', bstyle:'dashed', bcolor:mix('var(--tip)',50), bg:'transparent', heard:b.heard };
-  return { t: ab + (b.rank ? ' #' + b.rank : ''), color:'var(--tip)', bstyle:'solid', bcolor:mix('var(--tip)',40), bg:'transparent', heard:b.heard };
+function clsOf(r) {
+  const c = String(r.race_class);
+  if (/^\d$/.test(c)) return { t:'C' + c + (r.restricted ? ' (R)' : ''), c:'var(--cls-' + c + ')', g:'transparent' };
+  if (/^G/.test(c)) return { t:c, c:'var(--cls-group)', g:'var(--cls-group-g)' };
+  if (/GRIF/i.test(c)) return { t:'GRIF', c:'var(--cls-griffin)', g:'var(--cls-griffin-g)' };
+  return { t:c, c:'var(--text-2)', g:'transparent' };
 }
-function chips(s) {
-  if (!s) return [];
-  const o = [];
-  if (s.blackbook) o.push({ t:'BB', c:'var(--book)', b:mix('var(--book)',45), k:'BB' });
-  if (s.rank_delta != null && s.rank_delta <= -2) o.push({ t:'MODEL +' + (-s.rank_delta), c:'var(--edge)', b:mix('var(--edge)',40), k:'MODEL' });
-  if (s.rush_pct >= 10) o.push({ t:'LATE $ ' + s.rush_pct + '%', c:'var(--alert)', b:mix('var(--alert)',40), k:'LATE $' });
-  if (s.gear_first_time.length) o.push({ t:'1ST ' + s.gear_first_time.join(' '), c:'var(--gear-first)', b:mix('var(--gear-first)',40), k:'1ST GEAR' });
-  if (s.vet_flags) o.push({ t:'VET', c:'var(--loss-dim)', b:mix('var(--loss-dim)',40), k:'VET' });
-  if (s.trainer_changed) o.push({ t:'NEW TR', c:'var(--violet)', b:mix('var(--violet)',40), k:'NEW TR' });
-  return o;
+function kindTag(x) {
+  if (x.kind === 'computed') return { tag:'SCREEN', tc:'var(--text-2)', ts:'solid', tb:'var(--line-3)', tg:'var(--meter)' };
+  if (x.kind === 'said') return x.key === 'interview'
+    ? { tag:'SAID', tc:'var(--voice)', ts:'solid', tb:mix('var(--voice)', 45), tg:mix('var(--voice)', 12) }
+    : { tag:'SAID', tc:'var(--tip)', ts:'solid', tb:mix('var(--tip)', 40), tg:'transparent' };
+  return { tag:'PRICE', tc:'var(--text)', ts:'dashed', tb:'var(--line-3)', tg:'transparent' };
+}
+function mark(b) {
+  const ab = AB[b.source] || b.source.toUpperCase();
+  if (b.kind === 'connections') return { t:'INT ' + (b.role === 'trainer' ? 'T' : 'J'), color:'var(--voice)', bs:'solid', bc:mix('var(--voice)', 45), bg:mix('var(--voice)', 12), heard:!!b.heard };
+  if (!COUNTED[b.source]) return { t:ab + (b.rank ? ' #' + b.rank : ''), color:'var(--text-dim)', bs:'dotted', bc:'var(--line-3)', bg:'transparent', heard:!!b.heard };
+  if (b.kind === 'featured') return { t:ab + ' FEAT', color:'var(--tip)', bs:'dashed', bc:mix('var(--tip)', 50), bg:'transparent', heard:!!b.heard };
+  return { t:ab + (b.rank ? ' #' + b.rank : ''), color:'var(--tip)', bs:'solid', bc:mix('var(--tip)', 40), bg:'transparent', heard:!!b.heard };
 }
 
 class Component extends DCLogic {
-  state = { open: 6, mOpen: 8, q: {} };
+  state = { data:{}, err:null, q:{}, openD:{}, openM:{}, openR:{}, openRM:{} };
 
-  words(list, key) {
-    const fold = this.props.foldQuotes ?? true;
-    return list.map((w, i) => {
-      const k = key + '-' + i;
-      const long = w.text.length > 90;
-      const folded = long && (fold ? !this.state.q[k] : !!this.state.q[k]);
-      const t = w.t != null ? w.t : tFromUrl(w.url);
-      return {
-        text: w.text, en: w.en, hasEn: !!w.en, url: w.url,
-        tl: t != null ? tl(t) : 'page',
-        ws: folded ? 'nowrap' : 'normal',
-        caret: long ? (folded ? '▸' : '▾') : '',
-        toggle: (e) => { e.stopPropagation(); if (long) this.setState(s => ({ q: Object.assign({}, s.q, { [k]: !s.q[k] }) })); },
-      };
+  componentDidMount() {
+    Object.entries(FILES).forEach(([k, f]) => {
+      const url = (window.__resources && window.__resources[RES_ID[k]]) || ('./briefing-samples/' + f);
+      fetch(url).then(r => { if (!r.ok) throw new Error(f + ' ' + r.status); return r.json(); })
+        .then(j => this.setState(s => ({ data:Object.assign({}, s.data, { [k]:j }) })))
+        .catch(e => this.setState({ err:String(e.message || e) }));
     });
   }
 
+  words(list, key, lc) {
+    const fold = this.props.foldQuotes ?? true;
+    return (list || []).map((w, i) => {
+      const k = key + '-' + i, long = w.text.length > 110;
+      const folded = long && (fold ? !this.state.q[k] : !!this.state.q[k]);
+      const t = w.t != null ? w.t : tFromUrl(w.url);
+      return { text:w.text, en:w.en, hasEn:!!w.en, url:w.url, lc:lc || 'var(--text-muted)', tl:t != null ? tl(t) : 'page',
+        ws:folded ? 'nowrap' : 'normal', caret:long ? (folded ? '▸' : '▾') : '',
+        toggle:(e) => { e.stopPropagation(); if (long) this.setState(s => ({ q:Object.assign({}, s.q, { [k]:!s.q[k] }) })); } };
+    });
+  }
+  setMap(name, sk, v) { this.setState(s => ({ [name]:Object.assign({}, s[name], { [sk]:v }) })); }
+
   renderVals() {
-    const M = MOMENTS[this.props.moment ?? 'afternoon'] || MOMENTS.afternoon;
+    const sk = this.props.sample ?? 'voices';
     const view = this.props.view ?? 'both';
-    const toteOn = !!M.tote, lbOn = !!(M.pub.ladbrokes && M.lb), both = toteOn && lbOn;
-    const toteAge = toteOn && M.now != null ? M.now - toMin(M.tote) : 0;
-    const toteStale = toteAge > 10;
-    const pending = SRC_ORDER.filter(k => !M.pub[k]);
-    const bbNos = {};
-    Object.keys(SIGNALS).forEach(r => SIGNALS[r].forEach(s => { if (s.blackbook) bbNos[r + '-' + s.horse_no] = true; }));
-    const nameColor = (r, no) => bbNos[r + '-' + no] ? 'var(--book)' : 'var(--text)';
+    const d = this.state.data[sk];
+    const base = { showDesktop:false, showPhone:false, loading:true, loadMsg:this.state.err ? 'Could not load sample: ' + this.state.err : 'Loading ' + (FILES[sk] || sk) + '…' };
+    if (!d) return base;
 
-    const BOOKS = [
-      { k:'tote', label:'TOTE', short:'T', on:toteOn, sub: toteOn ? M.tote + (toteStale ? ' STALE ' + toteAge + 'm' : '') : 'NOT OPEN', subC: toteStale ? 'var(--incident)' : 'var(--text-dim)',
-        f:{ win:'tote_win', plc:'tote_place', fair:'fair_tote_pct', ev:'ev_tote_pct' } },
-      { k:'ladbrokes', label:'LADBROKES', short:'LB', on:lbOn, sub: lbOn ? M.lb : 'NOT YET', subC:'var(--text-dim)',
-        f:{ win:'fixed_win', plc:'fixed_place', fair:'fair_fixed_pct', ev:'ev_fixed_pct' } },
-    ];
-    const ptable = (o) => {
-      const cells = [];
-      [['WIN','win'],['PLACE','plc'],['FAIR CHANCE','fair'],['VALUE IF THE OTHER IS RIGHT','ev']].forEach(([lab, f]) => {
-        cells.push({ v:lab, vm: f === 'ev' ? 'VALUE' : lab.replace('FAIR CHANCE','FAIR %'), align:'left', size:'10px', ls:'.05em', color:'var(--text-muted)', weight:400, ws: 'normal' });
-        BOOKS.forEach(b => {
-          let v = '—', color = 'var(--text-faint)', weight = 400, size = '12px';
-          if (b.on && (f !== 'ev' || both)) {
-            const x = o[b.f[f]];
-            if (f === 'win') { v = px(x); color = 'var(--text)'; weight = both && o.pays_more === b.k ? 600 : 400; size = '13px'; }
-            else if (f === 'plc') { v = px(x); color = 'var(--text-2)'; }
-            else if (f === 'fair') { v = x.toFixed(1) + '%'; color = 'var(--text-2)'; }
-            else { v = sgn(x); color = x >= 5 ? 'var(--text)' : x < 0 ? 'var(--text-dim)' : 'var(--text-2)'; weight = x >= 5 ? 600 : 400; }
-          }
-          cells.push({ v, vm: v, align:'right', size, ls:'0', color, weight, ws:'nowrap' });
-        });
-      });
-      return {
-        cols: '98px repeat(' + BOOKS.length + ', minmax(0,1fr))',
-        colsM: '62px repeat(' + BOOKS.length + ', minmax(0,1fr))',
-        head: BOOKS.map(b => ({ label:b.label, labelShort:b.short, sub:b.sub, color:b.subC })),
-        cells,
-      };
+    const asOf = d.as_of, isRD = d.stage === 'race_day' || d.stage === 'settled';
+    const clockBy = {}; d.clock.forEach(c => { clockBy[c.key] = c; });
+    const statusBy = {}; (d.source_status || []).forEach(s => { statusBy[s.source] = s; });
+    const saidIn = d.clock.filter(c => c.kind === 'said' && c.state === 'in' && COUNTED[c.key]).length;
+    const nextSaid = d.clock.filter(c => c.kind === 'said' && c.state === 'due' && c.due).sort((a, b) => a.due < b.due ? -1 : 1)[0];
+    const tc = clockBy.tote;
+    const cap = d.captured || {};
+    const toteEarly = cap.tote && dayDiff(cap.tote, d.race_date) < 0;
+    const priceAge = cap.tote ? mins(asOf, cap.tote) : null;
+    const staleP = isRD && priceAge != null && priceAge > 15;
+
+    const clockItem = c => {
+      let txt, color, mk;
+      if (c.state === 'in') { mk = '✓'; txt = atShort(c.at, asOf) + (c.key === 'tote' && toteEarly ? ' · thin' : ''); color = 'var(--text-2)'; }
+      else if (c.state === 'due') { mk = '·'; txt = 'due ' + when(c.due, asOf); color = 'var(--text-dim)'; }
+      else if (c.state === 'overdue') { mk = '!'; txt = 'overdue · was due ' + when(c.due, asOf); color = 'var(--incident)'; }
+      else { mk = '?'; txt = 'irregular'; color = 'var(--text-faint)'; }
+      const abColor = c.state === 'in' ? (c.kind === 'priced' ? 'var(--text)' : c.key === 'rtw_interview' ? 'var(--voice)' : COUNTED[c.key] ? 'var(--tip)' : 'var(--text-2)') : c.state === 'overdue' ? 'var(--incident)' : 'var(--text-dim)';
+      const st = statusBy[c.key];
+      let detail = c.usual;
+      if (c.state === 'in' && st) {
+        const bits = [];
+        if (st.picks) bits.push(plural(st.picks, 'pick')); if (st.featured) bits.push(st.featured + ' featured'); if (st.interviews) bits.push(plural(st.interviews, 'interview'));
+        if (st.quotes) bits.push(plural(st.quotes, 'quote')); if (st.runner_lines) bits.push(st.runner_lines + ' form lines'); if (st.heard) bits.push(st.heard + ' heard'); if (st.races) bits.push(plural(st.races, 'race'));
+        if (st.held) bits.push(st.held + ' held for review');
+        detail = bits.join(' · ') || c.usual;
+      } else if (c.state === 'in' && c.kind === 'priced') detail = 'captured ' + atShort(c.at, asOf) + (toteEarly && c.key === 'tote' ? ' · one bet moves it' : '');
+      return { ab:AB[c.key] || c.key, label:c.label, txt, color, mark:mk, abColor, detail, counted:c.kind === 'said' ? (COUNTED[c.key] ? '' : 'shown, not counted') : '' };
     };
-    const sumByRace = {};
-    SUMMARY.races.forEach(r => { sumByRace[r.race_no] = r; });
+    const clock = d.clock.map(clockItem);
 
-    const races = RACEDAY.map(rd => {
-      const no = rd.race_no, sr = sumByRace[no];
-      const off = sr ? sr.off_time : OFF[no];
-      const isRun = M.now != null && toMin(off) <= M.now;
-      const minsTo = M.now != null ? toMin(off) - M.now : null;
-      const sig = SIGNALS[no] || [];
-      const sigBy = {}; sig.forEach(s => { sigBy[s.horse_no] = s; });
-      const ivs = sr && M.pub.rtw_interview ? sr.interviews : [];
-      const ivNos = ivs.map(i => i.horse_no);
+    const bbNos = {};
+    d.races.forEach(r => r.runners.forEach(x => { if (x.blackbook) bbNos[r.race_no + '-' + x.horse_no] = true; }));
+    const nameC = (rn, no) => bbNos[rn + '-' + no] ? 'var(--book)' : 'var(--text)';
 
-      const picks = (sr ? sr.picks : []).map(p => {
-        const bb = p.backed_by.filter(b => M.pub[b.source]);
-        if (!bb.length) return null;
-        return { p, bb, who: new Set(bb.map(b => b.who)).size, best: Math.min.apply(null, bb.map(b => b.rank || 9)) };
-      }).filter(Boolean).sort((a, b) => b.who - a.who || a.best - b.best || a.p.odds.tote_win - b.p.odds.tote_win);
-      const pickNos = picks.map(x => x.p.horse_no);
+    const nextRace = isRD ? d.races.find(r => !r.run && r.minutes_to_off != null && r.minutes_to_off > 0) : null;
+    const featNos = d.order.filter(n => { const r = d.races.find(z => z.race_no === n); return r && !r.run && r.reasons.length; }).slice(0, 3);
+    const defD = featNos[0], defM = nextRace ? nextRace.race_no : featNos[0];
+    const openD = sk in this.state.openD ? this.state.openD[sk] : defD;
+    const openM = sk in this.state.openM ? this.state.openM[sk] : defM;
 
-      const cands = [];
-      if (both) {
-        SUMMARY.edges.filter(e => e.race_no === no).forEach(e => cands.push({ no:e.horse_no, name:e.horse_name, at:e.bet_at, price:e.price, fair:e.fair_pct, ev:e.ev_pct, sup:e.supporters }));
-        picks.forEach(({ p, who }) => {
-          const o = p.odds;
-          [['tote', o.tote_win, o.fair_fixed_pct, o.ev_tote_pct], ['ladbrokes', o.fixed_win, o.fair_tote_pct, o.ev_fixed_pct]].forEach(([at, price, fair, ev]) => {
-            if (!cands.some(c => c.no === p.horse_no && c.at === at)) cands.push({ no:p.horse_no, name:p.horse_name, at, price, fair, ev, sup:who });
-          });
-        });
-      }
-      cands.sort((a, b) => b.ev - a.ev);
-      const g = cands[0];
-      const atL = a => a === 'tote' ? 'TOTE' : 'LB', otherL = a => a === 'tote' ? 'LB' : 'TOTE';
+    const races = d.races.map(r => {
+      const no = r.race_no, cl = clsOf(r);
+      const running = !r.run && r.minutes_to_off != null && r.minutes_to_off <= 0;
+      const isNext = nextRace && nextRace.race_no === no;
+      const m = r.minutes_to_off;
+      const minsL = running ? '● RUNNING' : (isRD && m != null && m > 0 ? (m >= 90 ? 'in ' + Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : 'in ' + m + 'm') : '');
+      const books = ['tote', 'ladbrokes', 'sportsbet'].filter(k => r.runners.some(x => x.price && x.price[k] && x.price[k].win));
+      const hasPrices = books.length > 0;
+      const srcIn = (r.voices && r.voices.sources || []).filter(s => COUNTED[s]).length;
 
-      const fv = FAVS[no];
-      const topPicks = picks.map(({ p, bb, who }) => ({
-        no: p.horse_no, name: p.horse_name, zh: p.name_zh, nameColor: nameColor(no, p.horse_no),
-        jt: p.jockey + ' · ' + p.trainer + ' · DR ' + p.draw,
-        countLabel: who + (who === 1 ? ' source' : ' sources'),
-        chips: chips(sigBy[p.horse_no]),
-        marks: bb.map(mark),
-        srcs: bb.map((b, i) => {
-          const isConn = b.kind === 'connections';
-          const ws = isConn ? [] : this.words(b.words, 'p' + no + '-' + p.horse_no + '-' + i);
+      const sorted = r.reasons.slice().sort((a, b) => (PRI[a.key] ?? 9) - (PRI[b.key] ?? 9));
+      const lead = [], seen = {};
+      sorted.forEach(x => { if (!seen[x.kind]) { seen[x.kind] = 1; lead.push(x); } });
+      const reasons = lead.sort((a, b) => (PRI[a.key] ?? 9) - (PRI[b.key] ?? 9)).concat(sorted.filter(x => !lead.includes(x))).map(x => Object.assign({ text:x.text }, kindTag(x)));
+      const kc = { computed:0, said:0, priced:0 }; r.reasons.forEach(x => { kc[x.kind]++; });
+      const kindCounts = [kc.computed && kc.computed + ' screen', kc.said && kc.said + ' said', kc.priced && kc.priced + ' price'].filter(Boolean).join(' · ') || 'nothing to read yet';
+
+      const L = r.pace.leaders || [], cn = r.pace.counts || {};
+      const pace = {
+        head: L.length === 0 ? 'No habitual leader' : L.length === 1 ? '1 leader · #' + L[0].horse_no + (r.pace.leader_x ? ' (×' + r.pace.leader_x + ')' : '') : L.length + ' leaders · ' + L.map(z => '#' + z.horse_no).join(' '),
+        segs: ['Leader', 'On-Pace', 'Midfield', 'Closer'].filter(k => cn[k]).map(k => ({ n:cn[k], c:STYLE[k][1], t:STYLE[k][0] + ' ' + cn[k] })),
+      };
+      pace.short = pace.head;
+
+      const ivs = (r.voices && r.voices.interviews) || [];
+      const runnersSorted = r.runners.slice().sort((a, b) => a.screen.rank - b.screen.rank);
+      const defRunner = (ivs[0] && ivs[0].horse_no) || (runnersSorted[0] && runnersSorted[0].horse_no);
+      const rk = sk + ':' + no;
+      const openRunner = rk in this.state.openR ? this.state.openR[rk] : (no === openD ? defRunner : null);
+      const openRunnerM = this.state.openRM[rk];
+
+      const saidOf = x => {
+        const n = x.support ? x.support.sources : 0;
+        const intv = x.support && x.support.backed_by.some(b => b.kind === 'connections');
+        if (n > 0) return { said:plural(n, 'source'), saidS:n + '/' + srcIn, saidC:'var(--tip)', int:intv ? 'INT' : '', intS:intv ? 'INT' : '' };
+        if (srcIn > 0) return { said:'0 of ' + srcIn, saidS:'0/' + srcIn, saidC:'var(--text-dim)', int:'', intS:'' };
+        return { said:'', saidS:'', saidC:'var(--text-dim)', int:'', intS:'' };
+      };
+
+      const shortlist = runnersSorted.filter(x => x.screen.tier === 'SHORTLIST').slice(0, 4).map(x => Object.assign({
+        rank:x.screen.rank, no:x.horse_no, name:x.horse_name, nameColor:nameC(no, x.horse_no),
+        bar:Math.min(100, x.screen.place_pct) + '%', place:Math.round(x.screen.place_pct) + '%',
+        price:x.price && x.price.tote ? px(x.price.tote.win) : '', mrank:x.market_rank ? 'M' + x.market_rank : '',
+      }, saidOf(x)));
+      const slCompact = shortlist.map(x => '#' + x.no + ' ' + x.place).join(' · ');
+
+      const priceCols = books.map(() => '44px').join(' ');
+      const runGrid = '24px 22px minmax(0,1.3fr) 30px 150px 58px 116px minmax(0,1.2fr)' + (hasPrices ? ' ' + (books.length * 44 + (books.length - 1) * 6) + 'px 58px' : '') + ' 64px';
+      const priceHead = books.map(k => ({ s:BK[k].s, sub:cap[k] ? hm(cap[k]) + (k === 'tote' && toteEarly ? ' thin' : '') : '', c:staleP ? 'var(--incident)' : 'var(--text-dim)' }));
+
+      const runners = runnersSorted.map(x => {
+        const s = x.screen, st = STYLE[x.style] || ['—', 'var(--text-dim)', 'transparent'];
+        const bb = x.blackbook, p = x.price, sup = x.support;
+        const hk = rk + ':' + x.horse_no;
+        const cells = books.map(k => { const q = p && p[k]; return { v:q && q.win ? px(q.win) : '—', c:q && q.win ? 'var(--text)' : 'var(--text-faint)', w:p && p.pays_most === k && books.length > 1 ? 600 : 400 }; });
+        let move = { t:'', c:'var(--text-dim)' };
+        if (x.move) {
+          if (x.move.rush_pct && x.move.rush_direction !== 'flat') move = { t:'LATE $ ' + x.move.rush_pct + '%', c:'var(--alert)' };
+          else if (x.move.change_pct <= -5) move = { t:'▼ ' + Math.abs(x.move.change_pct).toFixed(0) + '%', c:'var(--alert)' };
+          else if (x.move.change_pct >= 5) move = { t:'▲ ' + x.move.change_pct.toFixed(0) + '%', c:'var(--text-dim)' };
+        }
+        const chips = [];
+        (x.gear_first || []).forEach(g => chips.push({ t:'1ST ' + g, c:'var(--gear-first)', b:mix('var(--gear-first)', 40) }));
+        if (s.last_start && (s.last_start.tags || []).some(t => /vet/.test(t) && !/routine/.test(t))) chips.push({ t:'VET', c:'var(--loss-dim)', b:mix('var(--loss-dim)', 40) });
+        if (x.trainer_changed) chips.push({ t:'NEW TR', c:'var(--violet)', b:mix('var(--violet)', 40) });
+        const srcs = (sup ? sup.backed_by : []).map((b, i) => {
+          const conn = b.kind === 'connections';
+          const ws = this.words(b.words, 'w' + hk + '-' + i, conn ? 'var(--voice)' : null);
           const t = tFromUrl(b.url);
-          return {
-            m: mark(b), who: b.who + (b.role && b.kind !== 'featured' ? ' · ' + b.role : ''),
-            words: ws, noWords: ws.length === 0, url: b.url, tl: t != null ? tl(t) : 'page',
-            noWordsMsg: isConn ? 'quoted in the interview above' : (b.heard ? 'named aloud, no commentary captured' : 'pick only, no commentary captured'),
-          };
-        }),
-        pt: ptable(p.odds),
-        prices: BOOKS.map(b => ({ l:b.short === 'T' ? 'TOTE' : 'LB', v: b.on ? px(p.odds[b.f.win]) : b.sub, size: b.on ? '12px' : '10px', weight: b.on && both && p.odds.pays_more === b.k ? 600 : 400, color: b.on ? 'var(--text)' : 'var(--text-dim)' })),
-      }));
-      const top = topPicks[0];
-      const tied = picks.length ? picks.filter(x => x.who === picks[0].who).length - 1 : 0;
-      if (top) top.tie = tied ? '+' + tied + ' level' : '';
-
-      const restMap = {};
-      sig.forEach(s => { if (!pickNos.includes(s.horse_no) && chips(s).length) restMap[s.horse_no] = { no:s.horse_no, name:s.horse_name, s }; });
-      cands.filter(c => !pickNos.includes(c.no) && c.ev >= 5).forEach(c => { restMap[c.no] = Object.assign(restMap[c.no] || { no:c.no, name:c.name, s:sigBy[c.no] }, { e:c }); });
-      ivs.forEach(iv => { if (!pickNos.includes(iv.horse_no)) restMap[iv.horse_no] = Object.assign(restMap[iv.horse_no] || { no:iv.horse_no, name:iv.horse_name, s:sigBy[iv.horse_no] }, { iv:true }); });
-      const rest = Object.values(restMap).sort((a, b) => a.no - b.no).map(x => ({
-        no: x.no, name: x.name, nameColor: nameColor(no, x.no),
-        price: toteOn && x.s ? 'TOTE ' + px(x.s.win_odds) : (x.e ? atL(x.e.at) + ' ' + px(x.e.price) : (toteOn ? 'TOTE —' : 'TOTE NOT OPEN')),
-        chips: chips(x.s),
-        gap: x.e ? sgn(x.e.ev) : '', gapColor:'var(--text)', gapWeight:600,
-        gapLine: x.e ? 'value at ' + atL(x.e.at) + ' ' + px(x.e.price) + ' · ' + otherL(x.e.at) + ' fair ' + x.e.fair + '%' : '',
-        src: x.iv ? 'INTERVIEW ONLY · NO PICK' : (x.e ? (x.e.sup ? x.e.sup + ' source' + (x.e.sup > 1 ? 's' : '') : 'NO TIPS') : 'NO TIPS'),
-      }));
-
-      const flagsAgg = {};
-      sig.forEach(s => chips(s).forEach(c => { flagsAgg[c.k] = flagsAgg[c.k] ? Object.assign(flagsAgg[c.k], { n: flagsAgg[c.k].n + 1 }) : Object.assign({}, c, { n:1 }); }));
-      const flags = Object.values(flagsAgg).map(c => Object.assign({}, c, { t: c.k + (c.n > 1 ? ' ' + c.n : '') }));
-
-      const lit = {};
-      picks.forEach(x => x.bb.forEach(b => { lit[b.source] = true; }));
-      if (ivs.length) lit.rtw_interview = true;
-      const srcIn = SRC_ORDER.map(k => ({ t: SRC[k].ab, c: lit[k] ? (k === 'rtw_interview' ? 'var(--voice)' : 'var(--tip)') : (M.pub[k] ? 'var(--text-faint)' : 'var(--line-3)') }));
-
-      const lvl = BAND_LVL[rd.band] || 1;
-      const hasTips = topPicks.length > 0;
-      const open = this.state.open === no, mOpen = this.state.mOpen === no;
-      const noTipsMsg = pending.length ? 'NO TIPS YET · ' + SRC[pending[0]].usual : 'NO SOURCE HAS TIPPED THIS RACE';
-      return {
-        label: 'R' + no, off, isRun, live: !isRun,
-        offSub: minsTo != null && minsTo > 0 && minsTo <= 90 ? 'in ' + minsTo + 'm' : '',
-        dist: rd.distance + 'm', cls: 'C' + rd.race_class, distCls: rd.distance + 'm C' + rd.race_class, field: rd.field_size,
-        course: 'GOING ' + rd.going + ' · COURSE ' + rd.course + ' · FIELD ' + rd.field_size,
-        bars: [1, 2, 3].map(i => ({ h:[6, 10, 14][i - 1] + 'px', hs:[4, 7, 11][i - 1] + 'px', bg: i <= lvl ? 'var(--text-2)' : 'var(--line-3)' })),
-        band: rd.band.toUpperCase(), conc: Math.round(rd.concentration * 100) + '%',
-        fav: { no: fv[0], name: fv[1], price: toteOn ? px(fv[2]) : '—', color: nameColor(no, fv[0]) },
-        hasTips, noTips: !hasTips, noTipsMsg, top: top || { marks:[] },
-        topPrices: top ? top.prices : [],
-        hasGap: !!g, noGap: !g,
-        noGapMsg: !both ? (toteOn ? 'needs Ladbrokes prices' : 'needs both markets open') : 'no priced runner',
-        gap: g ? { no:g.no, name:g.name, val:sgn(g.ev), color: g.ev >= 5 ? 'var(--text)' : 'var(--text-dim)', weight: g.ev >= 5 ? 600 : 400,
-          line: 'at ' + atL(g.at) + ' ' + px(g.price) + ' · ' + otherL(g.at) + ' fair ' + g.fair + '%', atShort: 'at ' + atL(g.at) } : {},
-        gapStrong: !!g && g.ev >= 5,
-        hasMobileExtras: flags.length > 0 || (!!g && g.ev >= 5),
-        flags, srcIn,
-        picks: topPicks, rest, noRest: rest.length === 0, hasRest: rest.length > 0,
-        interviews: ivs.map((iv, i) => ({ role: iv.role.toUpperCase(), speaker: iv.speaker, horse: iv.horse_no + ' ' + iv.horse_name, nameColor: nameColor(no, iv.horse_no), words: this.words(iv.words, 'i' + no + '-' + i) })),
-        noInterview: ivs.length === 0,
-        noInterviewMsg: M.pub.rtw_interview ? 'NO JOCKEY OR TRAINER INTERVIEW FOR THIS RACE' : 'INTERVIEWS NOT IN YET · ' + SRC.rtw_interview.usual,
-        pool: money(sr ? sr.tote_win_pool : MONEY[no]),
-        mTote: OVERROUND[no] ? OVERROUND[no].tote + '%' : '—',
-        mLb: OVERROUND[no] && lbOn ? OVERROUND[no].ladbrokes + '%' : '—',
-        open, mOpen,
-        bg: open ? 'var(--surface-2)' : 'transparent', mark: open ? 'var(--text)' : 'transparent',
-        mBg: mOpen ? 'var(--surface-2)' : 'transparent', mMark: mOpen ? 'var(--text)' : 'transparent',
-        toggle: () => this.setState(s => ({ open: s.open === no ? null : no })),
-        mToggle: () => this.setState(s => ({ mOpen: s.mOpen === no ? null : no })),
-      };
-    });
-
-    const runSet = {}; races.forEach((r, i) => { if (r.isRun) runSet[i + 1] = true; });
-    const edges = both ? SUMMARY.edges.slice().sort((a, b) => b.ev_pct - a.ev_pct).slice(0, 8).map(e => ({
-      race: 'R' + e.race_no, no: e.horse_no, name: e.horse_name, nameColor: nameColor(e.race_no, e.horse_no),
-      at: e.bet_at === 'tote' ? 'TOTE' : 'LB', price: px(e.price), fair: e.fair_pct.toFixed(1) + '%', ev: sgn(e.ev_pct),
-      src: runSet[e.race_no] ? 'RAN' : (e.supporters ? e.supporters + (e.supporters > 1 ? ' sources' : ' source') : 'no tips'),
-      srcColor: e.supporters ? 'var(--tip)' : 'var(--text-dim)', op: runSet[e.race_no] ? 0.4 : 1,
-      go: () => this.setState({ open: e.race_no, mOpen: e.race_no }),
-    })) : [];
-
-    const sources = SRC_ORDER.map(k => {
-      const on = !!M.pub[k];
-      let picks = 0, feat = 0, quotes = 0, ivs = 0, heard = 0; const rs = new Set();
-      SUMMARY.races.forEach(r => {
-        r.picks.forEach(p => p.backed_by.forEach(b => {
-          if (b.source !== k || b.kind === 'connections') return;
-          rs.add(r.race_no); if (b.kind === 'pick') picks++; else feat++; quotes += b.words.length; if (b.heard) heard++;
-        }));
-        if (k === 'rtw_interview' && r.interviews.length) { ivs += r.interviews.length; rs.add(r.race_no); r.interviews.forEach(i => { quotes += i.words.length; }); }
+          return { m:mark(b), who:b.who + (b.role && b.kind === 'connections' ? ' · ' + b.role : '') + (!COUNTED[b.source] && !conn ? ' · shown, not counted' : ''), words:ws, noWords:ws.length === 0, url:b.url, tl:t != null ? tl(t) : 'page', noWordsMsg:b.heard ? 'named aloud, no commentary captured' : 'pick only, no commentary' };
+        });
+        const ls = s.last_start;
+        const last = ls ? {
+          head:ls.place + ' of ' + ls.field_size + ' · ' + ls.venue + ' ' + ls.distance + 'm C' + ls.race_class + ' · ' + ls.race_date.slice(8) + ' ' + MON[+ls.race_date.slice(5, 7) - 1] + ' · dr ' + ls.draw + ' · ' + ls.jockey,
+          run:ls.running_comment || '', hasInc:!!ls.incident_comment,
+          w:this.words([{ text:ls.incident_comment || '', url:'' }], 'inc' + hk)[0],
+          tags:(ls.tags || []).map(t => ({ t:t.replace(/_/g, ' ').toUpperCase() })),
+        } : null;
+        const tr = s.trial;
+        const trial = tr ? { head:tr.band + ' · ' + tr.place + ' of ' + tr.field_size + ' · ' + tr.trial_date.slice(8) + ' ' + MON[+tr.trial_date.slice(5, 7) - 1], comment:tr.comment || '', c:/STANDOUT|POSITIVE/.test(tr.band) ? 'var(--text)' : 'var(--text-dim)' } : null;
+        const pt = p ? (() => {
+          const cellsT = [];
+          [['WIN', 'win'], ['PLACE', 'place'], ['FAIR CHANCE', 'fair_pct'], ['VALUE IF OTHER RIGHT', 'value_pct']].forEach(([lab, f]) => {
+            cellsT.push({ v:lab, vm:f === 'value_pct' ? 'VALUE' : f === 'fair_pct' ? 'FAIR' : lab, al:'left', fs:'10px', c:'var(--text-muted)', w:400 });
+            books.forEach(k => {
+              const q = p[k]; let v = '—', c = 'var(--text-faint)', w = 400, fs = '12px';
+              if (q && q[f] != null) {
+                if (f === 'win') { v = px(q.win); c = 'var(--text)'; w = p.pays_most === k && books.length > 1 ? 600 : 400; fs = '13px'; }
+                else if (f === 'place') { v = px(q.place); c = 'var(--text-2)'; }
+                else if (f === 'fair_pct') { v = q.fair_pct.toFixed(1) + '%'; c = 'var(--text-2)'; }
+                else if (books.length > 1) { v = sgn(q.value_pct); c = q.value_pct >= 5 ? 'var(--text)' : q.value_pct < 0 ? 'var(--text-dim)' : 'var(--text-2)'; w = q.value_pct >= 5 ? 600 : 400; }
+              }
+              cellsT.push({ v, vm:v, al:'right', fs, c, w });
+            });
+          });
+          return { cols:'150px repeat(' + books.length + ', minmax(0,1fr))', colsM:'52px repeat(' + books.length + ', minmax(0,1fr))', head:books.map(k => ({ s:BK[k].s === 'T' ? 'TOTE' : BK[k].s })), cells:cellsT };
+        })() : null;
+        const tierL = s.tier === 'SHORTLIST' ? 'TOP 4' : s.tier === 'CASE' ? 'A CASE' : '';
+        const placed = x.result;
+        return {
+          rk:s.rank, no:x.horse_no, name:x.horse_name, zh:x.name_zh || '', nameColor:nameC(no, x.horse_no),
+          line2:'dr ' + x.draw + ' · ' + x.jockey + ' · ' + x.trainer + (x.weight ? ' · ' + x.weight + 'lb' : ''),
+          style:{ t:st[0], c:st[1], g:st[2] },
+          bar:Math.min(100, s.place_pct) + '%', barC:s.tier === 'SHORTLIST' ? 'var(--text-2)' : 'var(--text-dim)',
+          place:Math.round(s.place_pct) + '%', win:'W ' + s.win_pct.toFixed(1) + '%',
+          tier:tierL, tierC:s.tier === 'SHORTLIST' ? 'var(--text-2)' : 'var(--text-muted)',
+          hasBB:!!bb, setup:bb ? s.setup : '', setupS:bb ? s.setup : '', setupC:s.setup === 'AGAINST' ? 'var(--text-dim)' : 'var(--text-2)',
+          bbHead:bb ? s.setup + ' ×' + s.setup_x + ' · ' + bb.confidence + ' confidence · booked ' + bb.added_date + (bb.conditions_text ? ' · ' + bb.conditions_text : '') : '',
+          bbWhy:bb ? bb.reasoning : '',
+          said:saidOf(x).said, saidS:saidOf(x).saidS, saidC:saidOf(x).saidC,
+          marks:(sup ? sup.backed_by : []).map(mark),
+          cells, move, chips,
+          mPrice:p && p.tote ? px(p.tote.win) : '', mPriceW:p && p.pays_most === 'tote' && books.length > 1 ? 600 : 400,
+          op:placed != null && placed > 3 ? 0.55 : 1,
+          open:openRunner === x.horse_no, mOpen:openRunnerM === x.horse_no,
+          bg:openRunner === x.horse_no ? 'var(--run-open)' : 'transparent', mBg:openRunnerM === x.horse_no ? 'var(--run-open)' : 'transparent',
+          caret:openRunner === x.horse_no ? '▾' : '▸',
+          toggle:() => this.setMap('openR', rk, openRunner === x.horse_no ? null : x.horse_no),
+          mToggle:() => this.setMap('openRM', rk, openRunnerM === x.horse_no ? null : x.horse_no),
+          dGrid:p ? 'minmax(0,1.05fr) minmax(0,1fr) 290px' : 'minmax(0,1fr) minmax(0,1fr)',
+          setupLine:'SET-UP ' + s.setup + ' ×' + s.setup_x + ' · PLACE ' + s.place_pct + '% · WIN ' + s.win_pct + '% · RANK ' + s.rank + ' OF ' + r.field_size,
+          forList:(s.for || []).map(f => ({ why:f.why, x:'×' + f.x })), againstList:(s.against || []).map(f => ({ why:f.why, x:'×' + f.x })),
+          hasLast:!!last, last:last || { tags:[], w:{} }, hasTrial:!!trial, trial:trial || {},
+          notes:(s.notes || []).map(n => ({ t:typeof n === 'string' ? n : (n.text || n.note || '') })),
+          hasRev:(s.reversals || []).length > 0, reversals:(s.reversals || []).map(v => ({ no:v.vs_no, name:v.vs_name, note:v.note, moved:(v.moved || []).join(', ') })),
+          saidHead:sup ? plural(sup.sources, 'source') + ' back it' : srcIn ? '0 of ' + srcIn + ' sources that tipped this race' : 'nothing in yet',
+          srcs, noSaid:srcs.length === 0,
+          noSaidMsg:srcIn ? 'None of the ' + srcIn + ' sources that tipped this race named it.' : 'No source has published on this race yet' + (nextSaid ? ' · ' + nextSaid.label + ' due ' + when(nextSaid.due, asOf) : '') + '.',
+          hasForm:!!x.form_line, form:x.form_line || {},
+          hasPrice:!!p, pt:pt || { head:[], cells:[] },
+          priceHead:books.map(k => BK[k].s === 'T' ? 'TOTE ' + (cap.tote ? hm(cap.tote) : '') : BK[k].s + ' ' + (cap[k] ? hm(cap[k]) : '')).join(' · ') + (x.market_rank ? ' · MARKET RANK ' + x.market_rank : ''),
+          ptNote:(toteEarly ? 'Tote is the day-before pool: thin, one bet moves it. ' : '') + (books.length > 1 ? 'Value = this price × the other market\'s fair chance − 1.' : 'Value needs a second market.'),
+        };
       });
-      const bits = [];
-      if (picks) bits.push(picks + ' picks'); if (feat) bits.push(feat + ' featured'); if (ivs) bits.push(ivs + ' interviews');
-      bits.push(quotes + ' quotes'); if (heard) bits.push(heard + ' heard'); bits.push(rs.size + ' races');
+
+      const mk = r.market;
+      const winnerR = r.runners.find(x => x.result === 1);
+      const poolBits = [];
+      if (mk) {
+        poolBits.push({ l:'WIN POOL', v:money(mk.win_pool) });
+        poolBits.push({ l:'CONCENTRATION', v:Math.round(mk.concentration * 100) + '% ' + mk.band });
+        if (mk.overround) poolBits.push({ l:'MARGIN', v:Object.entries(mk.overround).map(([k, v]) => (BK[k] ? BK[k].s : k) + ' ' + v + '%').join(' · ') });
+      }
+      const edgeC = r.run ? 'transparent' : (no === openD ? 'var(--text)' : isNext ? 'var(--text-2)' : running ? 'var(--text-muted)' : 'transparent');
       return {
-        ab: SRC[k].ab, name: SRC[k].name, abColor: on ? (k === 'rtw_interview' ? 'var(--voice)' : 'var(--tip)') : 'var(--text-faint)',
-        nameColor: on ? 'var(--text)' : 'var(--text-muted)',
-        time: on ? M.times[k] : 'NOT YET', timeColor: on ? 'var(--text-2)' : 'var(--text-dim)',
-        line: on ? bits.join(' · ') : SRC[k].usual, held: on ? (M.held[k] || '') : '',
+        no, label:'R' + no, off:r.off_time, mins:minsL,
+        minsC:running ? 'var(--text)' : isNext ? 'var(--text)' : 'var(--text-muted)', minsW:running || isNext ? 600 : 400,
+        run:r.run, isRunRow:r.run, dist:r.distance + 'm', cls:cl.t, clsC:cl.c, clsBg:cl.g,
+        course:r.course, going:r.going || '—', field:r.field_size + ' run', fieldN:r.field_size,
+        hasMarket:!!mk, fav:mk ? { no:mk.favourite.horse_no, win:px(mk.favourite.win), tag:toteEarly ? 'THIN' : (cap.tote ? hm(cap.tote) : '') } : {},
+        favShort:mk ? 'FAV #' + mk.favourite.horse_no + ' ' + px(mk.favourite.win) : '',
+        conc:mk ? Math.round(mk.concentration * 100) + '% ' + mk.band : '', poolShort:mk ? moneyS(mk.win_pool) : '',
+        poolBits,
+        featReasons:reasons.slice(0, 4), hasMore:reasons.length > 4, moreLabel:'+' + (reasons.length - 4) + ' more when open · ' + kindCounts,
+        mReasons:reasons.slice(0, 3), mHasMore:reasons.length > 3, mMoreLabel:'+' + (reasons.length - 3) + ' more · ' + kindCounts,
+        kindCounts, firstReason:reasons[0] ? reasons[0].text : '',
+        pace, shortlist, slCompact, slPriceHead:hasPrices ? 'TOTE' : '',
+        interviews:ivs.map((iv, i) => {
+          const rr = r.runners.find(z => z.horse_no === iv.horse_no);
+          return { role:iv.role.toUpperCase(), speaker:iv.speaker, horse:'#' + iv.horse_no + ' ' + iv.horse_name, nameColor:nameC(no, iv.horse_no),
+            screen:rr ? 'SCREEN ' + rr.screen.rank + ' of ' + r.field_size + (rr.price && rr.price.tote ? ' · TOTE ' + px(rr.price.tote.win) : '') : '',
+            words:this.words(iv.words, 'iv' + rk + '-' + i, 'var(--voice)') };
+        }),
+        comments:((r.voices && r.voices.comments) || []).map((c, i) => ({ who:AB[c.source] || c.who, w:this.words([{ text:c.text, url:c.url || '' }], 'cm' + rk + '-' + i)[0] })),
+        hasPrices, books, priceCols, runGrid, priceHead, mPriceHead:hasPrices ? 'TOTE' : '',
+        runners, winner:winnerR ? '1st #' + winnerR.horse_no + ' ' + winnerR.horse_name + (winnerR.price && winnerR.price.tote ? ' · tote ' + px(winnerR.price.tote.win) : '') : 'result pending',
+        open:no === openD && !r.run, mOpen:no === openM && !r.run,
+        edgeC, bg:no === openD ? 'var(--surface-2)' : 'transparent',
+        mEdgeC:no === openM ? 'var(--text)' : isNext ? 'var(--text-2)' : 'transparent', mBg:no === openM ? 'var(--surface-2)' : 'transparent',
+        labelC:'var(--text)',
+        toggle:() => this.setMap('openD', sk, openD === no ? null : no),
+        mToggle:() => this.setMap('openM', sk, openM === no ? null : no),
       };
     });
 
-    const pageList = [['Briefing','Briefing.dc.html'],['Race Day','Race Day.dc.html'],['Form Guide','Form Guide.dc.html'],['Bets','Bets.dc.html'],['Blackbook','Blackbook.dc.html'],['Results','Results.dc.html'],['Lookup','Lookup.dc.html'],['Trials','Trials.dc.html'],['Model Analysis','Model Analysis.dc.html']];
-    const fr = (name, ok, age, stale, missing) => ({ name, mark: missing ? '—' : stale ? '⚠' : '✓', age: missing ? '' : age, color: missing ? 'var(--text-dim)' : stale ? 'var(--incident)' : 'var(--win)', border: stale ? 'var(--edge-ground)' : 'transparent' });
-    const nPub = SRC_ORDER.filter(k => M.pub[k]).length;
+    const byNo = {}; races.forEach(r => { byNo[r.no] = r; });
+    const ruleR = 'most different things to read first · a count of reasons, not a chance of anything';
+    const ruleRS = 'a count of reasons to read, not a chance of anything';
+    const head = (l, r, rs) => ({ isHead:true, headL:l, headR:r, headRS:rs });
+    const feat = featNos.map(n => Object.assign({}, byNo[n], { isFeat:true, isQuiet:false, isLive:true }));
+    const rest = races.filter(r => !featNos.includes(r.no)).map(r => Object.assign({}, r, { isFeat:false, isQuiet:!r.run, isLive:!r.run }));
+    const nRun = races.filter(r => r.run).length;
+    const list = [head('WORTH STUDYING FIRST', ruleR, ruleRS)].concat(feat, [head('THE REST · IN RACE ORDER', nRun ? nRun + ' run, collapsed to their result' : 'quieter: fewer things to read', nRun ? nRun + ' run' : 'in race order')], rest);
 
+    const nowItems = [];
+    if (isRD) {
+      const runningR = d.races.find(r => !r.run && r.minutes_to_off != null && r.minutes_to_off <= 0);
+      if (runningR) nowItems.push({ l:'RUNNING', ls:'RUNNING', v:'R' + runningR.race_no, c:'var(--text)', sub:runningR.off_time + ' off · no result yet', subS:runningR.off_time, go:() => {}, cursor:'default' });
+      if (nextRace) nowItems.push({ l:'NEXT', ls:'NEXT', v:'R' + nextRace.race_no, c:'var(--text)', sub:nextRace.off_time + ' · in ' + nextRace.minutes_to_off + 'm', subS:'in ' + nextRace.minutes_to_off + 'm', cursor:'pointer',
+        go:() => this.setState(s => ({ openD:Object.assign({}, s.openD, { [sk]:nextRace.race_no }), openM:Object.assign({}, s.openM, { [sk]:nextRace.race_no }) })) });
+      nowItems.push({ l:'CARD', ls:'CARD', v:nRun + ' of ' + d.races.length + ' run', c:'var(--text-2)', sub:'', subS:'', go:() => {}, cursor:'default' });
+      if (priceAge != null) nowItems.push({ l:'PRICES', ls:'PRICES', v:hm(cap.tote), c:staleP ? 'var(--incident)' : 'var(--text-2)', sub:staleP ? priceAge + 'm old · last capture' : priceAge + 'm old', subS:staleP ? priceAge + 'm old' : '', go:() => {}, cursor:'default' });
+    }
+
+    const capLine = [];
+    ['tote', 'ladbrokes', 'sportsbet'].forEach(k => { if (cap[k]) capLine.push({ l:BK[k].s === 'T' ? 'TOTE' : BK[k].s, v:hm(cap[k]) + (k === 'tote' && toteEarly ? ' thin' : ''), c:staleP ? 'var(--incident)' : 'var(--text)' }); });
+    if (d.meeting_total) capLine.push({ l:'ALL POOLS', v:moneyS(d.meeting_total), c:'var(--text)' });
+    if (!capLine.length) capLine.push(tc && tc.state === 'overdue'
+      ? { l:'PRICES', v:'tote overdue · none captured', c:'var(--incident)' }
+      : { l:'PRICES', v:tc && tc.due ? 'tote opens ' + when(tc.due, asOf) : 'none yet', c:'var(--text-dim)' });
+
+    const runSet = {}; races.forEach(r => { if (r.run) runSet[r.no] = true; });
+    const edges = isRD ? (d.edges || []).slice().sort((a, b) => b.ev_pct - a.ev_pct).slice(0, 10).map(e => ({
+      race:'R' + e.race_no, no:e.horse_no, name:e.horse_name, nameColor:nameC(e.race_no, e.horse_no),
+      at:BK[e.bet_at] ? (BK[e.bet_at].s === 'T' ? 'TOTE' : BK[e.bet_at].s) : e.bet_at, price:px(e.price),
+      against:e.against === 'books' ? 'BOOKS FAIR' : 'TOTE FAIR', fair:e.fair_pct.toFixed(1) + '%', ev:sgn(e.ev_pct),
+      src:runSet[e.race_no] ? 'RAN' : e.supporters ? plural(e.supporters, 'source') : 'no source', srcC:e.supporters ? 'var(--tip)' : 'var(--text-dim)', op:runSet[e.race_no] ? 0.4 : 1,
+      go:() => this.setState(s => ({ openD:Object.assign({}, s.openD, { [sk]:e.race_no }), openM:Object.assign({}, s.openM, { [sk]:e.race_no }), openR:Object.assign({}, s.openR, { [sk + ':' + e.race_no]:e.horse_no }) })),
+    })) : [];
+    const lbc = clockBy.ladbrokes;
+    const noEdgesMsg = isRD ? 'No runner is priced 5% or more above another market\'s chance.' : 'Race day only: needs the bookmakers beside a deep tote' + (lbc && lbc.due ? ' · bookmakers due ' + when(lbc.due, asOf) : '') + '.';
+
+    const f = d.fit || {};
+    const fitLine = f.top4_has_winner ? 'The Screen\'s four held the winner in ' + Math.round(f.top4_has_winner.screen * 100) + '% of ' + (f.test_races || 0).toLocaleString('en-US') + ' test races (the market\'s four: ' + Math.round(f.top4_has_winner.market * 100) + '%) · the order is a reading order, and nothing here re-ranks the race card' : '';
+    const dt = pd(d.race_date);
+    const pageList = [['Briefing','Briefing.dc.html'],['Race Day','Race Day.dc.html'],['Form Guide','Form Guide.dc.html'],['Bets','Bets.dc.html'],['Blackbook','Blackbook.dc.html'],['Results','Results.dc.html'],['Lookup','Lookup.dc.html'],['Trials','Trials.dc.html'],['Model Analysis','Model Analysis.dc.html']];
+    const asOfTxt = DAYS[pd(asOf).getDay()] + ' ' + pd(asOf).getDate() + ' ' + MON[pd(asOf).getMonth()] + ' ' + hm(asOf);
     return {
-      showDesktop: view !== 'phone', showPhone: view !== 'desktop',
-      momentLabel: M.label, clock: M.clock, clockShort: M.short,
-      clockDot: M.now != null && M.now > 1100 ? 'var(--win)' : 'var(--text-dim)',
-      pages: pageList.map(([name, href], i) => ({ name, href, color: i === 0 ? 'var(--text)' : 'inherit', mark: i === 0 ? 'var(--alert)' : 'transparent' })),
-      freshness: [
-        fr('Card', true, '2h', false, false),
-        fr('Tote', toteOn, toteOn ? (toteAge || 5) + 'm' : '', toteStale, !toteOn),
-        fr('Ladbrokes', lbOn, lbOn ? (M.now != null ? (M.now - toMin(M.lb)) + 'm' : '') : '', false, !lbOn),
-        fr('Tips', nPub > 0, nPub + '/4', false, nPub === 0),
-        fr('Money', toteOn, toteOn ? '5m' : '', false, !toteOn),
-      ],
-      capTote: { v: toteOn ? M.tote + ' HKT' + (toteStale ? ' · STALE ' + toteAge + 'm' : '') : 'NOT OPEN', color: toteStale ? 'var(--incident)' : toteOn ? 'var(--text)' : 'var(--text-dim)' },
-      capLb: { v: lbOn ? M.lb + ' HKT' : 'NO FIXED ODDS YET', color: lbOn ? 'var(--text)' : 'var(--text-dim)' },
-      srcInCount: nPub + ' / 4',
-      meetingPool: toteOn ? '$' + (MEETING_TOTAL / 1e6).toFixed(1) + 'M' : '—',
-      races, edges, hasEdges: edges.length > 0, noEdges: edges.length === 0,
-      noEdgesMsg: !toteOn ? 'Needs both markets. The tote has not opened and Ladbrokes has not priced this meeting yet.' : 'Needs Ladbrokes fixed odds to compare against the tote.',
-      sources,
+      loading:false, loadMsg:'', showDesktop:view !== 'phone', showPhone:view !== 'desktop',
+      stageLabel:(sk === 'mid' ? 'MID-MEETING' : STAGE_NAME[d.stage] || d.stage.toUpperCase()) + ' · AS OF ' + asOfTxt.toUpperCase(),
+      venue:d.venue, dateLong:DAYS[dt.getDay()] + ' ' + dt.getDate() + ' ' + MON[dt.getMonth()] + ' ' + dt.getFullYear(), dateShort:DAYS[dt.getDay()].toUpperCase() + ' ' + dt.getDate() + ' ' + MON[dt.getMonth()].toUpperCase(),
+      raceCount:plural(d.races.length, 'race'), asOfLine:'as of ' + asOfTxt, asOfShort:hm(asOf) + (dayDiff(asOf, d.race_date) ? ' · ' + DAYS[pd(asOf).getDay()] : ''),
+      pages:pageList.map(([name, href], i) => ({ name, href, color:i === 0 ? 'var(--text)' : 'inherit', mark:i === 0 ? 'var(--alert)' : 'transparent' })),
+      clock, clockFull:clock, capLine,
+      hasNextDue:!!nextSaid || d.clock.some(c => c.state === 'overdue'),
+      nextDue:[nextSaid ? 'Next: ' + nextSaid.label + ' due ' + when(nextSaid.due, asOf) : '', ...d.clock.filter(c => c.state === 'overdue').map(c => c.label + ' overdue')].filter(Boolean).join(' · '),
+      hasNow:nowItems.length > 0, nowItems,
+      deskList:list, phoneList:list,
+      edges, noEdges:edges.length === 0, noEdgesMsg, fitLine,
     };
   }
 }

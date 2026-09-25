@@ -11,7 +11,6 @@
 <link rel="stylesheet" href="../assets/tokens.css">
 <link rel="stylesheet" href="../assets/pages.css">
 <link rel="stylesheet" href="../assets/briefing.css">
-<link rel="stylesheet" href="../assets/screen.css">
 </head>
 <body>
 
@@ -21,48 +20,36 @@
 
 <nav class="chrome-nav" id="nav"></nav>
 
-<!-- BRIEFING · PRICES · TOTE hh:mm · each bookmaker · SOURCES IN · MEETING -->
+<!-- BRIEFING · every source, in or due · price capture times. -->
 <div class="bf-bar" id="bf-bar"></div>
 
-<!-- The Screen: who is a chance in each race, read before any price exists.
-     First, because it is the part of the page that works the day before. -->
-<section class="scr-wrap" id="scr"></section>
+<!-- Race day only: the race running, the next off, how much of the card has
+     run, how old the prices are. -->
+<div class="bf-now" id="bf-now" hidden></div>
 
-<div class="bf-main">
-  <section class="bf-board">
-    <div class="bf-head" role="row">
-      <div>R</div><div>OFF</div><div>RACE</div><div class="mid">FLD</div>
-      <div>MARKET</div><div>FAVOURITE</div><div>MOST BACKED</div>
-      <div>ITS PRICE</div><div>BIGGEST PRICE GAP</div><div>SIGNALS</div>
-      <div>SOURCES</div>
-    </div>
-    <div id="bf-races"></div>
+<div class="bf-stage" id="bf-stage"></div>
+<div class="bf-status" id="bf-status">Reading the card…</div>
 
-    <div class="bf-legend">
-      <span><span class="bf-mark k-pick">R&amp;S #1</span> pick, with the tipster’s rank</span>
-      <span><span class="bf-mark k-feat">FC FEAT</span> featured segment</span>
-      <span><span class="bf-mark k-voice">INT J</span> jockey or trainer interviewed</span>
-      <span><span class="bf-mark k-form">FORM</span> Racing &amp; Sports’ line on the horse, not counted</span>
-      <span><span class="heard-key">~</span> heard: name came through speech-to-text</span>
-      <span>VALUE = price × the other market’s fair chance − 1</span>
-      <span class="hint">click a race to open it</span>
-    </div>
-  </section>
+<!-- Worth studying first, then the rest in race order. Desktop and phone read
+     the same view; the stylesheet shows one. -->
+<main class="bf-page">
+  <section class="bf-desk" id="bf-desk"></section>
+  <section class="bf-phone" id="bf-phone"></section>
 
-  <aside class="bf-aside">
-    <div class="bf-rail-cap">
-      <span>WHERE THE MARKETS DISAGREE</span><span class="dim">VALUE ≥ +5%</span>
-    </div>
-    <div class="bf-edge-head" id="bf-edges-head">
-      <span>R</span><span>HORSE</span><span class="num">BETTER AT</span>
-      <span class="num">OTHER FAIR</span><span class="num">VALUE</span>
-    </div>
-    <div id="bf-edges"></div>
+  <section class="bf-panels" id="bf-panels"></section>
 
-    <div class="bf-rail-cap ruled"><span>SOURCES FOR THIS MEETING</span></div>
-    <div id="bf-sources"></div>
-  </aside>
-</div>
+  <div class="bf-legend">
+    <span><span class="bf-kind k-screen">SCREEN</span> computed from the card</span>
+    <span><span class="bf-kind k-tip">SAID</span> a source said it</span>
+    <span><span class="bf-kind k-price">PRICE</span> a market priced it</span>
+    <span><span class="bf-mark k-pick">RTW #2</span> pick and rank</span>
+    <span><span class="bf-mark k-feat">FC FEAT</span> featured</span>
+    <span><span class="bf-mark k-voice">INT J</span> jockey / trainer spoke</span>
+    <span><span class="bf-mark k-shown">BRY</span> shown, not counted</span>
+    <span>~ heard via speech-to-text</span>
+    <span class="dim" id="bf-fit"></span>
+  </div>
+</main>
 
 <script type="module" src="../assets/briefing.js"></script>
 </body>

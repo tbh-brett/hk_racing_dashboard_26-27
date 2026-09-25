@@ -111,23 +111,27 @@ What it adds on top of its parts:
 - **The bookmakers' and Horse Detective's timing** rest on one observation
   each.
 
+## The page
+
+`web/pages/briefing.html`, ported from Claude Design's artboard of 25 Sep
+(`web/design-source/Briefing.dc.html`, bound to the four real samples of
+this endpoint). `briefing-model.js` reads the answer into a view,
+`briefing-desk.js` and `briefing-phone.js` draw it; below 1000px the phone
+list is shown. It re-reads every minute on race day while a race is still to
+run and every ten minutes otherwise. `?as_of=YYYY-MM-DDTHH:MM` pins the page
+to a moment — the stage, the clock and the minutes to each off as they stood
+then — for looking back, and for checking each stage.
+
 ## Open items
 
-1. **The page.** `web/pages/briefing.html` still stacks the Screen
-   (`/api/screen`) over the board (`/api/tips/summary` plus eleven race-card
-   fetches). It moves to `/api/briefing` when the new artboard comes back
-   from Claude Design, and the second race list goes with it.
-2. **Following the day** needs the endpoint to answer conditional polls
-   (ETag, `poll_after`) the way the Race Day card does, so a phone at the
-   course re-reads only what changed.
-3. **Horse Detective** shows only its latest four posts and nothing that
+1. **Conditional polling.** The race-day re-read is a full answer each
+   minute (about 60 KB gzipped). An ETag/`poll_after` like the Race Day
+   card's would make an idle minute free.
+2. **Horse Detective** shows only its latest four posts and nothing that
    scrolls off can be fetched again. The PC reads it at 10:00 and 20:30; its
    one analysis post went up at 11:49 on race day. A race-day poll every 30
    minutes would be safer — a second scheduled task, not yet created.
-4. **Sportsbet has refused this PC too since 24 Sep.** Racing & Sports'
-   tips and race comment still come through Ladbrokes; Sportsbet's prices
-   and its form line on every runner do not.
-5. **Ladbrokes on the server**: `jobs/scrape_fixed_odds` is built and not yet
-   in `ops/crontab`.
-6. **Nothing here is deployed.** Production runs `tips-layer` @598bf81. The
-   `briefing` branch holds the tips layer's later work, the Screen, and this.
+3. **Sportsbet has refused this PC too since 24 Sep.** Racing & Sports'
+   tips and race comment still come through Ladbrokes, which the server now
+   captures every half hour through the day (`ops/crontab`); Sportsbet's
+   prices and its form line on every runner do not arrive.

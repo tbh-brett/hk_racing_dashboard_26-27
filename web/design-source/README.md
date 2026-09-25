@@ -32,3 +32,9 @@ back, what was said, and the tote against the bookmakers' fixed odds. It was
 exported as one self-contained file; this copy is that file unpacked, with its
 runtime reference pointed at `./support.js` like the others and nothing else
 changed. It proposed two tokens, `--tip` and `--voice`, now in `tokens.css`.
+
+It was redesigned on 25 Sep 2026 around one endpoint, `/api/briefing`, and
+this file is that second artboard. It loads four sample answers from
+`./briefing-samples/` when opened outside the bundle; those are real tipster
+and bookmaker text, so they are kept off this public repo, on the owner's PC
+in `Claude outputs/briefing-design/`.

@@ -264,3 +264,12 @@ def test_both_bookmakers_leave_one_racing_and_sports(db, sb):
     status = {x["source"]: x for x in s["source_status"]}
     assert status["racing_sports"]["runner_lines"] == 12
     assert not status["factcheck"]["published"]
+
+
+def test_the_scheduled_run_on_a_day_with_no_meeting_is_quiet(tmp_path):
+    """The crontab asks about today every half hour; most days have no card."""
+    got = scrape_fixed_odds.scrape("2026-09-24", db=tmp_path / "none.db",
+                                   idle_if_no_card=True)
+    assert got.idle and not got.errors
+    named = scrape_fixed_odds.scrape("2026-09-24", db=tmp_path / "none.db")
+    assert named.errors and not named.idle

@@ -67,6 +67,13 @@
 # about stored cards from today on that still have a horse it cannot name.
 30 7  * * *   python -m hkrd.jobs.sync_horse_names --pending --db /data/hkrd.db
 30 13 * * *   python -m hkrd.jobs.sync_horse_names --pending --db /data/hkrd.db
+# Ladbrokes' fixed odds, and the Racing & Sports tips and race comment it
+# carries, for the Briefing. Ladbrokes answers this machine (Sportsbet does
+# not, and is read from the owner's PC). Every half hour through the racing
+# day: its prices are the second market beside the tote, and they are not
+# pruned any more than the tote's are. A day with no meeting stored is a quiet
+# no-op, not a failure — the job only acts on today's card.
+*/30 8-22 * * *   python -m hkrd.jobs.scrape_fixed_odds --db /data/hkrd.db
 
 # Live odds. A different cadence again, because odds are the only signal here
 # that moves minute to minute — the favourite changes between morning and post

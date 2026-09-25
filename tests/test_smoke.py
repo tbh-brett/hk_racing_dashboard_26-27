@@ -344,7 +344,7 @@ def test_page_stylesheets_do_not_share_a_top_level_class() -> None:
     """
     page_sheets = ["raceday.css", "formguide.css", "model.css",
                    "blackbook.css", "bets.css", "lookup.css",
-                   "trials.css", "results.css", "briefing.css", "screen.css"]
+                   "trials.css", "results.css", "briefing.css"]
     seen: dict[str, list[str]] = {}
     for sheet in page_sheets:
         path = WEB_ASSETS / sheet
