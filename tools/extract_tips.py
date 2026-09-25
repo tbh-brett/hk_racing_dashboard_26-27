@@ -50,6 +50,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import _dashboard as dash                                  # noqa: E402
 import extract_bryan as bryan                              # noqa: E402
+import extract_threads as threads                          # noqa: E402
 import extract_rtw as rtw                                  # noqa: E402
 import extract_rtw_preview as preview                      # noqa: E402
 from _card import Card                                     # noqa: E402
@@ -379,6 +380,14 @@ def extract(date: str, raw: Path, roster: dict) -> dict | None:
             q, h = bryan.bryan_quotes(rec, card, date, fetched)
             quotes += q
             held += h
+
+    # Horse Detective's posts carry no meeting either; the same rule, by the
+    # Hong Kong day they went up. Chinese names only, so the card's are needed.
+    hd = [p for p in threads.read(raw / "threads") if threads.is_for(p, date)]
+    print(f"  {date}: {len(hd)} Horse Detective analysis post(s)")
+    if hd and card.named:
+        sources.append(threads.SOURCE)
+        picks += threads.selections(hd, date, fetched)
 
     if not sources:
         return None

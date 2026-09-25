@@ -10,7 +10,7 @@ horsedetective." Four was the cap before and after five scroll passes.
 
 THREADS HAS NO NATIVE RSS. /@horsedetective/rss answers 404 with the app shell.
 
-OPEN RSS DOES, AND IT WORKS. https://openrss.org/www.threads.com/@horsedetective
+OPEN RSS DOES, AND IT WORKS. https://openrss.org/feed/www.threads.com/@horsedetective (it moved to /feed/ by 25 Sep 2026)
 returns `application/xml`, RSS 2.0, four items carrying the full post text, the
 permalink and an exact pubDate. That is the route this script uses, and it
 matters for three reasons: it is a plain GET of XML so it needs no browser and
@@ -94,7 +94,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-FEED = "https://openrss.org/www.threads.com/@{handle}"
+FEED = "https://openrss.org/feed/www.threads.com/@{handle}"
 
 USER_AGENT = "hkrd-threads-harvester/1.0 (+personal racing research; contact via GitHub tbh-brett)"
 
