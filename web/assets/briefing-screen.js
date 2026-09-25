@@ -30,7 +30,8 @@ const SHORT = {
   leader_pair: 'LEADER OF 2', leader_crowd: 'LEADER OF 3+', on_pace: 'ON PACE',
   closer: 'CLOSER', trial_good: 'TRIAL +', trial_bad: 'TRIAL −', rating_up: 'RTG UP',
   rating_down: 'RTG DOWN', class_rise: 'CLASS UP', draw_in: 'DRAW IN',
-  draw_out: 'DRAW OUT', venue_change: 'OTHER COURSE', trainer_change: 'NEW STABLE',
+  draw_out: 'DRAW OUT', draw_in_3: 'DRAW IN 3-RUN', draw_out_3: 'DRAW OUT 3-RUN',
+  venue_change: 'OTHER COURSE', trainer_change: 'NEW STABLE',
 };
 const pct = (v) => (v === null || v === undefined ? DASH : `${Math.round(v)}%`);
 const times = (x) => `×${x.toFixed(2)}`;

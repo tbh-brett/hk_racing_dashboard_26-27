@@ -155,6 +155,39 @@ def test_the_changes_since_last_start() -> None:
     assert v["draw_out"] == 1 and v["rating_down"] == 1
 
 
+def test_the_gate_is_read_against_the_last_three_starts_not_just_the_last() -> None:
+    """Gates 12, 14, 3 and today 4: the last start says nothing moved, the
+    campaign says the draw has been against it. `draw_in` cannot see it."""
+    wide = [{"draw": 3}, {"draw": 14}, {"draw": 12}]
+    prev = {**_runner()["prev"], "draw": 3}
+    v, why = model.features(_runner(draw=4, prev=prev, history=wide), _race())
+    assert v["draw_in_3"] == 1 and v["draw_in"] == 0
+    assert why["draw_in_3"] == "gates 12, 14, 3, today 4"
+
+
+def test_the_two_draw_readings_never_fire_together() -> None:
+    """Where the last start already says it, the three-run reading stays
+    quiet: one fact is never split across two columns for the fit."""
+    v, _ = model.features(
+        _runner(draw=1, history=[{"draw": 12}, {"draw": 11}, {"draw": 13}]), _race())
+    assert v["draw_in"] == 1 and v["draw_in_3"] == 0
+
+
+def test_a_horse_with_too_little_history_gets_no_three_run_reading() -> None:
+    v, _ = model.features(_runner(draw=4, history=[{"draw": 14}, {"draw": 12}]), _race())
+    assert v["draw_in_3"] == 0 and v["draw_out_3"] == 0
+
+
+def test_the_tags_that_did_not_survive_are_not_scored() -> None:
+    """`eased`, `weakened` and `bumped` all looked real against the Screen's
+    own probability and none survived a walk-forward fit. They stay unread,
+    and this fails if one is quietly wired back in without a refit."""
+    prev = {**_runner()["prev"], "tags": {"eased", "weakened", "bumped"}}
+    v, _ = model.features(_runner(prev=prev), _race())
+    clean, _ = model.features(_runner(), _race())
+    assert v == clean
+
+
 # ── one race ───────────────────────────────────────────────────────────────
 
 def test_a_race_s_chances_are_a_distribution() -> None:

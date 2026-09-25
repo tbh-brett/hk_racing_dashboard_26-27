@@ -18,11 +18,30 @@ What survived, with what did not beside it:
          leader, finishing in the back 60% last start (SARR under-reads it),
          second-up after running 7th or worse first-up, raced wide last start,
          a real veterinary finding, rating moved by the handicapper, a better
-         or worse draw than last time, a new stable
+         or worse draw than last time, a gate better or worse than its last
+         THREE starts where the last one alone does not show it, a new stable
   gone   class DROP (x1.02 -- a drop is the handicapper saying the horse is
          struggling), a trip change, "finished off well" and "weakened" once
          the finishing position is counted, first-time gear, a trial under
-         the same jockey or in the same gear, weight relief on its own
+         the same jockey or in the same gear, weight relief on its own, the
+         stewards' `eased` and `bumped` tags, and trouble in two of the last
+         three runs
+
+HOW FAR BACK IT READS. Almost everything here is the LAST start: the trouble,
+the vet finding, the rating move, the class, the stable, the venue. That is
+deliberate and it was tested -- reading further back mostly finds what the
+form rating has already absorbed. Trouble in two of the last three runs is
+A/E 1.02, a wide trip in two of three 1.02, and a bad run after a good one
+0.99: all nothing, because a compromised run lowers the rating at the time and
+the rating is already in the model.
+
+THE GATE IS THE EXCEPTION, and it is the one thing a rating cannot absorb: a
+draw is a fact about the RACE the horse is about to run, not about a run it
+has already had. A horse drawn 12, 14 and 3, out today in gate 4, has had the
+gate against it all campaign and `draw_in` -- which compares today with the
+last start only -- reads no change at all. Those runs place at A/E 1.18
+walk-forward (1,888 runs, weights fitted only on earlier seasons) and the
+factor points the same way in all six seasons fitted alone.
 
 `FACTORS` holds each one's fitted weight and how many runs carried it, and
 `jobs/fit_screen` re-derives every number here from the same code path the
@@ -30,7 +49,7 @@ page runs, so nobody has to take a multiplier on trust.
 
 WHAT IT IS NOT. A value finder. Walk-forward, where the screen rates a horse
 well above the closing tote, the tote has been right: A/E 0.91 where the
-screen says 1.25-2x the tote's chance and 0.86 beyond that, over 20,600
+screen says 1.25-2x the tote's chance and 0.85 beyond that, over 20,606
 runners. The screen replaces reading every race to find the four or
 five horses with a case. Once prices exist, a big gap between the two is more
 often the market knowing something than the screen finding something.
@@ -65,6 +84,15 @@ TRIAL_WINDOW_DAYS = 60
 # "Beaten" last start: finished behind this share of its field.
 BEATEN_SHARE = 0.4
 DRAW_MOVE = 4          # gates, relative to the last start
+# The same threshold, read against the mean of the last three starts. A gate
+# is a fact about the RACE, not about the run, so unlike trouble it does not
+# wash into the form rating: a horse can carry three wide gates in a row and
+# the rating only sees three moderate runs. Measured over 60,885 runs, the
+# cases the last-start rule MISSES -- inside the three-run average but not
+# inside the last start -- placed at A/E 1.15 against the Screen's own
+# probability. `draw_in_3` and `draw_out_3` therefore fire only where the
+# last-start pair does not, which keeps them disjoint and readable.
+DRAW_RUNS = 3
 RATING_MOVE = 3        # handicap points since the last start
 SECOND_UP_BAD_PLACE = 7
 # The jockey's win rate over the year before the race, shrunk toward the
@@ -82,6 +110,16 @@ WIDE_TAGS = frozenset({"wide", "without_cover"})
 # measured, a bleeder's next run is no worse than its form says (x1.07).
 VET_BAD = frozenset({"roarer", "lame_fore", "lame_hind", "vet_finding",
                      "arrhythmia"})
+# TAGS THAT DID NOT SURVIVE, so nobody spends a second afternoon on them.
+# `eased` and `weakened` are the stewards saying the horse stopped rather than
+# was stopped, and against the Screen's own probability they looked real --
+# A/E 0.89 over 1,770 runs and 0.94 over 7,592. Fitted walk-forward they are
+# not: on the seasons that had not seen them, `eased` came back 0.94 +- 0.14
+# and `weakened` 0.91 +- 0.06, neither two standard errors from 1.00, and
+# `eased` pointed the wrong way in two seasons of five. `prev_beaten` already
+# carries most of it -- a horse that weakened is usually a horse that finished
+# out of the frame. `bumped` is the same story and worse: the most common tag
+# the Screen ignores, 9.6% of runs, and worth exactly A/E 1.00.
 
 # HKJC's race call writes about trouble in words the stewards' vocabulary
 # (`derive/tags`) never needed: "blocked near 200M", "3 wide no cover".
@@ -117,9 +155,10 @@ class Factor:
 _ONE_SEASON = "one season of trials in the archive; refit as 26/27 accrues"
 _TWO_SEASONS = "HKJC ratings are in the archive from 2024-25 only"
 
-# jobs/fit_screen, 2026-09-25: every settled race from 2020-21 to 23 Sep 2026,
-# refitted once Group and 4-year-old races carried their class (the class
-# fix in docs/audit-2026-09-24.md). Only "Up in class" moved: +0.083 to +0.047.
+# jobs/fit_screen, 2026-09-25: every settled race from 2020-21 to 23 Sep 2026.
+# Refitted twice that day -- once when Group and 4-year-old races gained their
+# class (docs/audit-2026-09-24.md), which moved only "Up in class" from +0.083
+# to +0.047, and again when the two three-run draw factors were added.
 # The walk-forward figures are the seasons 2022-23 to 26/27 so far, each
 # scored by weights fitted only on the seasons before it.
 FIT: dict[str, Any] = {
@@ -128,40 +167,42 @@ FIT: dict[str, Any] = {
     "races": 5019,
     "runs": 61007,
     "test_races": 3366,
-    "top3_has_winner": {"screen": 0.520, "form": 0.487, "market": 0.621},
+    "top3_has_winner": {"screen": 0.521, "form": 0.487, "market": 0.621},
     "top4_has_winner": {"screen": 0.622, "form": 0.586, "market": 0.710},
     # A/E against the closing tote where the screen rates a horse 1.25-2x and
     # 2x+ what the tote does: the tote has been right.
-    "above_tote_ae": {"x1.25-2": 0.912, "x2+": 0.849, "runs": 20610},
+    "above_tote_ae": {"x1.25-2": 0.910, "x2+": 0.848, "runs": 20606},
 }
 
 FACTORS: tuple[Factor, ...] = (
-    Factor("form", "FORM", "SARR rating, per standard deviation above the field", 0.466, 0),
-    Factor("jockey", "RIDER", "Jockey's strike rate over the last year", 0.488, 0),
-    Factor("unrated", "CONTROL", "No SARR rating yet", -0.147, 6024),
+    Factor("form", "FORM", "SARR rating, per standard deviation above the field", 0.460, 0),
+    Factor("jockey", "RIDER", "Jockey's strike rate over the last year", 0.491, 0),
+    Factor("unrated", "CONTROL", "No SARR rating yet", -0.141, 6024),
     Factor("prev_no_comment", "CONTROL", "No race comments on the last start", 0.091, 9933),
-    Factor("debut", "CAMPAIGN", "Debut", -0.397, 3020),
+    Factor("debut", "CAMPAIGN", "Debut", -0.387, 3020),
     Factor("first_up", "CAMPAIGN", "First-up from a spell", -0.119, 7985),
     Factor("second_up_bad", "CAMPAIGN", "Second-up after running 7th or worse first-up", -0.322, 4746),
-    Factor("deep_campaign", "CAMPAIGN", "Fifth run or later this campaign", 0.070, 27332),
-    Factor("prev_beaten", "LAST-START", "Beaten out of the frame last start", -0.319, 32660),
-    Factor("prev_excuse_beaten", "LAST-START", "Beaten last start, but held up, checked or blocked", 0.055, 6574),
-    Factor("prev_wide", "LAST-START", "Raced wide last start", 0.104, 17923),
-    Factor("prev_vet", "LAST-START", "Veterinary finding after the last start", -0.278, 606),
-    Factor("leader_alone", "PACE", "The only habitual leader in the race", 0.244, 1299),
-    Factor("leader_pair", "PACE", "One of two habitual leaders", 0.219, 2928),
-    Factor("leader_crowd", "PACE", "One of three or more habitual leaders", 0.016, 5544),
+    Factor("deep_campaign", "CAMPAIGN", "Fifth run or later this campaign", 0.069, 27332),
+    Factor("prev_beaten", "LAST-START", "Beaten out of the frame last start", -0.322, 32660),
+    Factor("prev_excuse_beaten", "LAST-START", "Beaten last start, but held up, checked or blocked", 0.054, 6574),
+    Factor("prev_wide", "LAST-START", "Raced wide last start", 0.109, 17923),
+    Factor("prev_vet", "LAST-START", "Veterinary finding after the last start", -0.279, 606),
+    Factor("leader_alone", "PACE", "The only habitual leader in the race", 0.245, 1299),
+    Factor("leader_pair", "PACE", "One of two habitual leaders", 0.222, 2928),
+    Factor("leader_crowd", "PACE", "One of three or more habitual leaders", 0.018, 5544),
     Factor("on_pace", "PACE", "Habitually races on the pace", 0.092, 7434),
-    Factor("closer", "PACE", "Habitually races at the back", -0.093, 26673),
-    Factor("trial_good", "TRIAL", "Trial rated POSITIVE or STANDOUT since the last run", 0.514, 832, _ONE_SEASON),
+    Factor("closer", "PACE", "Habitually races at the back", -0.090, 26673),
+    Factor("trial_good", "TRIAL", "Trial rated POSITIVE or STANDOUT since the last run", 0.515, 832, _ONE_SEASON),
     Factor("trial_bad", "TRIAL", "Trial rated NEGATIVE since the last run", -0.308, 682, _ONE_SEASON),
-    Factor("rating_up", "CHANGE", "Rating up 3+ since the last start", 0.168, 1584, _TWO_SEASONS),
-    Factor("rating_down", "CHANGE", "Rating down 3+ since the last start", -0.251, 908, _TWO_SEASONS),
-    Factor("class_rise", "CHANGE", "Up in class", 0.047, 3102),
-    Factor("draw_in", "CHANGE", "Drawn 4+ gates further in than last start", 0.105, 15059),
-    Factor("draw_out", "CHANGE", "Drawn 4+ gates further out than last start", -0.119, 15111),
-    Factor("venue_change", "CHANGE", "Other course from last start", -0.086, 15480),
-    Factor("trainer_change", "CHANGE", "New stable since last start", 0.243, 1119),
+    Factor("rating_up", "CHANGE", "Rating up 3+ since the last start", 0.167, 1584, _TWO_SEASONS),
+    Factor("rating_down", "CHANGE", "Rating down 3+ since the last start", -0.259, 908, _TWO_SEASONS),
+    Factor("class_rise", "CHANGE", "Up in class", 0.049, 3102),
+    Factor("draw_in", "CHANGE", "Drawn 4+ gates further in than last start", 0.122, 15059),
+    Factor("draw_out", "CHANGE", "Drawn 4+ gates further out than last start", -0.102, 15111),
+    Factor("draw_in_3", "CHANGE", "Drawn 4+ gates inside its last three starts, where the last start alone does not show it", 0.187, 2811),
+    Factor("draw_out_3", "CHANGE", "Drawn 4+ gates outside its last three starts, where the last start alone does not show it", -0.062, 2534),
+    Factor("venue_change", "CHANGE", "Other course from last start", -0.088, 15480),
+    Factor("trainer_change", "CHANGE", "New stable since last start", 0.244, 1119),
 )
 BY_KEY: dict[str, Factor] = {f.key: f for f in FACTORS}
 
@@ -274,6 +315,7 @@ def features(r: Mapping[str, Any], race: Mapping[str, Any]
 
     if prev:
         _last_start(v, why, r, prev)
+        _draw_run(v, why, r, prev)
 
     _pace(v, why, r.get("style"), race.get("n_leaders") or 0)
     _trial(v, why, date, prev, r.get("trials") or [])
@@ -333,6 +375,33 @@ def _last_start(v: dict, why: dict, r: Mapping[str, Any],
     if prev.get("trainer") and r.get("trainer") and prev["trainer"] != r["trainer"]:
         v["trainer_change"] = 1.0
         why["trainer_change"] = f"from {prev['trainer']}"
+
+
+def _draw_run(v: dict, why: dict, r: Mapping[str, Any],
+              prev: Mapping[str, Any]) -> None:
+    """The gate against the last three starts, not just the last one.
+
+    Only where the last-start pair is silent, so the two never fire together
+    and the fit is not asked to split one fact between two columns. This is
+    the horse whose gate has been against it all campaign -- 12, 14, 3, and
+    today 4 -- which `draw_in` reads as no change at all.
+    """
+    draw = r.get("draw")
+    gates = [h["draw"] for h in (r.get("history") or [])[:DRAW_RUNS] if h.get("draw")]
+    if draw is None or len(gates) < DRAW_RUNS:
+        return
+    mean = sum(gates) / len(gates)
+    last = prev.get("draw")
+    said = last is not None and abs(draw - last) >= DRAW_MOVE
+    if said:                              # the last start already says it
+        return
+    run = ", ".join(str(g) for g in reversed(gates))
+    if draw <= mean - DRAW_MOVE:
+        v["draw_in_3"] = 1.0
+        why["draw_in_3"] = f"gates {run}, today {draw}"
+    elif draw >= mean + DRAW_MOVE:
+        v["draw_out_3"] = 1.0
+        why["draw_out_3"] = f"gates {run}, today {draw}"
 
 
 def _pace(v: dict, why: dict, style: str | None, leaders: int) -> None:
