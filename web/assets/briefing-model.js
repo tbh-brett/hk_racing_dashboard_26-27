@@ -26,10 +26,12 @@ export const SRC = {
       + '16:00 the day before' },
   factcheck: { ab: 'FC', name: '賽馬Fact Check',
     usual: 'Fact Check usually posts at 20:00 two days before' },
+  threads: { ab: 'HD', name: '神探賽馬 Horse Detective',
+    usual: 'Horse Detective posts on race-day morning, when it posts at all' },
   bryan: { ab: 'BRY', name: '全方位Bryan', usual: '' },
 };
 export const SRC_ORDER = ['racing_sports', 'rtw_preview', 'rtw_interview',
-                          'factcheck'];
+                          'factcheck', 'threads'];
 
 /* The markets, tote first. A bookmaker the meeting has no prices from is left
  * out of the table rather than shown as a column of dashes. */

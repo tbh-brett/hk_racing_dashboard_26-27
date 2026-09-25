@@ -7,7 +7,8 @@ jockey interviews highlighted, and the fixed odds beside the tote.
 WHAT COUNTS AS SUPPORT, per source, and nothing else does:
 
   pick         a tipster's selection — Racing & Sports' top four, the RTW
-               pundit's numbers, 譚朗蔚's picks in the Fact Check tail
+               pundit's numbers, 譚朗蔚's picks in the Fact Check tail, and
+               神探賽馬 Horse Detective's signed race-day posts
   featured     a horse 賽馬Fact Check makes a segment of. That show is a list
                of horses worth following; being featured IS the endorsement
   connections  the trainer or jockey in a Racing To Win interview
@@ -57,10 +58,10 @@ _RS, _RS_FORM = "racing_sports", "racing_sports_form"
 _LABEL = {"factcheck": "賽馬Fact Check", "rtw_interview": "Racing To Win interview",
           "rtw_preview": "Racing To Win preview", _RS: "Racing & Sports",
           _RS_FORM: "Racing & Sports", "bryan": "全方位Bryan", "oncc": "on.cc",
-          "threads": "Horse Detective"}
+          "threads": "神探賽馬 Horse Detective"}
 # The sources the Briefing expects on every meeting, in the order it lists
 # them. One that has not published yet is listed as pending, not left out.
-EXPECTED = (_RS, "rtw_preview", "rtw_interview", "factcheck")
+EXPECTED = (_RS, "rtw_preview", "rtw_interview", "factcheck", "threads")
 
 
 def _hk(stamp: str | None) -> str | None:
@@ -119,11 +120,14 @@ def _odds_block(no: int, tote: dict, fair_t: dict, books: dict[str, dict],
     return out
 
 
-def summary(date: str, *, conn: Connection | None = None) -> dict[str, Any]:
+def summary(date: str, *, conn: Connection | None = None,
+            every_runner: bool = False) -> dict[str, Any]:
+    """`every_runner` adds each race's `odds` for the whole field, keyed by
+    horse number, for a page that prices horses nobody tipped."""
     own = conn is None
     conn = conn or get_conn()
     try:
-        return _summary(conn, date)
+        return _summary(conn, date, every_runner=every_runner)
     finally:
         if own:
             conn.close()
@@ -148,7 +152,8 @@ def _fixed(conn: Connection, date: str) -> tuple[dict, dict]:
     return fixed, at
 
 
-def _summary(conn: Connection, date: str) -> dict[str, Any]:
+def _summary(conn: Connection, date: str, *,
+             every_runner: bool = False) -> dict[str, Any]:
     races = {r["race_no"]: dict(r) for r in conn.execute(
         "SELECT race_no, venue, distance, race_class, off_time FROM races "
         "WHERE race_date = ? ORDER BY race_no", (date,))}
@@ -242,10 +247,11 @@ def _summary(conn: Connection, date: str) -> dict[str, Any]:
                   for b in books}
         numbers = sorted(n for (r, n) in runners if r == race_no)
 
-        picks = []
+        picks, field_odds = [], {}
         for no in numbers:
             who = backed.get((race_no, no), [])
-            odds = _odds_block(no, tote, fair_t, prices, fair_b)
+            odds = field_odds[no] = _odds_block(no, tote, fair_t, prices,
+                                                fair_b)
             horse = runners[(race_no, no)]
             supporters = len({(b["source"], b["who"]) for b in who})
             if who:
@@ -287,7 +293,8 @@ def _summary(conn: Connection, date: str) -> dict[str, Any]:
                      if r == race_no],
             "interviews": [dict(i, horse_name=runners[(race_no, i["horse_no"])]
                                 ["horse_name"]) for i in interviews[race_no]],
-            "picks": picks})
+            "picks": picks,
+            **({"odds": field_odds} if every_runner else {})})
 
     edges.sort(key=lambda e: -e["ev_pct"])
     return {"race_date": date,
