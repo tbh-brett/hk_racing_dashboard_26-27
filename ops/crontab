@@ -23,12 +23,23 @@
 # ever lost, the scrape would write to ./hkrd.db inside the container, every
 # count would look correct, and the dashboard would read a different file that
 # never changed. That failure is worth guarding twice.
+#
+# NICE 19, ON EVERY LINE BUT THE ODDS. The machine has one shared vCPU and the
+# web server takes turns on it with every job below, and nothing used to say
+# the page comes first. Measured 2026-09-25, the afternoon the Briefing was
+# deployed: repair, rebuild_tempo and scrape_meeting running together held the
+# load average at 1.5-1.6, and a health check that answers in 7ms locally took
+# up to 430ms, a 168-byte icon up to 190ms, and every page over ten seconds.
+# At nice 19 a job runs on whatever CPU no request wants, so a job takes longer
+# and a page does not. The odds capture keeps default priority: it is a fraction
+# of a second a minute and its timing is the whole point of it. Jobs started by
+# hand over `fly ssh console` get the same prefix (docs/deploy.md).
 
-0  7  * * *   python -m hkrd.jobs.nightly --db /data/hkrd.db
-0  13 * * *   python -m hkrd.jobs.nightly --db /data/hkrd.db
-0  19 * * *   python -m hkrd.jobs.nightly --db /data/hkrd.db
-45 22 * * *   python -m hkrd.jobs.nightly --db /data/hkrd.db
-45 23 * * *   python -m hkrd.jobs.nightly --db /data/hkrd.db
+0  7  * * *   nice -n 19 python -m hkrd.jobs.nightly --db /data/hkrd.db
+0  13 * * *   nice -n 19 python -m hkrd.jobs.nightly --db /data/hkrd.db
+0  19 * * *   nice -n 19 python -m hkrd.jobs.nightly --db /data/hkrd.db
+45 22 * * *   nice -n 19 python -m hkrd.jobs.nightly --db /data/hkrd.db
+45 23 * * *   nice -n 19 python -m hkrd.jobs.nightly --db /data/hkrd.db
 
 # The pre-race speed map. Its own line rather than a step inside `nightly`,
 # for the reason the trials line gives: a projection that fails must not take
@@ -44,9 +55,9 @@
 # scratching and read after it is wrong for every runner in the race, not just
 # the one that came out. The last two lines are that guard: one before a Sha Tin
 # afternoon, one before a Happy Valley evening.
-20 7  * * *   python -m hkrd.jobs.project_card --pending --db /data/hkrd.db
-20 12 * * *   python -m hkrd.jobs.project_card --pending --db /data/hkrd.db
-20 18 * * *   python -m hkrd.jobs.project_card --pending --db /data/hkrd.db
+20 7  * * *   nice -n 19 python -m hkrd.jobs.project_card --pending --db /data/hkrd.db
+20 12 * * *   nice -n 19 python -m hkrd.jobs.project_card --pending --db /data/hkrd.db
+20 18 * * *   nice -n 19 python -m hkrd.jobs.project_card --pending --db /data/hkrd.db
 
 # Barrier trials. A separate line because they are a different source on a
 # different schedule, and folding them into `nightly` would mean a failed
@@ -58,22 +69,22 @@
 # them silently. HKJC publishes the list of trial days on the page itself, so
 # the job reads it and fetches what the database is missing. Trial results
 # appear late morning; noon and evening cover a late publication.
-0  12 * * *   python -m hkrd.jobs.scrape_trials --db /data/hkrd.db
-0  20 * * *   python -m hkrd.jobs.scrape_trials --db /data/hkrd.db
+0  12 * * *   nice -n 19 python -m hkrd.jobs.scrape_trials --db /data/hkrd.db
+0  20 * * *   nice -n 19 python -m hkrd.jobs.scrape_trials --db /data/hkrd.db
 
 # Chinese horse names, for the tips layer. Half an hour behind the two nightly
 # runs that fetch a card — a card published at noon is stored by 13:00 and
 # named by 13:30. `--pending` makes the quiet days free: it only asks HKJC
 # about stored cards from today on that still have a horse it cannot name.
-30 7  * * *   python -m hkrd.jobs.sync_horse_names --pending --db /data/hkrd.db
-30 13 * * *   python -m hkrd.jobs.sync_horse_names --pending --db /data/hkrd.db
+30 7  * * *   nice -n 19 python -m hkrd.jobs.sync_horse_names --pending --db /data/hkrd.db
+30 13 * * *   nice -n 19 python -m hkrd.jobs.sync_horse_names --pending --db /data/hkrd.db
 # Ladbrokes' fixed odds, and the Racing & Sports tips and race comment it
 # carries, for the Briefing. Ladbrokes answers this machine (Sportsbet does
 # not, and is read from the owner's PC). Every half hour through the racing
 # day: its prices are the second market beside the tote, and they are not
 # pruned any more than the tote's are. A day with no meeting stored is a quiet
 # no-op, not a failure — the job only acts on today's card.
-*/30 8-22 * * *   python -m hkrd.jobs.scrape_fixed_odds --db /data/hkrd.db
+*/30 8-22 * * *   nice -n 19 python -m hkrd.jobs.scrape_fixed_odds --db /data/hkrd.db
 
 # Live odds. A different cadence again, because odds are the only signal here
 # that moves minute to minute — the favourite changes between morning and post

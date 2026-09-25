@@ -319,8 +319,8 @@ stored nothing, and it knows why. See **Live odds** below.
 
 ```bash
 fly ssh console -a hkrd
-python -m hkrd.jobs.nightly --db /data/hkrd.db --dry-run   # what would it do?
-python -m hkrd.jobs.nightly --db /data/hkrd.db             # do it
+nice -n 19 python -m hkrd.jobs.nightly --db /data/hkrd.db --dry-run   # what would it do?
+nice -n 19 python -m hkrd.jobs.nightly --db /data/hkrd.db             # do it
 ```
 
 `--dry-run` makes no requests at all. It reads the database and prints the
@@ -384,6 +384,15 @@ fly machine restart <id>                     # after a config change
 fly secrets set HKRD_PASSWORD="..."          # change the password (restarts)
 ```
 
+**Any job started by hand on the machine starts with `nice -n 19`.** The web
+server and the jobs share one shared vCPU, and a job at normal priority takes
+the CPU from every page. On 2026-09-25 the post-deploy repair, rebuild_tempo and
+scrape_meeting, run at normal priority, held the load at 1.5-1.6 and put every
+page over ten seconds for more than an hour. At nice 19 the job gets only the
+CPU no request wants. `ops/crontab` does the same for everything but the odds
+capture. A job already running can be lowered in place with
+`renice -n 19 -p <pid>`.
+
 Changing `HKRD_PASSWORD` invalidates every existing session immediately — the
 cookie is signed with the password as the key, so a changed password makes
 every outstanding cookie fail its signature check. That is the logout-everywhere
@@ -402,7 +411,7 @@ So after a deploy carrying a model change, run these **in this order**, one line
 each. Each is safe to re-run.
 
 ```bash
-fly ssh console -a hkrd -C "python -m hkrd.jobs.coverage --db /data/hkrd.db"
+fly ssh console -a hkrd -C "nice -n 19 python -m hkrd.jobs.coverage --db /data/hkrd.db"
 ```
 
 Read the `model generation of each derived table` section. Anything marked
@@ -410,7 +419,7 @@ BEHIND prints its own rebuild command, already carrying `--db /data/hkrd.db`.
 Usually that is:
 
 ```bash
-fly ssh console -a hkrd -C "python -m hkrd.jobs.rebuild_sarr --db /data/hkrd.db"
+fly ssh console -a hkrd -C "nice -n 19 python -m hkrd.jobs.rebuild_sarr --db /data/hkrd.db"
 ```
 
 Minutes, not seconds. Then re-run `coverage` and check nothing still says
@@ -418,8 +427,8 @@ BEHIND. Only once it is clean do the two jobs that read `runner_sarr` to
 regenerate published constants:
 
 ```bash
-fly ssh console -a hkrd -C "python -m hkrd.jobs.fit_blend --db /data/hkrd.db"
-fly ssh console -a hkrd -C "python -m hkrd.jobs.fit_backtest --db /data/hkrd.db"
+fly ssh console -a hkrd -C "nice -n 19 python -m hkrd.jobs.fit_blend --db /data/hkrd.db"
+fly ssh console -a hkrd -C "nice -n 19 python -m hkrd.jobs.fit_backtest --db /data/hkrd.db"
 ```
 
 Neither writes anything. Each prints figures to compare against the constants
