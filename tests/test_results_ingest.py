@@ -17,7 +17,7 @@ def _load(name: str) -> str:
 def test_header_reads_conditions():
     info = results.parse_race_header(_load("results_race.html"))
     assert info["distance"] == 1650
-    assert info["race_class"] == "5"
+    assert info["race_class"] == "Class 5"     # as written; store/coerce reads it
     assert info["going"] == "G"
     assert info["course"] == "C"
     assert info["surface"] == "Turf"

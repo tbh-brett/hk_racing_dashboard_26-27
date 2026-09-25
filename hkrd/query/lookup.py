@@ -53,15 +53,15 @@ FILTERS = {
 
 # Every entry is (sql fragment, how to bind). Keeping them in one table is what
 # makes "nothing filtered in pandas" checkable rather than a good intention.
-# The race's own pace, banded from the field's early deviation at read time.
-# Imported by slices.py too: one definition, so a race cannot be "Fast" in
-# the grid and "Neutral" in the breakdown computed over the same rows.
-_PACE_BAND = ("CASE WHEN p.early_dev IS NULL THEN NULL"
-              "      WHEN p.early_dev <= -1.0 THEN 'Very Slow'"
-              "      WHEN p.early_dev <= -0.35 THEN 'Slow'"
-              "      WHEN p.early_dev <   0.35 THEN 'Neutral'"
-              "      WHEN p.early_dev <   1.0 THEN 'Fast'"
-              "      ELSE 'Very Fast' END")
+# The race's own pace: `race_tempo.band` (derive/tempo), the leader's time to
+# the 800m against HKJC's standard for the course, distance and class.
+#
+# It used to be banded here from the RUNNER's early deviation from its own
+# field -- a fact about the horse, not the race -- and the labels ran the wrong
+# way: a runner quicker than its field (a negative deviation) read "Very Slow".
+# Imported by slices.py too: one definition, so a race cannot be "Fast" in the
+# grid and "Neutral" in the breakdown computed over the same rows.
+_PACE_BAND = "tp.band"
 
 _CLAUSES: dict[str, str] = {
     "date_from": "r.race_date >= ?",
@@ -133,6 +133,7 @@ _DERIVED = {
     "e": "LEFT JOIN runner_et e   USING (race_date, race_no, horse_no)",
     "p": "LEFT JOIN runner_pace p USING (race_date, race_no, horse_no)",
     "s": "LEFT JOIN runner_sarr s USING (race_date, race_no, horse_no)",
+    "tp": "LEFT JOIN race_tempo tp ON tp.race_date = r.race_date AND tp.race_no = r.race_no",
 }
 
 # Indented to sit under the FROM clause the joins are spliced into, so a query
@@ -148,7 +149,7 @@ def _joins(where: str, *, always: str = "e") -> str:
     from being wrong, and being wrong means a hard SQL error at read time on
     exactly the filter nobody tested.
     """
-    keep = [k for k in ("e", "p", "s") if k in always or (k + ".") in where]
+    keep = [k for k in ("e", "p", "s", "tp") if k in always or (k + ".") in where]
     return _JOIN_SEP.join(_DERIVED[k] for k in keep)
 
 

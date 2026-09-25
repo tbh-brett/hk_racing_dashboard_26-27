@@ -25,9 +25,9 @@ from pathlib import Path
 from hkrd.derive import pace as pace_d
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
-__all__ = ["rebuild_pace", "run"]
+__all__ = ["rebuild_pace", "run", "run_landed"]
 
-STEPS = ("pace", "et", "sarr", "tags")
+STEPS = ("pace", "tempo", "et", "sarr", "tags")
 
 
 @dataclass
@@ -119,6 +119,16 @@ def run(db: Path | None = None, *, date: str | None = None,
 
     if "pace" in only:
         rebuild_pace(target, date=date, report=report)
+    if "tempo" in only:
+        # After pace, from the same sectionals: how fast each RACE was run,
+        # against HKJC's standard for it (derive/tempo).
+        from hkrd.jobs import rebuild_tempo
+        out = rebuild_tempo.rebuild(target, date=date)
+        report.written["race_tempo"] = out.rows_written
+        key = ("tempo, no HKJC standards stored (scrape_standards)"
+               if out.missing_standards else "tempo, no standard")
+        report.skipped[key] = out.no_standard
+        report.errors += out.errors
     if "et" in only:
         from hkrd.jobs import rebuild_et
         out = rebuild_et.rebuild(target)
@@ -139,6 +149,50 @@ def run(db: Path | None = None, *, date: str | None = None,
         from hkrd.jobs import rebuild_tags
         out = rebuild_tags.rebuild(target)
         report.written["runner_tags"] = out.tags_written
+    return report
+
+
+def run_landed(db: Path | None = None, *, dates: list[str]) -> DeriveReport:
+    """What a night that landed results for `dates` needs, and no more.
+
+    The nightly job used to rebuild everything whenever anything landed, and
+    SARR alone is 87s of that on the full archive -- several times on a race
+    day, on a single shared CPU the dashboard is also serving from. Most of it
+    rewrote numbers that could not have changed:
+
+      pace, tempo  per race: only the meetings that landed
+      SARR         walk-forward, so a result can move only the races AFTER it.
+                   Every settled meeting from the earliest landed date on --
+                   usually just the one -- which also covers a late meeting
+                   landing after a later one was scored without it. Upcoming
+                   cards are rescored by the nightly job itself.
+      ET, tags     the whole archive, as before: ET's pars move with every
+                   meeting and the tags rebuild has no per-date form. 13s.
+    """
+    report = DeriveReport()
+    target = db if db is not None else db_path()
+    if not dates:
+        return report
+
+    def merge(sub: DeriveReport) -> None:
+        for k, v in sub.written.items():
+            report.written[k] = report.written.get(k, 0) + v
+        for k, v in sub.skipped.items():
+            report.skipped[k] = report.skipped.get(k, 0) + v
+        report.errors.extend(sub.errors)
+
+    for date in sorted(set(dates)):
+        merge(run(target, date=date, only=("pace", "tempo")))
+    conn = get_conn(target)
+    try:
+        settled = [r[0] for r in conn.execute(
+            "SELECT DISTINCT race_date FROM runners WHERE place IS NOT NULL "
+            "AND race_date >= ? ORDER BY race_date", (min(dates),))]
+    finally:
+        conn.close()
+    for date in settled:
+        merge(run(target, date=date, only=("sarr",)))
+    merge(run(target, only=("et", "tags")))
     return report
 
 

@@ -321,37 +321,54 @@ export function externalLink(href, text, cls) {
 export const CLASS_NAME = {
   '0': 'GRP',
   'Griffin Race': 'GRIF',
+  '4YO': '4YO',
+  Listed: 'LR',
 };
 
 const CLASS_TITLE = {
-  GRP: 'Group race — above the class ladder',
+  GRP: 'Group race, grade not recorded — above the class ladder',
+  G1: 'Group 1 — above the class ladder',
+  G2: 'Group 2 — above the class ladder',
+  G3: 'Group 3 — above the class ladder',
+  LR: 'Listed race — above the class ladder',
   GRIF: 'Griffin race — for horses not yet rated, so not on the class ladder',
+  '4YO': 'The 4-year-old series (Classic Mile, Classic Cup, Derby) — restricted to 4-year-olds',
 };
 
-export function classLabel(raceClass) {
+/** "C4", "C3 (R)" for a restricted class race, "G3", "GRIF", "4YO".
+ *
+ *  The store writes one vocabulary (store/coerce.to_race_class): 1-5, G1-G3,
+ *  Listed, "Griffin Race", 4YO, and the legacy archive's "0" for a Group race
+ *  whose grade it never kept. `restricted` marks HKJC's "(Restricted)" class
+ *  races, usually for 3- or 4-year-olds; the 4YO series and Griffin races are
+ *  restricted by definition and say so in their own label. */
+export function classLabel(raceClass, restricted = false) {
   if (raceClass === null || raceClass === undefined || raceClass === '') return null;
   const key = String(raceClass);
-  // The card names a Group race by its grade ("Group 1"), where the archive
-  // wrote '0'; prefixing it gave "CGroup 1".
+  if (/^G[123]$/.test(key)) return key;
+  // A value written before the store read the class phrase ("Group 1").
   const grade = /^group\s*(\d)$/i.exec(key);
   if (grade) return `G${grade[1]}`;
-  return CLASS_NAME[key] ?? `C${key}`;
+  const label = CLASS_NAME[key] ?? `C${key}`;
+  return restricted && /^[1-5]$/.test(key) ? `${label} (R)` : label;
 }
 
 /** The class as a tinted chip, or null when the race has no class on record.
  *  Callers append it; a missing class prints nothing rather than a dash,
  *  because the surrounding cell already carries the track and the distance. */
-export function classCell(raceClass, { cls = 'cl' } = {}) {
-  const label = classLabel(raceClass);
+export function classCell(raceClass, { cls = 'cl', restricted = false } = {}) {
+  const label = classLabel(raceClass, restricted);
   if (label === null) return null;
   const key = String(raceClass);
   // The tone name never comes from raw data — an unexpected class string would
   // otherwise become a CSS class name of its own and silently match nothing.
-  const tone = key === '0' ? 'group'
-    : CLASS_NAME[key] ? 'griffin'
+  const tone = (key === '0' || /^G[123]$/.test(key) || key === 'Listed' || key === '4YO')
+    ? 'group'
+    : key === 'Griffin Race' ? 'griffin'
       : /^[1-5]$/.test(key) ? `c${key}` : 'other';
   const chip = el('span', `${cls} ${cls}-${tone}`, label);
-  chip.title = CLASS_TITLE[label] ?? `Class ${key}`;
+  chip.title = CLASS_TITLE[label]
+    ?? (restricted ? `Class ${key} (Restricted) — usually for 3- or 4-year-olds` : `Class ${key}`);
   return chip;
 }
 
@@ -406,8 +423,11 @@ export function positionsText(positions) {
   return (positions ?? []).length ? positions.join(' ') : DASH;
 }
 
-/** Race pace with its signed deviation — "Sl.Fast (-0.25)".
- *  Brief 08 §4: the number is what makes the label checkable. */
+/** Race pace with its signed deviation — "Sl.Fast (−0.34s)": the leader's
+ *  time to the 800m against HKJC's standard for the course, distance and
+ *  class, on the day's track (derive/tempo). Brief 08 §4: the number is what
+ *  makes the label checkable, and the tooltip says what it was checked
+ *  against. */
 export const PACE_SHORT = {
   'Very Slow': 'V.Slow', Slow: 'Sl.Slow', Neutral: 'Neutral',
   Fast: 'Sl.Fast', 'Very Fast': 'V.Fast',
@@ -421,9 +441,11 @@ export function paceCell(pace, { cls = 'pace' } = {}) {
   }
   const key = (pace.band || '').toLowerCase().replace(/[^a-z]/g, '');
   box.append(el('span', `pace-band p-${key}`, PACE_SHORT[pace.band] ?? pace.band));
-  if (pace.z != null) {
-    box.append(el('span', 'z', ` (${pace.z > 0 ? '+' : ''}${pace.z.toFixed(2)})`));
+  if (pace.early_dev != null) {
+    const d = pace.early_dev;
+    box.append(el('span', 'z', ` (${d > 0 ? '+' : d < 0 ? MINUS : ''}${Math.abs(d).toFixed(2)}s)`));
   }
+  if (pace.note) box.title = pace.note;
   return box;
 }
 

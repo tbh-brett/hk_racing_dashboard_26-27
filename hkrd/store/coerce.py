@@ -15,7 +15,7 @@ from datetime import date, datetime
 __all__ = [
     "CoerceError", "parse_lbw", "parse_finish_time", "to_place",
     "to_odds", "to_date", "to_int", "parse_section_times",
-    "parse_running_positions", "parse_gear",
+    "parse_running_positions", "parse_gear", "to_race_class", "RACE_CLASSES",
 ]
 
 
@@ -348,3 +348,66 @@ def parse_gear(token: object) -> str | None:
     pieces = [p.strip() for p in str(token).split("/")]
     kept = [p for p in pieces if p.upper() not in _NO_GEAR]
     return "/".join(kept) or None
+
+
+# ── race class ────────────────────────────────────────────────────────────────
+#
+# HKJC writes a race's class five ways, and the two parsers each understood
+# one or two of them. Measured on the archive on 2026-09-24: 196 races had NO
+# class (every Group race, the 4-year-old series and every restricted race,
+# because the results page says "Group Three" in words and "Class 3
+# (Restricted) - 1600M" with a bracket the pattern did not allow), 70 more
+# held the legacy "0", and the racecard read "Group 1" off the site's
+# navigation menu for a Group 3 on 27 Sep 2026.
+#
+#     Class 4 - 1200M - (60-40)              ->  "4"
+#     Class 3 (Restricted) - 1600M - (85-60) ->  "3", restricted
+#     Group Three - 1800M                    ->  "G3"
+#     Griffin Race - 1200M                   ->  "Griffin Race", restricted
+#     4 Year Olds - 1600M                    ->  "4YO", restricted
+#
+# The 4-year-old series (Classic Mile, Classic Cup, Derby) is "4YO" whether or
+# not a grade is printed beside it: the results page never prints one, and a
+# card saying G1 that the results then overwrote with 4YO would be one race
+# with two classes depending on which page was read last.
+#
+# RESTRICTED means eligibility is narrower than a rating band: HKJC's
+# "(Restricted)" races (usually for 3- or 4-year-olds), the 4YO series and
+# Griffin races. HKJC's header does not say WHICH age a "(Restricted)" race is
+# for, so the flag says restricted and nothing more.
+_GRADE = {"one": "1", "two": "2", "three": "3", "1": "1", "2": "2", "3": "3"}
+RACE_CLASSES = ("1", "2", "3", "4", "5", "G1", "G2", "G3", "Listed",
+                "Griffin Race", "4YO")
+
+
+def to_race_class(token: object) -> tuple[str | None, int | None]:
+    """HKJC's class phrase -> (race_class, restricted).
+
+    `restricted` is None where the phrase cannot say: a bare "4" from the
+    legacy archive is class 4, restricted or not. An unrecognised phrase is
+    returned as written rather than raised: a class is context on a race, and
+    a new HKJC wording must not stop the meeting being stored.
+    `jobs/repair` lists any stored class outside `RACE_CLASSES`.
+    """
+    if token is None or is_absent(token) or not str(token).strip():
+        return None, None
+    text = " ".join(str(token).split())
+    low = text.lower()
+    flagged = 1 if "restricted" in low else 0
+    if re.search(r"\b4\s*-?\s*years?\s*-?\s*olds?\b|\b4yo\b", low):
+        return "4YO", 1
+    if "griffin" in low:
+        return "Griffin Race", 1
+    if m := re.search(r"\bclass\s*([1-5])\b", low):
+        return m.group(1), flagged
+    if re.fullmatch(r"[1-5]", low):
+        return low, None
+    if m := (re.search(r"\bgroup\s*(one|two|three|[123])\b", low)
+             or re.fullmatch(r"g\s*([123])", low)):
+        return f"G{_GRADE[m.group(1)]}", flagged
+    if "listed" in low:
+        return "Listed", flagged
+    # The legacy archive's code for a Group race whose grade it did not keep.
+    if low == "0":
+        return "0", None
+    return text, None

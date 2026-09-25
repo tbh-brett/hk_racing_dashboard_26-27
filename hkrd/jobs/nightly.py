@@ -30,7 +30,8 @@ from pathlib import Path
 
 from hkrd.ingest import corunning, racecard
 from hkrd.ingest._client import FetchError, NotFound
-from hkrd.jobs import derive_all, scrape_corunning, scrape_meeting as scrape_job
+from hkrd.ingest.standards import StandardsError
+from hkrd.jobs import derive_all, scrape_corunning, scrape_standards, scrape_meeting as scrape_job
 from hkrd.store import job_log
 from hkrd.store.connect import db_path, get_conn, init_db
 
@@ -290,6 +291,7 @@ def run(db: Path | None = None, *, today: dt.date | None = None,
         return report
 
     touched = False
+    landed: list[str] = []         # dates whose results landed this run
     commented = False              # comments on running landed this run
     cards: list[str] = []          # dates whose card landed this run
     probes = unparsed = 0
@@ -306,6 +308,8 @@ def run(db: Path | None = None, *, today: dt.date | None = None,
             results, card = _scrape(report, plan.date, plan.venue, past=past,
                                     db=db, session=session, expected=True)
             touched |= results
+            if results:
+                landed.append(plan.date)
             if results or card:
                 cards.append(plan.date)
             continue
@@ -322,6 +326,8 @@ def run(db: Path | None = None, *, today: dt.date | None = None,
             results, card = _scrape(report, plan.date, venue, past=past, db=db,
                                     session=session, expected=False)
             touched |= results
+            if results:
+                landed.append(plan.date)
             if results or card:
                 cards.append(plan.date)
             break        # one meeting per date; the other venue is not racing
@@ -336,11 +342,22 @@ def run(db: Path | None = None, *, today: dt.date | None = None,
             "HKJC changed the race card layout or the site is unreachable — "
             "check one date by hand before trusting an empty window.")
 
+    # HKJC's standard times, which race pace is read against. One request a
+    # week at most (`scrape_standards.refresh`); a failure is said, and the
+    # pace step reads against the copy already stored.
+    try:
+        got = scrape_standards.refresh(db, session=session)
+        if got:
+            report.scraped.append(got.render().strip())
+    except (FetchError, StandardsError) as exc:
+        report.warnings.append(f"standard times — {exc}")
+
     if derive and touched:
-        # Only when something landed. ET, SARR and tags rebuild across the
-        # whole history, so running them on a night with no new racing is
-        # minutes of work to write back the numbers already there.
-        out = derive_all.run(db)
+        # Only when something landed, and only what that landing can move:
+        # see `derive_all.run_landed`. The whole-archive rebuild this replaced
+        # spent 87s of its ~100s rescoring SARR ratings that are walk-forward
+        # and so could not have changed.
+        out = derive_all.run_landed(db, dates=landed)
         report.derived = out.render()
         report.errors.extend(out.errors)
     elif derive and commented:

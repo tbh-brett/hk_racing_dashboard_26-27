@@ -78,6 +78,7 @@ _FROM = """
     LEFT JOIN runner_et e   USING (race_date, race_no, horse_no)
     LEFT JOIN runner_pace p USING (race_date, race_no, horse_no)
     LEFT JOIN runner_sarr s USING (race_date, race_no, horse_no)
+    LEFT JOIN race_tempo tp ON tp.race_date = r.race_date AND tp.race_no = r.race_no
 """
 
 # The market's own ranking of the field, by closing price. Ties share a rank,

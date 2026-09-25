@@ -209,35 +209,27 @@ def test_the_pace_scale_is_the_one_the_brief_specifies():
 
 def test_a_run_race_is_measured_not_projected(db):
     """Pace is a property of how the race WAS run wherever that is knowable;
-    the style projection is the fallback for a race with no sectionals."""
+    the style projection is the fallback for a race with no reading. The
+    reading is `race_tempo` (derive/tempo): the leader to the 800m against
+    HKJC's standard for the class, in seconds."""
     conn = get_conn(db)
-    # 40 comparable races at the distance, each with an early sectional, so the
-    # z-score has something to be a z-score against.
     with transaction(conn):
-        for i in range(40):
-            date = f"2025-{(i % 12) + 1:02d}-{(i % 27) + 1:02d}"
-            upsert.upsert_races(conn, [
-                {"race_date": date, "race_no": 1, "venue": "HV", "course": "C",
-                 "surface": "Turf", "going": "G", "distance": 1650}])
-            conn.executemany(
-                "INSERT INTO runner_pace (race_date, race_no, horse_no, "
-                "early_pace, pace_style, derive_version) VALUES (?,?,?,?,?,'t')",
-                [(date, 1, h, 24.0 + (i % 5) * 0.1, "Midfield") for h in range(1, 9)])
-        # The race under test goes markedly faster early than any of them.
-        conn.executemany(
-            "INSERT INTO runner_pace (race_date, race_no, horse_no, early_pace, "
-            "pace_style, derive_version) VALUES ('2026-06-01', 1, ?, ?, ?, 't')",
-            [(h, 22.9, "Leader") for h in range(1, 11)])
-
+        conn.execute(
+            "INSERT INTO race_tempo (race_date, race_no, standard_class, standard_exact, "
+            "leader_sections, early_to, early_time, early_std, variant, early_dev, "
+            "early_dev_400, late_time, late_std, late_dev, band, derive_version) "
+            "VALUES ('2026-06-01', 1, '4', 1, '27.9;22.7;24.4;24.5', 800, 50.65, "
+            "51.43, -0.003, -0.78, -0.369, 24.52, 24.0, 0.52, 'Fast', 't')")
     p = pace_q.race_pace("2026-06-01", 1, conn=conn)
     conn.close()
     assert p["measured"] is True
-    assert p["z"] < -1.2 and p["band"] == "Very Fast"
-    assert p["peers"] >= 30
+    assert p["band"] == "Fast" and p["early_dev"] == -0.78
+    assert "0.78s faster than the Class 4 standard" in p["note"]
 
 
-def test_too_few_comparable_races_falls_back_rather_than_inventing_a_z(db):
-    """A z-score against eleven races is not a tempo reading."""
+def test_a_race_with_no_reading_falls_back_to_the_projection(db):
+    """No sectionals, or no HKJC standard for the course: projected from the
+    field's styles, and labelled a projection."""
     conn = get_conn(db)
     with transaction(conn):
         conn.executemany(
@@ -247,7 +239,7 @@ def test_too_few_comparable_races_falls_back_rather_than_inventing_a_z(db):
     p = pace_q.race_pace("2026-06-01", 1, conn=conn)
     conn.close()
     assert p["measured"] is False          # projected from styles instead
-    assert p["z"] is None
+    assert p["early_dev"] is None
 
 
 # ── gear ─────────────────────────────────────────────────────────────────────

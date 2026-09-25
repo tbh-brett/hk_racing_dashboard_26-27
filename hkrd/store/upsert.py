@@ -19,6 +19,7 @@ __all__ = [
     "upsert_comments", "upsert_odds_snapshots", "upsert_odds_pairs",
     "upsert_odds_doubles", "upsert_pool_turnover",
     "upsert_trials", "upsert_vet_records", "upsert_market_close",
+    "upsert_standard_times",
 ]
 
 Row = dict[str, Any]
@@ -84,22 +85,29 @@ def _check_venue(row: dict) -> None:
 
 
 def upsert_races(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
-    prepared = [{
-        "race_date": coerce.to_date(r.get("race_date")),
-        "race_no": coerce.to_int(r.get("race_no"), field="race_no"),
-        "venue": r.get("venue"),
-        "course": r.get("course"),
-        "surface": r.get("surface"),
-        "going": r.get("going"),
-        "distance": coerce.to_int(r.get("distance"), field="distance"),
-        "race_class": r.get("race_class"),
-        "race_name": r.get("race_name"),
-        "off_time": r.get("off_time"),
-    } for r in rows]
+    prepared = []
+    for r in rows:
+        # HKJC's phrase in, one vocabulary out: see coerce.to_race_class. A
+        # caller may also say `restricted` itself; the phrase wins when it
+        # can tell.
+        race_class, restricted = coerce.to_race_class(r.get("race_class"))
+        prepared.append({
+            "race_date": coerce.to_date(r.get("race_date")),
+            "race_no": coerce.to_int(r.get("race_no"), field="race_no"),
+            "venue": r.get("venue"),
+            "course": r.get("course"),
+            "surface": r.get("surface"),
+            "going": r.get("going"),
+            "distance": coerce.to_int(r.get("distance"), field="distance"),
+            "race_class": race_class,
+            "race_name": r.get("race_name"),
+            "off_time": r.get("off_time"),
+            "restricted": restricted if restricted is not None else r.get("restricted"),
+        })
     for row in prepared:
         _check_venue(row)
     cols = ["race_date", "race_no", "venue", "course", "surface", "going",
-            "distance", "race_class", "race_name", "off_time"]
+            "distance", "race_class", "race_name", "off_time", "restricted"]
     return _upsert(conn, "races", cols, ["race_date", "race_no"], prepared)
 
 
@@ -337,3 +345,22 @@ def upsert_pool_turnover(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
             "merged_into"]
     return _upsert(conn, "odds_pool_turnover", cols,
                    ["race_date", "race_no", "pool", "captured_at"], prepared)
+
+
+def upsert_standard_times(conn: sqlite3.Connection, rows: Sequence[Row], *,
+                          fetched_at: str) -> int:
+    """HKJC's standards, as `ingest/standards` read them. Re-running replaces
+    each cell with the page's current figure."""
+    prepared = [{
+        "venue": r["venue"], "surface": r["surface"],
+        "distance": coerce.to_int(r["distance"], field="distance"),
+        "class_key": str(r["class_key"]),
+        "standard_time": float(r["standard_time"]),
+        "sections": r.get("sections"), "updated": r.get("updated"),
+        "fetched_at": fetched_at,
+    } for r in rows]
+    cols = ["venue", "surface", "distance", "class_key", "standard_time",
+            "sections", "updated", "fetched_at"]
+    return _upsert(conn, "standard_times", cols,
+                   ["venue", "surface", "distance", "class_key"], prepared)
+

@@ -114,6 +114,24 @@ _GOING_CODE = {"Firm": "F", "Good to Firm": "GF", "Good": "G",
                "Wet Slow": "WS", "Wet Fast": "WF"}
 
 
+def _header_block(text: str, race_no: int) -> str:
+    """The race's own header, from "Race N -" to the field below it.
+
+    The page carries the site's navigation above the header, and the menu
+    mentions "Group One". Searched over the whole page, a Group 3 on
+    2026-09-27 was read as a Group 1: the menu came first. Everything the
+    header parse reads -- class, distance, off time, prize -- is read from
+    this block. A page without the marker falls back to the whole text, which
+    is what the parse always read.
+    """
+    start = re.search(rf"\bRace\s+{race_no}\s*[-–—]", text)
+    if not start:
+        return text
+    rest = text[start.start():]
+    end = re.search(r"SETUP MY STARTER|\bHorse\s+No\.", rest, re.IGNORECASE)
+    return rest[:end.start()] if end else rest[:800]
+
+
 def parse_race_header(html: str, race_no: int, *,
                       source: str = "") -> dict[str, Any]:
     """Race-level facts from the block above the field.
@@ -124,7 +142,7 @@ def parse_race_header(html: str, race_no: int, *,
     the wrong reference.
     """
     soup = BeautifulSoup(html, "html.parser")
-    text = soup.get_text(" ", strip=True)
+    text = _header_block(soup.get_text(" ", strip=True), race_no)
 
     out: dict[str, Any] = {"race_no": race_no}
 
@@ -134,12 +152,17 @@ def parse_race_header(html: str, race_no: int, *,
         text, re.IGNORECASE)
     out["race_name"] = _clean(name.group(1).rstrip(" ,")) if name else None
 
-    cls = re.search(r"\bClass\s+(\d)\b", text)
-    if cls:
-        out["race_class"] = cls.group(1)
-    else:
-        grp = re.search(r"\bGroup\s+(One|Two|Three|1|2|3)\b", text, re.IGNORECASE)
-        out["race_class"] = f"Group {grp.group(1)}" if grp else None
+    # HKJC's own phrases, every one the header carries ("Group One" beside
+    # "4 Year Olds" on a Classic card), for `store/coerce` to turn into the one
+    # class vocabulary -- the same answer the results page's header gets.
+    phrases = re.findall(
+        r"\bClass\s+\d\b(?:\s*\(Restricted\))?"
+        r"|\b4[\s-]*Years?[\s-]*Olds?\b"
+        r"|\bGriffin(?:\s+Race)?\b"
+        r"|\bGroup\s+(?:One|Two|Three|1|2|3)\b"
+        r"|\bListed\b"
+        r"|\(Restricted\)", text, re.IGNORECASE)
+    out["race_class"] = " ".join(phrases) or None
 
     dist = re.search(r"(\d{3,4})\s*M\b", text, re.IGNORECASE)
     out["distance"] = int(dist.group(1)) if dist else None

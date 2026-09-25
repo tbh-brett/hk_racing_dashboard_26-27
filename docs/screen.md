@@ -13,7 +13,8 @@ reads), `hkrd/query/screen.py` (the payload), `GET /api/screen/{date}`,
 `python -m hkrd.jobs.fit_screen`.
 
 Measured 2026-09-24 on every settled race from 2020-21 to 23 Sep 2026: 5,019
-races, 61,007 runs.
+races, 61,007 runs. Refitted 2026-09-25 once Group and 4-year-old races
+carried their class (docs/audit-2026-09-24.md section 2). Only "Up in class" moved.
 
 ---
 
@@ -21,7 +22,7 @@ races, 61,007 runs.
 
 - **Shortlist** is the Screen's top four by chance to place. Walk-forward over
   3,366 races (2022-23 to 26/27 so far, each season scored with weights fitted
-  only on the seasons before), the top four held the winner **62.4%** of the
+  only on the seasons before), the top four held the winner **62.2%** of the
   time. Form alone (SARR): 58.6%. The closing tote's top four: 71.0%.
 - **Also a case**: outside the four, but its circumstances (everything except
   form and rider) are worth ×1.2 or more.
@@ -34,8 +35,8 @@ races, 61,007 runs.
   says what fired it.
 
 **It is not a value signal.** Where the Screen rates a horse 1.25–2× the
-closing tote's chance, the tote has been right: A/E **0.91**. Beyond 2×, **0.86**
-(20,600 runners). The Screen finds the horses worth reading. The price decides
+closing tote's chance, the tote has been right: A/E **0.91**. Beyond 2×, **0.85**
+(20,610 runners). The Screen finds the horses worth reading. The price decides
 whether one is worth backing. This is the same result the Model Analysis page
 reports for SARR.
 
@@ -52,19 +53,19 @@ means it pointed the same way in every season it was fitted on alone.
 | Jockey's strike rate over the last year (per logit step) | ×1.63 | all | 6/6 |
 | Trial POSITIVE or STANDOUT since the last run | **×1.67** | 832 | one season |
 | New stable since the last start | ×1.28 | 1,119 | 6/6 |
-| The only habitual leader in the race | ×1.28 | 1,297 | 6/6 |
-| One of two habitual leaders | ×1.24 | 2,938 | 6/6 |
-| Rating up 3+ since the last start | ×1.17 | 1,584 | 2/2 |
+| The only habitual leader in the race | ×1.28 | 1,299 | 6/6 |
+| One of two habitual leaders | ×1.24 | 2,928 | 6/6 |
+| Rating up 3+ since the last start | ×1.18 | 1,584 | 2/2 |
 | Raced wide last start | ×1.11 | 17,923 | 6/6 |
 | Drawn 4+ gates further in than last start | ×1.11 | 15,059 | 6/6 |
-| Up in class | ×1.09 | 2,692 | 5/6 |
-| Habitually on the pace | ×1.09 | 7,431 | 5/6 |
+| Habitually on the pace | ×1.10 | 7,434 | 5/6 |
 | Fifth run or later this campaign | ×1.07 | 27,332 | 5/6 |
 | Beaten last start, but held up, checked or blocked | ×1.06 | 6,574 | 5/6 |
-| One of three or more habitual leaders | ×1.02 | 5,537 | — |
+| Up in class | ×1.05 | 3,102 | — |
+| One of three or more habitual leaders | ×1.02 | 5,544 | — |
 | First-up | ×0.89 | 7,985 | 4/6 |
 | Drawn 4+ gates further out | ×0.89 | 15,111 | 6/6 |
-| Habitually at the back | ×0.91 | 26,674 | 6/6 |
+| Habitually at the back | ×0.91 | 26,673 | 6/6 |
 | Other course from last start | ×0.92 | 15,480 | 6/6 |
 | Beaten out of the frame last start | **×0.73** | 32,660 | 6/6 |
 | Trial NEGATIVE since the last run | ×0.74 | 682 | one season |
@@ -77,11 +78,11 @@ Walk-forward win log loss, lower is better:
 
 | Test season | Form (SARR) | Form + rider | Screen | Closing tote |
 |---|---|---|---|---|
-| 2022-23 | 2.2425 | 2.1828 | **2.1605** | 1.9693 |
-| 2023-24 | 2.2856 | 2.2549 | **2.2205** | 2.0237 |
-| 2024-25 | 2.2780 | 2.2434 | **2.2084** | 1.9953 |
-| 2025-26 | 2.3012 | 2.2699 | **2.2530** | 2.0581 |
-| 26/27, 45 races | 2.2726 | 2.2078 | 2.2112 | 2.0052 |
+| 2022-23 | 2.2425 | 2.1828 | **2.1612** | 1.9693 |
+| 2023-24 | 2.2856 | 2.2549 | **2.2211** | 2.0237 |
+| 2024-25 | 2.2780 | 2.2434 | **2.2080** | 1.9953 |
+| 2025-26 | 2.3012 | 2.2699 | **2.2529** | 2.0581 |
+| 26/27, 45 races | 2.2726 | 2.2078 | 2.2106 | 2.0052 |
 
 The Screen beats form-plus-rider in every full season. The rider and the
 circumstances each add roughly as much as the other (the rider more in
@@ -98,7 +99,7 @@ circumstances each add roughly as much as the other (the rider more in
 | **Same jockey / same gear at the trial** | Nothing. Same jockey ×0.86 on 343 runs; same gear ×1.00 |
 | **Superior jockey** | The largest thing SARR cannot see. A top-five rider places at 1.38× what form says, in 7 of 7 seasons |
 | **Less weight** | Nothing on its own. In a handicap the weight follows the rating: weight down 5lb+ ×1.04, weight **up** 5lb+ ×1.06 |
-| **Weaker competition** | A class **drop** is nothing (×1.02). A class **rise** helps (×1.09), because the horses going up are the improvers |
+| **Weaker competition** | A class **drop** is nothing (×1.02). A class **rise** is ×1.05, inside its own error. It read ×1.09 before Group and 4-year-old races carried their class |
 | **Excuses** | Being beaten counts against a horse more than SARR allows (×0.73). An excuse — held up, checked, blocked — gives back a little of it (×1.06). "Raced wide" is the one that helps outright (×1.11) |
 | **"The commentator picked it up"** | "Finished off well" is ×1.04 once finishing position is counted, which is nothing. The words are shown on the page; they are not scored |
 | **Head-to-head swing** | See below. The weight swing is a trap |
@@ -120,8 +121,9 @@ Over 91,856 pairs meeting again within a year, the earlier result repeated
   which horse has been winning since. The Screen's reversal notes name the
   margin, the draw and the rider, and never the weight.
 
-This is at odds with the Race Day head-to-head panel, which sorts pairs by
-weight swing and badges it at 4, 6 and 8lb. That panel is untouched here.
+The Race Day head-to-head panel used to sort pairs by weight swing and badge
+it at 4, 6 and 8lb. It now follows this: margin, draw and rider, with the
+weight shown as context (docs/audit-2026-09-24.md §3).
 
 ### Your blackbook
 

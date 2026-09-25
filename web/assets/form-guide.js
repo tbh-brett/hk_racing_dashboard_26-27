@@ -133,8 +133,7 @@ function renderRaceHeader() {
     pace.title = !p.band
       ? 'no runner in this race has an established running style'
       : p.measured
-        ? `measured: this race's early sectional is ${p.z >= 0 ? '+' : ''}${p.z} sd `
-          + `against ${p.peers} races at ${state.guide?.race?.distance}m`
+        ? `measured: ${p.note}`
         : `projected from ${p.field_size - p.unknown} of ${p.field_size} classified `
           + `runners · pressure ${p.pressure} · leaders: ${p.leaders.join(', ') || 'none'}`
           + (p.confident ? '' : ' · too few classified to read confidently');
@@ -740,8 +739,7 @@ function runRow(runner, run, index) {
   const pace = state.guide?.pace?.[`${run.race_date}:${run.race_no}`];
   const paced = paceCell(pace);
   paced.title = pace
-    ? `the race was run ${pace.band.toLowerCase()} for the distance`
-      + ` — ${pace.z > 0 ? '+' : ''}${pace.z} sd over ${pace.peers} races`
+    ? `the race was run ${pace.band.toLowerCase()}: ${pace.note}`
     : 'no sectionals for this race, so its pace was never measured';
   trail.append(paced);
 

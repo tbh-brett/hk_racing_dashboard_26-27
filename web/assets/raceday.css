@@ -203,11 +203,13 @@
 }
 .h2h-meta .k { color: var(--text-dim); }
 .h2h-meta .v2 { color: var(--text-2); }
-.swing { font-size: 10px; padding: 0 5px; letter-spacing: .06em; }
-.swing-0 { color: var(--text-dim); }
-.swing-1 { color: var(--edge); border: 1px solid var(--edge-ground-2); background: var(--edge-ground); }
-.swing-2 { color: var(--incident); border: 1px solid var(--edge-ground-2); background: var(--edge-ground); }
-.swing-3 { color: var(--loss); border: 1px solid var(--h2h-rule); background: var(--h2h-band); }
+/* How open the rematch is (query/h2h). Green, because the measured swings
+   are toward the horse that was beaten; the weight never earns a mark. */
+.turn { font-size: 10px; padding: 0 5px; letter-spacing: .06em; }
+.turn-0 { color: var(--text-dim); }
+.turn-1 { color: var(--text-2); border: 1px solid var(--line-3); }
+.turn-2, .turn-3 { color: var(--win); border: 1px solid color-mix(in srgb, var(--win) 40%, transparent); }
+.h2h-meta .for { color: var(--win); }
 
 /* ── race context bar ────────────────────────────────────────────────────── */
 
@@ -566,12 +568,10 @@ table.card td { padding: 6px 8px; }
 }
 
 #detail .met-row .k { color: var(--text-faint); }
-/* Which way the weight went, from THIS horse's side. The swing is the gap
-   between the pair, so one number is a help to one of them and a hindrance to
-   the other; unsigned it left the arithmetic to the reader. */
-#detail .met-row .k.swing-better { color: var(--win); }
-#detail .met-row .k.swing-worse { color: var(--loss); }
-#detail .met-row .k.swing-level { color: var(--text-faint); }
+/* Who was beaten last time, from THIS horse's side, and whether the draw or
+   the rider has swung toward the beaten horse since (query/h2h). */
+#detail .met-row .k.turn-for { color: var(--win); }
+#detail .met-row .k.turn-held { color: var(--text-2); }
 
 
 /* WHO the weight change favours, said in words. The gap either side of the
@@ -587,7 +587,7 @@ table.card td { padding: 6px 8px; }
 }
 .h2h-verdict .by { color: var(--win); }
 .h2h-verdict .level { color: var(--text-faint); letter-spacing: .06em; }
-.h2h-verdict .swing { margin-left: auto; }
+.h2h-verdict .turn { margin-left: auto; }
 
 /* One gate per line, labelled with the horse it belongs to. Two unlabelled
    notes side by side gave no way to tell whose gate was whose. */

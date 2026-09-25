@@ -211,26 +211,29 @@ def test_a_card_with_no_capture_invents_no_ratio(db):
     assert len(card["runners"]) == 3
 
 
-def test_head_to_head_pairs_are_sorted_by_weight_swing(db):
+def test_head_to_head_pairs_lead_with_the_most_open_rematch(db):
+    """Sorted by how open the rematch is (query/h2h): a close margin, and the
+    draw or rider swung toward the beaten horse. Never by the weight swing,
+    which measured the wrong way round over 91,856 pairs."""
     conn = get_conn(db)
     card = raceday.build_card("2026-07-15", 1, conn=conn)
     conn.close()
     pairs = card["head_to_head"]
-    swings = [p["swing"] or 0 for p in pairs]
-    assert swings == sorted(swings, reverse=True)
+    levels = [p["turn_level"] for p in pairs]
+    assert levels == sorted(levels, reverse=True)
+    assert all("swing_tier" not in p for p in pairs)
 
 
-def test_swing_tiers_escalate_at_four_six_and_eight_pounds(db):
-    """Most pairs clear none of them, which is correct rather than a bug."""
+def test_a_rematch_names_who_was_beaten_and_how_often_that_repeats(db):
     conn = get_conn(db)
     card = raceday.build_card("2026-07-15", 1, conn=conn)
     conn.close()
     for p in card["head_to_head"]:
-        s = p["swing"]
-        if s is None:
+        if p["beaten_no"] is None:
             continue
-        expected = 3 if s >= 8 else 2 if s >= 6 else 1 if s >= 4 else 0
-        assert p["swing_tier"] == expected
+        assert p["beaten_no"] in (p["a_no"], p["b_no"])
+        assert p["repeat_pct"] in (51, 55, 59, 65, 68)
+        assert all("weight" not in t and "lb" not in t for t in p["turn"])
 
 
 def test_a_trainer_change_is_measured_against_one_run_back(db):

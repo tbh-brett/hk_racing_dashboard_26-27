@@ -83,6 +83,9 @@ JOIN races a       ON a.race_date = r.race_date AND a.race_no = r.race_no
 LEFT JOIN runner_et e   USING (race_date, race_no, horse_no)
 LEFT JOIN runner_pace p USING (race_date, race_no, horse_no)
 LEFT JOIN runner_sarr s USING (race_date, race_no, horse_no)
+-- The race's pace (derive/tempo), for Lookup's RACE PACE filter: one row per
+-- race, joined on its key.
+LEFT JOIN race_tempo tp ON tp.race_date = r.race_date AND tp.race_no = r.race_no
 """
 
 

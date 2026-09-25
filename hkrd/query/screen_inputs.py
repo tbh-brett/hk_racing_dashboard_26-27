@@ -19,6 +19,7 @@ limit, for the same reason.
 from __future__ import annotations
 
 import datetime as dt
+import time
 from collections.abc import Sequence
 from typing import Any
 
@@ -28,7 +29,7 @@ from hkrd.query.race import habitual_styles
 from hkrd.store.coerce import is_no_comment
 from hkrd.store.connect import Connection, get_conn
 
-__all__ = ["gather", "RAN"]
+__all__ = ["gather", "jockey_year", "RAN"]
 
 # A starter, as the rest of the archive defines one: not withdrawn.
 RAN = "coalesce({t}.place_code, '') NOT LIKE 'W%'"
@@ -40,7 +41,7 @@ WITH field AS (
 SELECT r.race_no, r.horse_no, r.horse_name, r.draw, r.jockey, r.trainer,
        r.actual_weight, r.rating, r.gear, r.place, r.lengths_behind, r.win_odds,
        a.venue, a.course, a.surface, a.going, a.distance, a.race_class,
-       a.off_time, f.n field_size, s.sarr, s.sarr_rank
+       a.off_time, a.restricted, f.n field_size, s.sarr, s.sarr_rank
   FROM runners r
   JOIN races a ON a.race_date = r.race_date AND a.race_no = r.race_no
   JOIN field f ON f.race_no = r.race_no
@@ -105,9 +106,33 @@ def _last_start_notes(conn: Connection, keys: list[tuple[str, int, int]]
     return out
 
 
-def _jockey_year(conn: Connection, date: str) -> tuple[dict[str, tuple[int, int]], float]:
+def jockey_year(conn: Connection, date: str) -> tuple[dict[str, tuple[int, int]], float]:
     """Every rider's wins and rides over the year before `date`, and the
-    year's overall win rate the model shrinks toward."""
+    year's overall win rate the model shrinks toward.
+
+    Cached per database and date for ten minutes. It is the same answer for
+    every race on a card -- strictly before the date, so the day's own results
+    never move it -- and Race Day asks for it once per race: the one aggregate
+    over a year of runners in a card that otherwise reads a few hundred rows.
+    """
+    path = conn.execute("PRAGMA database_list").fetchone()["file"]
+    if not path:                    # in memory: no name to key a cache on
+        return _jockey_year(conn, date)
+    hit = _JOCKEY_CACHE.get((path, date))
+    if hit and time.monotonic() - hit[0] < _JOCKEY_TTL:
+        return hit[1]
+    got = _jockey_year(conn, date)
+    if len(_JOCKEY_CACHE) > 64:
+        _JOCKEY_CACHE.clear()
+    _JOCKEY_CACHE[(path, date)] = (time.monotonic(), got)
+    return got
+
+
+_JOCKEY_CACHE: dict[tuple[str, str], tuple[float, Any]] = {}
+_JOCKEY_TTL = 600.0
+
+
+def _jockey_year(conn: Connection, date: str) -> tuple[dict[str, tuple[int, int]], float]:
     lo = (dt.date.fromisoformat(date) - dt.timedelta(days=JOCKEY_WINDOW_DAYS)).isoformat()
     rows = conn.execute(
         "SELECT jockey, sum(CASE WHEN place = 1 THEN 1 ELSE 0 END) wins, "
@@ -148,7 +173,7 @@ def gather(date: str, *, conn: Connection | None = None) -> list[dict[str, Any]]
             (p["race_date"], p["race_no"], p["horse_no"]) for p in last.values()))
         styles = habitual_styles(names, before=date, conn=conn)
         trials = trials_q.for_horses(names, before=date, limit=3, conn=conn)
-        jockeys, base = _jockey_year(conn, date)
+        jockeys, base = jockey_year(conn, date)
 
         races: dict[int, dict[str, Any]] = {}
         for row in card:
@@ -158,6 +183,7 @@ def gather(date: str, *, conn: Connection | None = None) -> list[dict[str, Any]]
                 "course": row["course"], "surface": row["surface"],
                 "going": row["going"], "distance": row["distance"],
                 "race_class": row["race_class"], "off_time": row["off_time"],
+                "restricted": row["restricted"],
                 "field_size": row["field_size"], "j_base": base,
                 # Every rider's year, shared by the races: the head-to-head
                 # compares riders who are not on today's card.

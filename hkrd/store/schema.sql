@@ -17,9 +17,15 @@ CREATE TABLE IF NOT EXISTS races (
                                          -- mislabelled Turf in the v4 builder)
   going      TEXT,
   distance   INTEGER,
-  race_class TEXT,
+  race_class TEXT,                      -- 1-5 | G1 G2 G3 | Listed | Griffin Race
+                                         -- | 4YO; '0' is the legacy archive's
+                                         -- Group race of unknown grade.
+                                         -- store/coerce.to_race_class
   race_name  TEXT,
   off_time   TEXT,
+  restricted INTEGER,                   -- 1 = eligibility narrower than a
+                                         -- rating band: "(Restricted)", the
+                                         -- 4YO series, Griffin. NULL = unknown
   PRIMARY KEY (race_date, race_no)
 );
 
@@ -755,3 +761,43 @@ CREATE TABLE IF NOT EXISTS fixed_odds (
 );
 CREATE INDEX IF NOT EXISTS ix_fixed_race
   ON fixed_odds(race_date, race_no, bookmaker, captured_at);
+
+-- HKJC's course standard times and reference sectionals, per course, distance
+-- and class: "the time that could be expected to be achieved by a winner in
+-- the class on good going" (ingest/standards). The reference race pace is read
+-- against. class_key is HKJC's row: G (every Group race), 1-5, Griffin Race.
+CREATE TABLE IF NOT EXISTS standard_times (
+  venue         TEXT    NOT NULL,     -- ST | HV
+  surface       TEXT    NOT NULL,     -- Turf | AWT
+  distance      INTEGER NOT NULL,
+  class_key     TEXT    NOT NULL,
+  standard_time REAL    NOT NULL,     -- seconds
+  sections      TEXT,                 -- ';'-joined seconds, first section first
+  updated       TEXT,                 -- HKJC's "Last Update on"
+  fetched_at    TEXT    NOT NULL,
+  PRIMARY KEY (venue, surface, distance, class_key)
+);
+
+-- How fast each race was run: its leader's time to the 800m-to-go mark
+-- against the HKJC standard for its course, distance and class, scaled by the
+-- day's track speed (derive/tempo). Derived and droppable: jobs/rebuild_tempo.
+CREATE TABLE IF NOT EXISTS race_tempo (
+  race_date       TEXT    NOT NULL,
+  race_no         INTEGER NOT NULL,
+  standard_class  TEXT,               -- the HKJC row read against
+  standard_exact  INTEGER,            -- 0 when a neighbouring class stood in
+  leader_sections TEXT,               -- the leader's time for each section
+  early_to        INTEGER,            -- metres to go the early reading runs to
+  early_time      REAL,
+  early_std       REAL,               -- the standard, scaled by the day
+  variant         REAL,               -- the day's track speed, NULL = unknown
+  early_dev       REAL,               -- seconds; negative = faster
+  early_dev_400   REAL,               -- per 400m of the early reading
+  late_time       REAL,
+  late_std        REAL,
+  late_dev        REAL,
+  band            TEXT,               -- Very Fast | Fast | Neutral | Slow | Very Slow
+  derive_version  TEXT    NOT NULL,
+  PRIMARY KEY (race_date, race_no)
+);
+

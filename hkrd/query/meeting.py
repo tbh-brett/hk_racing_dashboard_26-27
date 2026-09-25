@@ -9,8 +9,8 @@ on screen.
 They were carved out of it at 568 of a 600-line cap, which is the immediate
 reason, and the seam was already there: these two touch nothing `build_card`
 uses. The four helpers that sat below them in that file did not come, because
-`_days_between`, `_place_ratio_range`, `_pairs_meeting_again` and
-`_swing_favours` are all called from `build_card` and belong to the card.
+`_days_between` and `_place_ratio_range` are called from `build_card` and
+belong to the card. (The head-to-head pairs have since moved to `query/h2h`.)
 """
 from __future__ import annotations
 

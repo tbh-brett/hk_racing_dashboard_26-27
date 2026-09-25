@@ -16,7 +16,7 @@
  * it is: where it rates a horse well above the tote, the tote has been right.
  */
 import {
-  DASH, el, styleBadge, compactDate, ordinal, drawText, classLabel,
+  DASH, el, styleBadge, compactDate, ordinal, drawText, classLabel, classCell,
 } from './vocab.js';
 
 const state = { open: null, weights: false };
@@ -123,10 +123,25 @@ function paceCell(race) {
     x.title = 'what being a habitual leader has been worth with this many of them';
     line.append(x);
   }
+  // The field's running styles as one strip, front of the field to the
+  // back, in the colours every style badge in the app uses.
   const k = p.counts;
-  c.append(line, el('div', 'dim',
-    `L ${k.Leader} · P ${k['On-Pace']} · M ${k.Midfield} · C ${k.Closer}`
-    + (p.unknown ? ` · ? ${p.unknown}` : '')));
+  const strip = el('div', 'scr-strip');
+  [['Leader', 's-l'], ['On-Pace', 's-p'], ['Midfield', 's-m'], ['Closer', 's-c']]
+    .forEach(([name, cls]) => {
+      if (!k[name]) return;
+      const seg = el('span', cls, String(k[name]));
+      seg.style.flexGrow = String(k[name]);
+      seg.title = `${k[name]} habitual ${name.toLowerCase()}${k[name] === 1 ? '' : 's'}`;
+      strip.append(seg);
+    });
+  if (p.unknown) {
+    const seg = el('span', 's-u', String(p.unknown));
+    seg.style.flexGrow = String(p.unknown);
+    seg.title = `${p.unknown} with no classified run`;
+    strip.append(seg);
+  }
+  c.append(line, strip);
   return c;
 }
 
@@ -137,16 +152,22 @@ function row(race, tipsHere) {
   const cell = (cls, ...kids) => { const c = el('div', cls); c.append(...kids); return c; };
   r.append(cell('c-r', el('div', 'no', `R${race.race_no}`),
                 el('div', 'off', race.run ? 'RAN' : race.off_time ?? '')));
-  r.append(cell('c-race', el('div', null, `${race.distance ?? DASH}m · ${classLabel(race.race_class) ?? DASH}`),
-                el('div', 'dim', `${race.venue ?? ''} ${race.course ?? ''} · ${race.field_size}`)));
+  const head = el('div', 'dist');
+  head.append(document.createTextNode(`${race.distance ?? DASH}m `));
+  const cls = classCell(race.race_class, { restricted: !!race.restricted });
+  if (cls) head.append(cls);
+  r.append(cell('c-race', head,
+                el('div', 'dim', `${race.venue ?? ''} ${race.course ?? ''} · ${race.field_size} run`)));
   r.append(paceCell(race));
 
   const short = cell('c-short');
   race.runners.filter((x) => x.tier === 'SHORTLIST').forEach((x) => {
-    const it = el('div', 'pick');
-    it.append(nameEl(x, tipsHere), el('span', 'pp', pct(x.place_pct)));
-    const res = resultEl(x);
-    if (res) it.append(res);
+    const it = el('div', 'pick sl');
+    it.append(nameEl(x, tipsHere), bar(x.place_pct), el('span', 'pp', pct(x.place_pct)),
+              resultEl(x) ?? el('span'));
+    it.title = x.for.length || x.against.length
+      ? [...x.for, ...x.against].map((f) => `${times(f.x)}  ${f.label}`).join(NL)
+      : 'form rating and rider only: nothing else measured moves it';
     short.append(it);
   });
   r.append(short);
@@ -157,7 +178,8 @@ function row(race, tipsHere) {
   also.slice(0, 3).forEach((x) => {
     const it = el('div', 'pick');
     const top = x.for[0];
-    it.append(nameEl(x, tipsHere), el('span', 'why', top ? SHORT[top.key] ?? top.key : ''));
+    it.append(nameEl(x, tipsHere));
+    if (top) it.append(chip(top, 'for'));
     const res = resultEl(x);
     if (res) it.append(res);
     cases.append(it);
@@ -171,7 +193,7 @@ function row(race, tipsHere) {
   booked.forEach((x) => {
     const it = el('div', 'pick');
     it.append(el('span', 'nm booked', `${x.horse_no} ${x.horse_name}`),
-              el('span', `setup ${x.setup.toLowerCase()}`, `${x.setup} ${times(x.setup_x)}`),
+              el('span', `setup-chip ${x.setup.toLowerCase()}`, `${x.setup} ${times(x.setup_x)}`),
               el('span', 'dim', ` · ${ordinal(x.rank)}`));
     it.title = [x.blackbook.reasoning ?? '', '', setupText(x)].join(NL);
     book.append(it);
@@ -278,7 +300,7 @@ function detail(race, tipsHere) {
   // The all-weather's course and surface are both "AWT"; say it once.
   const track = [...new Set([race.surface, race.course].filter(Boolean))].join(' ');
   cap.append(el('span', null, `R${race.race_no} · ${race.distance}m ${track} · `
-    + `${classLabel(race.race_class) ?? DASH} · ${race.field_size} runners`));
+    + `${classLabel(race.race_class, race.restricted) ?? DASH} · ${race.field_size} runners`));
   const link = el('a', 'go', 'RACE DAY ▸');
   link.href = `raceday.html?race=${race.race_no}`;
   link.addEventListener('click', (e) => e.stopPropagation());

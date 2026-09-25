@@ -83,9 +83,15 @@ def parse_race_header(html: str) -> dict[str, Any]:
     text = " ".join(BeautifulSoup(html, "html.parser").stripped_strings)
     info: dict[str, Any] = {}
 
-    if m := re.search(r"Class\s*(\d+)\s*-\s*(\d+)M", text):
-        info["race_class"], info["distance"] = m.group(1), int(m.group(2))
-    elif m := re.search(r"(Griffin\s+Race|Group\s+\d+|Listed\s+Race)\s*-\s*(\d+)M",
+    # The phrase before the distance is the class as HKJC writes it, and it
+    # writes it five ways: "Class 4", "Class 3 (Restricted)", "Group Three",
+    # "Griffin Race", "4 Year Olds". Only the first was read, so every Group,
+    # restricted and 4-year-old race was stored with no class at all -- 196
+    # races. `store/coerce.to_race_class` reads the phrase.
+    if m := re.search(r"\bRACE\s+\d+\s*\(\d+\)\s*(.+?)\s*-\s*(\d{3,4})M", text):
+        info["race_class"], info["distance"] = m.group(1).strip() or None, int(m.group(2))
+    elif m := re.search(r"(Class\s*\d+(?:\s*\(Restricted\))?|Griffin\s+Race"
+                        r"|Group\s+\w+|Listed\s+Race|4\s*Years?\s*Olds?)\s*-\s*(\d+)M",
                         text, re.I):
         info["race_class"], info["distance"] = m.group(1).strip(), int(m.group(2))
     elif m := re.search(r"-\s*(\d{3,4})M", text):

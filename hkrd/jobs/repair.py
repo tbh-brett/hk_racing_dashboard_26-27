@@ -21,6 +21,13 @@ against a public site to fix things that mostly need no requests at all.
   headers   A race whose row has no distance, class or name — the results
             landed but the race header did not. This one does need the meeting
             fetched properly, because that is where the header comes from.
+
+  classes   A race whose class is missing, is not in the archive's one
+            vocabulary (`coerce.RACE_CLASSES`), or has never been asked
+            whether it was restricted. HKJC writes the class five ways and
+            the parsers read one or two of them: every Group, 4-year-old and
+            restricted race came through with none. ONE request per meeting --
+            the all-results page carries every race's header.
 """
 from __future__ import annotations
 
@@ -28,11 +35,12 @@ import argparse
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from hkrd.store.coerce import RACE_CLASSES
 from hkrd.store.connect import db_path, get_conn, init_db
 
 __all__ = ["Damage", "survey", "repair"]
 
-KINDS = ("pace", "comments", "headers")
+KINDS = ("pace", "comments", "headers", "classes")
 
 
 @dataclass
@@ -42,6 +50,7 @@ class Damage:
     pace_races: list[tuple[str, int]] = field(default_factory=list)
     comment_dates: list[str] = field(default_factory=list)
     header_dates: list[str] = field(default_factory=list)
+    class_dates: list[str] = field(default_factory=list)
     counts: dict[str, int] = field(default_factory=dict)
 
     def render(self) -> str:
@@ -75,11 +84,24 @@ class Damage:
             lines.append(f"    {', '.join(self.header_dates)}")
         else:
             lines.append("    nothing missing")
+
+        lines.append("  race classes")
+        if self.class_dates:
+            mins = len(self.class_dates) * 1.2 / 60
+            lines.append(f"    {self.counts.get('class_wrong', 0):,} races with no class or "
+                         f"one outside the vocabulary; "
+                         f"{self.counts.get('class_unasked', 0):,} never asked whether "
+                         "restricted")
+            lines.append(f"    {len(self.class_dates)} meetings, one request each, "
+                         f"about {mins:.0f} minutes")
+        else:
+            lines.append("    nothing missing")
         return "\n".join(lines)
 
     @property
     def anything(self) -> bool:
-        return bool(self.pace_races or self.comment_dates or self.header_dates)
+        return bool(self.pace_races or self.comment_dates or self.header_dates
+                    or self.class_dates)
 
 
 def survey(db: Path | None = None) -> Damage:
@@ -121,9 +143,70 @@ def survey(db: Path | None = None) -> Damage:
             WHERE distance IS NULL GROUP BY race_date ORDER BY race_date""").fetchall()
         d.header_dates = [r["race_date"] for r in rows]
         d.counts["header_races"] = sum(r["n"] for r in rows)
+
+        # Settled meetings only: the all-results page has nothing to say about
+        # a card that has not run, and the nightly card scrape reads that.
+        known = ",".join(f"'{c}'" for c in RACE_CLASSES)
+        rows = conn.execute(f"""
+            SELECT a.race_date,
+                   sum(a.race_class IS NULL OR a.race_class NOT IN ({known})) wrong,
+                   sum(a.restricted IS NULL) unasked
+              FROM races a
+             WHERE EXISTS (SELECT 1 FROM runners r WHERE r.race_date = a.race_date
+                              AND r.race_no = a.race_no AND r.place IS NOT NULL)
+             GROUP BY a.race_date
+            HAVING wrong > 0 OR unasked > 0
+             ORDER BY a.race_date""").fetchall()
+        d.class_dates = [r["race_date"] for r in rows]
+        d.counts["class_wrong"] = sum(r["wrong"] for r in rows)
+        d.counts["class_unasked"] = sum(r["unasked"] for r in rows)
         return d
     finally:
         conn.close()
+
+
+def _repair_classes(db: Path | None, dates: list[str], *, session=None) -> list[str]:
+    """Re-read each meeting's headers and write the class, as HKJC wrote it.
+
+    Only races already stored are touched, and only the header fields: a
+    race the archive does not have is not invented from a header line.
+    """
+    from hkrd.ingest._client import FetchError
+    from hkrd.ingest.headers import fetch_meeting_headers
+    from hkrd.store import upsert
+    from hkrd.store.connect import transaction
+
+    log: list[str] = []
+    conn = get_conn(db if db is not None else db_path())
+    try:
+        changed = 0
+        for date in dates:
+            try:
+                heads = fetch_meeting_headers(date, session=session)
+            except FetchError as exc:
+                log.append(f"classes {date}: FAILED — {exc}")
+                continue
+            have = {r[0] for r in conn.execute(
+                "SELECT race_no FROM races WHERE race_date = ?", (date,))}
+            rows = [{"race_date": date, **h} for h in heads if h["race_no"] in have]
+            if not rows:
+                log.append(f"classes {date}: no header lines read")
+                continue
+            before = dict(conn.execute(
+                "SELECT race_no, race_class FROM races WHERE race_date = ?", (date,)).fetchall())
+            with transaction(conn):
+                upsert.upsert_races(conn, rows)
+            after = dict(conn.execute(
+                "SELECT race_no, race_class FROM races WHERE race_date = ?", (date,)).fetchall())
+            moved = [f"R{n} {before.get(n)}→{after[n]}" for n in sorted(after)
+                     if before.get(n) != after[n]]
+            changed += len(moved)
+            if moved:
+                log.append(f"classes {date}: " + ", ".join(moved))
+        log.append(f"classes: {len(dates)} meetings read, {changed} classes changed")
+    finally:
+        conn.close()
+    return log
 
 
 def repair(db: Path | None = None, *, only: tuple[str, ...] = KINDS,
@@ -146,6 +229,9 @@ def repair(db: Path | None = None, *, only: tuple[str, ...] = KINDS,
                     log.append(f"header {date} {venue}: {got.races} races, "
                                f"{got.runners} runners re-read")
                     break
+
+    if "classes" in only and d.class_dates:
+        log.extend(_repair_classes(db, d.class_dates[:limit], session=session))
 
     if "comments" in only and d.comment_dates:
         for date in d.comment_dates[:limit]:

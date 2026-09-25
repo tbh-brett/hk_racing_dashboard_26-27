@@ -21,8 +21,8 @@ from dataclasses import replace
 from typing import Any
 
 from hkrd.derive.probability import devig
-from hkrd.query import (blackbook as bb_q, formguide as fg_q,
-                        gear as gear_q, market as market_q,
+from hkrd.query import (blackbook as bb_q,
+                        gear as gear_q, h2h as h2h_q, market as market_q,
                         money as money_q, movement as movement_q,
                         pools as pools_q, rating as rating_q, vet as vet_q)
 from hkrd.query.race import (get_horse_form, get_race, habitual_styles,
@@ -330,7 +330,9 @@ def build_card(date: str, race_no: int, *,
             "concentration": conc,
             "overround": overround,
             "place_ratio_range": _place_ratio_range(race.runners),
-            "head_to_head": _pairs_meeting_again(conn, date, race.runners),
+            # Who in this field has met before, most open rematch first
+            # (query/h2h): the margin, the draw and the rider, never the weight.
+            "head_to_head": h2h_q.pairs(conn, date, race.runners),
             # What each pool on this race holds, and the pairs the money is
             # actually on. Race-level rather than per-runner because a pool
             # size is a fact about the race.
@@ -381,80 +383,3 @@ def _place_ratio_range(runners) -> str | None:
     if len(ratios) < 2:
         return None
     return f"{min(ratios):.2f}–{max(ratios):.2f}"
-
-
-def _swing_favours(a, b, gap_then: int | None, gap_now: int | None
-                   ) -> dict[str, Any]:
-    """Which horse the weight change favours, and by how much.
-
-    `gap` is A's weight minus B's. A FALL means A carries less relative to B
-    than it did, so A is better off by that much; a rise favours B. Equal
-    weights either side is not "no swing" — it is a real change if the gap
-    moved, and the horse that came down is the one that benefits.
-    """
-    if gap_then is None or gap_now is None:
-        return {"favours_no": None, "favours_name": None, "favours_lb": None}
-    move = gap_now - gap_then
-    if move == 0:
-        return {"favours_no": None, "favours_name": None, "favours_lb": 0}
-    better = b if move > 0 else a
-    return {"favours_no": better.horse_no, "favours_name": better.horse_name,
-            "favours_lb": abs(move)}
-
-
-def _pairs_meeting_again(conn: Connection, date: str, runners,
-                         limit: int = 40) -> list[dict[str, Any]]:
-    """Runners in today's field who have met before.
-
-    Sorted by weight swing, because the swing is the gap BETWEEN them and a
-    pair both going up 5lb has not changed relative to one another.
-    """
-    out: list[dict[str, Any]] = []
-    for i, a in enumerate(runners):
-        for b in runners[i + 1:]:
-            h2h = fg_q.head_to_head(a.horse_name, b.horse_name,
-                                    before=date, conn=conn)
-            if not h2h["meetings"]:
-                continue
-            today_gap = (a.actual_weight - b.actual_weight
-                         if a.actual_weight and b.actual_weight else None)
-            swing = fg_q.weight_swing(h2h["last_weight_gap"], today_gap)
-            last = h2h["meetings"][0]
-            out.append({
-                "a_no": a.horse_no, "a_name": a.horse_name,
-                "b_no": b.horse_no, "b_name": b.horse_name,
-                "record": f"{h2h['record']['a']}-{h2h['record']['b']}",
-                "meetings": len(h2h["meetings"]),
-                "last_date": last["race_date"],
-                "last_cond": f"{last['distance']}m {last['going']}",
-                # How each FINISHED and what each CARRIED, which is the pair
-                # the weight swing is about: "2nd (126) · 6th (126)" says the
-                # one that beat the other was on the same weight, and today's
-                # gap is the change to that.
-                "a_place": last["pa"], "b_place": last["pb"],
-                "a_weight_then": last["wa"], "b_weight_then": last["wb"],
-                "gap_then": h2h["last_weight_gap"], "gap_now": today_gap,
-                "swing": swing,
-                # WHO THE SWING FAVOURS, said outright. The card used to print
-                # "-9 → 0" and leave the reader to work out which horse got
-                # the better of it — which is arithmetic done wrong under
-                # time pressure, on the one figure the pair is sorted by.
-                #
-                # The gap is A minus B. It FALLING means A is carrying less
-                # relative to B than it was, so A is better off.
-                **_swing_favours(a, b, h2h["last_weight_gap"], today_gap),
-                # Escalating tiers at 4, 6 and 8 lb. Most pairs clear none of
-                # them, which is correct rather than a bug.
-                "swing_tier": (3 if swing is not None and swing >= 8
-                               else 2 if swing is not None and swing >= 6
-                               else 1 if swing is not None and swing >= 4 else 0),
-                # BOTH gates, so the card can show the move. Only the gate at
-                # the last meeting was carried, and today's draw was sitting
-                # unused on the runner two lines up — so the card showed two
-                # bare numbers that read as a pair of draws and were in fact
-                # one horse's history each.
-                "a_gate_then": last["da"], "a_gate_now": a.draw,
-                "b_gate_then": last["db"], "b_gate_now": b.draw,
-            })
-    out.sort(key=lambda p: (-(p["swing"] or 0), -p["meetings"]))
-    return out[:limit]

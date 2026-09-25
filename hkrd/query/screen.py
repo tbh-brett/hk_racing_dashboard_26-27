@@ -212,7 +212,8 @@ def _race(block: dict, books: dict, notes: dict) -> dict[str, Any]:
         x["tier"] = ("SHORTLIST" if i < SHORTLIST else
                      "CASE" if x["case_x"] >= math.exp(CASE_AT) else "FIELD")
     return {**{k: race[k] for k in ("race_no", "venue", "course", "surface", "going",
-                                     "distance", "race_class", "off_time", "field_size")},
+                                     "distance", "race_class", "off_time", "field_size",
+                                     "restricted")},
             "run": any(r["place"] is not None for r in runners),
             "pace": _pace(runners),
             "runners": order}

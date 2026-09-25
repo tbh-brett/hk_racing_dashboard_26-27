@@ -51,7 +51,8 @@ def test_going_is_matched_longest_first(html):
 def test_the_header_carries_distance_class_and_off_time(html):
     head = rc.parse_race_header(html, 4)
     assert head["distance"] == 1650
-    assert head["race_class"] == "4"
+    # HKJC's phrase, as written; store/coerce reads it into the vocabulary.
+    assert head["race_class"] == "Class 4"
     assert head["off_time"] == "20:15"
     assert head["prize"] == 1275000
     assert head["race_name"] == "SHEK KIP MEI HANDICAP"

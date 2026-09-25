@@ -79,7 +79,20 @@ def test_the_swing_is_the_gap_between_them_not_each_horse_s_change(db) -> None:
     p = _pair(db)
     assert p["gap_then"] == -9 and p["gap_now"] == 0
     assert p["swing"] == 9
-    assert p["swing_tier"] == 3        # 8lb and over
+    # Shown as context and nothing more: the swing earns no mark (query/h2h).
+    assert "swing_tier" not in p
+
+
+def test_the_beaten_horse_is_named_with_what_has_moved_since(db) -> None:
+    """TO INFINITY was 4th to SETANTA's 2nd. Then it was drawn one gate
+    outside SETANTA (12 to 11); today six inside it (6 to 12): seven gates
+    better relatively, which is a measured swing. The 9lb it gained on the
+    weights since is not."""
+    p = _pair(db)
+    assert (p["beaten_no"], p["beaten_name"]) == (6, "TO INFINITY")
+    assert p["draw_swing"] == 7
+    assert any("drawn 7 gates" in t for t in p["turn"])
+    assert not any("lb" in t for t in p["turn"])
 
 
 def test_a_missing_draw_does_not_invent_one(db) -> None:

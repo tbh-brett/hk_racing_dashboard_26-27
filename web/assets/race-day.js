@@ -303,13 +303,15 @@ function renderBlackbookBand() {
   host.append(grid);
 }
 
-function swingLabel(p) {
-  if (p.swing === null || p.swing === undefined) return 'NO WT DATA';
-  // The dots are the tier, at 4, 6 and 8lb. A number alone makes the reader do
-  // the threshold arithmetic on every card; the dots say "this one" at a
-  // glance, which is the whole job of a band you scan rather than read.
-  const dots = p.swing_tier ? ` ${'●'.repeat(p.swing_tier)}` : '';
-  return `SWING ${p.swing}lb${dots}`;
+/** How open the rematch is, as a mark you scan rather than read: a close
+ *  margin last time (within 2L, inside a year) is one dot, and each measured
+ *  swing toward the beaten horse since -- the draw, the rider -- another.
+ *  Never the weight: measured over 91,856 pairs it points the wrong way
+ *  (query/h2h). */
+function turnLabel(p) {
+  if (!p.beaten_no) return 'DEAD HEAT';
+  if (!p.turn_level) return `REPEATS ${p.repeat_pct}%`;
+  return `OPEN ${'●'.repeat(p.turn_level)}`;
 }
 
 /** Where a horse jumps from today against where it jumped from last time.
@@ -435,10 +437,8 @@ function renderH2HBand() {
   host.replaceChildren(row);
 
   if (!state.h2hOpen || !pairs.length) return;
-  // EVERY pair, scrolled. Four of twenty-two were shown and the rest were
-  // simply gone, with nothing on screen to say so — the band is sorted by
-  // weight swing, so the ones dropped were the smallest swings, which is the
-  // least bad truncation and still a silent one.
+  // EVERY pair, scrolled, most open rematch first (query/h2h). Four of
+  // twenty-two used to be shown and the rest were simply gone.
   const grid = el('div', 'h2h-grid');
   pairs.forEach((p) => {
     const c = el('div', 'h2h-cell');
@@ -472,26 +472,39 @@ function renderH2HBand() {
       + ` · ${ordinal(p.b_place)}${p.b_weight_then ? ` (${p.b_weight_then})` : ''}`));
     c.append(l2);
 
-    // WHO THE SWING FAVOURS, in words, above the arithmetic that produced it.
-    // "-9 → 0" is the evidence; it is not the answer, and working the answer
-    // out from it is the step that was going wrong.
+    // WHO WAS BEATEN, BY HOW MUCH, AND WHAT HAS MOVED SINCE. The margin
+    // decides most rematches (a length or less repeats 51%, a coin toss), and
+    // the draw and the rider are the two swings measured to move it.
     const l3 = el('div', 'h2h-verdict');
-    if (p.favours_no) {
-      const mine = p.favours_no === p.a_no;
-      l3.append(el('span', `won-wt ${mine ? 'a' : 'b'}`,
-        `${p.favours_no} ${p.favours_name}`));
-      l3.append(el('span', 'by', `${p.favours_lb}lb better off`));
-    } else if (p.favours_lb === 0) {
-      l3.append(el('span', 'level', 'SAME WEIGHTS AS LAST TIME'));
+    if (p.beaten_no) {
+      l3.append(el('span', 'won-wt', `${p.beaten_no} ${p.beaten_name}`));
+      l3.append(el('span', 'by', `beaten ${p.margin < 0.1 ? 'a short margin' : `${p.margin}L`}`));
     } else {
-      l3.append(el('span', 'level', 'NO WEIGHT ON RECORD'));
+      l3.append(el('span', 'level', 'DEAD HEAT LAST TIME'));
     }
-    l3.append(el('span', `swing swing-${p.swing_tier}`, swingLabel(p)));
+    const mark = el('span', `turn turn-${p.turn_level ?? 0}`, turnLabel(p));
+    mark.title = p.beaten_no
+      ? `margins like this repeated ${p.repeat_pct}% of the time over 91,856 pairs`
+        + (p.turn?.length ? ` — and since then: ${p.turn.join(', ')}` : '')
+      : '';
+    l3.append(mark);
     c.append(l3);
+    if (p.turn?.length) {
+      const lt = el('div', 'h2h-meta');
+      lt.append(el('span', 'k', 'SINCE'));
+      lt.append(el('span', 'for', p.turn.join(' · ')));
+      c.append(lt);
+    }
 
+    // The weights, as context. They follow the rating in a handicap, so the
+    // horse a swing goes against is usually the improver: shown, never scored.
     const l4 = el('div', 'h2h-meta');
     l4.append(el('span', 'k', 'WT GAP'));
     l4.append(el('span', 'v2', `${p.gap_then ?? DASH} → ${p.gap_now ?? DASH}`));
+    const note = el('span', 'k', 'follows the rating');
+    note.title = 'pairs where the beaten horse is now 8lb+ worse off reversed more '
+      + 'often (repeat 49%) than pairs where it is 8lb+ better off (61-62%)';
+    l4.append(note);
     c.append(l4);
 
     // The gate move, one horse per line and labelled with the horse. Two
@@ -1156,26 +1169,19 @@ function renderDetail() {
       const rec = String(p.record ?? '').split('-');
       row.append(el('span', 'rec',
         mine ? p.record : `${rec[1] ?? ''}-${rec[0] ?? ''}`));
-      // WHICH WAY THE WEIGHT WENT, from this horse's side. The swing is the
-      // gap BETWEEN the pair, so the same "5lb" is a help to one of them and a
-      // hindrance to the other, and printing it unsigned left the reader doing
-      // that arithmetic under time pressure on the one figure the pair is
-      // sorted by. Green is better off than when they last met, red is worse.
-      if (p.swing != null) {
-        const helped = p.favours_no === r.horse_no;
-        const level = p.favours_no == null || !p.favours_lb ? 'level'
-          : helped ? 'better' : 'worse';
-        const k = el('span', `k swing-${level}`,
-          level === 'level' ? 'level'
-            : `${helped ? '−' : '+'}${p.favours_lb}lb`);
-        k.title = level === 'level'
-          ? 'the weight gap between them is unchanged since they last met'
-          : helped
-            ? `${p.favours_lb}lb better off with ${mine ? p.b_name : p.a_name} `
-              + 'than when they last met'
-            : `${p.favours_lb}lb worse off with ${mine ? p.b_name : p.a_name} `
-              + 'than when they last met';
+      // WHO WAS BEATEN, from this horse's side, and what has moved since in
+      // the beaten horse's favour. The weight is left out on purpose: it
+      // follows the rating (query/h2h).
+      if (p.beaten_no) {
+        const beaten = p.beaten_no === r.horse_no;
+        const by = p.margin < 0.1 ? 'a short margin' : `${p.margin}L`;
+        const k = el('span', `k ${beaten ? 'turn-for' : 'turn-held'}`,
+          beaten ? `beaten ${by}` : `beat it ${by}`);
+        k.title = `margins like this repeated ${p.repeat_pct}% of the time`
+          + (p.turn?.length ? `; since then the beaten horse is ${p.turn.join(', ')}` : '');
         row.append(k);
+        if (p.turn?.length) row.append(el('span', 'k turn-for', p.turn.length === 2
+          ? 'draw + rider' : p.turn[0].split(' ')[0] === 'drawn' ? 'draw' : 'rider'));
       }
       sec.append(row);
     });

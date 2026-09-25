@@ -134,6 +134,20 @@ def _migrate(conn: sqlite3.Connection) -> None:
     with transaction(conn, immediate=True):
         _migrate_blackbook_close(conn)
         _migrate_blackbook_prefs(conn)
+        _migrate_races_restricted(conn)
+
+
+def _migrate_races_restricted(conn: sqlite3.Connection) -> None:
+    """`races.restricted`: is eligibility narrower than a rating band.
+
+    Adds the column and decides nothing. The archive's classes are wrong in
+    ways only HKJC can settle -- 196 races with none, two carrying a grade
+    read off the site's menu -- so the values are left for `jobs/repair
+    --only classes`, which asks HKJC, rather than guessed here.
+    """
+    cols = _columns(conn, "races")
+    if cols and "restricted" not in cols:
+        conn.execute("ALTER TABLE races ADD COLUMN restricted INTEGER")
 
 
 def _migrate_blackbook_prefs(conn: sqlite3.Connection) -> None:

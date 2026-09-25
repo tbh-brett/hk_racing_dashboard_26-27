@@ -117,49 +117,51 @@ class Factor:
 _ONE_SEASON = "one season of trials in the archive; refit as 26/27 accrues"
 _TWO_SEASONS = "HKJC ratings are in the archive from 2024-25 only"
 
-# jobs/fit_screen, 2026-09-24: every settled race from 2020-21 to 23 Sep 2026.
+# jobs/fit_screen, 2026-09-25: every settled race from 2020-21 to 23 Sep 2026,
+# refitted once Group and 4-year-old races carried their class (the class
+# fix in docs/audit-2026-09-24.md). Only "Up in class" moved: +0.083 to +0.047.
 # The walk-forward figures are the seasons 2022-23 to 26/27 so far, each
 # scored by weights fitted only on the seasons before it.
 FIT: dict[str, Any] = {
-    "fitted": "2026-09-24",
+    "fitted": "2026-09-25",
     "seasons": "2020-21 to 2026-27",
     "races": 5019,
     "runs": 61007,
     "test_races": 3366,
-    "top3_has_winner": {"screen": 0.521, "form": 0.487, "market": 0.621},
-    "top4_has_winner": {"screen": 0.624, "form": 0.586, "market": 0.710},
+    "top3_has_winner": {"screen": 0.520, "form": 0.487, "market": 0.621},
+    "top4_has_winner": {"screen": 0.622, "form": 0.586, "market": 0.710},
     # A/E against the closing tote where the screen rates a horse 1.25-2x and
     # 2x+ what the tote does: the tote has been right.
-    "above_tote_ae": {"x1.25-2": 0.910, "x2+": 0.855, "runs": 20600},
+    "above_tote_ae": {"x1.25-2": 0.912, "x2+": 0.849, "runs": 20610},
 }
 
 FACTORS: tuple[Factor, ...] = (
     Factor("form", "FORM", "SARR rating, per standard deviation above the field", 0.466, 0),
-    Factor("jockey", "RIDER", "Jockey's strike rate over the last year", 0.489, 0),
+    Factor("jockey", "RIDER", "Jockey's strike rate over the last year", 0.488, 0),
     Factor("unrated", "CONTROL", "No SARR rating yet", -0.147, 6024),
-    Factor("prev_no_comment", "CONTROL", "No race comments on the last start", 0.092, 9933),
-    Factor("debut", "CAMPAIGN", "Debut", -0.396, 3020),
+    Factor("prev_no_comment", "CONTROL", "No race comments on the last start", 0.091, 9933),
+    Factor("debut", "CAMPAIGN", "Debut", -0.397, 3020),
     Factor("first_up", "CAMPAIGN", "First-up from a spell", -0.119, 7985),
     Factor("second_up_bad", "CAMPAIGN", "Second-up after running 7th or worse first-up", -0.322, 4746),
     Factor("deep_campaign", "CAMPAIGN", "Fifth run or later this campaign", 0.070, 27332),
-    Factor("prev_beaten", "LAST-START", "Beaten out of the frame last start", -0.318, 32660),
-    Factor("prev_excuse_beaten", "LAST-START", "Beaten last start, but held up, checked or blocked", 0.056, 6574),
+    Factor("prev_beaten", "LAST-START", "Beaten out of the frame last start", -0.319, 32660),
+    Factor("prev_excuse_beaten", "LAST-START", "Beaten last start, but held up, checked or blocked", 0.055, 6574),
     Factor("prev_wide", "LAST-START", "Raced wide last start", 0.104, 17923),
-    Factor("prev_vet", "LAST-START", "Veterinary finding after the last start", -0.277, 606),
-    Factor("leader_alone", "PACE", "The only habitual leader in the race", 0.246, 1297),
-    Factor("leader_pair", "PACE", "One of two habitual leaders", 0.215, 2938),
-    Factor("leader_crowd", "PACE", "One of three or more habitual leaders", 0.017, 5537),
-    Factor("on_pace", "PACE", "Habitually races on the pace", 0.088, 7431),
-    Factor("closer", "PACE", "Habitually races at the back", -0.095, 26674),
-    Factor("trial_good", "TRIAL", "Trial rated POSITIVE or STANDOUT since the last run", 0.513, 832, _ONE_SEASON),
+    Factor("prev_vet", "LAST-START", "Veterinary finding after the last start", -0.278, 606),
+    Factor("leader_alone", "PACE", "The only habitual leader in the race", 0.244, 1299),
+    Factor("leader_pair", "PACE", "One of two habitual leaders", 0.219, 2928),
+    Factor("leader_crowd", "PACE", "One of three or more habitual leaders", 0.016, 5544),
+    Factor("on_pace", "PACE", "Habitually races on the pace", 0.092, 7434),
+    Factor("closer", "PACE", "Habitually races at the back", -0.093, 26673),
+    Factor("trial_good", "TRIAL", "Trial rated POSITIVE or STANDOUT since the last run", 0.514, 832, _ONE_SEASON),
     Factor("trial_bad", "TRIAL", "Trial rated NEGATIVE since the last run", -0.308, 682, _ONE_SEASON),
-    Factor("rating_up", "CHANGE", "Rating up 3+ since the last start", 0.161, 1584, _TWO_SEASONS),
-    Factor("rating_down", "CHANGE", "Rating down 3+ since the last start", -0.253, 908, _TWO_SEASONS),
-    Factor("class_rise", "CHANGE", "Up in class", 0.083, 2692),
+    Factor("rating_up", "CHANGE", "Rating up 3+ since the last start", 0.168, 1584, _TWO_SEASONS),
+    Factor("rating_down", "CHANGE", "Rating down 3+ since the last start", -0.251, 908, _TWO_SEASONS),
+    Factor("class_rise", "CHANGE", "Up in class", 0.047, 3102),
     Factor("draw_in", "CHANGE", "Drawn 4+ gates further in than last start", 0.105, 15059),
     Factor("draw_out", "CHANGE", "Drawn 4+ gates further out than last start", -0.119, 15111),
     Factor("venue_change", "CHANGE", "Other course from last start", -0.086, 15480),
-    Factor("trainer_change", "CHANGE", "New stable since last start", 0.244, 1119),
+    Factor("trainer_change", "CHANGE", "New stable since last start", 0.243, 1119),
 )
 BY_KEY: dict[str, Factor] = {f.key: f for f in FACTORS}
 
@@ -174,7 +176,9 @@ def class_number(race_class: str | None) -> float | None:
     c = str(race_class).strip()
     if c in {"1", "2", "3", "4", "5"}:
         return float(c)
-    if c == "0" or "group" in c.lower():
+    # store/coerce's vocabulary: G1-G3, Listed and the 4YO series sit above
+    # the ladder; "0" and "Group N" are the archive's older spellings of it.
+    if c in {"0", "Listed", "4YO"} or re.fullmatch(r"G[123]", c) or "group" in c.lower():
         return 0.0
     if "griffin" in c.lower():
         return 6.0
