@@ -112,6 +112,7 @@ def test_a_run_reports_what_it_wrote_not_that_it_ran(monkeypatch) -> None:
 
     class Report:
         date, batches, runners, with_distance = "2026-08-21", 0, 0, 0
+        unfinished = 0
         errors: list = []
         no_such_day = True
 
@@ -121,3 +122,20 @@ def test_a_run_reports_what_it_wrote_not_that_it_ran(monkeypatch) -> None:
     assert body["wrote"] == {"batches": 0, "runners": 0, "days": 1}
     assert body["total"] == 1        # the day it looked at, not rows written
     assert body["warnings"] == ["2026-08-21: none published"]
+
+
+def test_a_trial_day_hkjc_has_not_finished_is_said_on_the_chip(
+        monkeypatch) -> None:
+    """Times landed, positions and comments did not. Without the warning the
+    chip read "✓ now" about 2026-09-19 and 2026-09-25, which stayed that way
+    in production with no comment on any of their 116 runners."""
+    from hkrd.jobs import scrape_trials
+
+    report = scrape_trials.TrialScrapeReport(
+        date="2026-09-25", batches=5, runners=44, unfinished=5)
+    monkeypatch.setattr(scrape_trials, "scrape", lambda *a, **k: report)
+    body = client.post("/api/jobs/scrape",
+                       json={"source": "trials", "date": "2026-09-25"}).json()
+    assert body["ok"]
+    assert body["warnings"] == [
+        "2026-09-25: 5 of 5 batches without positions or comments yet"]

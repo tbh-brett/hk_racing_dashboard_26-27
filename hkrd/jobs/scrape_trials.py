@@ -44,6 +44,15 @@ class TrialScrapeReport:
     batches: int = 0
     runners: int = 0
     with_distance: int = 0
+    # HKJC publishes these after the times. A day fetched before it has, or
+    # fetched again while it still has not, stores every runner and fills
+    # neither — which only these two counts can tell apart from a day that
+    # landed whole.
+    with_positions: int = 0
+    with_comment: int = 0
+    # Batches with no position or no comment on ANY runner — the same test
+    # `outstanding` uses to fetch the day again.
+    unfinished: int = 0
     errors: list[str] = field(default_factory=list)
     # HKJC answering "there is no trial page for that date" is an answer, not
     # a failure. It only became worth distinguishing when this went on a
@@ -61,7 +70,12 @@ class TrialScrapeReport:
         lines = [f"  trial day          {self.date}",
                  f"  batches            {self.batches:>6}",
                  f"  runners            {self.runners:>6}",
-                 f"  with a distance    {self.with_distance:>6}"]
+                 f"  with a distance    {self.with_distance:>6}",
+                 f"  with positions     {self.with_positions:>6}",
+                 f"  with a comment     {self.with_comment:>6}"]
+        if self.unfinished:
+            lines.append(f"  NOT YET PUBLISHED  {self.unfinished:>6} batches "
+                         "— fetched again next run")
         if self.errors:
             lines.append(f"  ERRORS             {len(self.errors):>6}")
             lines += [f"    {e}" for e in self.errors[:10]]
@@ -97,9 +111,15 @@ def scrape(date: str, *, db: Path | None = None,
                     "horse_name": r.get("horse_name"),
                     "place": r.get("place"),
                     "finish_time": r.get("finish_time"),
-                    "section_times": "; ".join(batch.get("section_times") or []),
+                    # NULL, not "", when the page has none. A stored day is
+                    # fetched again while HKJC finishes it, and the upsert
+                    # keeps a stored value against a NULL but not against an
+                    # empty string — "" would blank positions already held.
+                    "section_times": "; ".join(
+                        batch.get("section_times") or []) or None,
                     "running_positions": " ".join(
-                        str(p) for p in (r.get("running_positions") or [])),
+                        str(p) for p in (r.get("running_positions") or [])
+                    ) or None,
                     "venue": batch.get("venue"),
                     "course": batch.get("course"),
                     "surface": batch.get("surface"),
@@ -115,6 +135,12 @@ def scrape(date: str, *, db: Path | None = None,
                 report.runners += upsert.upsert_trials(conn, rows)
                 if batch.get("distance"):
                     report.with_distance += len(rows)
+                positions = sum(1 for r in rows if r["running_positions"])
+                comments = sum(1 for r in rows if r["comment_text"])
+                report.with_positions += positions
+                report.with_comment += comments
+                if rows and not (positions and comments):
+                    report.unfinished += 1
 
         # Recorded so the freshness strip can say when trials last LANDED.
         # Trials are published weekly, so three days old is current for this
@@ -136,21 +162,50 @@ def scrape(date: str, *, db: Path | None = None,
     return report
 
 
+# A batch HKJC has not finished publishing: the times are up, but no runner in
+# it has a running position or no runner has a comment. One runner short is a
+# horse that did not finish and is complete; a whole batch short is a page
+# that was read too early.
+_UNFINISHED = """
+    SELECT DISTINCT trial_date FROM (
+        SELECT trial_date FROM trials
+        WHERE trial_date >= ?
+        GROUP BY trial_date, venue, trial_no
+        HAVING max(length(coalesce(running_positions, ''))) = 0
+            OR max(length(coalesce(comment_text, ''))) = 0)
+"""
+
+
 def outstanding(days: Sequence[str], *, db: Path | None = None,
-                limit: int = 6) -> list[str]:
-    """Of the days HKJC lists, the recent ones not already in the database.
+                limit: int = 6, recheck: int = 8) -> list[str]:
+    """Of the days HKJC lists, the recent ones the database lacks or holds
+    only half of.
+
+    HKJC puts a trial day's times up first and the running positions and
+    comments later. A day read in between used to count as HAD, so it was
+    never asked about again: 2026-09-19 and 2026-09-25 sat in production with
+    all 116 runners carrying a time and no position, no placing and no
+    comment, and HKJC had published all three for every one of them by
+    2026-09-26. So the most recent `recheck` listed days are fetched again
+    while a batch on them is unfinished — about a fortnight of trial days,
+    room for a page that is days late, and short enough that a day HKJC never
+    completes stops costing a request.
 
     Oldest first, so a run that is cut short has filled the gap from the far
     end rather than leaving a hole in the middle of the archive.
     """
+    window = list(days[:recheck])
     conn = get_conn(db if db is not None else db_path())
     try:
         init_db(conn)
         have = {r[0] for r in conn.execute(
             "SELECT DISTINCT trial_date FROM trials")}
+        unfinished = {r[0] for r in conn.execute(
+            _UNFINISHED, (min(window),))} if window else set()
     finally:
         conn.close()
-    missing = [d for d in days if d not in have]
+    missing = [d for d in days
+               if d not in have or (d in unfinished and d in window)]
     # `days` arrives newest first; take the most recent few, then run them in
     # order. The limit is a guard against a first run against an empty
     # database fetching a year of trial days in one go.
@@ -159,7 +214,8 @@ def outstanding(days: Sequence[str], *, db: Path | None = None,
 
 def catch_up(*, db: Path | None = None, limit: int = 6,
              session=None) -> list[TrialScrapeReport]:
-    """Ask which trial days exist, fetch the recent ones we are missing."""
+    """Ask which trial days exist, fetch the recent ones we are missing or
+    hold only half of."""
     days = trials_ingest.list_days(session=session)
     return [scrape(d, db=db, session=session)
             for d in outstanding(days, db=db, limit=limit)]
