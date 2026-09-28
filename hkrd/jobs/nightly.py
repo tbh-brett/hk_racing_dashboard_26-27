@@ -31,7 +31,7 @@ from pathlib import Path
 from hkrd.ingest import corunning, racecard
 from hkrd.ingest._client import FetchError, NotFound
 from hkrd.ingest.standards import StandardsError
-from hkrd.jobs import derive_all, scrape_corunning, scrape_standards, scrape_meeting as scrape_job
+from hkrd.jobs import derive_all, record_screen, scrape_corunning, scrape_standards, scrape_meeting as scrape_job
 from hkrd.store import job_log
 from hkrd.store.connect import db_path, get_conn, init_db
 
@@ -88,6 +88,9 @@ class NightlyReport:
     # so an upcoming card was fetched here five times a day and ranked by
     # nobody. A run that scored one says so.
     scored_cards: list[str] = field(default_factory=list)
+    # Settled meetings whose Screen order was recorded for the sources'
+    # record (jobs/record_screen). Once per meeting, after its results.
+    screened: list[str] = field(default_factory=list)
     # Meetings whose comments on running HKJC has not written yet. Not an
     # error and not a warning -- it is the normal state of a meeting for its
     # first week -- but said, so a quiet night explains itself.
@@ -114,6 +117,8 @@ class NightlyReport:
         lines.append(f"  cards scored       {len(self.scored_cards):>6}")
         for c in self.scored_cards:
             lines.append(f"    {c}")
+        for s in self.screened:
+            lines.append(f"  screen recorded    {s}")
         if self.pending_comments:
             lines.append(f"  comments pending   {len(self.pending_comments):>6}"
                          "   (HKJC writes these up days after the meeting)")
@@ -130,8 +135,9 @@ class NightlyReport:
         """What goes in job_runs.detail and, from there, onto the page."""
         if self.errors:
             return f"{len(self.errors)} error(s): {self.errors[0][:160]}"
-        if self.scraped or self.scored_cards:
-            return "; ".join([*self.scraped, *self.scored_cards])
+        if self.scraped or self.scored_cards or self.screened:
+            return "; ".join([*self.scraped, *self.scored_cards,
+                              *self.screened])
         if self.pending_comments:
             return ("waiting on HKJC's comments on running for "
                     + ", ".join(self.pending_comments))
@@ -372,7 +378,21 @@ def run(db: Path | None = None, *, today: dt.date | None = None,
         # After the full derive, so a card is ranked against any results that
         # landed earlier in this same run.
         _score_cards(report, cards, db=db)
+        _record_screen(report, db=db)
     return report
+
+
+def _record_screen(report: NightlyReport, *, db: Path | None) -> None:
+    """What the Screen said about each settled meeting it was not fitted on,
+    kept for the sources' record. Asked of the database rather than of this
+    run's landings, so results stored by hand are recorded too; a night with
+    nothing outstanding costs one query."""
+    try:
+        got = record_screen.record(record_screen.pending(db=db), db=db)
+    except Exception as exc:                       # noqa: BLE001 - recorded
+        report.errors.append(f"screen record: {type(exc).__name__}: {exc}")
+        return
+    report.screened += [f"{d}: {n} runners" for d, n in got.recorded.items()]
 
 
 def _comments(report: NightlyReport, date: str, *, db: Path | None,

@@ -24,10 +24,19 @@ export function renderPhone(host, view, ctx) {
     const wrap = el('div', 'bf-prace');
     wrap.dataset.race = String(r.no);
     if (r.mode === 'run') {
-      const row = el('div', 'bf-pran');
+      // Opens like any race: the Screen's order beside where each finished.
+      const row = el('div', `bf-pran bf-ran-go${r.mOpen ? ' bf-ran-open' : ''}`);
+      row.addEventListener('click', () => ctx.act.raceM(r.no));
       row.append(el('span', 'lbl', r.label), el('span', null, r.off), el('span', 'win', r.winner),
                  link(`results.html?date=${ctx.date}&race=${r.no}`, 'RESULT ▸', 'res'));
       wrap.append(row);
+      if (r.verdict && r.mOpen) {
+        const v = el('div', 'bf-pverdict');
+        v.append(el('span', 'sc', r.verdict.screen), ...r.verdict.marks.map(markEl),
+                 el('span', 'first', r.verdict.first));
+        wrap.append(v);
+      }
+      if (r.mOpen) wrap.append(opened(r, ctx));
     } else {
       wrap.append(card(r, ctx));
       if (r.mOpen) wrap.append(opened(r, ctx));
@@ -77,7 +86,7 @@ function card(r, ctx) {
 }
 
 function opened(r, ctx) {
-  const box = el('div', 'bf-popen');
+  const box = el('div', `bf-popen${r.run ? ' bf-after' : ''}`);
   r.interviews.forEach((iv) => box.append(interviewBox(iv)));
   if (r.poolBits.length) {
     const pools = el('div', 'pools');
@@ -94,7 +103,8 @@ function opened(r, ctx) {
     box.append(line);
   });
   const hd = el('div', 'bf-prunhead');
-  hd.append(el('span', 'grow', `ALL ${r.fieldN} · SCREEN ORDER`), el('span', null, 'PLACE'),
+  hd.append(el('span', 'grow', `ALL ${r.fieldN} · SCREEN ORDER${r.run ? ' · FINISH' : ''}`),
+            el('span', null, 'PLACE'),
             el('span', 'w40', 'SAID'), el('span', 'w44', r.hasPrices ? 'TOTE' : ''));
   box.append(hd);
   r.runners.forEach((x) => {
@@ -102,7 +112,9 @@ function opened(r, ctx) {
     const row = el('div', `bf-prunner${open ? ' open' : ''}${x.unplaced ? ' out' : ''}`);
     row.addEventListener('click', () => ctx.act.runnerM(r.no, open ? null : x.no));
     const l1 = el('div', 'l1');
-    l1.append(el('span', 'rk', String(x.rk)), el('span', 'no', String(x.no)),
+    l1.append(el('span', 'rk', String(x.rk)));
+    if (r.run) l1.append(el('span', `fin f-${x.finTone}`, x.fin));
+    l1.append(el('span', 'no', String(x.no)),
               nameEl(x.name, x.booked, 'nm grow'), el('span', 'pl', x.place),
               el('span', `w40 ${x.tip ? 'tip' : 'dim'}`, x.saidS),
               el('span', `w44 px${x.mPriceMost ? ' most' : ''}`, x.mPrice));

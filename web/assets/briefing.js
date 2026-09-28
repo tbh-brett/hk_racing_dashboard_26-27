@@ -8,7 +8,9 @@
  * It follows the day. Two days out it is the card and the Screen, with what
  * is due and when; the night before the voices land; on race day it re-reads
  * every minute until the last race, and a race that has run collapses to its
- * winner. It is a briefing, not a bet slip, and it re-ranks nothing.
+ * winner and opens to the Screen beside where each horse finished. Below it,
+ * every source's record this season (briefing-record). It is a briefing, not
+ * a bet slip, and it re-ranks nothing.
  */
 import { api } from './api.js';
 import { context } from './context.js';
@@ -16,6 +18,7 @@ import { $, el, renderNav } from './vocab.js';
 import { buildView } from './briefing-model.js';
 import { renderDesk, renderPanels } from './briefing-desk.js';
 import { renderPhone } from './briefing-phone.js';
+import { renderRecord } from './briefing-record.js';
 
 const LIVE_EVERY = 60e3;          // race day, a race still to run
 const QUIET_EVERY = 10 * 60e3;    // otherwise: sources land on a clock of hours
@@ -25,10 +28,28 @@ const firstRace = Number(params.get('race')) || null;
 // ?as_of=2026-09-23T17:40 reads the page as it stood then; a page pinned to a
 // moment does not re-read itself.
 const asOf = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(params.get('as_of') ?? '') ? params.get('as_of') : null;
-const state = { data: null, error: null, date: null, timer: null, ui: fresh() };
+const state = { data: null, error: null, date: null, timer: null, ui: fresh(),
+                record: null, recordRan: -1 };
 
+/** `urlRace`: the race the address named, which the page does not open once
+ *  it has run (briefing-model, buildView). A click clears it. */
 function fresh(race = null) {
-  return { openD: race ?? undefined, openM: race ?? undefined, openR: {}, openRM: {} };
+  return { openD: race ?? undefined, openM: race ?? undefined, urlRace: race,
+           openR: {}, openRM: {} };
+}
+
+/** The sources' record changes only when a result lands, so it is read on
+ *  the first load and again only when another race has run. */
+async function loadRecord() {
+  const ran = state.data ? state.data.races.filter((r) => r.run).length : 0;
+  if (ran === state.recordRan) return;
+  state.recordRan = ran;
+  try {
+    state.record = await api.tipsRecord();
+  } catch (e) {
+    state.record = { error: `The sources' record could not be read — ${e.message}` };
+  }
+  renderRecord($('bf-record'), state.record);
 }
 
 async function load({ quiet = false } = {}) {
@@ -53,6 +74,7 @@ async function load({ quiet = false } = {}) {
   }
   render();
   schedule();
+  loadRecord();
 }
 
 function schedule() {
@@ -71,18 +93,21 @@ function schedule() {
 const act = {
   race(no) {
     const view = buildView(state.data, state.ui);
+    state.ui.urlRace = null;
     state.ui.openD = view.openD === no ? null : no;
     if (state.ui.openD) context.setRace(no);
     render();
   },
   raceM(no) {
     const view = buildView(state.data, state.ui);
+    state.ui.urlRace = null;
     state.ui.openM = view.openM === no ? null : no;
     render();
   },
   runner(race, horse) { state.ui.openR[race] = horse; render(); },
   runnerM(race, horse) { state.ui.openRM[race] = horse; render(); },
   edge(race, horse) {
+    state.ui.urlRace = null;
     state.ui.openD = race;
     state.ui.openM = race;
     state.ui.openR[race] = horse;

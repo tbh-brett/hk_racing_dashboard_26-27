@@ -739,6 +739,28 @@ CREATE TABLE IF NOT EXISTS tips_quarantine (
 );
 CREATE INDEX IF NOT EXISTS ix_tq_date ON tips_quarantine(race_date, source);
 
+-- What the Screen said about a race it was never fitted on, kept once the
+-- result is in (jobs/record_screen). The sources' record reads it beside the
+-- tipsters'. Not a derived table: the Screen's weights move when it is
+-- refitted, and recomputing would rescore every race it has already been
+-- judged on with weights that were not the ones in force. So the FIRST row
+-- written for a runner is the one kept, and nothing rewrites it.
+CREATE TABLE IF NOT EXISTS screen_pick (
+  race_date   TEXT    NOT NULL,
+  race_no     INTEGER NOT NULL,
+  horse_no    INTEGER NOT NULL,
+  rank        INTEGER NOT NULL,       -- 1 = the Screen's first, by place chance
+  win_pct     REAL,
+  place_pct   REAL,
+  tier        TEXT,                   -- SHORTLIST | CASE | FIELD
+  version     TEXT    NOT NULL,       -- model/screen VERSION
+  fitted      TEXT    NOT NULL,       -- the date its weights were fitted
+  recorded_at TEXT    NOT NULL,
+  PRIMARY KEY (race_date, race_no, horse_no),
+  FOREIGN KEY (race_date, race_no, horse_no)
+    REFERENCES runners(race_date, race_no, horse_no)
+);
+
 -- Fixed-odds prices from Australian bookmakers, beside the HKJC tote. Raw,
 -- and like odds_snapshots never pruned: a fixed price is only worth
 -- comparing at the moment it was on offer, and the history cannot be

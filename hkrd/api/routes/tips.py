@@ -1,15 +1,18 @@
 """Tips routes — what the connections said, and who tipped what.
 
-The write, the roster the PC-side extractor resolves against, and the meeting
-summary the front page reads. The two reads the race card needs
+The write, the roster the PC-side extractor resolves against, the meeting
+summary the front page reads, and every source's record this season. The two reads the race card needs
 (`GET /api/tips/race` and `/api/tips/card`) arrive with the panels that draw
 them; see docs/handover/tips-layer/SPEC.md §8.
 """
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, Body, HTTPException
 
-from hkrd.query import tips as tips_q, tips_summary as tips_summary_q
+from hkrd.query import (tips as tips_q, tips_record as tips_record_q,
+                        tips_summary as tips_summary_q)
 
 router = APIRouter()
 
@@ -43,6 +46,17 @@ def summary(date: str) -> dict:
     if not out["races"]:
         raise HTTPException(404, f"no card stored for {date}")
     return out
+
+
+@router.get("/api/tips/record")
+def record(since: str | None = None, until: str | None = None) -> dict:
+    """How each source's picks have run, beside the tote favourite and the
+    Screen, over this season or `since`..`until` (YYYY-MM-DD). A record with
+    its sample sizes, not a ranking: see query/tips_record."""
+    for name, value in (("since", since), ("until", until)):
+        if value is not None and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+            raise HTTPException(422, f"{name} must be YYYY-MM-DD, got {value!r}")
+    return tips_record_q.record(since=since, until=until)
 
 
 @router.get("/api/tips/roster/{date}")

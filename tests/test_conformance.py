@@ -76,7 +76,8 @@ SERVER_LABELS = {
 # A page's own module plus anything it imports for rendering. A header may be
 # ported into a helper rather than the page file itself.
 EXTRA_SOURCES = {
-    "briefing.js": ["briefing-desk.js", "briefing-phone.js", "briefing-model.js"],
+    "briefing.js": ["briefing-desk.js", "briefing-phone.js", "briefing-model.js",
+                    "briefing-format.js", "briefing-record.js"],
     "bets.js": ["bets-entry.js"],
     "form-guide.js": ["review.js"],
     "results.js": ["review.js"],

@@ -98,7 +98,7 @@ def test_the_fixture_imports_and_reports_what_it_wrote(db, payload):
     assert got == {"race_date": DATE, "quotes": 7, "selections": 5,
                    "quarantined": 2,
                    "quarantine_reasons": {"name_unknown": 1, "unparsed": 1},
-                   "unplaced_quotes": 1, "removed": 0,
+                   "unplaced_quotes": 1, "removed": 0, "settled": 0,
                    "prices": 0, "prices_skipped": []}
     assert [len(table(db, t)) for t in TABLES] == [7, 5, 2]
 
@@ -445,6 +445,80 @@ def test_a_meeting_is_never_touched_by_another_meetings_push(db, payload):
              "sources": ["factcheck"]}
     assert import_tips.run(other, db=db).removed == 0
     assert len(table(db, "connections_quote")) == 7
+
+
+# ── a race that has gone off keeps what was said before it ─────────────────
+#
+# The Ladbrokes job pushes Racing & Sports every half hour until 22:30, hours
+# after the last race; what a source shows then is not what it said before
+# the race, and the record scores the latter.
+
+def off(db: Path, race_no: int, *, result: bool = False) -> None:
+    """Race `race_no` goes off: HKJC shuts its pool, or its result lands."""
+    conn = get_conn(db)
+    with transaction(conn):
+        if result:
+            conn.execute("UPDATE runners SET place = horse_no WHERE "
+                         "race_date = ? AND race_no = ?", (DATE, race_no))
+        else:
+            upsert.upsert_market_close(conn, [{
+                "race_date": DATE, "race_no": race_no,
+                "closed_at": f"{DATE}T20:15:00", "status": "STOPSELL"}])
+    conn.close()
+
+
+def test_a_pool_shut_or_a_result_stored_is_a_race_gone_off(db):
+    off(db, 9)
+    off(db, 6, result=True)
+    conn = get_conn(db)
+    try:
+        assert tips.races_gone_off(conn, DATE) == {6, 9}
+    finally:
+        conn.close()
+
+
+def test_after_the_off_a_pick_left_out_is_kept(db, payload):
+    import_tips.run(payload, db=db)
+    off(db, 9)
+    again = copy.deepcopy(payload)
+    again["selections"] = [s for s in again["selections"] if s["race_no"] != 9]
+    got = import_tips.run(again, db=db)
+    assert got.removed == 0
+    assert query(db, "SELECT horse_no FROM tipster_selection "
+                     "WHERE race_no = 9") == [(3,)]
+
+
+def test_after_the_off_a_stored_pick_is_not_rewritten(db, payload):
+    import_tips.run(payload, db=db)
+    off(db, 9)
+    again = copy.deepcopy(payload)
+    pick = next(s for s in again["selections"] if s["race_no"] == 9)
+    pick["note"] = "changed after the race"
+    got = import_tips.run(again, db=db)
+    assert query(db, "SELECT note FROM tipster_selection WHERE race_no = 9")         == [("潘頓親自試閘，出擊訊號明顯。",)]
+    # The race-9 pick and the race-9 quote were carried and left alone.
+    assert got.settled == 2
+    assert got.as_dict()["selections"] == 4
+
+
+def test_after_the_off_what_was_never_stored_is_still_added(db, payload):
+    """A meeting filled in afterwards from videos published before it."""
+    first = copy.deepcopy(payload)
+    first["selections"] = [s for s in first["selections"] if s["race_no"] != 9]
+    import_tips.run(first, db=db)
+    off(db, 9)
+    got = import_tips.run(payload, db=db)
+    assert got.settled == 1                 # the race-9 quote, stored already
+    assert query(db, "SELECT horse_no FROM tipster_selection "
+                     "WHERE race_no = 9") == [(3,)]
+
+
+def test_a_race_still_to_run_is_replaced_as_before(db, payload):
+    import_tips.run(payload, db=db)
+    off(db, 9)
+    again = copy.deepcopy(payload)
+    again["selections"] = [s for s in again["selections"] if s["race_no"] != 6]
+    assert import_tips.run(again, db=db).removed == 1
 
 
 # ── picks heard through speech-to-text ───────────────────────────────────────

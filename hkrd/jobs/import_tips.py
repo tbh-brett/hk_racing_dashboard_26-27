@@ -59,10 +59,13 @@ class ImportReport:
     reasons: Counter = field(default_factory=Counter)
     prices: int = 0
     prices_skipped: list[str] = field(default_factory=list)
+    # Rows this push carried for races already off that were stored already,
+    # and so were left exactly as they stood at the off.
+    settled: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return {"race_date": self.race_date, "quotes": self.quotes,
-                "selections": self.selections,
+                "selections": self.selections, "settled": self.settled,
                 "quarantined": self.quarantined,
                 "quarantine_reasons": dict(sorted(self.reasons.items())),
                 "unplaced_quotes": self.unplaced_quotes,
@@ -80,6 +83,9 @@ class ImportReport:
         if self.removed:
             lines.append(f"  removed            {self.removed:>6}   "
                          f"(stored before, not in this push)")
+        if self.settled:
+            lines.append(f"  kept as at the off {self.settled:>6}   "
+                         f"(races already run: not rewritten)")
         if self.prices or self.prices_skipped:
             lines.append(f"  fixed prices       {self.prices:>6}   "
                          f"({len(self.prices_skipped)} not stored)")
@@ -237,8 +243,18 @@ def _import(conn, body: object) -> ImportReport:
             prices.append(f)
 
     with transaction(conn, immediate=True):
-        report.quotes = tips.upsert_quotes(conn, quotes)
-        report.selections = tips.upsert_selections(conn, sels)
+        # A race that has gone off keeps what was said before it: rows for
+        # it are added if new and never rewritten (store/tips docstring).
+        off = tips.races_gone_off(conn, payload.race_date)
+        off_q = [q for q in quotes if q["race_no"] in off]
+        off_s = [s for s in sels if s["race_no"] in off]
+        added_q = tips.upsert_quotes(conn, off_q, keep_stored=True)
+        added_s = tips.upsert_selections(conn, off_s, keep_stored=True)
+        report.quotes = added_q + tips.upsert_quotes(
+            conn, [q for q in quotes if q["race_no"] not in off])
+        report.selections = added_s + tips.upsert_selections(
+            conn, [s for s in sels if s["race_no"] not in off])
+        report.settled = len(off_q) - added_q + len(off_s) - added_s
         report.quarantined = tips.upsert_quarantine(conn, held)
         report.prices = fixed_odds.upsert_fixed_odds(conn, prices)
         # The latest push is the source's whole answer for this meeting.
@@ -246,7 +262,8 @@ def _import(conn, body: object) -> ImportReport:
             conn, payload.race_date, payload.sources,
             quote_ids=[tips.quote_id(q) for q in quotes],
             selection_keys=kept,
-            quarantine_ids=[tips.quarantine_row_id(r) for r in held])
+            quarantine_ids=[tips.quarantine_row_id(r) for r in held],
+            settled=off)
         job_log.record_source(
             conn, "import_tips", ok=True,
             detail=(f"{report.race_date} · {report.quotes} quotes · "

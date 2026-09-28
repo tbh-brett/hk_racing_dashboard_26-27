@@ -122,15 +122,72 @@ run and every ten minutes otherwise. `?as_of=YYYY-MM-DDTHH:MM` pins the page
 to a moment — the stage, the clock and the minutes to each off as they stood
 then — for looking back, and for checking each stage.
 
+`briefing-format.js` holds the pure formatting and mark helpers, split out
+of the model at its 500-line mark on 28 Sep.
+
+**After the off.** A race that has run collapses to one line — its winner,
+where the Screen had it, who named it, and how the Screen's first choice
+finished — and opens, like any race, to the Screen's order with where each
+horse finished beside it (`FIN`). The race the address names (the shared
+header writes race 1 there on every load) is not opened once it has run; a
+race someone clicks always is. `briefing-after.css` styles both this and the
+record below.
+
+## The sources' record: `GET /api/tips/record`
+
+Brett, 28 Sep: "track how good each source performs". Below the panels,
+every source's record this season (`query/tips_record`,
+`briefing-record.js`), on races with a result only:
+
+- **Top pick**, one a race: the pick ranked first, or the only horse the
+  source named in that race. Won and placed out of how many, the return of
+  $10 on each at the final tote price, A/E (wins against what the closing
+  tote expected of the same horses, de-vigged), and what the tote favourite
+  did in the same races.
+- **Every horse named**: won and placed. Interviews (the horses the
+  connections were asked about) and Fact Check's featured horses have no top
+  pick: a conversation is not a tip.
+- **Benchmarks**, scored the same way: the tote favourite (the market's four
+  shortest as its "every horse"), and the Screen's first and its four.
+
+Two rules keep it honest:
+
+1. **A race's tips are frozen at the off.** Once HKJC shuts a race's pool
+   (`market_close`) or its result is stored, an import can add to that race
+   but never rewrite or remove what it holds (`store/tips.races_gone_off`);
+   the Ladbrokes job pushes Racing & Sports every half hour until 22:30,
+   hours after the last race. A pick whose own publish time is after the off
+   is not counted (`late`); one on a non-runner is not scored (`scratched`).
+2. **The Screen is scored on what it said, on races it never saw.** When a
+   meeting's result lands, the nightly job records the Screen's order for it
+   (`jobs/record_screen`, table `screen_pick`), and nothing rewrites that row
+   — a refit would otherwise rescore every race it has been judged on.
+   Meetings on or before the fit date (`model.FIT["fitted"]`, 25 Sep) are
+   never recorded: the weights were fitted on them.
+
+The record is not sorted by how anyone has done, and every figure carries
+its sample. Six meetings in, one winner moves a strike rate by several
+points.
+
+**Backfilled 28 Sep.** Every meeting this season, 6 to 27 Sep, was extracted
+again from videos published before each meeting and pushed. Nothing had
+reached the dashboard before 27 Sep because `.env` held an empty password,
+and Racing To Win's previews were never fetched. Fact Check resolves only
+where a runner's Chinese name is known: HKJC serves no race card for a
+past meeting, so 6 to 16 Sep resolve only the horses whose names were
+learned from later cards.
+
 ## Open items
 
 1. **Conditional polling.** The race-day re-read is a full answer each
    minute (about 60 KB gzipped). An ETag/`poll_after` like the Race Day
    card's would make an idle minute free.
-2. **Horse Detective** shows only its latest four posts and nothing that
-   scrolls off can be fetched again. The PC reads it at 10:00 and 20:30; its
-   one analysis post went up at 11:49 on race day. A race-day poll every 30
-   minutes would be safer — a second scheduled task, not yet created.
+2. **Horse Detective's feed has gone stale.** Open RSS last rebuilt it on
+   21 Sep; its two picks of 23 Sep (R3 #2, R7 #1) never reached it, and every
+   poll since has read the same four posts. `harvest_threads.py` now reports
+   the feed's build date and says STALE past two days. Nothing here can make
+   the service rebuild, and Threads' robots.txt forbids reading the profile
+   by script. It posted nothing for 27 Sep.
 3. **Sportsbet has refused this PC too since 24 Sep.** Racing & Sports'
    tips and race comment still come through Ladbrokes, which the server now
    captures every half hour through the day (`ops/crontab`); Sportsbet's

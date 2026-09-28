@@ -36,7 +36,7 @@ __all__ = ["repair", "clear_results", "RepairReport"]
 # trainer's quote on whichever horse the right card gives that number. The
 # raw transcripts stay on the PC, so re-pushing the payload restores them.
 _TABLES = ("runner_tags", "runner_comments", "runner_et", "runner_pace",
-           "runner_sarr", "runner_sarr_component", "dividends",
+           "runner_sarr", "runner_sarr_component", "dividends", "screen_pick",
            "connections_quote", "tipster_selection", "tips_quarantine",
            "runners", "races")
 
@@ -65,9 +65,11 @@ _RESULT_COLUMNS = ("place", "place_code", "finish_time", "lengths_behind",
 # `dead_heat` is NOT NULL with a default of 0, so it resets rather than clears.
 _RESULT_FLAGS = {"dead_heat": 0}
 
-# Derived from results, so meaningless once the results are gone.
+# Derived from results, so meaningless once the results are gone. The
+# Screen's recorded order is kept only for a race with a result to judge it.
 _RESULT_TABLES = ("runner_tags", "runner_comments", "runner_et", "runner_pace",
-                  "runner_sarr", "runner_sarr_component", "dividends")
+                  "runner_sarr", "runner_sarr_component", "dividends",
+                  "screen_pick")
 
 
 def clear_results(date: str, *, db: Path | None = None) -> RepairReport:

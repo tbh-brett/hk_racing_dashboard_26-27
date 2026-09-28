@@ -11,6 +11,11 @@ the quote to a runner — and keeping the old number would be keeping exactly
 the guess the NULL withdrew. So every column is overwritten on conflict, and
 whatever a source said about a meeting and no longer says — left out of its
 latest push, or quarantined by it — is removed (`replace_absent`).
+
+EXCEPT ONCE A RACE HAS GONE OFF. From then on what was stored is what was
+said before it, and that is what every source is scored on: a push can add
+to such a race but never rewrite or remove what it holds. The Ladbrokes job
+pushes every half hour until 22:30, long after the last race.
 """
 from __future__ import annotations
 
@@ -27,7 +32,7 @@ __all__ = [
     "upsert_horse_names", "upsert_quotes", "upsert_selections",
     "upsert_quarantine", "quarantine_row_id", "replace_absent",
     "meeting_card", "meeting_venue", "meeting_names_zh",
-    "dates_missing_names",
+    "dates_missing_names", "races_gone_off",
 ]
 
 Row = dict[str, Any]
@@ -96,15 +101,20 @@ def _date(value: object) -> str:
 # ── writes ───────────────────────────────────────────────────────────────────
 
 def _overwrite(conn: sqlite3.Connection, table: str, cols: Sequence[str],
-               keys: Sequence[str], rows: Sequence[tuple]) -> int:
+               keys: Sequence[str], rows: Sequence[tuple], *,
+               keep_stored: bool = False) -> int:
+    """`keep_stored`: add what is new and leave every stored row as it is,
+    and return how many were added."""
     if not rows:
         return 0
     sets = ", ".join(f"{c} = excluded.{c}" for c in cols if c not in keys)
+    before = conn.total_changes
     conn.executemany(
         f"INSERT INTO {table} ({', '.join(cols)}) "
         f"VALUES ({', '.join('?' for _ in cols)}) "
-        f"ON CONFLICT ({', '.join(keys)}) DO UPDATE SET {sets}", rows)
-    return len(rows)
+        f"ON CONFLICT ({', '.join(keys)}) "
+        + ("DO NOTHING" if keep_stored else f"DO UPDATE SET {sets}"), rows)
+    return conn.total_changes - before if keep_stored else len(rows)
 
 
 def upsert_horse_names(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
@@ -129,7 +139,8 @@ def upsert_horse_names(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
     return len(prepared)
 
 
-def upsert_quotes(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
+def upsert_quotes(conn: sqlite3.Connection, rows: Sequence[Row], *,
+                  keep_stored: bool = False) -> int:
     prepared = [(
         quote_id(r), _date(r.get("race_date")),
         coerce.to_int(r.get("race_no"), field="race_no"),
@@ -144,10 +155,11 @@ def upsert_quotes(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
         _text(r.get("fetched_at")),
     ) for r in rows]
     return _overwrite(conn, "connections_quote", QUOTE_COLS, ("quote_id",),
-                      prepared)
+                      prepared, keep_stored=keep_stored)
 
 
-def upsert_selections(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
+def upsert_selections(conn: sqlite3.Connection, rows: Sequence[Row], *,
+                      keep_stored: bool = False) -> int:
     prepared = [(
         _text(r.get("source")), _text(r.get("tipster")),
         _date(r.get("race_date")),
@@ -159,7 +171,7 @@ def upsert_selections(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
         _text(r.get("published_at")), _text(r.get("fetched_at")),
     ) for r in rows]
     return _overwrite(conn, "tipster_selection", SELECTION_COLS,
-                      SELECTION_KEY, prepared)
+                      SELECTION_KEY, prepared, keep_stored=keep_stored)
 
 
 def quarantine_row_id(row: Row) -> str:
@@ -190,14 +202,18 @@ def upsert_quarantine(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
 def replace_absent(conn: sqlite3.Connection, date: str,
                    sources: Sequence[str], *, quote_ids: Iterable[str],
                    selection_keys: Iterable[Sequence[Any]],
-                   quarantine_ids: Iterable[str]) -> int:
+                   quarantine_ids: Iterable[str],
+                   settled: Iterable[int] = ()) -> int:
     """Remove what these sources said about this meeting and no longer say.
 
     The latest push for a source is its whole answer (Brett, 2026-09-22): a
     quote left out of it, or quarantined by it, goes; so does a quarantine
     row for a failure that is fixed, or that the source no longer produces.
-    Other sources, and other meetings, are not touched. Returns how many
-    quotes and selections went — the quarantine is bookkeeping, not tips.
+    Other sources, and other meetings, are not touched — and nor are the
+    `settled` races, those already off (`races_gone_off`): what was said
+    before a race is the record of it, whatever a source shows afterwards.
+    Returns how many quotes and selections went — the quarantine is
+    bookkeeping, not tips.
     """
     if not sources:
         return 0
@@ -205,15 +221,17 @@ def replace_absent(conn: sqlite3.Connection, date: str,
     keep_q = set(quote_ids)
     keep_s = {tuple(k) for k in selection_keys}
     keep_x = set(quarantine_ids)
+    off = set(settled)
     args = (date, *sources)
 
     gone_q = [(r[0],) for r in conn.execute(
-        "SELECT quote_id FROM connections_quote WHERE race_date = ? "
-        f"AND source IN ({marks})", args) if r[0] not in keep_q]
+        "SELECT quote_id, race_no FROM connections_quote WHERE race_date = ? "
+        f"AND source IN ({marks})", args)
+        if r[0] not in keep_q and r[1] not in off]
     gone_s = [tuple(r) for r in conn.execute(
         f"SELECT {', '.join(SELECTION_KEY)} FROM tipster_selection "
         f"WHERE race_date = ? AND source IN ({marks})", args)
-        if tuple(r) not in keep_s]
+        if tuple(r) not in keep_s and r["race_no"] not in off]
     gone_x = [(r[0],) for r in conn.execute(
         "SELECT quarantine_id FROM tips_quarantine WHERE race_date = ? "
         f"AND source IN ({marks})", args) if r[0] not in keep_x]
@@ -242,6 +260,19 @@ def meeting_card(conn: sqlite3.Connection, date: str
         if r["horse_no"] is not None:
             field[r["horse_no"]] = r["horse_name"]
     return card
+
+
+def races_gone_off(conn: sqlite3.Connection, date: str) -> set[int]:
+    """The races at one meeting that have gone off, on stored evidence only:
+    HKJC shut the pool (`market_close`), or a result is stored. Never the
+    clock — a card's off time is when it was due, not when it went."""
+    return {r[0] for r in conn.execute(
+        "SELECT r.race_no FROM races r WHERE r.race_date = ? AND ("
+        "  EXISTS (SELECT 1 FROM market_close m WHERE m.race_date = r.race_date"
+        "          AND m.race_no = r.race_no)"
+        "  OR EXISTS (SELECT 1 FROM runners u WHERE u.race_date = r.race_date"
+        "             AND u.race_no = r.race_no AND u.place IS NOT NULL))",
+        (date,))}
 
 
 def meeting_venue(conn: sqlite3.Connection, date: str) -> str | None:

@@ -119,11 +119,21 @@ function timeCell(r, big) {
   return t;
 }
 
+/** A race that has run: its winner, where the Screen had it and who named
+ *  it. Opens, like any race, to the Screen beside where each horse finished. */
 function runRow(r, ctx) {
-  const row = el('div', 'bf-ranrow');
+  const row = el('div', `bf-ranrow bf-ran-go${r.open ? ' bf-ran-open' : ''}`);
+  row.addEventListener('click', () => ctx.act.race(r.no));
   row.append(el('span', 'lbl', r.label), el('span', 'off', r.off),
-             el('span', 'ran', 'RAN'), el('span', 'win', r.winner),
-             link(`results.html?date=${ctx.date}&race=${r.no}`, 'RESULT ▸', 'res'));
+             el('span', 'ran', 'RAN'), el('span', 'win', r.winner));
+  if (r.verdict) {
+    const v = el('span', 'bf-verdict');
+    v.append(el('span', 'sc', r.verdict.screen), ...r.verdict.marks.map(markEl),
+             el('span', 'first', r.verdict.first));
+    row.append(v);
+  }
+  row.append(link(`results.html?date=${ctx.date}&race=${r.no}`, 'RESULT ▸', 'res'),
+             el('span', 'bf-ran-caret', r.open ? '▾' : '▸'));
   return row;
 }
 
@@ -210,7 +220,8 @@ function quietRow(r, ctx) {
 /* ── an opened race ─────────────────────────────────────────────────────── */
 
 function raceDetail(r, ctx) {
-  const box = el('div', 'bf-open');
+  // `bf-after`: a race already run, which adds where each horse finished.
+  const box = el('div', `bf-open${r.run ? ' bf-after' : ''}`);
   const top = el('div', 'bf-openhead');
   const cls = classCell(r.raceClass, { restricted: r.restricted });
   top.append(el('span', null, `${r.dist} ·`));
@@ -234,8 +245,9 @@ function raceDetail(r, ctx) {
   const grid = runGrid(r);
   const head = el('div', 'bf-runhead');
   head.style.setProperty('--bf-run-grid', grid);
-  ['SCR', 'NO', 'HORSE · DRAW · JOCKEY · TRAINER', 'STYLE', 'SCREEN · PLACE / WIN', '',
-   'BLACKBOOK', 'SAID · SOURCES'].forEach((t) => head.append(el('span', null, t)));
+  ['SCR', ...(r.run ? ['FIN'] : []), 'NO', 'HORSE · DRAW · JOCKEY · TRAINER', 'STYLE',
+   'SCREEN · PLACE / WIN', '', 'BLACKBOOK', 'SAID · SOURCES']
+    .forEach((t) => head.append(el('span', null, t)));
   if (r.hasPrices) {
     const ph = el('span', 'prices');
     ph.style.setProperty('--bf-price-cols', r.books.map(() => '44px').join(' '));
@@ -269,7 +281,9 @@ function raceDetail(r, ctx) {
     x.marks.forEach((m) => said.append(markEl(m)));
     const style = el('span');
     style.append(styleEl(x));
-    row.append(el('span', 'rk', String(x.rk)), el('span', 'no', String(x.no)), who,
+    row.append(el('span', 'rk', String(x.rk)));
+    if (r.run) row.append(el('span', `fin f-${x.finTone}`, x.fin));
+    row.append(el('span', 'no', String(x.no)), who,
                style, sc, el('span', `tier${x.top ? ' top' : ''}`, x.tier), bb, said);
     if (r.hasPrices) {
       const pc = el('span', 'prices');
@@ -290,7 +304,8 @@ function raceDetail(r, ctx) {
 function runGrid(r) {
   const prices = r.hasPrices
     ? ` ${r.books.length * 44 + (r.books.length - 1) * 6}px 58px` : '';
-  return `24px 22px minmax(0,1.3fr) 30px 150px 58px 116px minmax(0,1.2fr)${prices} 64px`;
+  return `24px ${r.run ? '34px ' : ''}22px minmax(0,1.3fr) 30px 150px 58px 116px `
+    + `minmax(0,1.2fr)${prices} 64px`;
 }
 
 export function interviewBox(iv) {

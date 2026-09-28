@@ -1,0 +1,108 @@
+/* briefing-after.css — the Briefing after the off.
+ *
+ * A race that has run opens like any other, with where each horse finished
+ * beside the Screen's rank (`.bf-after`), and below the list every source's
+ * record this season (`.bf-record`, briefing-record.js). Its own sheet
+ * because briefing.css had passed 500 lines; every class here is new, so no
+ * rule restyles one of briefing.css's.
+ */
+
+/* ── a run race, opened ───────────────────────────────────────────────── */
+
+.bf-ran-go { cursor: pointer; }
+.bf-ran-go:hover { background: var(--run-hover); }
+.bf-ran-open { background: var(--run-open); border-left-color: var(--text-dim); }
+.bf-ran-caret { color: var(--text-dim); font-size: 11px; }
+
+.bf-verdict {
+  display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden;
+  font-size: 10px; letter-spacing: .04em;
+}
+.bf-verdict .sc, .bf-pverdict .sc { color: var(--text-2); }
+.bf-verdict .first, .bf-pverdict .first { color: var(--text-dim); }
+
+.bf-pverdict {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 12px;
+  border-bottom: 1px solid var(--line); font-family: var(--font-mono); font-size: 10px;
+}
+
+.bf-after .fin {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text-dim);
+}
+.bf-after .fin.f-won { color: var(--win); }
+.bf-after .fin.f-placed { color: var(--text-2); }
+.bf-after .l1 .fin { flex: none; width: 34px; }
+
+/* ── the sources' record ──────────────────────────────────────────────── */
+
+.bf-record { padding: 12px 14px 18px; border-top: 1px solid var(--line-2); }
+.bf-record:empty { display: none; }
+/* Figures stay near their names on a wide screen. */
+.bf-record > * { max-width: 1120px; }
+
+.bf-rec-cap {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin-bottom: 8px;
+  font-family: var(--font-mono); font-size: 10px;
+}
+.bf-rec-cap .l { letter-spacing: .12em; color: var(--text-2); font-weight: 600; }
+.bf-rec-cap .r { color: var(--text-dim); }
+
+.bf-rec-row {
+  display: grid; align-items: baseline; gap: 0 10px; padding: 5px 0;
+  grid-template-columns: minmax(0, 2.4fr) 34px 46px 74px 74px 52px 42px 62px 84px 84px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: 12px; color: var(--text-2);
+}
+.bf-rec-row .c { text-align: right; white-space: nowrap; }
+.bf-rec-row .c-src {
+  display: flex; align-items: baseline; gap: 8px; min-width: 0; text-align: left;
+  overflow: hidden; font-family: var(--font); font-size: 13px; color: var(--text);
+}
+.bf-rec-row .nm, .bf-rec-row .nm-s { overflow: hidden; text-overflow: ellipsis; }
+.bf-rec-row .nm-s, .bf-rec-groups .gs { display: none; }
+.bf-rec-row .aside { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); }
+.bf-rec-row .p { font-size: 10px; color: var(--text-dim); }
+.bf-rec-row .good { color: var(--win); }
+.bf-rec-row .neg { color: var(--loss); }
+.bf-rec-row .dim { color: var(--text-dim); }
+.bf-rec-row.bench .c-src { color: var(--text-muted); }
+.bf-rec-row .dot {
+  flex: none; align-self: center; width: 7px; height: 7px; border-radius: 1px;
+  background: var(--text-dim);
+}
+.bf-rec-row .dot.k-tip { background: var(--tip); }
+.bf-rec-row .dot.k-voice { background: var(--voice); }
+.bf-rec-row .dot.k-screen { background: var(--text-2); }
+.bf-rec-row .dot.k-price { background: none; border: 1px dashed var(--text); }
+
+.bf-rec-head {
+  font-size: 10px; letter-spacing: .08em; color: var(--text-dim);
+  border-bottom-color: var(--line-2);
+}
+.bf-rec-head .c-src { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); }
+.bf-rec-groups {
+  padding-bottom: 0; border-bottom: none;
+  font-size: 10px; letter-spacing: .1em; color: var(--text-muted);
+}
+.bf-rec-groups .g1 { grid-column: 4 / 9; border-bottom: 1px solid var(--line-3); }
+.bf-rec-groups .g2 { grid-column: 9 / 11; border-bottom: 1px solid var(--line-3); }
+
+.bf-rec-rule {
+  padding: 12px 0 3px; font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: .1em; color: var(--text-dim);
+}
+.bf-rec-note { max-width: 920px; margin-top: 8px; font-size: 11px; line-height: 1.5; color: var(--text-dim); }
+
+/* The phone keeps the source, its races, the top pick's won, placed and
+ * return, and how every horse it named placed. */
+@media (max-width: 999px) {
+  .bf-rec-row { grid-template-columns: minmax(0, 1fr) 34px 52px 56px 44px 56px; gap: 0 6px; }
+  .bf-rec-row .c-mtg, .bf-rec-row .c-ae, .bf-rec-row .c-fav,
+  .bf-rec-row .c-aw { display: none; }
+  .bf-rec-row .p { display: none; }
+  .bf-rec-row .aside, .bf-rec-row .nm, .bf-rec-groups .gl { display: none; }
+  .bf-rec-row .nm-s, .bf-rec-groups .gs { display: inline; }
+  .bf-rec-groups .g1 { grid-column: 3 / 6; }
+  .bf-rec-groups .g2 { grid-column: 6 / 7; }
+  .bf-rec-row .c-src { font-size: 12px; }
+}
