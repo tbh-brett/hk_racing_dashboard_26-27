@@ -107,6 +107,11 @@ def scrape_job(body: dict = Body(...)) -> JSONResponse:
             errors = [e for x in reports for e in x.errors]
             warnings = [f"{x.date}: none published"
                         for x in reports if x.no_such_day]
+            # Stored, but HKJC has not finished the page. Said, because a
+            # day that landed times and nothing else otherwise reads "✓ now".
+            warnings += [f"{x.date}: {x.unfinished} of {x.batches} batches "
+                         "without positions or comments yet"
+                         for x in reports if x.unfinished]
             ok = not errors
     except HTTPException:
         raise
