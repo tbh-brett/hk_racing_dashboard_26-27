@@ -312,8 +312,16 @@ function factRow(label, value, title) {
   return row;
 }
 
-function detailBlock(runner, stewardsFor, booked) {
+function detailBlock(runner, stewardsFor, booked, here) {
   const box = el('div', 'result-detail');
+  // The system's reason for booking this horse off this very run, in full.
+  // The chip on the row says it was booked; this says why.
+  if (isSystem(here)) {
+    const why = el('div', 'run-sys');
+    why.append(el('span', 'k', `SYSTEM BLACKBOOK · ADDED ${here.added_date}`));
+    why.append(el('div', 'text', here.reasoning ?? ''));
+    box.append(why);
+  }
   const band = sectionalBand(runner);
   if (band) box.append(band);
 
@@ -341,9 +349,10 @@ function detailBlock(runner, stewardsFor, booked) {
   }
 
   const actions = el('div', 'run-actions');
+  const inBook = booked ?? here;
   const note = el('button', 'act',
-    booked ? '■ IN THE BLACKBOOK · NOTE THIS RUN' : 'RUN NOTE · ADD TO BLACKBOOK');
-  note.addEventListener('click', (e) => openReview(e, runner, booked));
+    inBook ? '■ IN THE BLACKBOOK · NOTE THIS RUN' : 'RUN NOTE · ADD TO BLACKBOOK');
+  note.addEventListener('click', (e) => openReview(e, runner, inBook));
   actions.append(note);
   actions.append(el('span', 'hint',
     'same form as the Form Guide — reviewing and booking is one action'));
@@ -391,7 +400,7 @@ function openReview(event, runner, booked) {
   pop.style.top = `${Math.min(r.bottom + 4, window.innerHeight - 220)}px`;
 }
 
-function resultRow(runner, booked, backed) {
+function resultRow(runner, booked, backed, here) {
   const row = el('div', 'res-row');
   const placed = runner.place !== null
     && runner.place <= (runner.field_size >= 7 ? 3 : 2);
@@ -405,11 +414,23 @@ function resultRow(runner, booked, backed) {
   const horse = el('div', 'horse');
   horse.append(document.createTextNode(runner.horse_name));
   if (booked) {
-    const chip = el('span', 'bb', 'BB');
+    const chip = el('span', `bb${isSystem(booked) ? ' sys' : ''}`,
+      isSystem(booked) ? 'SYS' : 'BB');
     chip.title = `in the blackbook since ${booked.added_date}`
       + (booked.tags ? ` — ${booked.tags}` : '');
     horse.append(chip);
+  } else if (here) {
+    // Booked FROM this run, after it: the chip is hollow, because the book
+    // takes no credit for this result — it was written from it.
+    const sys = isSystem(here);
+    const chip = el('span', `bb here${sys ? ' sys' : ''}`, sys ? 'SYS' : 'BB');
+    chip.title = `booked from this run on ${here.added_date}`
+      + (here.reasoning ? ` — ${here.reasoning}` : '');
+    horse.append(chip);
   }
+  // The name in the system's colour wherever the system booked the horse and
+  // the owner has not taken it on, as on every other page.
+  if (isSystem(booked ?? here)) horse.classList.add('sys');
   // Money was on this horse. A join, not something anyone had to log.
   if (backed) horse.append(el('span', 'backed', '$'));
   horse.title = runner.horse_name;
@@ -490,6 +511,7 @@ function renderResult() {
   head.replaceChildren(...COLS.map(([label, cls]) => el('div', cls || null, label)));
 
   const booked = new Map((r.booked ?? []).map((b) => [b.horse_name, b]));
+  const here = new Map((r.booked_here ?? []).map((b) => [b.horse_name, b]));
   const backed = new Set((r.booked ?? [])
     .filter((b) => b.backed).map((b) => b.horse_name));
   // Finishing order, which is what a result IS. get_race returns the card in
@@ -509,10 +531,11 @@ function renderResult() {
   });
   host.replaceChildren();
   order.forEach((x) => {
-    host.append(resultRow(x, booked.get(x.horse_name), backed.has(x.horse_name)));
+    host.append(resultRow(x, booked.get(x.horse_name), backed.has(x.horse_name),
+                          here.get(x.horse_name)));
     if (state.open.has(x.horse_no)) {
       host.append(detailBlock(x, byHorse.get(x.horse_no) ?? [],
-                              booked.get(x.horse_name)));
+                              booked.get(x.horse_name), here.get(x.horse_name)));
     }
   });
 }

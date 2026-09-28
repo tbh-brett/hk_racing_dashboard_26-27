@@ -318,6 +318,9 @@
 }
 .tr-row .sc-btn:hover { color: var(--text); border-color: var(--tr-accent); }
 .tr-row .sc-btn.booked { color: var(--book); border-color: var(--book-ground); }
+.tr-row .sc-btn.booked.sys { color: var(--book-sys); border-color: var(--book-sys-dim); }
+.tr-row .horse.sys { color: var(--book-sys); }
+.tr-row .bb.sys { color: var(--book-sys); border-color: var(--book-sys-dim); }
 .tr-row .sc-btn.has { color: var(--book); border-color: var(--book-ground); }
 
 /* ── the four panels ─────────────────────────────────────────────────────── */

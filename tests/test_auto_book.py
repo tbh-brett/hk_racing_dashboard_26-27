@@ -328,6 +328,26 @@ def test_a_horse_the_system_booked_gets_an_entry_not_a_note(db):
     assert _run_note(db, "HELD UP LATE") is None
 
 
+def test_the_result_a_system_entry_came_from_can_find_it(db):
+    """Dated the day after its meeting, a system entry is not "in the book"
+    over the race it was written from — so the Results page asks for the
+    entries booked FROM a race separately, and credits none of them."""
+    from hkrd.query import results as rq
+
+    _publish_comments(db)
+    auto_book.run(db, since=MEETING, today=WAITING)
+    conn = get_conn(db)
+    try:
+        here = {b["horse_name"]: b for b in rq._booked_from_here(conn, MEETING, 1)}
+        ran = rq._booked_that_ran(conn, MEETING, 1)
+    finally:
+        conn.close()
+    assert {e["horse_name"] for e in _system(db)} == set(here)
+    assert here["HELD UP LATE"]["origin"] == "system"
+    assert "concluding stages" in here["HELD UP LATE"]["reasoning"]
+    assert ran == []
+
+
 def test_a_dry_run_writes_nothing(db):
     _publish_comments(db)
     report = auto_book.run(db, dates=[MEETING], dry_run=True, today=WAITING)

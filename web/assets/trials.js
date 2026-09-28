@@ -30,6 +30,7 @@ import { el, $, DASH, MINUS, renderNav, tripTagChips,
 import { context } from './context.js';
 import { renderReview, trialSubject, loadTags } from './review.js';
 import { install as installPalette } from './palette.js';
+import { isSystem } from './book-origin.js';
 import { attachHorseSearch } from './horse-search.js';
 
 
@@ -443,9 +444,14 @@ function runnerRow(r) {
   const horse = el('div', 'horse');
   horse.append(document.createTextNode(r.horse_name));
   if (r.blackbook) {
-    const chip = el('span', 'bb', 'BB');
-    chip.title = `in the blackbook since ${r.blackbook.added_date}`;
+    // The system books every STANDOUT trial (`jobs/auto_book`); those read in
+    // its colour, as on every other page, until the owner adopts one.
+    const sys = isSystem(r.blackbook);
+    const chip = el('span', `bb${sys ? ' sys' : ''}`, sys ? 'SYS' : 'BB');
+    chip.title = `in the blackbook since ${r.blackbook.added_date}`
+      + (sys && r.blackbook.reasoning ? ` — ${r.blackbook.reasoning}` : '');
     horse.append(chip);
+    if (sys) horse.classList.add('sys');
   }
   if (r.note) {
     const pen = el('span', 'noted', '✎');
@@ -483,8 +489,9 @@ function runnerRow(r) {
   // offering to add it a second time, and a note that exists carries its
   // count. Clicks stop here; the row's own handler is the expander.
   const screen = el('div', 'screen');
-  const book = el('button', r.blackbook ? 'sc-btn booked' : 'sc-btn',
-    r.blackbook ? 'BB ✓' : '+ BB');
+  const book = el('button', r.blackbook
+    ? `sc-btn booked${isSystem(r.blackbook) ? ' sys' : ''}` : 'sc-btn',
+    r.blackbook ? `${isSystem(r.blackbook) ? 'SYS' : 'BB'} ✓` : '+ BB');
   book.title = r.blackbook
     ? `in the blackbook since ${r.blackbook.added_date}`
     : 'add this horse to the blackbook, from this trial';

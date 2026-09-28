@@ -225,6 +225,7 @@ def race_result(date: str, race_no: int, *, conn: Connection | None = None
             # finished, and the page must not render one as the other.
             body.update({"dividends": [], "stewards": [], "money": None,
                          "pace": None, "quality": None, "booked": [],
+                         "booked_here": [],
                          "winning_time": None})
             return body
 
@@ -244,6 +245,7 @@ def race_result(date: str, race_no: int, *, conn: Connection | None = None
                      "backfilled silently."),
         }
         body["booked"] = _booked_that_ran(conn, date, race_no)
+        body["booked_here"] = _booked_from_here(conn, date, race_no)
         body["sectionals"] = race_sectionals(date, race_no, conn=conn)
         winner = next((r for r in race.runners if r.place == 1), None)
         body["winning_time"] = winner.finish_time if winner else None
@@ -277,6 +279,28 @@ def _booked_that_ran(conn: Connection, date: str, race_no: int
         JOIN runners r ON r.horse_name = b.horse_name
         WHERE r.race_date = ? AND r.race_no = ? AND r.race_date >= b.added_date
         ORDER BY r.place IS NULL, r.place""", (date, race_no))]
+
+
+def _booked_from_here(conn: Connection, date: str, race_no: int
+                      ) -> list[dict[str, Any]]:
+    """Entries written OFF this race — the runs the book was started from.
+
+    A separate list from `_booked_that_ran`, and deliberately so: those were
+    in the book when the race was run, and the backed-versus-missed panel is a
+    question about them. These were booked afterwards, from what this race
+    showed, so the book takes no credit for the result and no bet on them was
+    missed. What the page does with them is mark them on the result they came
+    from — which is where the automatic blackbook's picks (`jobs/auto_book`)
+    have to be found, since each one is dated the day after its meeting.
+    """
+    return [dict(r) for r in conn.execute("""
+        SELECT b.id entry_id, b.horse_name, b.status, b.added_date,
+               b.reasoning, b.origin, b.adopted_date,
+               (SELECT group_concat(t.tag, ',') FROM blackbook_tags t
+                 WHERE t.id = b.id) tags
+        FROM blackbook b
+        WHERE b.source_date = ? AND b.source_race_no = ?
+        ORDER BY b.added_date, b.id""", (date, race_no))]
 
 
 def race_sectionals(date: str, race_no: int, *,

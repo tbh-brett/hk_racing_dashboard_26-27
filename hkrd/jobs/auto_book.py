@@ -42,11 +42,13 @@ from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
 __all__ = ["run", "AutoBookReport", "FIRST_DAY"]
 
-# The first meeting the pass reads unless told otherwise: 27 September 2026,
-# the meeting the owner went through by hand the day this was asked for, so
-# the first system entries arrive beside the owner's own from the same card.
-# `--since` reaches further back.
-FIRST_DAY = "2026-09-27"
+# The first day the pass reads unless told otherwise: the opening of the
+# 2026-27 season (`query/period.SEASON_START_MONTH`). It began at 27
+# September, the meeting the owner went through by hand the day this was
+# asked for; the owner then asked for the whole season. A start later than a
+# meeting still waiting for its comments would strand that meeting, since
+# `--pending` never looks before it.
+FIRST_DAY = "2026-09-01"
 
 
 @dataclass

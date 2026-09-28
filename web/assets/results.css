@@ -170,6 +170,11 @@
   color: var(--book); border: 1px solid var(--book-ground); padding: 0 3px;
   font-size: var(--fs-xs); margin-left: 5px;
 }
+/* Booked from this run, after it — hollow, the book takes no credit for it. */
+.res-row .bb.here { border-style: dashed; }
+/* Booked by the system and not adopted (web/assets/book-origin.js). */
+.res-row .horse.sys { color: var(--book-sys); }
+.res-row .bb.sys { color: var(--book-sys); border-color: var(--book-sys-dim); }
 /* Money was on this horse. A join, not something anyone had to log. */
 .res-row .backed { color: var(--edge); margin-left: 4px; }
 
@@ -282,6 +287,16 @@
   font-family: var(--font-mono); font-size: var(--fs-sm); }
 .fact .k { font-size: var(--fs-xs); letter-spacing: .1em; color: var(--page-dim); }
 .fact .v { color: var(--text-2); }
+
+.run-sys { margin-bottom: 8px; padding-left: 8px; border-left: 2px solid var(--book-sys); }
+.run-sys .k {
+  display: block; font-family: var(--font-mono); font-size: var(--fs-xs);
+  letter-spacing: .1em; color: var(--book-sys); margin-bottom: 3px;
+}
+.run-sys .text {
+  font-family: var(--font-mono); font-size: var(--fs-xs); line-height: 1.5;
+  color: var(--text-2); max-width: 96ch;
+}
 
 .run-stewards { margin-top: 8px; }
 .run-stewards .k {

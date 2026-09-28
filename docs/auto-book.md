@@ -140,8 +140,11 @@ card reads crowded.
 ```
 python -m hkrd.jobs.auto_book --date 2026-09-27 --dry-run   # what it would book
 python -m hkrd.jobs.auto_book --pending                      # what the cron runs
-python -m hkrd.jobs.auto_book --pending --since 2026-09-06   # this season so far
+python -m hkrd.jobs.auto_book --pending --dry-run            # the same, writing nothing
 ```
 
-It starts at 2026-09-27 (`FIRST_DAY`), the meeting the owner reviewed by hand
-the day it was asked for.
+It reads from 2026-09-01 (`FIRST_DAY`), the opening of the 2026-27 season.
+It first started at 27 September, the meeting the owner reviewed by hand the
+day it was asked for; the same day the owner asked for the season so far, and
+the earlier meetings and trial days were read on production that evening. A
+meeting read then with its comments still unpublished says so on every entry.
