@@ -538,6 +538,28 @@ def test_a_standout_already_followed_gets_a_trial_note_not_a_run_note(db):
     assert races == 0
 
 
+def test_days_read_together_are_read_in_the_order_they_happened(db):
+    """A backfill reads a season at once. A horse that won a trial before the
+    meeting it was picked from is booked off the trial — the meeting is its
+    first test and gets the note — as it would have been, read live."""
+    conn = get_conn(db)
+    with transaction(conn):
+        upsert.upsert_trials(conn, [
+            {"trial_date": "2026-09-20", "trial_no": 1, "horse_name": name,
+             "place": str(place), "venue": "ST", "finish_time": 58.0 + place,
+             "running_positions": f"{place} {place}", "comment_text": text}
+            for name, place, text in (
+                ("HELD UP LATE", 1, "Led all the way to score; impressive."),
+                ("SOMEONE", 2, "Raced wide."))])
+    conn.close()
+    _publish_comments(db)
+    report = auto_book.run(db, since="2026-09-20", today=WAITING)
+    got = {e["horse_name"]: e for e in _system(db)}
+    assert got["HELD UP LATE"]["source_race"] == "2026-09-20 T1"
+    assert _run_note(db, "HELD UP LATE").startswith(write_notes.SYSTEM_NOTE)
+    assert report.passes[0].startswith("trials  2026-09-20")
+
+
 def test_a_trial_day_hkjc_has_not_finished_waits(db):
     _trials(db, comments=False)
     auto_book.run(db, since=TRIAL_DAY, today=TRIAL_DAY)

@@ -233,19 +233,26 @@ def run(db: Path | None = None, *, since: str = FIRST_DAY,
                                                             today=today)
             report.waiting += waiting + t_waiting
 
-        for date, basis in meetings:
+        # In date order, trials before races on the same day (they are run in
+        # the morning). When several days are read at once — a backfill, or a
+        # week of comments landing together — a horse that won a trial on the
+        # 2nd and was picked off a race on the 16th has to be booked from the
+        # trial, with the race as its first test, exactly as it would have
+        # been had each day been read as it happened.
+        days = sorted([(d, 1, "results", basis) for d, basis in meetings]
+                      + [(d, 0, "trials", None) for d in trial_days])
+        for date, _, kind, basis in days:
             try:
-                _results(conn, report, date, basis, today=today, dry_run=dry_run)
+                if kind == "results":
+                    _results(conn, report, date, basis, today=today,
+                             dry_run=dry_run)
+                else:
+                    _trials(conn, report, date, today=today, dry_run=dry_run)
             except Exception as exc:          # noqa: BLE001 - reported, see below
-                # One meeting failing must not stop the next being read. It is
-                # not swallowed: it is in the report, the job exits 1, and the
-                # day is not marked as read, so it is tried again.
-                report.errors.append(f"results {date}: {type(exc).__name__}: {exc}")
-        for date in trial_days:
-            try:
-                _trials(conn, report, date, today=today, dry_run=dry_run)
-            except Exception as exc:          # noqa: BLE001 - reported, as above
-                report.errors.append(f"trials {date}: {type(exc).__name__}: {exc}")
+                # One day failing must not stop the next being read. It is not
+                # swallowed: it is in the report, the job exits 1, and the day
+                # is not marked as read, so it is tried again.
+                report.errors.append(f"{kind} {date}: {type(exc).__name__}: {exc}")
         if not dry_run:
             _close_tested(conn, report)
             with transaction(conn):
