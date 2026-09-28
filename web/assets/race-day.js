@@ -310,7 +310,9 @@ function renderBlackbookBand() {
  *  (query/h2h). */
 function turnLabel(p) {
   if (!p.beaten_no) return 'DEAD HEAT';
-  if (!p.turn_level) return `REPEATS ${p.repeat_pct}%`;
+  // How often the horse BEATEN finished in front next time — the question a
+  // rematch asks. "REPEATS 51%" was the same fact from the winner's side.
+  if (!p.turn_level) return `REVERSED ${100 - p.repeat_pct}%`;
   return `OPEN ${'●'.repeat(p.turn_level)}`;
 }
 
@@ -484,7 +486,8 @@ function renderH2HBand() {
     }
     const mark = el('span', `turn turn-${p.turn_level ?? 0}`, turnLabel(p));
     mark.title = p.beaten_no
-      ? `margins like this repeated ${p.repeat_pct}% of the time over 91,856 pairs`
+      ? `from a margin like this, the horse beaten finished in front next time `
+        + `${100 - p.repeat_pct}% of the time (91,856 pairs)`
         + (p.turn?.length ? ` — and since then: ${p.turn.join(', ')}` : '')
       : '';
     l3.append(mark);
@@ -502,8 +505,8 @@ function renderH2HBand() {
     l4.append(el('span', 'k', 'WT GAP'));
     l4.append(el('span', 'v2', `${p.gap_then ?? DASH} → ${p.gap_now ?? DASH}`));
     const note = el('span', 'k', 'follows the rating');
-    note.title = 'pairs where the beaten horse is now 8lb+ worse off reversed more '
-      + 'often (repeat 49%) than pairs where it is 8lb+ better off (61-62%)';
+    note.title = 'pairs where the beaten horse is now 8lb+ worse off reversed the '
+      + 'result more often (51%) than pairs where it is 8lb+ better off (38-39%)';
     l4.append(note);
     c.append(l4);
 
@@ -1177,7 +1180,8 @@ function renderDetail() {
         const by = p.margin < 0.1 ? 'a short margin' : `${p.margin}L`;
         const k = el('span', `k ${beaten ? 'turn-for' : 'turn-held'}`,
           beaten ? `beaten ${by}` : `beat it ${by}`);
-        k.title = `margins like this repeated ${p.repeat_pct}% of the time`
+        k.title = `from a margin like this, the horse beaten finished in front next `
+          + `time ${100 - p.repeat_pct}% of the time`
           + (p.turn?.length ? `; since then the beaten horse is ${p.turn.join(', ')}` : '');
         row.append(k);
         if (p.turn?.length) row.append(el('span', 'k turn-for', p.turn.length === 2

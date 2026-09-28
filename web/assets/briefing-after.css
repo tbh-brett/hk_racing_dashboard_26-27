@@ -33,6 +33,21 @@
 .bf-after .fin.f-placed { color: var(--text-2); }
 .bf-after .l1 .fin { flex: none; width: 34px; }
 
+/* ── the Screen's reasons, in colour ──────────────────────────────────────
+ * Direction is green or red (briefing.css, .bf-factors); an effect under
+ * ×1.15 either way is fainter. Trial bands match the Trials page's meaning
+ * — STANDOUT, POSITIVE, NEGATIVE — with positive green here, since teal is
+ * the Briefing's blackbook colour. */
+.bf-mild { opacity: .6; }
+.bf-q { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); }
+.bf-q-standout { color: var(--win); font-weight: 600; }
+.bf-q-positive { color: var(--win); }
+.bf-q-negative { color: var(--loss); }
+.bf-setup-up { color: var(--win); }
+.bf-setup-down { color: var(--loss); }
+.bf-setup-flat { color: var(--text-muted); }
+.bf-rev-why { letter-spacing: 0; color: var(--text-dim); }
+
 /* ── the sources' record ──────────────────────────────────────────────── */
 
 .bf-record { padding: 12px 14px 18px; border-top: 1px solid var(--line-2); }

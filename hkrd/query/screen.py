@@ -45,7 +45,9 @@ SETUP_AT = 0.15
 # A reversal is only worth naming when the last margin was this close.
 REVERSAL_MARGIN = 2.0
 REVERSAL_DAYS = 365
-# What each margin band repeated at, measured (see module docstring).
+# What each margin band repeated at, measured (see module docstring): the
+# winner finished in front again. The rest of the time the beaten horse
+# turned it round, and that is the figure the page shows.
 _REPEAT = ((1.0, 51), (2.0, 55))
 _SITUATION = {"PACE", "CHANGE", "CAMPAIGN", "TRIAL"}
 
@@ -89,11 +91,13 @@ def _reversals(runners: list[dict[str, Any]], race: dict[str, Any]
             if None not in (x["draw"], y["draw"], hx["draw"], hy["draw"]):
                 swing = (hx["draw"] - hy["draw"]) - (x["draw"] - y["draw"])
                 if swing >= 3:
-                    moved.append(f"draw {swing} gates better relative to it")
+                    moved.append(f"its draw is {swing} gates better against "
+                                 f"#{y['horse_no']}'s")
             jswing = ((_jrate(jockeys, x["jockey"], base) - _jrate(jockeys, y["jockey"], base))
                       - (_jrate(jockeys, hx["jockey"], base) - _jrate(jockeys, hy["jockey"], base)))
             if jswing >= 0.02:
-                moved.append(f"rider {100 * jswing:.0f} pts better relative to it")
+                moved.append(f"its rider is {100 * jswing:.0f} pts of strike rate "
+                             f"better against #{y['horse_no']}'s")
             repeat = next(p for m, p in _REPEAT if margin <= m)
             # Under a tenth of a length is a nose or a head: HKJC's own words
             # read better than "0.05L", and a dead heat is not "beaten".
@@ -102,14 +106,24 @@ def _reversals(runners: list[dict[str, Any]], race: dict[str, Any]
                 "vs_no": y["horse_no"], "vs_name": y["horse_name"],
                 "met": shared[0][0], "margin": round(margin, 2),
                 "then": f"{hx['place']} v {hy['place']}",
-                "moved": moved,
-                "note": (f"beaten {by} by #{y['horse_no']} on {shared[0][0]}; "
-                         f"margins this close repeat {repeat}% of the time"),
+                "moved": moved, "repeat_pct": repeat, "reverse_pct": 100 - repeat,
+                # Said from the side of the horse that was beaten, which is
+                # the one this note is about: "repeat 51%" was the same fact
+                # from the winner's side, and read as the opposite.
+                "note": (f"beat it by {by} on {shared[0][0]}, "
+                         f"{_nth(hy['place'])} to its {_nth(hx['place'])}; from "
+                         f"a margin that close, the horse beaten finished in "
+                         f"front next time {100 - repeat}% of the time"),
             })
     for notes in out.values():
         notes.sort(key=lambda n: (-len(n["moved"]), n["margin"]))
         del notes[3:]
     return out
+
+
+def _nth(n: int) -> str:
+    teen = 11 <= n % 100 <= 13
+    return f"{n}{'th' if teen else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
 
 
 def _pace(runners: list[dict[str, Any]]) -> dict[str, Any]:

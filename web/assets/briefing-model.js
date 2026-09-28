@@ -31,6 +31,9 @@ const PRI = { interview: 0, screen_alone: 1, talked_up: 2, price_gap: 3,
               late_money: 3, market_apart: 3, lone_leader: 4, book: 5,
               consensus: 6, case: 7, trial: 8 };
 const STALE_AFTER = 15;          // minutes, for a race-day price
+/* A reason worth less than ×1.15 either way is drawn fainter: ×1.02 must
+ * not read as loudly as ×1.67. */
+const MILD = Math.log(1.15);
 
 /* ── the meeting ────────────────────────────────────────────────────────── */
 
@@ -370,7 +373,7 @@ function runnerView(x, r, { books, srcIn, saidOf, isBooked, cap, toteEarly, ctx 
   const tr = s.trial;
   const trial = tr ? {
     head: `${tr.band} · ${tr.place ?? DASH} of ${tr.field_size ?? DASH} · ${shortDate(tr.trial_date)}`,
-    comment: tr.comment || '', good: /STANDOUT|POSITIVE/.test(tr.band || '') } : null;
+    comment: tr.comment || '', band: (tr.band || 'untested').toLowerCase() } : null;
   const pt = p ? priceTable(p, books) : null;
   const booked = isBooked(r.race_no, x.horse_no);
   return {
@@ -396,8 +399,14 @@ function runnerView(x, r, { books, srcIn, saidOf, isBooked, cap, toteEarly, ctx 
     finTone: x.result === 1 ? 'won' : x.result && x.result <= 3 ? 'placed' : 'out',
     setupLine: `SET-UP ${s.setup} ×${s.setup_x} · PLACE ${s.place_pct}% · WIN ${s.win_pct}% · `
       + `RANK ${s.rank} OF ${r.field_size}`,
-    forList: (s.for || []).map((f) => ({ why: f.why || f.label, x: `×${f.x}`, title: f.label })),
-    againstList: (s.against || []).map((f) => ({ why: f.why || f.label, x: `×${f.x}`, title: f.label })),
+    // The same line in three pieces, so the verdict can carry its colour.
+    setupWord: `${s.setup} ×${s.setup_x}`,
+    setupTone: s.setup === 'FAVOURABLE' ? 'up' : s.setup === 'AGAINST' ? 'down' : 'flat',
+    setupRest: ` · PLACE ${s.place_pct}% · WIN ${s.win_pct}% · RANK ${s.rank} OF ${r.field_size}`,
+    forList: (s.for || []).map((f) => ({ why: f.why || f.label, x: `×${f.x}`, title: f.label,
+                                         mild: Math.abs(Math.log(f.x)) < MILD })),
+    againstList: (s.against || []).map((f) => ({ why: f.why || f.label, x: `×${f.x}`, title: f.label,
+                                                 mild: Math.abs(Math.log(f.x)) < MILD })),
     last, trial,
     notes: (s.notes || []).map((n) => (typeof n === 'string' ? n : n.note || n.text || '')).filter(Boolean),
     reversals: (s.reversals || []).map((v) => ({ no: v.vs_no, name: v.vs_name, note: v.note,

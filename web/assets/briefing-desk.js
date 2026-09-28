@@ -274,7 +274,7 @@ function raceDetail(r, ctx) {
     sc.append(bar(x.bar, x.top ? 'top' : ''), el('span', 'pl', x.place), el('span', 'wn', x.win));
     const bb = el('span', 'bb');
     if (x.hasBB) {
-      bb.append(el('span', 'bf-bbtag', 'BB'), el('span', x.setupAgainst ? 'dim' : 'v', ` ${x.setup}`));
+      bb.append(el('span', 'bf-bbtag', 'BB'), el('span', `bf-setup-${x.setupTone}`, ` ${x.setup}`));
     }
     const said = el('span', 'said');
     said.append(el('span', `n ${x.tip ? 'tip' : 'dim'}`, x.said));
@@ -322,16 +322,21 @@ export function interviewBox(iv) {
 
 export function screenBlock(x, { compact = false } = {}) {
   const col = el('div', 'bf-col');
-  if (!compact) col.append(el('div', 'cap', `THE SCREEN · ${x.setupLine}`));
+  if (!compact) {
+    const cap = el('div', 'cap', 'THE SCREEN · SET-UP ');
+    cap.append(el('span', `bf-setup-${x.setupTone}`, x.setupWord),
+               document.createTextNode(x.setupRest));
+    col.append(cap);
+  }
   const reasons = el('div', 'bf-factors');
   x.forList.forEach((f) => {
-    const c = el('span', 'for', `${f.why} `);
+    const c = el('span', `for${f.mild ? ' bf-mild' : ''}`, `${f.why} `);
     c.title = f.title;
     c.append(el('span', 'x', f.x));
     reasons.append(c);
   });
   x.againstList.forEach((f) => {
-    const c = el('span', 'against', `${f.why} `);
+    const c = el('span', `against${f.mild ? ' bf-mild' : ''}`, `${f.why} `);
     c.title = f.title;
     c.append(el('span', 'x', f.x));
     reasons.append(c);
@@ -360,7 +365,7 @@ export function screenBlock(x, { compact = false } = {}) {
   }
   if (x.trial) {
     const t = el('div', 'bf-trial');
-    t.append(el('span', 'cap', 'TRIAL '), el('span', x.trial.good ? 'good' : 'dim', x.trial.head),
+    t.append(el('span', 'cap', 'TRIAL '), el('span', `bf-q bf-q-${x.trial.band}`, x.trial.head),
              document.createTextNode(` ${x.trial.comment}`));
     col.append(t);
   }
@@ -370,11 +375,16 @@ export function screenBlock(x, { compact = false } = {}) {
     col.append(t);
   });
   if (x.reversals.length && !compact) {
-    col.append(el('div', 'cap gap', 'COULD TURN AROUND'));
+    // A horse in this race beat this one by 2L or less within a year. The
+    // figure is how often the horse BEATEN finished in front next time.
+    const cap = el('div', 'cap gap', 'COULD TURN AROUND');
+    cap.append(el('span', 'bf-rev-why',
+                  ' · a horse here beat it by 2L or less in the last year'));
+    col.append(cap);
     x.reversals.forEach((v) => {
       const t = el('div', 'bf-rev');
       t.append(el('b', null, `#${v.no} ${v.name}`),
-               el('span', 'dim', ` ${v.note}${v.moved ? ` · ${v.moved}` : ''}`));
+               el('span', 'dim', ` ${v.note}${v.moved ? ` · since then ${v.moved}` : ''}`));
       col.append(t);
     });
   }

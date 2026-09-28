@@ -14,6 +14,7 @@
  */
 import { api } from './api.js';
 import { context } from './context.js';
+import { install as installPalette } from './palette.js';
 import { $, el, renderNav } from './vocab.js';
 import { buildView } from './briefing-model.js';
 import { renderDesk, renderPanels } from './briefing-desk.js';
@@ -190,6 +191,9 @@ function render() {
 }
 
 async function main() {
+  // The meeting in the header opens the palette on MEETINGS, and so does
+  // ⌘K; both only send an event, and without this nothing here heard it.
+  installPalette();
   await context.init();
   renderNav($('nav'), 'briefing.html');
   state.ui = fresh(firstRace);

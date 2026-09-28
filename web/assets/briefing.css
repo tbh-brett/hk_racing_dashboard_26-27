@@ -325,10 +325,10 @@
 .bf-col .cap.gap { margin: 9px 0 0; }
 .bf-factors { display: flex; flex-wrap: wrap; gap: 4px; }
 .bf-factors span { font-size: 12px; line-height: 1.35; padding: 1px 6px; border: 1px solid var(--line-3); cursor: help; }
-.bf-factors .for { color: var(--text-2); }
-.bf-factors .against { color: var(--text-muted); border-style: dashed; }
-.bf-factors .x { padding: 0; border: none; font-family: var(--font-mono); font-size: 10px; color: var(--text); }
-.bf-factors .against .x { color: var(--cool); }
+/* For green, against red; the dashed border keeps against legible without colour. */
+.bf-factors .for { color: var(--win); border-color: color-mix(in srgb, var(--win) 35%, transparent); }
+.bf-factors .against { color: var(--loss); border-style: dashed; border-color: color-mix(in srgb, var(--loss) 40%, transparent); }
+.bf-factors .x { padding: 0; border: none; font-family: var(--font-mono); font-size: 10px; font-weight: 600; color: inherit; }
 .bf-bookbox { margin-top: 9px; padding-left: 9px; border-left: 2px solid var(--book); }
 .bf-bookbox .hd { font-family: var(--font-mono); font-size: 10px; color: var(--book); }
 .bf-bookbox .why { font-size: 12px; line-height: 1.45; color: var(--text-2); }
@@ -346,8 +346,6 @@
 .bf-trial, .bf-note, .bf-rev { margin-top: 6px; font-size: 12px; line-height: 1.45; color: var(--text-2); }
 .bf-trial { margin-top: 9px; }
 .bf-trial .cap, .bf-note .cap { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; color: var(--text-muted); }
-.bf-trial .good { font-family: var(--font-mono); font-size: 10px; color: var(--text); }
-.bf-trial .dim { font-family: var(--font-mono); font-size: 10px; }
 .bf-rev b { font-family: var(--font-mono); font-weight: 600; }
 .bf-rev .dim { color: var(--text-muted); }
 .bf-said { padding: 4px 0; border-top: 1px solid var(--line); }
