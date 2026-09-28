@@ -22,6 +22,7 @@ import { el, $, DASH, MINUS, renderNav, paceCell, styleBadge,
          tripTagChips, drawText, replayUrl, externalLink } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
+import { isSystem } from './book-origin.js';
 import { loadTags, renderReview } from './review.js';
 
 
@@ -598,8 +599,11 @@ function bookedPanel(rows) {
   let missed = 0;
   rows.forEach((b) => {
     const backed = Boolean(b.backed);
-    if (!backed) missed += 1;
-    const row = el('div', `book-row${backed ? '' : ' missed'}`);
+    // A horse the system booked and the owner never took on is not a bet the
+    // owner missed — the same rule the Blackbook's BACKED vs MISSED keeps.
+    const sys = isSystem(b);
+    if (!backed && !sys) missed += 1;
+    const row = el('div', `book-row${backed || sys ? '' : ' missed'}${sys ? ' sys' : ''}`);
     row.append(el('span', null, String(b.horse_no ?? DASH)));
     const name = el('span', 'name', b.horse_name);
     name.title = b.reasoning ?? '';
@@ -607,8 +611,8 @@ function bookedPanel(rows) {
     const fin = el('span', `fin${b.place === 1 ? ' win' : ''}`,
       b.place === null ? DASH : String(b.place));
     row.append(fin);
-    row.append(el('span', backed ? 'backed' : 'missed-mark',
-      backed ? 'BACKED' : 'NOT BACKED'));
+    row.append(el('span', backed ? 'backed' : sys ? 'sys-mark' : 'missed-mark',
+      backed ? 'BACKED' : sys ? 'SYSTEM' : 'NOT BACKED'));
     row.append(el('span', 'tags', b.tags ?? ''));
     body.append(row);
   });

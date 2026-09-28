@@ -264,7 +264,8 @@ def _booked_that_ran(conn: Connection, date: str, race_no: int
     """
     return [dict(r) for r in conn.execute("""
         SELECT b.id entry_id, b.horse_name, b.status, b.added_date,
-               b.reasoning, r.horse_no, r.place, r.win_odds,
+               b.reasoning, b.origin, b.adopted_date,
+               r.horse_no, r.place, r.win_odds,
                (SELECT group_concat(t.tag, ',') FROM blackbook_tags t
                  WHERE t.id = b.id) tags,
                EXISTS (SELECT 1 FROM bet_selections s

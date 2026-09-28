@@ -196,6 +196,8 @@ export const api = {
     + (next ? '&next=true' : '')),
   blackbookSummary: (today) => get(
     `/blackbook/summary${today ? `?today=${today}` : ''}`),
+  adoptBlackbookEntry: (id) => post(
+    `/blackbook/${encodeURIComponent(id)}/adopt`, {}),
   // `body` carries `reason` (why the decision was taken) and, on a reopen,
   // `reasoning` (the new thesis). Both optional; the route refuses a new
   // thesis on a CLOSE, which would be rewriting history rather than recording

@@ -22,8 +22,9 @@ from pathlib import Path
 from hkrd.store.connect import db_path, get_conn, transaction
 
 __all__ = ["save_note", "delete_note", "save_trial_note",
-           "delete_trial_note", "promote_to_blackbook",
-           "next_entry_id", "set_status", "set_triggers"]
+           "delete_trial_note", "promote_to_blackbook", "insert_entry",
+           "next_entry_id", "set_status", "set_triggers", "adopt",
+           "close_tested"]
 
 
 def _now() -> str:
@@ -143,59 +144,84 @@ def promote_to_blackbook(horse_name: str, *, reasoning: str,
     """
     from datetime import date
 
+    conn = get_conn(db if db is not None else db_path())
+    try:
+        with transaction(conn):
+            return insert_entry(
+                conn, horse_name, reasoning=reasoning,
+                added_date=date.today().isoformat(), source_date=source_date,
+                source_race_no=source_race_no, source_trial_no=source_trial_no,
+                tags=tags, conditions=conditions, confidence=confidence)
+    finally:
+        conn.close()
+
+
+def insert_entry(conn, horse_name: str, *, reasoning: str, added_date: str,
+                 source_date: str | None = None,
+                 source_race_no: int | None = None,
+                 source_trial_no: int | None = None,
+                 tags: list[str] | None = None,
+                 conditions: list[dict] | None = None,
+                 confidence: str = "medium",
+                 origin: str = "owner") -> dict:
+    """Write one entry inside the caller's transaction.
+
+    The one INSERT every entry goes through, whoever books it. `jobs/auto_book`
+    calls it directly so a meeting's entries and the row saying that meeting
+    has been read commit together: a pass that died half-way would otherwise
+    come back the next night and find its own entries in the book.
+    """
     horse = horse_name.strip().upper()
     reason = (reasoning or "").strip()
     if not reason:
         raise ValueError("an entry needs a reason; that is what makes it a thesis")
+    if origin not in ("owner", "system"):
+        raise ValueError("origin must be owner or system")
     # Checked BEFORE the entry is written, so a condition nothing can evaluate
     # cannot be saved. One that never matches is worse than none at all: the
     # horse silently stops appearing and the book looks empty rather than wrong.
     rows = _condition_rows(conditions)
 
-    conn = get_conn(db if db is not None else db_path())
-    try:
-        added = date.today().isoformat()
-        # A trial is a T, not an R. Writing "2026-08-21 R1" for a trial would
-        # point the entry at a race that was never run, and every later reader
-        # of `source_race` would believe it.
-        if source_trial_no is not None:
-            source = (f"{source_date} T{source_trial_no}" if source_date
-                      else f"T{source_trial_no}")
-        elif source_date and source_race_no:
-            source = f"{source_date} R{source_race_no}"
-        else:
-            source = source_date or (f"R{source_race_no}" if source_race_no else None)
-        with transaction(conn):
-            entry_id = next_entry_id(conn)
-            conn.execute(
-                "INSERT INTO blackbook (id, horse_name, added_date, "
-                "status, reasoning, confidence, source_race, source_date, "
-                "source_race_no, source_date_from) "
-                "VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)",
-                (entry_id, horse, added, reason, confidence, source,
-                 source_date,
-                 # Only a real race number goes in the race column. A trial's
-                 # batch number left here would make the Blackbook link back
-                 # to race 1 of a meeting that may not exist.
-                 None if source_trial_no is not None else source_race_no,
-                 "memo" if source_date else None))
-            conn.executemany(
-                "INSERT INTO blackbook_tags (id, tag) VALUES (?, ?) "
-                "ON CONFLICT (id, tag) DO NOTHING",
-                [(entry_id, t.strip()) for t in (tags or []) if t.strip()])
-            conn.executemany(
-                "INSERT INTO blackbook_trigger (id, kind, op, value) "
-                "VALUES (?, ?, ?, ?)",
-                [(entry_id, *row) for row in rows])
-            _log_status(conn, entry_id, None, "active", reason, None)
-        return {"id": entry_id, "horse_name": horse, "added_date": added,
-                "closed_date": None, "status": "active", "reasoning": reason,
-                "confidence": confidence, "source_race": source,
-                "tags": sorted({t.strip() for t in (tags or []) if t.strip()}),
-                "conditions": [{"kind": k, "op": o, "value": v}
-                               for k, o, v in rows]}
-    finally:
-        conn.close()
+    # A trial is a T, not an R. Writing "2026-08-21 R1" for a trial would
+    # point the entry at a race that was never run, and every later reader
+    # of `source_race` would believe it.
+    if source_trial_no is not None:
+        source = (f"{source_date} T{source_trial_no}" if source_date
+                  else f"T{source_trial_no}")
+    elif source_date and source_race_no:
+        source = f"{source_date} R{source_race_no}"
+    else:
+        source = source_date or (f"R{source_race_no}" if source_race_no else None)
+    entry_id = next_entry_id(conn)
+    conn.execute(
+        "INSERT INTO blackbook (id, horse_name, added_date, "
+        "status, reasoning, confidence, source_race, source_date, "
+        "source_race_no, source_date_from, origin) "
+        "VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)",
+        (entry_id, horse, added_date, reason, confidence, source,
+         source_date,
+         # Only a real race number goes in the race column. A trial's
+         # batch number left here would make the Blackbook link back
+         # to race 1 of a meeting that may not exist.
+         None if source_trial_no is not None else source_race_no,
+         # 'system' when the system read the date off the run it booked.
+         (origin if origin == "system" else "memo") if source_date else None,
+         origin))
+    conn.executemany(
+        "INSERT INTO blackbook_tags (id, tag) VALUES (?, ?) "
+        "ON CONFLICT (id, tag) DO NOTHING",
+        [(entry_id, t.strip()) for t in (tags or []) if t.strip()])
+    conn.executemany(
+        "INSERT INTO blackbook_trigger (id, kind, op, value) "
+        "VALUES (?, ?, ?, ?)",
+        [(entry_id, *row) for row in rows])
+    _log_status(conn, entry_id, None, "active", reason, None)
+    return {"id": entry_id, "horse_name": horse, "added_date": added_date,
+            "closed_date": None, "status": "active", "reasoning": reason,
+            "confidence": confidence, "source_race": source, "origin": origin,
+            "tags": sorted({t.strip() for t in (tags or []) if t.strip()}),
+            "conditions": [{"kind": k, "op": o, "value": v}
+                           for k, o, v in rows]}
 
 
 def _condition_rows(conditions: list[dict] | None
@@ -325,3 +351,62 @@ def set_status(entry_id: str, status: str, *, reason: str | None = None,
         return dict(row)
     finally:
         conn.close()
+
+
+def adopt(entry_id: str, *, db: Path | None = None) -> dict:
+    """Take a system entry into the owner's book.
+
+    Its origin stays 'system' -- the system's record keeps every horse it
+    booked, adopted or not, or it stops being a fair control -- and from today
+    it also counts as the owner's, which is what `adopted_date` says. It is
+    no longer closed after its tested starts: the owner decides when it ends,
+    as with any entry of theirs.
+
+    Not a status change, so nothing is written to the status log: a line
+    there going from ACTIVE to ACTIVE would read as a reopening.
+    """
+    conn = get_conn(db if db is not None else db_path())
+    try:
+        with transaction(conn):
+            row = conn.execute(
+                "SELECT origin, adopted_date FROM blackbook WHERE id = ?",
+                (entry_id,)).fetchone()
+            if row is None:
+                raise KeyError(entry_id)
+            if row["origin"] != "system":
+                raise ValueError("only an entry the system booked can be "
+                                 "adopted; this one is already yours")
+            if row["adopted_date"] is None:
+                conn.execute("UPDATE blackbook SET adopted_date = date('now') "
+                             "WHERE id = ?", (entry_id,))
+        return dict(conn.execute(
+            "SELECT id, horse_name, status, origin, adopted_date "
+            "FROM blackbook WHERE id = ?", (entry_id,)).fetchone())
+    finally:
+        conn.close()
+
+
+def close_tested(conn, entry_id: str, *, closed_date: str, reason: str) -> None:
+    """Close a system entry at the end of its test, inside the caller's
+    transaction.
+
+    The one place anything but the owner closes an entry, and deliberately
+    narrow: only a live system entry nobody adopted. It is closed the way the
+    RETIRE button closes one -- RETIRED, a date, a reason, a line in the
+    history -- so the row says it is closed everywhere it is read. The expiry
+    removed in September 2026 did the opposite: it closed entries quietly
+    while they still read ACTIVE, and they were the owner's.
+    """
+    was = conn.execute(
+        "SELECT status, reasoning, origin, adopted_date FROM blackbook "
+        "WHERE id = ?", (entry_id,)).fetchone()
+    if was is None:
+        raise KeyError(entry_id)
+    if was["origin"] != "system" or was["adopted_date"] is not None:
+        raise ValueError(f"{entry_id} is the owner's; only they close it")
+    if was["status"] != "active":
+        return
+    conn.execute(
+        "UPDATE blackbook SET status = 'retired', closed_date = ?, "
+        "closed_reason = ? WHERE id = ?", (closed_date, reason, entry_id))
+    _log_status(conn, entry_id, "active", "retired", reason, was["reasoning"])

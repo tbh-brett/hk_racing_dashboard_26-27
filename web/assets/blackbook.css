@@ -53,6 +53,7 @@
 .bb-sum b { font-weight: 600; font-size: var(--fs); color: var(--text); }
 .bb-sum b.teal { color: var(--book); }
 .bb-sum b.amber { color: var(--edge); }
+.bb-sum b.orchid { color: var(--book-sys); }
 .bb-sum .pipe { color: var(--line-3); }
 .bb-sum .caveat { color: var(--loss-dim); }
 
@@ -84,6 +85,10 @@
 }
 .bb-row:hover { background: var(--row-hover); }
 .bb-row.open { background: var(--surface-2); border-left-color: var(--book); }
+/* Booked by the system and not adopted (web/assets/book-origin.js). Before
+   .today, so a system horse declared at this meeting still reads amber. */
+.bb-row.system { border-left-color: var(--book-sys); border-bottom-color: transparent; }
+.bb-row.system .who .nm { color: var(--book-sys); }
 .bb-row.today { border-left-color: var(--edge); }
 .bb-row > * { padding: 0 8px; min-width: 0; }
 .bb-row .caret { padding: 0 6px; text-align: center; font-size: 9px; color: var(--text-faint); }
@@ -292,6 +297,7 @@
 }
 .bb-foot .right { margin-left: auto; color: var(--text-dim); }
 .bb-foot .amber { color: var(--edge); }
+.bb-foot .orchid { color: var(--book-sys); }
 .bb-foot .magenta { color: var(--loss-dim); }
 .tag-head, .tag-row {
   display: grid;
@@ -392,3 +398,28 @@
   margin-left: auto; font-size: var(--fs-xs); color: var(--text-faint);
   font-family: var(--font-mono);
 }
+
+/* ── a system entry's reason, under its row ──────────────────────────────── */
+
+.sys-line {
+  display: flex; align-items: baseline; gap: 10px; min-width: 0;
+  padding: 0 8px 7px 32px; cursor: pointer;
+  border-bottom: 1px solid var(--line); border-left: 3px solid var(--book-sys);
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+}
+.sys-line:hover { background: var(--row-hover); }
+.sys-line .sys-tag {
+  flex: none; font-size: var(--fs-xs); letter-spacing: .09em; padding: 0 5px;
+  color: var(--book-sys); background: var(--book-sys-ground);
+  border: 1px solid var(--book-sys-dim);
+}
+.sys-line .sys-date { flex: none; color: var(--text-dim); white-space: nowrap; }
+.sys-line .sys-why {
+  min-width: 0; color: var(--text-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bb-row .act-btn.adopt { color: var(--book-sys); border-color: var(--book-sys-dim); }
+.bb-row .act-btn.adopt:hover { color: var(--text); border-color: var(--book-sys); }
+#book-chips .chip.sys.on { color: var(--book-sys); border-color: var(--book-sys-dim);
+  background: var(--book-sys-ground); }
+.book-pick.sys .a-chip.on { color: var(--book-sys); border-color: var(--book-sys); }

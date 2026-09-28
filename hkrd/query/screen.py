@@ -203,6 +203,9 @@ def _runner(r: dict, sc: dict, race: dict, book: dict | None, notes: list,
 def _book(b: dict[str, Any]) -> dict[str, Any]:
     return {"id": b["id"], "status": b["status"], "confidence": b["confidence"],
             "reasoning": b["reasoning"], "added_date": b["added_date"],
+            # A system entry is shown in its own colour until it is adopted
+            # (`jobs/auto_book`); the page needs both to tell them apart.
+            "origin": b["origin"], "adopted_date": b["adopted_date"],
             "live": bool(b["live_at_race"]),
             "on_conditions": bool(b["on_conditions"]),
             "conditions_text": b["conditions_text"],

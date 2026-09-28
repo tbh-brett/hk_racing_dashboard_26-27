@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from hkrd.query import period
+from hkrd.query import blackbook_origin as origin, period
 from hkrd.query.period import Window
 from hkrd.store.connect import Connection, get_conn
 
@@ -336,7 +336,11 @@ def backed_and_missed(*, entry_id: str | None = None,
     own = conn is None
     conn = conn or get_conn()
     try:
-        where = "WHERE r.place IS NOT NULL"
+        # The owner's book only. A system entry the owner never adopted is
+        # not a horse they meant to back, and counting its runs as MISSED
+        # would make the owner's selection look worse by however many horses
+        # the system booked. See `query/blackbook_origin`.
+        where = f"WHERE r.place IS NOT NULL AND {origin.clause('owner')}"
         params: dict[str, Any] = {
             "account": account.lower() if account else None}
         if entry_id:

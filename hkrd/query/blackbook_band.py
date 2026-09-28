@@ -88,6 +88,7 @@ def for_race(date: str, race_no: int, *, conn: Connection | None = None
         return _with_conditions(conn, [dict(r) for r in conn.execute(f"""
             SELECT b.id, b.horse_name, b.status, b.confidence, b.reasoning,
                    b.added_date, b.closed_date, b.closed_reason, b.source_race,
+                   b.origin, b.adopted_date,
                    r.horse_no, r.draw, r.jockey, r.win_odds,
                    b.added_date <= r.race_date AS booked_before_race,
                    {LIVE_AT_RACE_SQL} AS live_at_race,
@@ -123,6 +124,7 @@ def declared_on(date: str, *, conn: Connection | None = None
         return _with_conditions(conn, [dict(r) for r in conn.execute(f"""
             SELECT b.id, b.horse_name, b.status, b.confidence, b.added_date,
                    b.closed_date, b.closed_reason, b.reasoning,
+                   b.origin, b.adopted_date,
                    r.race_no, r.horse_no, r.draw, r.win_odds,
                    b.added_date <= r.race_date AS booked_before_race,
                    {LIVE_AT_RACE_SQL} AS live_at_race,

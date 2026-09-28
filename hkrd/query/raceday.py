@@ -266,6 +266,10 @@ def build_card(date: str, race_no: int, *,
                 "blackbook": {
                     "id": book["id"], "status": book["status"],
                     "confidence": book["confidence"],
+                    # Who booked it — a system entry is drawn in its own
+                    # colour until the owner adopts it (`jobs/auto_book`).
+                    "origin": book["origin"],
+                    "adopted_date": book["adopted_date"],
                     "added_date": book["added_date"],
                     "reasoning": book["reasoning"],
                     # A closed thesis is still worth knowing about when the

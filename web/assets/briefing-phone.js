@@ -120,7 +120,10 @@ function opened(r, ctx) {
               el('span', `w44 px${x.mPriceMost ? ' most' : ''}`, x.mPrice));
     const l2 = el('div', 'l2');
     l2.append(styleEl(x), el('span', `tier${x.top ? ' top' : ''}`, x.tier));
-    if (x.hasBB) l2.append(el('span', 'bf-bbtag', `BB ${x.setup}`));
+    if (x.hasBB) {
+      l2.append(el('span', `bf-bbtag${x.bbSys ? ' sys' : ''}`,
+                   `${x.bbSys ? 'SYS' : 'BB'} ${x.setup}`));
+    }
     x.marks.forEach((m) => l2.append(markEl(m)));
     x.chips.forEach((ch) => l2.append(chipEl(ch)));
     if (x.move) l2.append(el('span', `move t-${x.move.tone}`, x.move.t));

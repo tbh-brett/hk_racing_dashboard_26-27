@@ -67,6 +67,7 @@
 
 .bf-page { font-size: 13px; }
 .bf-page .booked { color: var(--book); }
+.bf-page .booked.sys { color: var(--book-sys); }
 .bf-page .dim { color: var(--text-dim); }
 .bf-page .tip { color: var(--tip); }
 .bf-page .voice { color: var(--voice); }
@@ -206,6 +207,7 @@
 .bf-chip.t-vet { color: var(--loss-dim); border-color: color-mix(in srgb, var(--loss-dim) 40%, transparent); }
 .bf-chip.t-violet { color: var(--violet); border-color: color-mix(in srgb, var(--violet) 40%, transparent); }
 .bf-bbtag { padding: 0 4px; line-height: 14px; color: var(--book); background: var(--book-ground); }
+.bf-bbtag.sys { color: var(--book-sys); background: var(--book-sys-ground); }
 .bf-tag {
   padding: 0 4px; color: var(--incident);
   border: 1px solid color-mix(in srgb, var(--incident) 40%, transparent);
@@ -332,6 +334,8 @@
 .bf-bookbox { margin-top: 9px; padding-left: 9px; border-left: 2px solid var(--book); }
 .bf-bookbox .hd { font-family: var(--font-mono); font-size: 10px; color: var(--book); }
 .bf-bookbox .why { font-size: 12px; line-height: 1.45; color: var(--text-2); }
+.bf-bookbox.sys { border-left-color: var(--book-sys); }
+.bf-bookbox.sys .hd { color: var(--book-sys); }
 .bf-last { margin-top: 9px; }
 .bf-last .hd {
   display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline;

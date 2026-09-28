@@ -353,9 +353,37 @@ CREATE TABLE IF NOT EXISTS blackbook (
   source_race  TEXT,                 -- 'YYYY-MM-DD Rn', the run that prompted it
   source_date  TEXT,
   source_race_no INTEGER,
+  -- Who booked it: 'owner', or 'system' for an entry `jobs/auto_book` wrote
+  -- off a meeting's results or a trial day. It never changes. Adopting a
+  -- system entry sets `adopted_date` and leaves the origin alone, so the
+  -- system's record stays whole (it is the control group for the owner's own
+  -- picks) while the owner's record gains the horses they chose to keep.
+  origin       TEXT NOT NULL DEFAULT 'owner',
+  adopted_date TEXT,
   -- 'memo' when the user typed a date, 'matched' when it was recovered from the
-  -- horse's own runs. The page must be able to tell the two apart.
+  -- horse's own runs, 'system' when `jobs/auto_book` wrote it. The page must be
+  -- able to tell them apart.
   source_date_from TEXT
+);
+
+-- One row per meeting or trial day the automatic blackbook has read, written
+-- by `jobs/auto_book`. It is what makes that pass one-off: a day with a row
+-- here is never read again, so an entry the owner dismissed is not written
+-- back the next night. Not derived — what it records is a decision that was
+-- taken on the data as it stood, like `screen_pick`.
+CREATE TABLE IF NOT EXISTS auto_book_pass (
+  kind        TEXT    NOT NULL,       -- results | trials
+  source_date TEXT    NOT NULL,       -- the meeting or the trial day
+  ran_at      TEXT    NOT NULL,       -- ISO timestamp, UTC
+  -- results only: 'full' when HKJC's comments on running were in, 'stewards'
+  -- when the backstop ran it on the stewards' report and sectionals alone.
+  basis       TEXT    NOT NULL,
+  considered  INTEGER NOT NULL,       -- runners read
+  flagged     INTEGER NOT NULL,       -- runners that cleared a rule
+  picked      INTEGER NOT NULL,       -- the top of those, after the cap
+  added       INTEGER NOT NULL,       -- entries written
+  in_book     TEXT,                   -- picked, but already followed: csv
+  PRIMARY KEY (kind, source_date)
 );
 
 -- The circumstances a thesis depends on: "1200-1400m, on Turf, drawn 6 or

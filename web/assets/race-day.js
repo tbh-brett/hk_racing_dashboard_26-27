@@ -16,6 +16,7 @@ import { context } from './context.js';
 import { Live } from './live.js';
 import { anchoredPanel } from './overlay.js';
 import { install as installPalette } from './palette.js';
+import { isSystem } from './book-origin.js';
 
 const svg = (tag, attrs) => {
   const n = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -220,6 +221,8 @@ function renderBlackbookBand() {
     here.forEach((e) => {
       const item = el('div', 'band-item');
       if (!e.booked_before_race) item.classList.add('bb-stale');
+      // Booked by the system off a result or a trial, not by the owner.
+      if (isSystem(e)) item.classList.add('sys');
       if (!roomy) item.classList.add('tight');
       item.append(el('span', 'name', `${e.horse_no} ${e.horse_name}`));
       item.append(el('span', 'od', num(e.win_odds)));
@@ -966,6 +969,7 @@ function cardRow(r, index) {
   // retired in June is not that, and colouring it anyway is what made the mark
   // stop being worth looking for.
   if (isLiveBooking(r.blackbook)) nm.classList.add('booked');
+  if (isLiveBooking(r.blackbook) && isSystem(r.blackbook)) nm.classList.add('sys');
   box.append(nm);
   // The FIRST tag in the array was an arbitrary pick — the order the deriver
   // happened to write them in — so a horse that bled last start showed
@@ -1096,6 +1100,8 @@ function cardRow(r, index) {
     // being followed.
     if (r.blackbook.booked_before_race === false) dot.classList.add('later');
     else if (!isLiveBooking(r.blackbook)) dot.classList.add('closed');
+    // Only a live one is filled, in whichever colour says who booked it.
+    else if (isSystem(r.blackbook)) dot.classList.add('sys');
     dot.title = [r.blackbook.reasoning,
                  r.blackbook.tags?.join(' · ').replace(/_/g, ' '),
                  `booked ${r.blackbook.added_date} · ${r.blackbook.status}`,
@@ -1135,8 +1141,9 @@ function renderDetail() {
   // the owner wrote themselves, and the reason the horse is worth a second
   // look at all.
   if (r.blackbook?.reasoning) {
-    const bb = el('section', 'bb-note');
-    bb.append(el('h6', null, 'BLACKBOOK NOTE'));
+    const sys = isSystem(r.blackbook);
+    const bb = el('section', `bb-note${sys ? ' sys' : ''}`);
+    bb.append(el('h6', null, sys ? 'SYSTEM BLACKBOOK NOTE' : 'BLACKBOOK NOTE'));
     bb.append(el('p', null, r.blackbook.reasoning));
     // A thesis that was abandoned is the more recent fact about the horse and
     // usually the more useful one, so the panel says so in its own line rather

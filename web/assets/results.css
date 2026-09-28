@@ -228,6 +228,8 @@
 .book-row .backed { color: var(--edge); letter-spacing: .06em; font-size: var(--fs-xs); }
 /* The whole point of brief 06: a booked horse ran and no money was on it. */
 .book-row.missed { background: var(--miss-ground); }
+.book-row.sys .name { color: var(--book-sys); }
+.book-row .sys-mark { color: var(--book-sys); letter-spacing: .06em; font-size: var(--fs-xs); }
 .book-row .missed-mark { color: var(--loss-dim); letter-spacing: .06em;
   font-size: var(--fs-xs); }
 

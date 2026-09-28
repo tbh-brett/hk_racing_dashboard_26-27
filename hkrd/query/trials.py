@@ -216,7 +216,8 @@ def _booked(conn: Connection, names: list[str]) -> dict[str, dict[str, Any]]:
         return {}
     marks = ",".join("?" * len(names))
     return {r["horse_name"]: dict(r) for r in conn.execute(
-        f"SELECT horse_name, id, status, added_date, reasoning, confidence "
+        f"SELECT horse_name, id, status, added_date, reasoning, confidence, "
+        f"origin, adopted_date "
         f"FROM blackbook WHERE horse_name IN ({marks}) "
         f"ORDER BY added_date", [n.strip().upper() for n in names])}
 

@@ -40,7 +40,7 @@ def _window(period_name: str | None, since: str | None, until: str | None,
 @router.get("/api/blackbook/tags")
 def blackbook_tags(period: str | None = None, since: str | None = None,
                    until: str | None = None, anchor: str | None = None,
-        season: int | None = None) -> dict:
+        season: int | None = None, book: str = "owner") -> dict:
     """Per booking reason: strike, place, ROI and A/E with a 95% interval.
 
     A/E is the figure that says whether a tag beats the PRICE rather than
@@ -49,21 +49,46 @@ def blackbook_tags(period: str | None = None, since: str | None = None,
     what stops a tag that looks like it is working from reading as one.
     """
     win = _window(period, since, until, anchor, season)
-    tags = bb_q.tag_performance(window=win)
+    try:
+        # Whose picks: `owner` (the default), `system` or `all` — see
+        # `query/blackbook_origin`. The system's row beside the owner's is
+        # the control the automatic blackbook exists to provide.
+        tags = bb_q.tag_performance(window=win, book=book)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
     scored = [t for t in tags if t["ae"] is not None]
     cleared = [t["tag"] for t in scored
                if t["ae_lo"] > 1.0 or t["ae_hi"] < 1.0]
     return {"tags": tags, "scored": len(scored), "cleared": cleared,
             "expected_by_chance": round(len(scored) * 0.05, 1),
+            "book": book,
             # Named and bounded, so a figure copied off this page can be
             # checked later against the same dates.
             "window": win.as_dict()}
 
 
 @router.get("/api/blackbook/summary")
-def blackbook_summary(today: str | None = None) -> dict:
+def blackbook_summary(today: str | None = None, book: str = "owner") -> dict:
     """How big the book is, and whether it resolves."""
-    return bb_q.book_summary(today=today)
+    try:
+        return bb_q.book_summary(today=today, book=book)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/api/blackbook/{entry_id}/adopt")
+def adopt_blackbook_entry(entry_id: str) -> dict:
+    """Take a system entry into the owner's book. It keeps its origin — the
+    system's record keeps every horse it booked — and from today it counts as
+    the owner's too, and is no longer closed at the end of its test."""
+    from hkrd.jobs import write_notes
+
+    try:
+        return write_notes.adopt(entry_id)
+    except KeyError as exc:
+        raise HTTPException(404, f"no blackbook entry {exc.args[0]}") from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
 
 
 @router.post("/api/blackbook/{entry_id}/status")

@@ -72,6 +72,15 @@
 0  12 * * *   nice -n 19 python -m hkrd.jobs.scrape_trials --db /data/hkrd.db
 0  20 * * *   nice -n 19 python -m hkrd.jobs.scrape_trials --db /data/hkrd.db
 
+# The automatic blackbook (jobs/auto_book): each meeting read once its comments
+# on running are in (or eight days on, without them), each trial day once HKJC
+# has finished it. Its own line for the reason the trials have theirs: a
+# failure here must not take the race-day scrape down with it. 07:40 is after
+# the 07:00 run has fetched any comments published overnight; 20:30 is after
+# the evening trials. A day already read costs one query and nothing else.
+40 7  * * *   nice -n 19 python -m hkrd.jobs.auto_book --pending --db /data/hkrd.db
+30 20 * * *   nice -n 19 python -m hkrd.jobs.auto_book --pending --db /data/hkrd.db
+
 # Chinese horse names, for the tips layer. Half an hour behind the two nightly
 # runs that fetch a card — a card published at noon is stored by 13:00 and
 # named by 13:30. `--pending` makes the quiet days free: it only asks HKJC

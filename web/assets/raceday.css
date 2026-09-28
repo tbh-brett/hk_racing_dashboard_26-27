@@ -46,6 +46,7 @@
 .band-item .od { font-weight: 600; }
 .band-bb .band-item { border-right: 1px solid var(--book-rule); }
 .band-item .name { font-weight: 600; white-space: nowrap; }
+.band-item.sys .name { color: var(--book-sys); }
 .band-item .note {
   font-family: var(--font); font-size: var(--fs-sm); color: var(--text-muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -74,6 +75,7 @@
 .band-toggle:hover { color: var(--text); }
 
 .horse .nm.booked { color: var(--book); }
+.horse .nm.booked.sys { color: var(--book-sys); }
 .bb-dot {
   display: inline-block; width: 6px; height: 6px; background: var(--book);
 }
@@ -83,6 +85,7 @@
    reason `.later` is — the mark is worth finding on a card, and it is only
    worth finding if a filled one means one thing. */
 .bb-dot.closed { background: none; box-shadow: inset 0 0 0 1px var(--text-faint); }
+.bb-dot.sys { background: var(--book-sys); }
 
 /* The chips for OTHER races. These are the reason the band is worth keeping on
    screen — the entries in the race you are already looking at are on the card
@@ -460,6 +463,7 @@ table.card td { padding: 6px 8px; }
  * field. Both were in the payload and neither was drawn.
  */
 #detail .bb-note h6 { color: var(--book); }
+#detail .bb-note.sys h6 { color: var(--book-sys); }
 #detail .bb-note p {
   margin: 0; color: var(--text-2); font-size: var(--fs-sm);
   line-height: 1.45; font-family: var(--font-sans);

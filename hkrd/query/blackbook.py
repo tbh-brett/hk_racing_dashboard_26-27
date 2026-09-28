@@ -27,7 +27,7 @@ from __future__ import annotations
 from typing import Any
 
 from hkrd.derive.probability import actual_over_expected
-from hkrd.query import period, triggers as trig_q
+from hkrd.query import blackbook_origin as origin, period, triggers as trig_q
 from hkrd.query.period import Window
 from hkrd.store.connect import Connection, get_conn
 
@@ -290,7 +290,7 @@ def entry_detail(entry_id: str, *, conn: Connection | None = None
             conn.close()
 
 
-def tag_performance(*, window: Window | None = None,
+def tag_performance(*, window: Window | None = None, book: str = "owner",
                     conn: Connection | None = None) -> list[dict[str, Any]]:
     """Strike and place rate per booking reason, with the sample size beside it.
 
@@ -306,6 +306,8 @@ def tag_performance(*, window: Window | None = None,
         # this tag do last month" is a question about the runs that happened
         # last month, whatever month the horse was booked in.
         _win, _wp = period.clause(window, "r.race_date")
+        # Whose picks: the owner's by default. See `query/blackbook_origin`.
+        _book = origin.clause(book)
         rows = conn.execute(f"""
             SELECT t.tag,
                    count(DISTINCT b.id) entries,
@@ -319,7 +321,7 @@ def tag_performance(*, window: Window | None = None,
                    sum(CASE WHEN {_IMPLIED_SQL} IS NOT NULL THEN 1 ELSE 0 END) ae_runs
             {_RUNS_SINCE_FROM}
             JOIN blackbook_tags t ON t.id = b.id
-            WHERE r.place IS NOT NULL AND {_win}
+            WHERE r.place IS NOT NULL AND {_win} AND {_book}
             GROUP BY t.tag
             ORDER BY count(*) DESC
         """, _wp).fetchall()
@@ -327,7 +329,8 @@ def tag_performance(*, window: Window | None = None,
         # Entries carrying a tag but no subsequent run yet — they belong in the
         # count, otherwise a tag looks better tested than it is.
         booked = {r["tag"]: r["n"] for r in conn.execute(
-            "SELECT tag, count(*) n FROM blackbook_tags GROUP BY tag")}
+            f"SELECT t.tag, count(*) n FROM blackbook_tags t "
+            f"JOIN blackbook b ON b.id = t.id WHERE {_book} GROUP BY t.tag")}
         defs = tag_definitions(conn=conn)
 
         out = []
@@ -373,7 +376,7 @@ def tag_definitions(*, conn: Connection | None = None) -> dict[str, str]:
             conn.close()
 
 
-def book_summary(*, today: str | None = None,
+def book_summary(*, today: str | None = None, book: str = "owner",
                  conn: Connection | None = None) -> dict[str, Any]:
     """The header strip: how big the book is, and whether it resolves.
 
@@ -385,8 +388,10 @@ def book_summary(*, today: str | None = None,
     own = conn is None
     conn = conn or get_conn()
     try:
+        _book = origin.clause(book)
         status = {r["status"]: r["n"] for r in conn.execute(
-            "SELECT status, count(*) n FROM blackbook GROUP BY status")}
+            f"SELECT status, count(*) n FROM blackbook b WHERE {_book} "
+            "GROUP BY status")}
         total = sum(status.values())
 
         declared = 0
@@ -394,7 +399,7 @@ def book_summary(*, today: str | None = None,
             declared = conn.execute(
                 "SELECT count(DISTINCT b.id) FROM blackbook b "
                 "JOIN runners r ON r.horse_name = b.horse_name "
-                "WHERE r.race_date = ?", (today,)).fetchone()[0]
+                f"WHERE r.race_date = ? AND {_book}", (today,)).fetchone()[0]
 
         # Every run since booking, priced, as if each had been backed to a flat
         # stake. Not a claim about what was bet -- see `bets_ledger` below.
@@ -406,7 +411,7 @@ def book_summary(*, today: str | None = None,
                    sum({_IMPLIED_SQL}) expected_wins,
                    sum(CASE WHEN {_IMPLIED_SQL} IS NOT NULL THEN 1 ELSE 0 END) ae_runs
             {_RUNS_SINCE_FROM}
-            WHERE r.place IS NOT NULL AND r.win_odds IS NOT NULL
+            WHERE r.place IS NOT NULL AND r.win_odds IS NOT NULL AND {_book}
         """).fetchone()
 
         priced = row["priced"] or 0
@@ -416,10 +421,16 @@ def book_summary(*, today: str | None = None,
         # REVIEW chips would be the page arguing with itself — which is what
         # the previous version did as soon as conditions started deciding which
         # runs test a thesis.
-        review = sum(1 for e in _entry_rows(conn, "WHERE b.status = 'active'")
-                     if e["review_due"])
+        review = sum(1 for e in _entry_rows(
+            conn, f"WHERE b.status = 'active' AND {_book}") if e["review_due"])
+        # The other book's live entries, so the header can say they are there
+        # without folding them into this one's figures.
+        system_live = conn.execute(
+            "SELECT count(*) FROM blackbook b WHERE b.status = 'active' "
+            "AND b.origin = 'system' AND b.adopted_date IS NULL").fetchone()[0]
 
         return {
+            "book": origin.check(book), "system_live": system_live,
             "total": total, "status": status,
             "active": status.get("active", 0),
             "resolved": total - status.get("active", 0),

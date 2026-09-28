@@ -11,6 +11,7 @@
  * anything — and nothing here re-ranks the Race Day card.
  */
 import { DASH } from './vocab.js';
+import { isSystem } from './book-origin.js';
 import {
   AB, COUNTED, DAYS, MON, atShort, clock, dayDiff, hm, kindTag, mark,
   minutesBetween, money, moneyS, ordinal, pd, plural, px, sgn, shortDate,
@@ -93,11 +94,15 @@ export function buildView(d, ui) {
     && d.races.some((r) => !r.run);
   const clockItems = d.clock.map((c) => clockItem(c, asOf, status, toteEarly));
 
-  const booked = new Set();
+  // 'owner' or 'system' for a live entry, false for none: a horse the system
+  // booked is named in its own colour until the owner adopts it.
+  const booked = new Map();
   d.races.forEach((r) => r.runners.forEach((x) => {
-    if (x.blackbook && x.blackbook.live) booked.add(`${r.race_no}-${x.horse_no}`);
+    if (x.blackbook && x.blackbook.live) {
+      booked.set(`${r.race_no}-${x.horse_no}`, isSystem(x.blackbook) ? 'system' : 'owner');
+    }
   }));
-  const isBooked = (rn, no) => booked.has(`${rn}-${no}`);
+  const isBooked = (rn, no) => booked.get(`${rn}-${no}`) || false;
 
   const nextRace = isRD ? d.races.find((r) => !r.run && r.minutes_to_off !== null
     && r.minutes_to_off > 0) : null;
@@ -384,7 +389,8 @@ function runnerView(x, r, { books, srcIn, saidOf, isBooked, cap, toteEarly, ctx 
     bar: Math.min(100, s.place_pct), top: s.tier === 'SHORTLIST',
     place: `${Math.round(s.place_pct)}%`, win: `W ${Number(s.win_pct).toFixed(1)}%`,
     tier: s.tier === 'SHORTLIST' ? 'TOP 4' : s.tier === 'CASE' ? 'A CASE' : '',
-    hasBB: !!bb, setup: bb ? s.setup : '', setupAgainst: s.setup === 'AGAINST',
+    hasBB: !!bb, bbSys: isSystem(bb),
+    setup: bb ? s.setup : '', setupAgainst: s.setup === 'AGAINST',
     bbHead: bb ? `${s.setup} ×${s.setup_x} · ${bb.confidence || DASH} confidence · booked `
       + `${bb.added_date}${bb.conditions_text ? ` · ${bb.conditions_text}` : ''}` : '',
     bbWhy: bb ? bb.reasoning || '' : '',

@@ -15,6 +15,7 @@ import { el, $, DASH, MINUS, renderNav, periodPicker, accountPicker,
          styleClass, conditionLabel } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
+import { isSystem, inBook, BOOKS, systemLine } from './book-origin.js';
 
 
 const COLS = [
@@ -61,6 +62,10 @@ const state = {
   // what a condition can be — a form offering something the band cannot
   // evaluate would never match, and the horse would silently stop appearing.
   conditionVocab: null,
+  // Whose entries the list shows, and whose record the analysis reads. The
+  // list shows both books by default, the system's in its own colour; the
+  // analysis reads the owner's, because that is the record being kept.
+  book: 'all', analysisBook: 'owner',
 };
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
@@ -98,6 +103,14 @@ function renderSummary() {
   host.append(stat(s.total, 'ENTRIES'));
   host.append(stat(s.active, 'ACTIVE', 'teal'));
   host.append(stat(s.declared_today, `RUN ${s.today ?? 'TODAY'}`, 'amber'));
+  if (s.system_live) {
+    // Beside the owner's figures, never inside them: every number on this
+    // strip is the owner's book (`query/blackbook_origin`).
+    const sys = stat(s.system_live, 'SYSTEM', 'orchid');
+    sys.title = 'live entries the system booked off results and trials, not '
+      + 'adopted — not counted in any figure on this strip';
+    host.append(sys);
+  }
   host.append(el('span', 'pipe', '|'));
   host.append(stat(s.runs_since, 'RUNS SINCE BOOKING'));
 
@@ -154,6 +167,16 @@ function renderChips() {
     return b;
   }));
 
+  $('book-chips').replaceChildren(...BOOKS.map(([key, label]) => {
+    const b = el('button', `chip${state.book === key ? ' on' : ''}`
+      + `${key === 'system' ? ' sys' : ''}`);
+    b.append(document.createTextNode(`${label} `));
+    b.append(el('span', 'n', String(
+      state.entries.filter((e) => inBook(e, key)).length)));
+    b.addEventListener('click', () => { state.book = key; render(); });
+    return b;
+  }));
+
   const today = el('button', `chip${state.todayOnly ? ' on' : ''}`);
   today.append(document.createTextNode('RUNNING TODAY '));
   today.append(el('span', 'n', String(state.declared.size)));
@@ -188,6 +211,10 @@ function activeFilters() {
     out.push(['BOOKED', r[1], () => { state.range = 'all'; }]);
   }
   if (state.todayOnly) out.push(['', 'RUNNING TODAY', () => { state.todayOnly = false; }]);
+  if (state.book !== 'all') {
+    out.push(['BOOK', BOOKS.find((b) => b[0] === state.book)[1],
+              () => { state.book = 'all'; }]);
+  }
   return out;
 }
 
@@ -215,6 +242,7 @@ function renderActiveFilters(matched) {
       state.status = 'all';
       state.range = 'all';
       state.todayOnly = false;
+      state.book = 'all';
       $('search').value = '';
       render();
     });
@@ -234,6 +262,7 @@ function daysAgo(date) {
 }
 
 function matches(e) {
+  if (!inBook(e, state.book)) return false;
   if (state.tag && !e.tags.includes(state.tag)) return false;
   if (state.status !== 'all' && e.status !== state.status) return false;
   if (state.todayOnly && !state.declared.has(e.horse_name)) return false;
@@ -320,7 +349,8 @@ function conditionRecord(e) {
 function entryRow(e) {
   const open = state.open.has(e.id);
   const today = state.declared.has(e.horse_name);
-  const row = el('div', `bb-row${open ? ' open' : ''}${today ? ' today' : ''}`);
+  const row = el('div', `bb-row${open ? ' open' : ''}${today ? ' today' : ''}`
+    + `${isSystem(e) ? ' system' : ''}`);
   row.addEventListener('click', (event) => {
     if (event.target.closest('.acts')) return;
     toggleEntry(e);
@@ -397,6 +427,16 @@ function entryRow(e) {
     const r = el('span', 'review', `REVIEW · ${e.review_reason.toUpperCase()}`);
     r.title = 'owed a verdict — nothing closes an entry but you';
     acts.append(r);
+  }
+  if (isSystem(e)) {
+    // A system entry ends one of two ways: the owner takes it on, or lets it
+    // go. Left alone it closes itself after its tested starts
+    // (`jobs/auto_book`), so WON OUT is not a decision anyone has to take.
+    if (e.status === 'active') acts.append(adoptButton(e));
+    if (e.status === 'active') acts.append(statusButton(e, 'retired', 'DISMISS', 'retire'));
+    if (e.status !== 'active') acts.append(statusButton(e, 'active', 'REOPEN'));
+    row.append(acts);
+    return row;
   }
   if (e.status !== 'won_out') acts.append(statusButton(e, 'won_out', 'WON OUT'));
   if (e.status !== 'retired') acts.append(statusButton(e, 'retired', 'RETIRE', 'retire'));
@@ -534,6 +574,32 @@ function statusButton(e, status, label, extra) {
       delete state.details[e.id];
       if (state.open.has(e.id)) loadDetail(e.id);
       // The summary counts by status, so it has to be re-read, not patched.
+      state.summary = await api.blackbookSummary(state.today);
+    } catch (err) {
+      b.textContent = err.message;
+    } finally {
+      state.busy.delete(e.id);
+      render();
+    }
+  });
+  return b;
+}
+
+/** Take a system entry into the owner's book. One click and no question:
+ *  the reason it was booked is already on the row. */
+function adoptButton(e) {
+  const b = el('button', 'act-btn adopt', 'ADOPT');
+  b.disabled = state.busy.has(e.id);
+  b.title = 'make this entry yours: it joins your record and is no longer '
+    + 'closed after its tested starts';
+  b.addEventListener('click', async (event) => {
+    event.stopPropagation();
+    state.busy.add(e.id);
+    render();
+    try {
+      const out = await api.adoptBlackbookEntry(e.id);
+      e.adopted_date = out.adopted_date;
+      // The owner's record has just gained an entry, so the strip is re-read.
       state.summary = await api.blackbookSummary(state.today);
     } catch (err) {
       b.textContent = err.message;
@@ -845,6 +911,11 @@ function renderList() {
     const rows = [];
     shown.forEach((e) => {
       rows.push(entryRow(e));
+      if (isSystem(e)) {
+        const line = systemLine(e);
+        line.addEventListener('click', () => toggleEntry(e));
+        rows.push(line);
+      }
       if (state.open.has(e.id)) rows.push(entryDetail(e));
     });
     host.replaceChildren(...rows);
@@ -856,6 +927,9 @@ function renderList() {
     'CLICK AN ENTRY FOR THE THESIS AND EVERY RUN SINCE — DERIVED FROM THE '
     + 'RUNNERS TABLE, NOT FROM WHAT WAS LOGGED'));
   foot.append(el('span', 'amber', '■ DECLARED AT THE LATEST MEETING'));
+  foot.append(el('span', 'orchid',
+    '■ BOOKED BY THE SYSTEM OFF RESULTS OR TRIALS — CLOSES AFTER 3 STARTS '
+    + 'UNLESS ADOPTED'));
   // The thresholds come off the summary rather than being typed here. This
   // repo has already paid for the other way: `sarr.MIN_PRIOR` was written as a
   // literal 2 in three places, and the page went on quoting a number the model
@@ -942,6 +1016,21 @@ function renderScope() {
     state.account = key;
     reloadScoped();
   }));
+  // Whose record the BY TAG table reads. The system's is the control: the
+  // same reasons, booked by rule, to set the owner's own picks against.
+  // Drawn as the ledger switch beside it is, because it is the same kind of
+  // question: whose record is this.
+  const books = el('div', `acct-pick book-pick${state.analysisBook === 'system' ? ' sys' : ''}`);
+  books.append(el('span', 'lab', 'BOOK'));
+  [['owner', 'YOURS'], ['system', 'SYSTEM']].forEach(([key, label]) => {
+    const on = state.analysisBook === key;
+    const b = el('button', `a-chip${on ? ' on' : ''}`, label);
+    b.type = 'button';
+    b.setAttribute('aria-pressed', String(on));
+    b.addEventListener('click', () => { state.analysisBook = key; reloadScoped(); });
+    books.append(b);
+  });
+  host.append(books);
   host.append(periodPicker(state.period, (key) => {
     state.period = key;
     reloadScoped();
@@ -961,6 +1050,7 @@ function renderScope() {
  *  and every reload ask for exactly the same thing. */
 function _scopeQuery() {
   const q = new URLSearchParams({ period: state.period });
+  if (state.analysisBook !== 'owner') q.set('book', state.analysisBook);
   if (state.account) q.set('account', state.account);
   if (state.season !== null) q.set('season', String(state.season));
   // Anchored on the meeting in the header, like the Bets page. Measuring back
@@ -1026,7 +1116,15 @@ function renderAnalysis() {
     // question than the same one over the whole book, because it names the
     // reason the entry was made. The definition has not been dropped: it is
     // the tag label's hover, two columns to the left, where it always was.
-    row.append(tagBackedVsMissed(state.tagBvm?.[t.tag]));
+    if (state.analysisBook === 'system') {
+      // The ledger is the owner's. A system horse nobody meant to back is
+      // not a miss, so the column says whose it is rather than show one.
+      const box = el('div', 'bvm');
+      box.append(el('span', 'none', 'YOUR BOOK ONLY'));
+      row.append(box);
+    } else {
+      row.append(tagBackedVsMissed(state.tagBvm?.[t.tag]));
+    }
     return row;
   }));
 

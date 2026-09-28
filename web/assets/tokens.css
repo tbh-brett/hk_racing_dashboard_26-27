@@ -45,6 +45,12 @@
   --book:         #2ec4b6;   /* blackbook                   (brief: teal) */
   --book-ground:  #1e4a45;
   --book-dim:     #5f7a78;
+  /* An entry the SYSTEM booked (jobs/auto_book) that the owner has not
+   * adopted. Orchid: the one hue no other signal here uses, so a system
+   * horse never reads as the owner's own teal.                            */
+  --book-sys:        #d58fd0;
+  --book-sys-ground: #2a1a2a;
+  --book-sys-dim:    #7e6480;
 
   --alert:        #e63946;   /* accent; odds firming        (named: UP)   */
   --win:          #35b37e;   /* a win / positive result     (named: WIN)  */

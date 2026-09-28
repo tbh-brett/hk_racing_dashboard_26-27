@@ -134,7 +134,24 @@ def _migrate(conn: sqlite3.Connection) -> None:
     with transaction(conn, immediate=True):
         _migrate_blackbook_close(conn)
         _migrate_blackbook_prefs(conn)
+        _migrate_blackbook_origin(conn)
         _migrate_races_restricted(conn)
+
+
+def _migrate_blackbook_origin(conn: sqlite3.Connection) -> None:
+    """`origin` and `adopted_date`: who booked an entry.
+
+    Every entry already in the book is the owner's, which is what the column's
+    default says, so adding it decides nothing about any of them.
+    """
+    cols = _columns(conn, "blackbook")
+    if not cols:
+        return
+    if "origin" not in cols:
+        conn.execute("ALTER TABLE blackbook ADD COLUMN origin TEXT NOT NULL "
+                     "DEFAULT 'owner'")
+    if "adopted_date" not in cols:
+        conn.execute("ALTER TABLE blackbook ADD COLUMN adopted_date TEXT")
 
 
 def _migrate_races_restricted(conn: sqlite3.Connection) -> None:
