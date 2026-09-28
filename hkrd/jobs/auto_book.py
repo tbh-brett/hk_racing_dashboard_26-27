@@ -11,9 +11,10 @@ page shows them in their own colour, with the reason written out and the day
 they were added. A trial day is read the same way once HKJC has finished
 publishing it, and its STANDOUT trials are booked.
 
-What it does not do is book a horse the book already follows, or read a day
-twice: `auto_book_pass` records every day read, so a horse the owner dismissed
-is not written back the next night.
+What it does not do is book a horse the book already follows — it writes the
+reason on that run as a note instead, "System: …", and never over a note that
+is already there — or read a day twice: `auto_book_pass` records every day
+read, so a horse the owner dismissed is not written back the next night.
 
 A system entry is tested over its next `TESTED_RUNS` starts and then closed —
 RETIRED, with the date and its record in the reason — unless the owner adopted
@@ -83,6 +84,16 @@ def _added(source_date: str, today: str) -> str:
     return min(after, today)
 
 
+def _note_in_book(report: AutoBookReport, written: list[bool]) -> None:
+    """A picked horse the book already follows gets no second entry; the
+    reason it was picked goes on the run as a note instead, unless the run
+    already has one. Said either way."""
+    if written:
+        report.passes[-1] += (f"; noted on {sum(written)} of their runs"
+                              + (f", {len(written) - sum(written)} already had "
+                                 "a note" if not all(written) else ""))
+
+
 def _results(conn, report: AutoBookReport, date: str, basis: str, *,
              today: str, dry_run: bool) -> None:
     by_race = auto_q.meeting_runners(conn, date)
@@ -111,6 +122,10 @@ def _results(conn, report: AutoBookReport, date: str, basis: str, *,
                 added_date=_added(date, today), source_date=date,
                 source_race_no=c.source_no, tags=c.tags,
                 confidence=c.confidence, origin="system")
+        _note_in_book(report, [
+            write_notes.add_system_note(conn, c.horse_name, date, c.source_no,
+                                        c.reasoning(basis=basis))
+            for c in picked if c.horse_name in in_book])
         auto_store.record_pass(
             conn, kind="results", source_date=date, ran_at=_now(), basis=basis,
             considered=considered, flagged=len(flagged), picked=len(picked),
@@ -141,6 +156,10 @@ def _trials(conn, report: AutoBookReport, date: str, *, today: str,
                 added_date=_added(date, today), source_date=date,
                 source_trial_no=c.source_no, tags=c.tags,
                 confidence=c.confidence, origin="system")
+        _note_in_book(report, [
+            write_notes.add_system_note(conn, c.horse_name, date, c.source_no,
+                                        c.reasoning(), trial=True)
+            for c in picked if c.horse_name in in_book])
         auto_store.record_pass(
             conn, kind="trials", source_date=date, ran_at=_now(), basis="full",
             considered=len(rated), flagged=len(flagged), picked=len(picked),

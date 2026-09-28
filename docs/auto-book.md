@@ -23,8 +23,12 @@ record a figure is), `web/assets/book-origin.js` (the colour). Runs from
   sectionals alone, and every entry it writes says so.
 - **Once per trial day**, when HKJC has finished publishing it.
 - Books the top **six** runs of a meeting, and every trial rated **STANDOUT**
-  (at most six a day; it averages 1.6). Never a horse the book already follows,
-  never a winner, never a run with a veterinary finding.
+  (at most six a day; it averages 1.6). Never a winner, never a run with a
+  veterinary finding.
+- A picked horse the book **already follows** gets no second entry. The reason
+  it was picked goes on that run as its note instead — "System: …", on the run
+  (or the trial) it was read from — and only where the run has no note yet: a
+  note the owner wrote is never replaced.
 - Writes them into the blackbook as **system** entries, in the owner's own tag
   vocabulary, dated the day after the meeting, with the reason written out —
   the finish, then each reason, quoting HKJC where HKJC said it:
@@ -47,8 +51,9 @@ Results panel. Adopting makes it the owner's; it reads teal from then on.
 
 | Reason | Read from | Tag | Rule |
 |---|---|---|---|
-| Held up, checked, crowded, hampered, short of room, steadied | stewards' report, comments on running | `traffic` | beaten 6L or less; "restrained" and "taken back" alone do not count |
+| Held up, checked, crowded, hampered, short of room, steadied | stewards' report, comments on running | `traffic` | beaten 6L or less; "restrained" and "taken back" alone do not count, and nor does trouble in a sentence that says the horse was racing keenly |
 | Wide without cover, three or four wide | the same | `bad_run` | beaten 5L or less |
+| Saddle slipped, plate or shoe lost, iron lost | stewards' report | `bad_run` | beaten 6L or less |
 | Fastest or second-fastest closing section | `runner_pace.late_dev` | `final_sectional` | beaten 6L or less |
 | Far back at the turn, passed 4+ in the straight | running positions | `final_sectional` | beaten 4L or less |
 | Slow away | stewards' report | `slow_start` | beaten 4L or less |
@@ -70,11 +75,11 @@ report:
 
 | Picks | Runs | Win A/E | Place A/E |
 |---|---|---|---|
-| all | 912 | 0.91 ±0.21 | 0.94 |
-| with a closing reason | 726 | 0.92 | 0.95 |
-| with traffic | 694 | 0.95 | 0.92 |
-| with a wide trip | 145 | 1.09 ±0.50 | 1.04 |
-| outran its price | 372 | 0.67 ±0.37 | 0.92 |
+| all | 906 | 0.92 ±0.21 | 0.95 |
+| with a closing reason | 717 | 0.94 | 0.95 |
+| with traffic | 673 | 0.99 | 0.92 |
+| with a wide trip | 145 | 0.99 ±0.50 | 0.98 |
+| outran its price | 366 | 0.67 ±0.37 | 0.95 |
 
 The market reads the same stewards' report, and a hard-luck story it can see
 is, if anything, overbet. The owner's own book over the same period: win A/E
@@ -91,6 +96,18 @@ reason, 14% with two, 27% with three; 14% with trouble in the straight against
 8% without; 20% at 50.0 or longer against 6-9% below. The margin made no
 difference. Re-ordering by those moved the overlap from 22 to 25 — the owner's
 picks are spread wider than any six.
+
+**The first live meeting, 2026-09-27** (read on production, before its
+comments on running): the owner booked THE BOOM BOX, BUCEPHALAS and MISTER
+DAPPER off it. The first cut ranked them 18th, 8th and not at all, and two of
+its six were keen horses steadied at the 900m. Two rules came out of it — trouble
+a keen horse brought on itself is not hard luck (388 of 18,867 stewards'
+reports), and gear that failed in the run is (12 saddles, 124 plates) — which
+put BUCEPHALAS (closing, crowded, lost a plate) and THE BOOM BOX (fastest
+closing section from last, saddle slipped) into the six. MISTER DAPPER was
+a judgement about pace, 4th at 33 with no report; no rule here reads that.
+Over the archive the two rules changed the record by a hundredth and the
+overlap with the owner's April-July entries not at all.
 
 **So it is for three things, none of them a tip:**
 

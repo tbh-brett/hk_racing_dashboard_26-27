@@ -92,6 +92,58 @@ def test_a_rider_settling_the_horse_is_not_trouble():
     assert "TAKEN BACK" not in _by_name(bc.race_candidates(_race()))
 
 
+def _pair(incident, *, lbw=2.0, late=0.3):
+    """One run worth reading in a field of six, its closing section middling
+    so that only the text can make it a candidate."""
+    return [_run(1, "WINNER", 1, late=-0.9, pos="1 1 1"),
+            _run(2, "OTHER", 2, lbw=1.0, pos="2 2 2", late=-0.5),
+            _run(3, "THIRD", 3, lbw=1.5, pos="3 3 3", late=-0.2),
+            _run(4, "SUBJECT", 4, lbw=lbw, pos="4 4 4", late=late,
+                 incident=incident),
+            _run(5, "FIFTH", 5, lbw=3.0, pos="5 5 5", late=0.4),
+            _run(6, "LAST", 6, lbw=4.0, pos="6 6 6", late=0.5)]
+
+
+def test_trouble_a_keen_horse_brought_on_itself_is_not_hard_luck():
+    """2026-09-27 R8 and R10: two of the first cut's six picks read exactly
+    like this, and neither was a run that hid its form."""
+    got = _by_name(bc.race_candidates(_pair(
+        "Near the 900 Metres commenced to race keenly and shifted out when "
+        "being steadied to avoid STORMY GROVE.")))
+    assert "SUBJECT" not in got
+
+
+def test_keen_early_does_not_excuse_trouble_later():
+    """Read by the sentence: keen at the 1000m and held up in the straight is
+    still a horse that was held up."""
+    got = _by_name(bc.race_candidates(_pair(
+        "Raced keenly in the early stages.  Over the final 100 Metres was "
+        "held up for clear running.")))
+    assert got["SUBJECT"].kinds == ["traffic"]
+    assert "final 100 Metres" in got["SUBJECT"].reasoning()
+
+
+@pytest.mark.parametrize("text", [
+    "When questioned C Y Ho stated that after making contact at the start his "
+    "saddle shifted back, placing him at a disadvantage throughout.",
+    "Noted to have lost its right front plate after the race.",
+    "Lost a plate during the race.",
+])
+def test_gear_that_failed_in_the_run_is_a_reason(text):
+    """THE BOOM BOX, 2026-09-27 R11: the saddle slipped, and the stewards'
+    report is the only place that says so."""
+    got = _by_name(bc.race_candidates(_pair(text)))
+    assert got["SUBJECT"].kinds == ["equipment"]
+    assert got["SUBJECT"].tags == ["bad_run"]
+    assert "Stewards: “" in got["SUBJECT"].reasoning()
+
+
+def test_a_saddle_mentioned_without_trouble_is_not_a_reason():
+    got = _by_name(bc.race_candidates(_pair(
+        "C Y Ho was fined for presenting with the incorrect saddle cloth.")))
+    assert "SUBJECT" not in got
+
+
 def test_a_run_beaten_a_long_way_is_not_hidden_form():
     assert "TAILED OFF" not in _by_name(bc.race_candidates(_race()))
 
@@ -236,6 +288,44 @@ def test_a_horse_the_book_already_follows_is_not_booked_again(db):
                        "WHERE kind = 'results'").fetchone()
     conn.close()
     assert row["in_book"] == "HELD UP LATE"
+
+
+def _run_note(path, horse):
+    conn = get_conn(path)
+    try:
+        row = conn.execute("SELECT note FROM run_notes WHERE horse_name = ? "
+                           "AND race_date = ? AND race_no = 1",
+                           (horse, MEETING)).fetchone()
+        return row["note"] if row else None
+    finally:
+        conn.close()
+
+
+def test_a_horse_already_followed_gets_the_reason_on_its_run_instead(db):
+    """LET'S HAVE FUN, 2026-09-27: picked, already in the book, so no second
+    entry — the reason it was picked goes on the run as its note."""
+    write_notes.promote_to_blackbook("HELD UP LATE", reasoning="mine", db=db)
+    _publish_comments(db)
+    report = auto_book.run(db, since=MEETING, today=WAITING)
+    note = _run_note(db, "HELD UP LATE")
+    assert note.startswith(write_notes.SYSTEM_NOTE)
+    assert "concluding stages" in note
+    assert "noted on 1 of their runs" in report.passes[0]
+
+
+def test_the_owners_note_on_a_run_is_never_replaced(db):
+    write_notes.promote_to_blackbook("HELD UP LATE", reasoning="mine", db=db)
+    write_notes.save_note("HELD UP LATE", MEETING, 1, "my own words", db=db)
+    _publish_comments(db)
+    report = auto_book.run(db, since=MEETING, today=WAITING)
+    assert _run_note(db, "HELD UP LATE") == "my own words"
+    assert "already had a note" in report.passes[0]
+
+
+def test_a_horse_the_system_booked_gets_an_entry_not_a_note(db):
+    _publish_comments(db)
+    auto_book.run(db, since=MEETING, today=WAITING)
+    assert _run_note(db, "HELD UP LATE") is None
 
 
 def test_a_dry_run_writes_nothing(db):
@@ -409,6 +499,23 @@ def test_a_standout_trial_is_booked_with_its_comment(db):
     assert star["added_date"] == TRIAL_DAY           # never a day in the future
     assert "Rated STANDOUT" in star["reasoning"]
     assert any(p.startswith("trials") for p in report.passes)
+
+
+def test_a_standout_already_followed_gets_a_trial_note_not_a_run_note(db):
+    """A trial is a T, not an R: its note goes on the trial, where a note on
+    race 3 of that date would be a different run altogether."""
+    write_notes.promote_to_blackbook("TRIAL STAR", reasoning="mine", db=db)
+    _trials(db)
+    auto_book.run(db, since=TRIAL_DAY, today=TRIAL_DAY)
+    conn = get_conn(db)
+    try:
+        trial = conn.execute("SELECT note FROM trial_notes WHERE trial_no = 3"
+                             ).fetchone()
+        races = conn.execute("SELECT count(*) FROM run_notes").fetchone()[0]
+    finally:
+        conn.close()
+    assert trial["note"].startswith(write_notes.SYSTEM_NOTE)
+    assert races == 0
 
 
 def test_a_trial_day_hkjc_has_not_finished_waits(db):

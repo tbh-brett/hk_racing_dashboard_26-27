@@ -24,7 +24,7 @@ from hkrd.store.connect import db_path, get_conn, transaction
 __all__ = ["save_note", "delete_note", "save_trial_note",
            "delete_trial_note", "promote_to_blackbook", "insert_entry",
            "next_entry_id", "set_status", "set_triggers", "adopt",
-           "close_tested"]
+           "close_tested", "add_system_note", "SYSTEM_NOTE"]
 
 
 def _now() -> str:
@@ -109,6 +109,33 @@ def delete_trial_note(horse_name: str, trial_date: str, trial_no: int, *,
         return cur.rowcount > 0
     finally:
         conn.close()
+
+
+#: How a note the system wrote begins, so it never reads as the owner's own.
+SYSTEM_NOTE = "System: "
+
+
+def add_system_note(conn, horse_name: str, date: str, number: int, note: str,
+                    *, trial: bool = False) -> bool:
+    """The system's reading of a run, as that run's note — inside the caller's
+    transaction, and only where the run has no note yet. True if written.
+
+    `jobs/auto_book` writes one when it picks a horse the book already
+    follows: there is no entry to write, and the reason it picked the run is
+    still worth having on the run itself. A run carries one note, so an
+    existing one — the owner's words — is never replaced.
+    """
+    table, number_col = (("trial_notes", "trial_no") if trial
+                         else ("run_notes", "race_no"))
+    date_col = "trial_date" if trial else "race_date"
+    before = conn.total_changes
+    conn.execute(
+        f"INSERT INTO {table} (horse_name, {date_col}, {number_col}, note, "
+        f"written_at) VALUES (?, ?, ?, ?, ?) "
+        f"ON CONFLICT (horse_name, {date_col}, {number_col}) DO NOTHING",
+        (horse_name.strip().upper(), date, number,
+         SYSTEM_NOTE + note.strip(), _now()))
+    return conn.total_changes > before
 
 
 def next_entry_id(conn) -> str:

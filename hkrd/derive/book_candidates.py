@@ -5,9 +5,10 @@ writes the few runs that ran better than they finished. It uses the owner's own
 reasons, each read off data the dashboard already holds:
 
     reason                          read from                        owner's tag
-    held up, checked, crowded       stewards' report, comments on    traffic
-                                    running
+    held up, checked, crowded —     stewards' report, comments on    traffic
+    unless it was racing keenly     running
     wide without cover, 3-4 wide    the same two texts               bad_run
+    saddle slipped, plate lost      stewards' report                 bad_run
     fastest closing section, or     sectionals, running positions    final_sectional
     far back at the turn and closing
     slow away and still close       stewards' report                 slow_start
@@ -76,12 +77,32 @@ _WIDE_TRIP = re.compile(r"\bwithout cover\b|\bno cover\b|"
 # costs a position in the run. The first is what the owner books.
 _LATE = re.compile(r"\bstraight\b|\bfinal\b|\bconcluding\b|\bclosing stages\b|"
                    r"\bhome\b|\b[1-4]00\s*metres\b", re.I)
+# A horse pulling for its head and being steadied off the heels in front
+# brought the trouble on itself. 388 of 18,867 stewards' reports (2.1%) put
+# the two in one sentence. On 2026-09-27 two of the first cut's six picks were
+# exactly that — "commenced to race keenly and shifted out when being steadied"
+# — and neither was a run that hid its form.
+_KEEN = re.compile(r"\bkeen(?:ly)?\b|\bover[- ]?rac(?:ed|ing)\b|"
+                   r"\bpull(?:ed|ing) hard\b", re.I)
+# Gear that failed during the run: a saddle that slipped, a plate or shoe lost,
+# an iron lost. Not in the tag vocabulary, and rare — 12 saddles and 124
+# plates in 18,867 reports — but it is the whole story when it happens. THE
+# BOOM BOX on 2026-09-27: "his saddle shifted back, placing him at a
+# disadvantage throughout the early and middle stages", then the fastest
+# closing section in the race from last at the turn.
+_EQUIPMENT = re.compile(
+    r"\bsaddle\b[^.]{0,40}\b(?:shifted|slipped|moved|displaced)\b|"
+    r"\b(?:shifted|slipped)\b[^.]{0,20}\bsaddle\b|"
+    r"\blost (?:a|an|its|his|her|the)?\s*(?:\w+\s+){0,2}(?:plate|shoe|iron)s?\b|"
+    r"\bspread a plate\b|\bbit (?:slipped|through)\b|\breins? (?:broke|snapped)\b",
+    re.I)
 _QUOTE_MAX = 180
 
 
 @dataclass(frozen=True)
 class Evidence:
-    kind: str                       # closing | traffic | wide | slow_start | outran_price
+    kind: str                       # closing | traffic | wide | slow_start |
+                                    # equipment | outran_price
     text: str                       # what the entry says about it
     tags: tuple[str, ...]           # in the owner's vocabulary
     late: bool = False              # trouble in the straight
@@ -200,6 +221,10 @@ def _is_traffic(sentence: str) -> bool:
     hit = {t.name for t in tagger.tag_comment(sentence)} & _TRAFFIC
     if not hit:
         return False
+    # Its own doing. Only the SENTENCE is read, so a horse keen early and held
+    # up in the straight — two sentences — still counts for the second.
+    if _KEEN.search(sentence):
+        return False
     # "restrained" and "taken back" are how a rider settles a horse, not
     # trouble it met. Only the words themselves count for those two.
     if hit == {"held_up"}:
@@ -280,6 +305,12 @@ def _evidence(run: dict[str, Any], *, field_size: int, late_rank: int | None,
         if slow:
             src, s = slow[0]
             out.append(Evidence("slow_start", _quote(src, s), ("slow_start",)))
+
+    if lbw <= _TROUBLE_LBW:
+        gear = [(src, s) for src, s in texts if _EQUIPMENT.search(s)]
+        if gear:
+            src, s = gear[0]
+            out.append(Evidence("equipment", _quote(src, s), ("bad_run",)))
 
     odds = run.get("win_odds")
     if odds and odds >= _LONG_ODDS and (place <= 3 or lbw <= _OUTRAN_LBW):
