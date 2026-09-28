@@ -237,7 +237,29 @@ def preview(rec: dict, card, fetched_at: str
                     "quote_en": None, "topic": None, "stance": None,
                     "confidence": kept[0]["score"], "extracted_by": EXTRACTOR,
                     "fetched_at": fetched_at})
-    return quotes, picks, held
+    return unique_seconds(quotes), picks, held
+
+
+def unique_seconds(quotes: list[dict]) -> list[dict]:
+    """One quote per whole second of a video, because that is its key.
+
+    A quote is stored as `<video_id>:<int(t_start)>` (store.tips.quote_id),
+    and two sentences of one caption line share the line's start: on 16 Sep
+    the words under R3 #5 and R3 #1 both began at 772s, and the import
+    refused the whole meeting for the duplicate. A later quote on a taken
+    second moves to the next free one — its link lands a second late — and
+    the same video re-extracted gets the same keys.
+    """
+    taken: set[tuple[str, int]] = set()
+    for q in quotes:
+        t = int(q["t_start"])
+        while (q["video_id"], t) in taken:
+            t += 1
+        taken.add((q["video_id"], t))
+        if t != int(q["t_start"]):
+            q["t_start"] = float(t)
+            q["url"] = f"https://www.youtube.com/watch?v={q['video_id']}&t={t}s"
+    return quotes
 
 
 def _pundit(lines: list[dict], show: str) -> str:

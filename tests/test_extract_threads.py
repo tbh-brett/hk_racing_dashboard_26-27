@@ -74,3 +74,19 @@ def test_the_picks_pass_the_payload_contract(posts):
             "selections": threads.selections(posts, "2026-09-13",
                                              "2026-09-25T04:00:00Z")}
     assert parse(json.loads(json.dumps(body))).selections[0]["horse_no"] == 10
+
+
+# ── the feed's own age ──────────────────────────────────────────────────────
+
+_FEED_HEAD = ("<?xml version='1.0' encoding='utf-8'?><rss version='2.0'>"
+              "<channel><title>horsedetective</title>"
+              "<lastBuildDate>Mon, 21 Sep 2026 10:09:18 GMT</lastBuildDate>")
+
+
+def test_the_feed_says_when_it_was_last_built():
+    import harvest_threads as harvest
+    built = harvest.feed_built(_FEED_HEAD + "<item><pubDate>Wed, 16 Sep 2026 "
+                               "13:58:04 GMT</pubDate></item></channel></rss>")
+    # The channel's build date, never an item's publish date.
+    assert built.isoformat() == "2026-09-21T10:09:18+00:00"
+    assert harvest.feed_built("<rss><channel></channel></rss>") is None

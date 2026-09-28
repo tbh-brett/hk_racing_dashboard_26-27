@@ -407,9 +407,12 @@ def show(payload: dict, card_by: dict[tuple[int, int], dict]) -> None:
               f"conf {q['confidence']}  「{q['quote'][:30]}…」")
     for s in payload["selections"]:
         x = card_by.get((s["race_no"], s["horse_no"]), {})
-        race = [v.get("name_zh") for k, v in card_by.items()
+        # The name in the language it was given in: an English pick checked
+        # against the Chinese card read "name_unknown" on every horse.
+        lang = "name_zh" if names.is_chinese(s["name_seen"]) else "horse_name"
+        race = [v.get(lang) for k, v in card_by.items()
                 if k[0] == s["race_no"] and k[1] != s["horse_no"]]
-        check = names.verdict_heard(s["name_seen"], x.get("name_zh"), race)
+        check = names.verdict_heard(s["name_seen"], x.get(lang), race)
         print(f"    pick  {s['tipster']} #{s['pick_rank']}  heard "
               f"「{s['name_seen']}」 -> {who(s['race_no'], s['horse_no'])}  "
               f"[{s['caption_kind']}] {check or 'name agrees'}")

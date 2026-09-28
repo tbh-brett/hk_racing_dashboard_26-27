@@ -49,6 +49,7 @@ EVERY CLAIM BELOW WAS TESTED LIVE, 2026-09-21 and 2026-09-22. None is inferred.
         Race previews – Sha Tin 12/07/26              DD/MM/YY; `Shatin` also occurs
         [Racing To Win Interviews]: … | Meeting 87 | 12 Jul
         賽前Highlights｜9.23谷草9場夜馬 …              谷=HV 田=ST, 草=turf 泥=AWT
+        賽前Highlights｜9.27沙田8草3泥11場日馬 …       venue in full, a split card
         兵馬檢閱｜告東尼 …                            per-stable, no meeting
 
 WHAT THIS DOES NOT SOLVE, AND YOU SHOULD NOT PRETEND IT DOES
@@ -290,11 +291,22 @@ SURFACE_ZH = {"草": "Turf", "泥": "AWT"}
 # `CC中文字幕` in a title is the channel's own flag that the video carries
 # human-written subtitles rather than only the auto track -- worth reading,
 # because it predicts whether the horse names will be correct.
+#
+# THE KIND AND THE DATE ARE THE IDENTITY; the rest is read if it is there.
+# The first form below was the only one parsed, and on 27 Sep the channel
+# wrote the venue in full and the surface as a split, so the whole preview
+# was filed as "other" and never fetched. The forms seen so far:
+#   9.23谷草9場夜馬   9.27沙田8草3泥11場日馬   9.6開鑼戰沙田10場   9.9谷草開鑼戰
 _ZH_MEETING = re.compile(
     r"(?P<kind>賽前Highlights|賽後Spotlights)\s*[｜|]\s*"
-    r"(?P<mon>\d{1,2})[.\-/](?P<day>\d{1,2})\s*"
-    r"(?P<venue>[谷田從])(?P<surface>[草泥])\s*"
-    r"(?:(?P<races>\d{1,2})\s*場)?")
+    r"(?P<mon>\d{1,2})[.\-/](?P<day>\d{1,2})(?P<head>\S*)")
+_ZH_VENUE_FULL = re.compile(r"沙田|跑馬地|快活谷|從化")
+_ZH_VENUE_SHORT = re.compile(r"([谷田從])(?=[草泥])")
+_VENUES_ZH_FULL = {"沙田": "ST", "跑馬地": "HV", "快活谷": "HV", "從化": "CH"}
+_ZH_RACES = re.compile(r"(\d{1,2})\s*場")
+# A title that names a meeting's preview in words this file cannot date. Said
+# aloud by the harvester, where "not this kind" would have hidden it.
+_LOOKS_DATED = re.compile(r"賽前Highlights|race\s*previews?|racing to win", re.I)
 
 _ZH_KINDS = (
     ("兵馬檢閱", "stable_zh"),
@@ -368,10 +380,17 @@ def parse_title(title: str, *, season_hint: int | None = None) -> dict[str, Any]
                 d = dt.date(year, month, int(m["day"])).isoformat()
             except ValueError:
                 d = None
-        return {"kind": kind, "race_date": d,
-                "venue": VENUES_ZH.get(m["venue"]),
-                "surface": SURFACE_ZH.get(m["surface"]),
-                "races_billed": int(m["races"]) if m["races"] else None,
+        head = m["head"]
+        full = _ZH_VENUE_FULL.search(head)
+        short = _ZH_VENUE_SHORT.search(head)
+        venue = (_VENUES_ZH_FULL[full.group(0)] if full
+                 else VENUES_ZH[short.group(1)] if short else None)
+        # One surface when only one is named; a card of both (8草3泥) has none.
+        named = {s for ch, s in SURFACE_ZH.items() if ch in head}
+        races = _ZH_RACES.findall(head)
+        return {"kind": kind, "race_date": d, "venue": venue,
+                "surface": named.pop() if len(named) == 1 else None,
+                "races_billed": int(races[-1]) if races else None,
                 "manual_subs_claimed": "CC中文字幕" in t,
                 "meeting_no": None}
 
@@ -556,6 +575,32 @@ def fetch_video(video_id: str, *, session: requests.Session,
     }
 
 
+def dated_near(race_date: str | None, published: str | None) -> str | None:
+    """A yearless title's date, in whichever year puts it nearest the upload.
+
+    The season hint dates 「7.12」 to the season's July, which for last
+    season's preview is a year too late: harvested on 28 Sep 2026, the 12 Jul
+    2026 preview read as 2027-07-12, a meeting "upcoming" for ten months. The
+    upload date settles it, since a preview goes up days before its meeting.
+    """
+    if not race_date or not published:
+        return race_date
+    try:
+        d = dt.date.fromisoformat(race_date)
+        pub = dt.date.fromisoformat(published[:10])
+    except ValueError:
+        return race_date
+    best = d
+    for year in (pub.year - 1, pub.year, pub.year + 1):
+        try:
+            c = d.replace(year=year)
+        except ValueError:                      # 29 Feb in a common year
+            continue
+        if abs((c - pub).days) < abs((best - pub).days):
+            best = c
+    return best.isoformat()
+
+
 def assemble(video: dict, meta: dict) -> dict:
     """Join the pieces into the record that goes on disk."""
     segs = video["segments"]
@@ -646,11 +691,14 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     tally = {"saved": 0, "skipped": 0, "no_captions": 0, "filtered": 0, "error": 0}
+    unread: list[str] = []
     done = 0
 
     with manifest.open("a", encoding="utf-8") as log:
         for it in items:
             meta = parse_title(it.get("title") or "", season_hint=args.season_year)
+            if meta["kind"] == "other" and _LOOKS_DATED.search(it.get("title") or ""):
+                unread.append(f"{it['id']}  {it.get('title')}")
             if meta["kind"] not in kinds:
                 tally["filtered"] += 1
                 continue
@@ -673,6 +721,7 @@ def main(argv: list[str] | None = None) -> int:
                 log.flush()
                 continue
 
+            meta["race_date"] = dated_near(meta["race_date"], video["published"])
             record = assemble(video, {"source_id": args.playlist or args.channel,
                                       "source_title": it.get("title"), **meta})
             target.write_text(json.dumps(record, ensure_ascii=False, indent=1),
@@ -712,6 +761,14 @@ def main(argv: list[str] | None = None) -> int:
     print(f"\n  saved {tally['saved']}   skipped {tally['skipped']}   "
           f"no captions {tally['no_captions']}   "
           f"not this kind {tally['filtered']}   errors {tally['error']}")
+    if unread:
+        # A preview the title reader could not date is counted as "not this
+        # kind" above, which is how 27 Sep's Fact Check went unfetched.
+        print(f"  TITLE NOT UNDERSTOOD — {len(unread)} look like a meeting's "
+              f"video but carry no date this reader knows (tools/"
+              f"harvest_youtube.py, parse_title):")
+        for line in unread[:5]:
+            print(f"    {line}")
     if tally["no_captions"]:
         print("  NOTE: 'no captions' means YouTube listed no caption track, or "
               "listed one and served nothing. The second case is the PO-token "

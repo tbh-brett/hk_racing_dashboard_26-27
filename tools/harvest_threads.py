@@ -17,6 +17,13 @@ matters for three reasons: it is a plain GET of XML so it needs no browser and
 no login; Open RSS does the fetching, so nothing here touches a page Threads
 disallows in robots.txt; and it runs anywhere, including a server.
 
+IT CAN ALSO GO STALE. By 28 Sep Open RSS had not rebuilt this feed since
+21 Sep, and the account's two picks of 23 Sep never reached it. Nothing here
+can make the service rebuild; every poll reports the build date and says
+STALE past two days (STALE_AFTER_DAYS). Scraping the profile page instead is
+not an option: Threads' robots.txt forbids automated collection without its
+written permission.
+
 RSSHub's public instance (rsshub.app/threads/horsedetective) sits behind a
 Cloudflare challenge and is not usable unattended. Self-hosting RSSHub is the
 alternative if the four-item cap ever becomes the binding constraint.
@@ -125,6 +132,13 @@ RESULT = re.compile(r"R\s*\d{1,2}[^\n]{0,40}(?:✅|倍[QT]|單T)")
 # `[王子]` — which of the two runs the account signs the post.
 AUTHOR = re.compile(r"^\s*\[([^\]]{1,12})\]")
 
+# A FEED CAN STOP BEING REBUILT and still answer 200 with the same four items.
+# Measured 28 Sep 2026: Open RSS last built this one on 21 Sep, and every poll
+# since read "seen 4 new 0" while the account posted two picks on 23 Sep. So
+# the feed's own <lastBuildDate> is reported on every poll, and a build older
+# than this is said out loud: "new 0" from it is not "nothing was posted".
+STALE_AFTER_DAYS = 2
+
 
 def fetch(url: str, *, timeout: float = 30.0) -> tuple[int, str]:
     req = urllib.request.Request(url, headers={
@@ -151,6 +165,17 @@ def _tag(block: str, name: str) -> str:
     if cd:
         v = cd.group(1)
     return html.unescape(v).strip()
+
+
+def feed_built(xml: str) -> dt.datetime | None:
+    """When the feed service last rebuilt the feed, from <lastBuildDate>."""
+    raw = _tag(xml.split("<item>", 1)[0], "lastBuildDate")
+    for fmt in ("%a, %d %b %Y %H:%M:%S %Z", "%a, %d %b %Y %H:%M:%S %z"):
+        try:
+            return dt.datetime.strptime(raw, fmt).replace(tzinfo=dt.timezone.utc)
+        except ValueError:
+            continue
+    return None
 
 
 def parse_feed(xml: str) -> list[dict]:
@@ -248,8 +273,18 @@ def run_once(handle: str, out: Path) -> dict:
                     timespec="seconds")
                 f.write(json.dumps(p, ensure_ascii=False) + "\n")
 
-    return {"status": status, "seen": len(posts), "new": len(fresh),
-            "items": fresh}
+    built = feed_built(xml)
+    age = ((dt.datetime.now(dt.timezone.utc) - built).total_seconds() / 86400
+           if built else None)
+    out_ = {"status": status, "seen": len(posts), "new": len(fresh),
+            "items": fresh, "built": built, "stale": age is None
+            or age > STALE_AFTER_DAYS}
+    if out_["stale"]:
+        out_["note"] = (f"STALE FEED — last rebuilt "
+                        f"{built:%d %b %H:%M} UTC, {age:.0f} days ago; 'new 0' "
+                        f"does not mean nothing was posted" if built else
+                        "the feed carries no build date; its age is unknown")
+    return out_
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -263,11 +298,13 @@ def main(argv: list[str] | None = None) -> int:
                         "(1800 = every 30 min)")
     args = p.parse_args(argv)
 
-    def poll() -> None:
+    def poll() -> dict:
         r = run_once(args.handle, args.out)
         now = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+        built = (f"  built {r['built']:%Y-%m-%dT%H:%M}Z" if r.get("built")
+                 else "")
         line = (f"{now}  http {r['status']}  seen {r['seen']}  new {r['new']}"
-                + (f"  — {r['note']}" if r.get("note") else ""))
+                + built + (f"  — {r['note']}" if r.get("note") else ""))
         print(line)
         for it in r.get("items", []):
             sel = " ".join(f"R{s['race_no']}#{s['horse_no']}·{s['name_zh']}"
@@ -276,11 +313,14 @@ def main(argv: list[str] | None = None) -> int:
                   f"{it['author_tag'] or '·'}  {sel}")
             print(f"      {it['text'][:110]}")
         (args.out / "poll.log").open("a", encoding="utf-8").write(line + "\n")
+        return r
 
     args.out.mkdir(parents=True, exist_ok=True)
     if not args.watch:
-        poll()
-        return 0
+        r = poll()
+        # Non-zero when nothing trustworthy was read, so ops/tips.ps1 says
+        # "reported a problem" rather than carrying on as if all were well.
+        return 2 if r.get("stale") or r["status"] != 200 or not r["seen"] else 0
 
     print(f"watching @{args.handle} every {args.watch}s — Ctrl-C to stop\n")
     try:

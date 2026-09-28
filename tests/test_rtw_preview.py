@@ -96,3 +96,15 @@ def test_only_the_closing_words_are_kept(card):
     assert quotes and all(q["race_no"] in (3, 6) for q in quotes)
     assert all(len(q["quote"]) < 400 for q in quotes)
     assert all(q["role"] == "presenter" for q in quotes)
+
+
+def test_two_quotes_on_one_second_of_a_video_get_two_keys():
+    # 16 Sep, 13TzmT9DJ_Q: the words under R3 #5 and R3 #1 both began at
+    # 772s, and the import refused the meeting for the duplicate key.
+    from extract_rtw_preview import unique_seconds
+    q = lambda no, t: {"video_id": "v", "t_start": t, "horse_no": no,
+                       "url": f"https://www.youtube.com/watch?v=v&t={int(t)}s"}
+    got = unique_seconds([q(5, 772.0), q(1, 772.4), q(2, 773.0), q(9, 900.0)])
+    assert [int(x["t_start"]) for x in got] == [772, 773, 774, 900]
+    assert got[1]["url"].endswith("&t=773s")
+    assert unique_seconds([q(5, 772.0), q(1, 772.4)])[1]["t_start"] == 773.0

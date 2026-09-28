@@ -8,7 +8,8 @@
     prints what it did:
 
       1. harvest   the newest Fact Check previews to raw\factcheck, the
-                   newest Racing To Win interviews to raw\rtw, and
+                   newest Racing To Win previews and interviews to
+                   raw\rtw, and
                    Sportsbet's fixed odds and Racing & Sports comments
                    for the next meeting to out\ (Sportsbet refuses the
                    server)
@@ -46,6 +47,11 @@ $env:PYTHONUTF8 = "1"
 $py = ".venv\Scripts\python.exe"
 if (-not (Test-Path $py)) { $py = "python" }
 
+# Every run appends to one log (the scheduled task's `>> out\tips-run.log`),
+# so each says when it started: without it, which run missed what cannot be read.
+Write-Host ""
+Write-Host "  ===== tips run $(Get-Date -Format 'yyyy-MM-dd HH:mm') =====" -ForegroundColor Cyan
+
 function Head ($t) { Write-Host ""; Write-Host "  $t" -ForegroundColor Cyan; Write-Host "  $('-' * $t.Length)" -ForegroundColor DarkGray }
 
 # A Hong Kong season opens in September; the titles carry no year.
@@ -63,9 +69,11 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "  harvest reported a problem; carrying on with what is on disk" -ForegroundColor Yellow
 }
 
-Head "1b. harvest  Racing To Win interviews (PLK8zYRjJwINk)"
+Head "1b. harvest  Racing To Win previews + interviews (PLK8zYRjJwINk)"
+# Both kinds: the preview carries the pundits' picks race by race. Asking for
+# interviews alone is how every preview this season went unfetched.
 & $py tools\harvest_youtube.py --playlist PLK8zYRjJwINk `
-    --lang en --season-year $season --kinds interview `
+    --lang en --season-year $season --kinds interview preview `
     --pages 1 --limit 6 --out raw\rtw
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  harvest reported a problem; carrying on with what is on disk" -ForegroundColor Yellow
