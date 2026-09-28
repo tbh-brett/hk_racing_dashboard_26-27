@@ -1,0 +1,22 @@
+/* background.css — where an import came from (background.js), on the
+ * Briefing and Race Day alike. */
+
+.bf-bg {
+  margin-top: 9px; padding: 5px 8px; border-left: 2px solid var(--line-3);
+  font-size: 12px; line-height: 1.45;
+}
+.bf-bg .hd { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.bf-bg .cap { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; color: var(--text-muted); }
+.bf-bg .go { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); }
+.bf-bg .facts { color: var(--text-2); }
+.bf-bg .who { color: var(--text); }
+.bf-bg .about {
+  margin-top: 3px; color: var(--text-muted); cursor: pointer;
+  display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
+}
+.bf-bg .about.open { display: block; }
+/* The agent, on the row and in the block: a name, not a verdict. */
+.bf-agent {
+  padding: 0 4px; border: 1px solid var(--line-3); white-space: nowrap;
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .04em; color: var(--text);
+}

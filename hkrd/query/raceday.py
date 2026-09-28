@@ -21,7 +21,7 @@ from dataclasses import replace
 from typing import Any
 
 from hkrd.derive.probability import devig
-from hkrd.query import (blackbook as bb_q,
+from hkrd.query import (background as background_q, blackbook as bb_q,
                         gear as gear_q, h2h as h2h_q, market as market_q,
                         money as money_q, movement as movement_q,
                         pools as pools_q, rating as rating_q, vet as vet_q)
@@ -247,6 +247,12 @@ def build_card(date: str, race_no: int, *,
         # A card nobody scored is a fault the strip above this table can act
         # on, and it outranks every per-runner reason below it.
         scored_card = rating_q.race_was_scored(conn, date, race_no)
+        # Where each import came from, for its first few starts only: after
+        # that its own form says more (query/background).
+        backgrounds = background_q.for_horses(
+            [r.horse_name for r in race.runners
+             if prior_runs.get(r.horse_name, 0) < background_q.EARLY_STARTS],
+            conn=conn)
 
         runners: list[dict[str, Any]] = []
         for r in race.runners:
@@ -307,6 +313,7 @@ def build_card(date: str, race_no: int, *,
                 "rank_delta": (r.sarr_rank - m_rank
                                if r.sarr_rank and m_rank else None),
                 "sarr_prior": prior_runs.get(r.horse_name, 0),
+                "background": backgrounds.get(r.horse_name),
                 "sarr_unrated": rating_q.unrated_reason(
                     r.sarr_rank, prior_runs.get(r.horse_name, 0),
                     card_scored=scored_card),

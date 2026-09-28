@@ -197,6 +197,9 @@ def _runner(r: dict, sc: dict, race: dict, book: dict | None, notes: list,
         "reversals": reversals,
         "blackbook": book,
         "result": r["place"],
+        # Hong Kong starts before this one: the Briefing shows a horse's
+        # background for its first few (query/background).
+        "starts": len(r["prior_dates"]),
     }
 
 

@@ -94,6 +94,11 @@
 # pruned any more than the tote's are. A day with no meeting stored is a quiet
 # no-op, not a failure — the job only acts on today's card.
 */30 8-22 * * *   nice -n 19 python -m hkrd.jobs.scrape_fixed_odds --db /data/hkrd.db
+# Where each new import came from: HKJC's "Intro to New Horses", for the
+# Briefing's and Race Day's background line and the background record. A
+# profile goes up a few days before a horse's first declared race and is not
+# revised, so once a day is ample; a day with nothing new is one request.
+50 13 * * *   nice -n 19 python -m hkrd.jobs.scrape_background --db /data/hkrd.db
 
 # Live odds. A different cadence again, because odds are the only signal here
 # that moves minute to minute — the favourite changes between morning and post

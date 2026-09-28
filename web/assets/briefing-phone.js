@@ -126,6 +126,7 @@ function opened(r, ctx) {
     }
     x.marks.forEach((m) => l2.append(markEl(m)));
     x.chips.forEach((ch) => l2.append(chipEl(ch)));
+    if (x.agent) l2.append(el('span', 'bf-agent', `AG ${x.agent}`));
     if (x.move) l2.append(el('span', `move t-${x.move.tone}`, x.move.t));
     row.append(l1, l2);
     box.append(row);

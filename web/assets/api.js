@@ -117,6 +117,7 @@ export const api = {
   money: (date) => get(`/money/${date}`),
   tipsSummary: (date) => get(`/tips/summary/${date}`),
   tipsRecord: () => get('/tips/record'),
+  backgroundRecord: () => get('/background/record'),
   briefing: (date, asOf) => get(`/briefing/${date}${asOf ? `?as_of=${encodeURIComponent(asOf)}` : ''}`),
   screen: (date) => get(`/screen/${date}`),
   meetingBlackbook: (date) => get(`/raceday/${date}/blackbook`),

@@ -773,6 +773,44 @@ CREATE INDEX IF NOT EXISTS ix_tq_date ON tips_quarantine(race_date, source);
 -- refitted, and recomputing would rescore every race it has already been
 -- judged on with weights that were not the ones in force. So the FIRST row
 -- written for a runner is the one kept, and nothing rewrites it.
+-- Where each import came from, from HKJC's "Intro to New Horses"
+-- (ingest/newhorse). One row per horse, written for the race it was first
+-- declared for and never revised by HKJC. Raw: none of it can be rebuilt
+-- from anything else here. Covers the imports from 2025/26 on, which is as
+-- far back as the site goes. `agents` is every bloodstock agent the profile
+-- names, comma-separated; `about` is the profile's own paragraph, kept so a
+-- field the rules could not read is still there to be read.
+CREATE TABLE IF NOT EXISTS horse_background (
+  horse_name       TEXT PRIMARY KEY,   -- the join key, as on the card
+  brand_no         TEXT,
+  profiled_for     TEXT NOT NULL,      -- the race date the profile was written for
+  path             TEXT NOT NULL,      -- the profile's address in HKJC's index
+  url              TEXT NOT NULL,
+  origin           TEXT,               -- where it was foaled
+  import_type      TEXT NOT NULL,      -- PP (raced) | PPG (unraced) | ISG (HKJC sale)
+  sire             TEXT,
+  dam              TEXT,
+  sire_hk_starters INTEGER,
+  sire_hk_winners  INTEGER,
+  sale_kind        TEXT,               -- of its highest sale: weanling | yearling | 2yo ...
+  sale_ccy         TEXT,
+  sale_amount      REAL,
+  sale_aud         REAL,               -- approximate, for banding only
+  sales_text       TEXT,
+  prev_name        TEXT,
+  prev_trainer     TEXT,
+  prev_owner       TEXT,
+  buyer            TEXT,
+  prev_country     TEXT,               -- where it was TRAINED before import
+  agents           TEXT,
+  overseas_starts  INTEGER,
+  overseas_wins    INTEGER,
+  trial_won        INTEGER,            -- unraced imports only: won a trial or jump-out
+  about            TEXT,
+  fetched_at       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_hb_path ON horse_background(path);
+
 CREATE TABLE IF NOT EXISTS screen_pick (
   race_date   TEXT    NOT NULL,
   race_no     INTEGER NOT NULL,

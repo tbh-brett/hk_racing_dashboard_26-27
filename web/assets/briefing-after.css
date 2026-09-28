@@ -121,3 +121,21 @@
   .bf-rec-groups .g2 { grid-column: 6 / 7; }
   .bf-rec-row .c-src { font-size: 12px; }
 }
+
+/* ── the background record (briefing-background.js) ──────────────────── */
+
+.bf-bgtabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 8px; }
+.bf-bgtabs .tab {
+  padding: 2px 8px; border: 1px solid var(--line-3); background: none; cursor: pointer;
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .04em; color: var(--text-dim);
+}
+.bf-bgtabs .tab.on { color: var(--text); border-color: var(--text-dim); }
+.bf-bgrow { grid-template-columns: minmax(0, 2fr) 54px 48px 96px 48px 60px 56px; }
+.bf-bgrow .gn { overflow: hidden; text-overflow: ellipsis; }
+
+@media (max-width: 999px) {
+  .bf-bgrow { grid-template-columns: minmax(0, 1fr) 44px 64px 44px 46px; }
+  .bf-bgrow .c-runs, .bf-bgrow .c-rt { display: none; }
+  /* The sources' record drops A/E on a phone; here it is the point. */
+  .bf-bgrow .c-ae { display: block; }
+}

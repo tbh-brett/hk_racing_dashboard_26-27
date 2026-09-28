@@ -35,7 +35,7 @@ import datetime as dt
 from dataclasses import dataclass
 from typing import Any
 
-from hkrd.query import market, money, movement, screen, tips_summary
+from hkrd.query import background, market, money, movement, screen, tips_summary
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["meeting", "CLOCK", "Due", "LATE_FIRMING", "MARKET_APART"]
@@ -124,7 +124,7 @@ def _stage(date: str, now: dt.datetime, clock: list[dict],
 
 def _runner(s: dict, tip: dict | None, form: dict | None, odds: dict | None,
             zh: str | None, move: dict | None, mrank: int | None,
-            priced: bool) -> dict[str, Any]:
+            priced: bool, bg: dict | None = None) -> dict[str, Any]:
     ident = ("horse_no", "horse_name", "draw", "jockey", "trainer", "rating",
              "weight", "gear", "style")
     gear_first = [g[:-1] for g in (s["gear"] or "").replace(",", " ").split()
@@ -135,6 +135,8 @@ def _runner(s: dict, tip: dict | None, form: dict | None, odds: dict | None,
         "screen": {k: v for k, v in s.items()
                    if k not in ident and k not in ("blackbook", "result")},
         "blackbook": s["blackbook"],
+        # Where it came from, for its first few starts (query/background).
+        "background": bg,
         "support": None if not tip else {
             "sources": tip["supporters"], "top_picks": tip["top_picks"],
             "interviewed": tip["interviewed"], "backed_by": tip["backed_by"]},
@@ -261,6 +263,9 @@ def _meeting(conn: Connection, date: str, now: dt.datetime) -> dict[str, Any]:
     # day (module docstring).
     priced = any(tips["captured"].values())
 
+    bgs = background.for_horses(
+        [s["horse_name"] for sr in scr["races"] for s in sr["runners"]
+         if s["starts"] < background.EARLY_STARTS], conn=conn)
     races = []
     for sr in scr["races"]:
         no = sr["race_no"]
@@ -278,7 +283,7 @@ def _meeting(conn: Connection, date: str, now: dt.datetime) -> dict[str, Any]:
         runners = [_runner(s, picks.get(s["horse_no"]), form.get(s["horse_no"]),
                            odds.get(s["horse_no"]), zh.get(s["horse_name"]),
                            moves.get(s["horse_no"]), mrank.get(s["horse_no"]),
-                           priced) for s in sr["runners"]]
+                           priced, bgs.get(s["horse_name"])) for s in sr["runners"]]
         tipped = {b["source"] for p in tr["picks"] for b in p["backed_by"]}
         conc = market.concentration(date, no, conn=conn) if tote_in else None
         fav = (next(r for r in runners if r["horse_no"] == wins[0][1])

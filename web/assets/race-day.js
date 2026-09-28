@@ -17,6 +17,7 @@ import { Live } from './live.js';
 import { anchoredPanel } from './overlay.js';
 import { install as installPalette } from './palette.js';
 import { isSystem } from './book-origin.js';
+import { agentShort, backgroundBlock, backgroundView } from './background.js';
 
 const svg = (tag, attrs) => {
   const n = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -1026,6 +1027,10 @@ function cardRow(r, index) {
     box.append(chip);
   }
   gearChips(r).forEach((c) => box.append(c));
+  // The agent the import came through, for its first five HK starts.
+  if (r.background?.agents?.length) {
+    box.append(el('span', 'bf-agent', `AG ${agentShort(r.background.agents[0])}`));
+  }
   name.append(box);
   tr.append(name);
 
@@ -1160,6 +1165,10 @@ function renderDetail() {
     bb.append(meta);
     host.append(bb);
   }
+
+  // Where it came from — only for its first five HK starts, which is when the
+  // row carries it at all (query/background).
+  if (r.background) host.append(backgroundBlock(backgroundView(r.background, r.sarr_prior ?? 0)));
 
   // Who else in today's field this horse has already run against. The band
   // across the top has every pair; this is the same fact narrowed to the

@@ -20,6 +20,7 @@ import { buildView } from './briefing-model.js';
 import { renderDesk, renderPanels } from './briefing-desk.js';
 import { renderPhone } from './briefing-phone.js';
 import { renderRecord } from './briefing-record.js';
+import { renderBackgroundRecord } from './briefing-background.js';
 
 const LIVE_EVERY = 60e3;          // race day, a race still to run
 const QUIET_EVERY = 10 * 60e3;    // otherwise: sources land on a clock of hours
@@ -51,6 +52,13 @@ async function loadRecord() {
     state.record = { error: `The sources' record could not be read — ${e.message}` };
   }
   renderRecord($('bf-record'), state.record);
+  let bg;
+  try {
+    bg = await api.backgroundRecord();
+  } catch (e) {
+    bg = { error: `The background record could not be read — ${e.message}` };
+  }
+  renderBackgroundRecord($('bf-bgrec'), bg);
 }
 
 async function load({ quiet = false } = {}) {

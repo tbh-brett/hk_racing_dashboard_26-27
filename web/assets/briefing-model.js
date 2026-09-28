@@ -17,6 +17,7 @@ import {
   minutesBetween, money, moneyS, ordinal, pd, plural, px, sgn, shortDate,
   tFromUrl, when, words,
 } from './briefing-format.js';
+import { agentShort, backgroundView } from './background.js';
 
 export const STAGE_NAME = {
   cold: 'TWO DAYS OUT', voices: 'NIGHT BEFORE', priced: 'DAY BEFORE · TOTE OPEN',
@@ -414,6 +415,10 @@ function runnerView(x, r, { books, srcIn, saidOf, isBooked, cap, toteEarly, ctx 
     againstList: (s.against || []).map((f) => ({ why: f.why || f.label, x: `×${f.x}`, title: f.label,
                                                  mild: Math.abs(Math.log(f.x)) < MILD })),
     last, trial,
+    // Where it came from, for its first five HK starts (query/background).
+    bg: x.background ? backgroundView(x.background, s.starts ?? 0) : null,
+    agent: x.background && (x.background.agents || []).length
+      ? agentShort(x.background.agents[0]) : '',
     notes: (s.notes || []).map((n) => (typeof n === 'string' ? n : n.note || n.text || '')).filter(Boolean),
     reversals: (s.reversals || []).map((v) => ({ no: v.vs_no, name: v.vs_name, note: v.note,
                                                 moved: (v.moved || []).join(', ') })),

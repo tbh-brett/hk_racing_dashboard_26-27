@@ -9,6 +9,7 @@
  * the Screen's reasons, what was said about it verbatim, and its prices.
  */
 import { el, classCell, styleClass } from './vocab.js';
+import { backgroundBlock } from './background.js';
 
 /* ── shared pieces ──────────────────────────────────────────────────────── */
 
@@ -294,6 +295,7 @@ function raceDetail(r, ctx) {
     }
     const tail = el('span', 'tail');
     x.chips.forEach((c) => tail.append(chipEl(c)));
+    if (x.agent) tail.append(el('span', 'bf-agent', `AG ${x.agent}`));
     tail.append(el('span', 'caret', open ? '▾' : '▸'));
     row.append(tail);
     box.append(row);
@@ -371,6 +373,7 @@ export function screenBlock(x, { compact = false } = {}) {
              document.createTextNode(` ${x.trial.comment}`));
     col.append(t);
   }
+  if (x.bg) col.append(backgroundBlock(x.bg, { compact }));
   x.notes.forEach((n) => {
     const t = el('div', 'bf-note');
     t.append(el('span', 'cap', 'YOUR NOTE '), document.createTextNode(n));

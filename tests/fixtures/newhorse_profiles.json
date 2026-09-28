@@ -1,0 +1,182 @@
+{
+ "_fixture_note": "Four profiles from HKJC's Intro to New Horses (racing.hkjc.com/contentAsset/api/getNewHorse), as rendered 28 Sep 2026, and a trimmed index: two dated folders and one empty one. Written by HKJC's contractor; kept verbatim for the parser tests.",
+ "profiles": [
+  {
+   "entry": {
+    "path": "/sitecore/content/Sites/JCRW/Local/NewHorse/25_26/20260503/L216",
+    "brand_no": "L216",
+    "horse_name": "CHIU CHOW GOLF",
+    "race_date": "2026-05-03",
+    "race_no": "2",
+    "horse_no": "4"
+   },
+   "html": " <table width=\"731\"><tr><td><p>&nbsp;</p></td></tr> <tr> <td> <table width=\"100%\"> <tr>     <td class=\"table_title\"><span><span class=\"horse_name\"><a href=\"/en-us/local/information/horse?HorseNo=L216\" target=\"_blank\">CHIU CHOW GOLF(L216)</a></span></span></td>           <td width=\"50%\" align=\"right\"><div class=\"newhorse-txt\" align=\"right\">Information and comment (as of 30/04/2026) </div></td>  </tr> </table> </td>  </tr> <tr>  <td><br />  <table class=\"blood\">      <tr>   <th>PROFILE HIGHLIGHTS :  </th>        </tr>     </table><div class=\"newhorse-txt\">COUNTRY OF ORIGIN: NEW ZEALAND<br />COLOUR: BAY<br />IMPORT TYPE: PPG</div><br />\n\n\n\n\n\n\n\n\n\n\n\n<table class=\"blood\">            <tr>              <th colspan=\"6\">PEDIGREE:</th>              </tr>            <tr>              <td width=\"200\" rowspan=\"4\" class=\"sire \">OCEAN PARK (NZ)<br />BAY 2008</td>              <td width=\"200\" rowspan=\"2\" class=\"sire \">THORN PARK (AUS)<br />CHESTNUT 1999</td>              <td width=\"200\" class=\"sire \">SPINNING WORLD (USA)<br />CHESTNUT 1993</td>            </tr>             <tr>              <td>JOY (USA)<br />BAY 1993</td>            </tr>            <tr>              <td rowspan=\"2\">SAYYIDA (NZ)<br />BAY 2000</td>              <td class=\"sire \">ZABEEL (NZ)<br />BAY 1986</td>            </tr>            <tr>              <td>EASTERN PRINCESS (NZ)<br />BAY 1991</td>            </tr>         \n\n\n\n\n\n\n\n\n  <tr>              <td width=\"200\" rowspan=\"4\">PODRAVINA (NZ)<br />BAY 2014</td>              <td width=\"200\" rowspan=\"2\" class=\"sire \">BEL ESPRIT (AUS)<br />BAY 1999</td>              <td width=\"200\" class=\"sire \">ROYAL ACADEMY (USA)<br />BAY 1987</td>            </tr>             <tr>              <td>BESPOKEN (AUS)<br />BROWN 1990</td>            </tr>            <tr>              <td rowspan=\"2\">POSAVINA (NZ)<br />BAY 2006</td>              <td class=\"sire \">TIGER HILL (IRE)<br />BAY 1995</td>            </tr>            <tr>              <td>DANCE MY DANCE (IRE)<br />BAY 2000</td>            </tr>          </table>   <div class=\"droplist right\"><img src=\"/general/-/media/Sites/JCRW/Page/newhorse/sire_dam_index_en\" /></div>              <div class=\"newhorse-txt\">     \n\n\n\n\n\n\n\n\n\n   <p><br /></p><h6>SIRE HIGHLIGHTS: </h6>  <p /> <table class=\"blood\">        <tr>      <td width=\"200\" class=\"sire \">SIRE: <br />OCEAN PARK</td>      <td width=\"200\" class=\"sire \">COLOUR: <br />BAY</td>      <td width=\"200\" class=\"sire \">YEAR OF BIRTH: <br />2008</td>      <td width=\"200\" class=\"sire \">COUNTRY OF ORIGIN: <br />NEW ZEALAND</td>    </tr>    <tr>      <td colspan=\"2\" class=\"sire \">CAREER WINS: <br />8</td>      <td colspan=\"2\" class=\"sire \">WINNING DISTANCE: <br />1200M-2040M</td>      </tr>        <tr>      <td colspan=\"4\" class=\"sire \">MAJOR VICTORIES: <br />Makfi Challenge Stakes (GI) , New Zealand<br />Underwood Stakes (GI) , Australia<br />Caulfield Stakes (GI) , Australia<br />Cox Plate (GI) , Australia<br />New Zealand Stakes (GI) , New Zealand</td>      </tr>    <tr>      <td class=\"sire \">AT STUD SINCE:<br />2013</td>   <td class=\"sire \">STUD FEE:<br />NZD$15,000 (2025)</td>   <td colspan=\"2\" class=\"sire \">NUMBER OF STAKES WINNERS: <br />26</td>          </tr>  </table>  \n\n\n\n\n\n\n\n\n  <p><br /></p><h6>SAME-SIRE RUNNERS' PERFORMANCE IN HONG KONG: </h6>  <p /> <table class=\"blood\">        <tr>      <td colspan=\"2\" class=\"sire \">NO. OF STARTERS: <br />27</td>      <td colspan=\"2\" class=\"sire \">NO. OF WINNERS: <br />13</td>       </tr>    <tr>      <td colspan=\"4\" class=\"sire \">BEST PERFORMER (RATED 80+):<br />KING OPIE (5 wins / highest rating: 91) *retired</td>      </tr>   <tr>      <td colspan=\"4\" class=\"sire \">PREFERRED DISTANCE:  <br />1650M - 2200M.</td>      </tr>     <tr>      <td colspan=\"4\" class=\"sire \">SIRE ATTRIBUTES:  <br />This prodigious branch features a majority of winners at mile or above, general.</td>      </tr>           </table>   \n\n\n\n\n\n\n\n\n\n\n     <p><br /></p><h6>DAM HIGHLIGHTS: </h6>  <p /> <table class=\"blood\">        <tr>      <td width=\"200\">DAM: <br />PODRAVINA </td>      <td width=\"200\">COLOUR: <br />BAY</td>      <td width=\"200\">YEAR OF BIRTH:<br />2014</td>      <td width=\"200\">COUNTRY OF ORIGIN:<br />NEW ZEALAND</td>   <td width=\"200\">BROODMARE SIRE: <br />BEL ESPRIT</td>    </tr>    <tr>      <td colspan=\"5\">RACING CAREER: <br />5 wins from 1400M to 1600M.</td>           </tr>        <tr>      <td colspan=\"5\">PROGENY'S RACING PERFORMANCE: <br />Dam of two named foals with CHIU CHOW GOLF. DUMA 4 wins from 1200M to 1400M.</td>      </tr>    <tr>      <td colspan=\"5\">DAM ATTRIBUTES:<br />Dam from POSAVINA won twice at 1600M and 2100M with G3 Lowland Stakes and foaled Hong Kong runner MISTER DAPPER 5 wins at 1600M and 1650M. Most progenies are versatile with natural speed in early stage, most from this family can stretch out to middle-distance events later in their racing careers.</td>                </tr></table>       \n\n\n\n\n\n\n\n\n\n    <h6>SALES HISTORY: </h6>   <p><p>Sold as a yearling at NZD$ 70,000 in 2024 NZB Karaka Book 1. </p></p>    <h6>COMMENTS AND PROSPECT: </h6>   <p><p>OCEAN PARK was owned by HK owners Andrew Wong Kwok Kin, with a record of 8 wins, 3 seconds, 1 third and 1 fourth in 15 starts including G1 Cox Plate, Underwood Stakes, Caulfield Stakes and other two G1s. He took part in Dubai Turf on his last start but was well beaten on that race. He retired because of tendon injury and performed his stud duties at New Zealand in 2013. 26 runners won the black types contest including KOLDING, 2019 Epsom Handicap, Golden Eagle and 2021 All Aged Stakes winner; four-time G1 winner TOFANE and 2023 Queensland Derby hero KOVALICA. His service fee in 2025 is NZD$15,000. </p><p>CHIU CHOW GOLF was owned by Price Bloodstock Management Ltd that under Allan & Jason Williams’ yard in Australia and finished 2nd in an 800M jump out. Most same sire runners take time to settle and prefer middle distance events. His dam PODRAVINA is half-sister of present HK runner MISTER DAPPER while she collected 5 wins from 1400M to 1600M and place-getters in Listed races, one of her off-spring prefers 1400M or under in distance. The bay gelding should be able to handle up to 1600M and fine at Happy Valley. </p>  </p>    </div>      </td>        </tr>      </table>\n"
+  },
+  {
+   "entry": {
+    "path": "/sitecore/content/Sites/JCRW/Local/NewHorse/25_26/20260607/L360",
+    "brand_no": "L360",
+    "horse_name": "FAITHFUL WARRIOR",
+    "race_date": "2026-06-07",
+    "race_no": "7",
+    "horse_no": "1"
+   },
+   "html": " <table width=\"731\"><tr><td><p>&nbsp;</p></td></tr> <tr> <td> <table width=\"100%\"> <tr>     <td class=\"table_title\"><span><span class=\"horse_name\"><a href=\"/en-us/local/information/horse?HorseNo=L360\" target=\"_blank\">FAITHFUL WARRIOR(L360)</a></span></span></td>           <td width=\"50%\" align=\"right\"><div class=\"newhorse-txt\" align=\"right\">Information and comment (as of 04/06/2026) </div></td>  </tr> </table> </td>  </tr> <tr>  <td><br />  <table class=\"blood\">      <tr>   <th>PROFILE HIGHLIGHTS :  </th>        </tr>     </table><div class=\"newhorse-txt\">COUNTRY OF ORIGIN: AUSTRALIA<br />COLOUR: BAY<br />IMPORT TYPE: PPG</div><br />\n\n\n\n\n\n\n\n\n\n\n\n<table class=\"blood\">            <tr>              <th colspan=\"6\">PEDIGREE:</th>              </tr>            <tr>              <td width=\"200\" rowspan=\"4\" class=\"sire \">D'ARGENTO (AUS)<br />GREY 2014</td>              <td width=\"200\" rowspan=\"2\" class=\"sire \">SO YOU THINK (NZ)<br />BAY/BROWN 2006</td>              <td width=\"200\" class=\"sire \">HIGH CHAPARRAL (IRE)<br />BAY 1999</td>            </tr>             <tr>              <td>TRIASSIC (NZ)<br />BAY 1990</td>            </tr>            <tr>              <td rowspan=\"2\">FULLAZZ (AUS)<br />GREY 2002</td>              <td class=\"sire \">REDOUTE'S CHOICE (AUS)<br />BAY 1996</td>            </tr>            <tr>              <td>BATTONAGE (AUS)<br />GREY 1994</td>            </tr>         \n\n\n\n\n\n\n\n\n  <tr>              <td width=\"200\" rowspan=\"4\">SARZANA (AUS)<br />BAY 2015</td>              <td width=\"200\" rowspan=\"2\" class=\"sire \">ANIMAL KINGDOM (USA)<br />CHESTNUT 2008</td>              <td width=\"200\" class=\"sire \">LEROIDESANIMAUX (BRZ)<br />CHESTNUT 2000</td>            </tr>             <tr>              <td>DALICIA (GER)<br />BAY 2001</td>            </tr>            <tr>              <td rowspan=\"2\">SARA'S CHOICE (AUS)<br />BAY 2005</td>              <td class=\"sire \">CHOISIR (AUS)<br />CHESTNUT 1999</td>            </tr>            <tr>              <td>MOMENTOUS RIDE (AUS)<br />BROWN 1996</td>            </tr>          </table>   <div class=\"droplist right\"><img src=\"/general/-/media/Sites/JCRW/Page/newhorse/sire_dam_index_en\" /></div>              <div class=\"newhorse-txt\">     \n\n\n\n\n\n\n\n\n\n   <p><br /></p><h6>SIRE HIGHLIGHTS: </h6>  <p /> <table class=\"blood\">        <tr>      <td width=\"200\" class=\"sire \">SIRE: <br />D'ARGENTO</td>      <td width=\"200\" class=\"sire \">COLOUR: <br />GREY</td>      <td width=\"200\" class=\"sire \">YEAR OF BIRTH: <br />2014</td>      <td width=\"200\" class=\"sire \">COUNTRY OF ORIGIN: <br />AUSTRALIA</td>    </tr>    <tr>      <td colspan=\"2\" class=\"sire \">CAREER WINS: <br />4</td>      <td colspan=\"2\" class=\"sire \">WINNING DISTANCE: <br />1200M – 2000M</td>      </tr>        <tr>      <td colspan=\"4\" class=\"sire \">MAJOR VICTORIES: <br />Rosehill Guineas (GI), Australia</td>      </tr>    <tr>      <td class=\"sire \">AT STUD SINCE:<br />2020</td>   <td class=\"sire \">STUD FEE:<br />AUD$ 16,500 (2026)</td>   <td colspan=\"2\" class=\"sire \">NUMBER OF STAKES WINNERS: <br />1</td>          </tr>  </table>  \n\n\n\n\n\n\n\n\n  <p><br /></p><h6>SAME-SIRE RUNNERS' PERFORMANCE IN HONG KONG: </h6>  <p /> <table class=\"blood\">        <tr>      <td colspan=\"2\" class=\"sire \">NO. OF STARTERS: <br />5</td>      <td colspan=\"2\" class=\"sire \">NO. OF WINNERS: <br />3</td>       </tr>    <tr>      <td colspan=\"4\" class=\"sire \">BEST PERFORMER (RATED 80+):<br />N/A</td>      </tr>   <tr>      <td colspan=\"4\" class=\"sire \">PREFERRED DISTANCE:  <br />1200M-1400M</td>      </tr>     <tr>      <td colspan=\"4\" class=\"sire \">SIRE ATTRIBUTES:  <br />From a well-established middle-distance family.</td>      </tr>           </table>   \n\n\n\n\n\n\n\n\n\n\n     <p><br /></p><h6>DAM HIGHLIGHTS: </h6>  <p /> <table class=\"blood\">        <tr>      <td width=\"200\">DAM: <br />SARZANA </td>      <td width=\"200\">COLOUR: <br />BAY</td>      <td width=\"200\">YEAR OF BIRTH:<br />2015</td>      <td width=\"200\">COUNTRY OF ORIGIN:<br />AUSTRALIA</td>   <td width=\"200\">BROODMARE SIRE: <br />ANIMAL KINGDOM</td>    </tr>    <tr>      <td colspan=\"5\">RACING CAREER: <br />6 wins from 1000M to 1210M.</td>           </tr>        <tr>      <td colspan=\"5\">PROGENY'S RACING PERFORMANCE: <br />FAITHFUL WARRIOR is her first foal.</td>      </tr>    <tr>      <td colspan=\"5\">DAM ATTRIBUTES:<br />Dam from SARA'S CHOICE won at 1400M and foaled OOHLALOUVRE won twice at 1000M and 1075M. SARALAGO won twice at 1100M and 1600M. Through the past two generations, this branch features a host of winners at a mile or under.</td>                </tr></table>       \n\n\n\n\n\n\n\n\n\n    <h6>SALES HISTORY: </h6>   <p><p>Sold as a yearling at AUD$ 60,000 in 2024 Magic Millions Gold Coast National Yearling Sale.</p></p>    <h6>COMMENTS AND PROSPECT: </h6>   <p><p>D’ARGENTO was owned by Star Thoroughbreds and trained by Chris Waller with 4 wins, 2 seconds and 2 thirds in 14 starts, winning distance from 1200M to 2000M. His dam FULLAZZ is a grey mare who won a 900M listed contest on her debut. The grey colt notched 2000M G1 Rosehill Guineas in 2018 that ran down TANGLED and FURORE who landed 2019 HK Derby, D’ARGENTO then finished 2nd in Epsom Handicap and 3rd in Winx Stakes. The son of SO YOU THINK joined the stallion roaster of Bowness Stud with 1 black type contest winner. His fee in 2026 is AUD$ 16,500. </p><p>FAITHFUL WARRIOR was trained by Alex Oliveira in New Zealand and took part in a 900M trial (30th Oct 2025) where he led all the way and kept on well to win under urge on soft going. Same sire runners possess plenty of stamina. His dam SARZANA was sired by ANIMAL KINGDOM while she had 6 wins from 1000M to 1210M and placed on heavy ground and synthetic tracks. Most dam family members ran on well in sprint races. The bay gelding should be a sprinter that fine at Happy Valley and no issue on dirt. </p>  </p>    </div>      </td>        </tr>      </table>\n"
+  },
+  {
+   "entry": {
+    "path": "/sitecore/content/Sites/JCRW/Local/NewHorse/25_26/20260701/L420",
+    "brand_no": "L420",
+    "horse_name": "STUNNING BUNDLE",
+    "race_date": "2026-07-01",
+    "race_no": "6",
+    "horse_no": "7"
+   },
+   "html": " <table width=\"731\"><tr><td><p>&nbsp;</p></td></tr> <tr> <td> <table width=\"100%\"> <tr>     <td class=\"table_title\"><span><span class=\"horse_name\"><a href=\"/en-us/local/information/horse?HorseNo=L420\" target=\"_blank\">STUNNING BUNDLE(L420)</a></span></span></td>           <td width=\"50%\" align=\"right\"><div class=\"newhorse-txt\" align=\"right\">Information and comment (as of 29/06/2026) </div></td>  </tr> </table> </td>  </tr> <tr>  <td><br />  <table class=\"blood\">      <tr>   <th>PROFILE HIGHLIGHTS :  </th>        </tr>     </table><div class=\"newhorse-txt\">COUNTRY OF ORIGIN: NEW ZEALAND<br />COLOUR: BROWN<br />IMPORT TYPE: PPG</div><br />\n\n\n\n\n\n\n\n\n\n\n\n<table class=\"blood\">            <tr>              <th colspan=\"6\">PEDIGREE:</th>              </tr>            <tr>              <td width=\"200\" rowspan=\"4\" class=\"sire \">SHOCKING (AUS)<br />BAY 2005 </td>              <td width=\"200\" rowspan=\"2\" class=\"sire \">STREET CRY (IRE)<br />BAY/BROWN 1998</td>              <td width=\"200\" class=\"sire \">MACHIAVELLIAN (USA)<br />BAY/BROWN 1987</td>            </tr>             <tr>              <td>HELEN STREET (GB)<br />BAY 1982</td>            </tr>            <tr>              <td rowspan=\"2\">MARIA DI CASTIGLIA (GB)<br />BAY 1994</td>              <td class=\"sire \">DANEHILL (USA)<br />BAY 1986</td>            </tr>            <tr>              <td>MACRINA POMPEA (IRE)<br />CHESTNUT 1985</td>            </tr>         \n\n\n\n\n\n\n\n\n  <tr>              <td width=\"200\" rowspan=\"4\">SAVANITE (NZ)<br />BROWN 2010</td>              <td width=\"200\" rowspan=\"2\" class=\"sire \">SAVABEEL (AUS)<br />BROWN 2001</td>              <td width=\"200\" class=\"sire \">ZABEEL (NZ)<br />BAY 1986</td>            </tr>             <tr>              <td>SAVANNAH SUCCESS (AUS)<br />BROWN 1995</td>            </tr>            <tr>              <td rowspan=\"2\">JELIGNITE JEN (NZ)<br />BAY/BROWN 1990</td>              <td class=\"sire \">CRESTED WAVE (USA)<br />BAY 1976</td>            </tr>            <tr>              <td>POP ART (AUS)<br />BROWN 1978</td>            </tr>          </table>   <div class=\"droplist right\"><img src=\"/general/-/media/Sites/JCRW/Page/newhorse/sire_dam_index_en\" /></div>              <div class=\"newhorse-txt\">     \n\n\n\n\n\n\n\n\n\n   <p><br /></p><h6>SIRE HIGHLIGHTS: </h6>  <p /> <table class=\"blood\">        <tr>      <td width=\"200\" class=\"sire \">SIRE: <br />SHOCKING</td>      <td width=\"200\" class=\"sire \">COLOUR: <br />BAY</td>      <td width=\"200\" class=\"sire \">YEAR OF BIRTH: <br />2005</td>      <td width=\"200\" class=\"sire \">COUNTRY OF ORIGIN: <br />AUSTRALIA</td>    </tr>    <tr>      <td colspan=\"2\" class=\"sire \">CAREER WINS: <br />7</td>      <td colspan=\"2\" class=\"sire \">WINNING DISTANCE: <br />1300M-3200M</td>      </tr>        <tr>      <td colspan=\"4\" class=\"sire \">MAJOR VICTORIES: <br />Melbourne Cup (GI) , Australia<br />Australian Cup (GI) , Australia</td>      </tr>    <tr>      <td class=\"sire \">AT STUD SINCE:<br />2011</td>   <td class=\"sire \">STUD FEE:<br />NZD$ 8,000 (2026)</td>   <td colspan=\"2\" class=\"sire \">NUMBER OF STAKES WINNERS: <br />26</td>          </tr>  </table>  \n\n\n\n\n\n\n\n\n  <p><br /></p><h6>SAME-SIRE RUNNERS' PERFORMANCE IN HONG KONG: </h6>  <p /> <table class=\"blood\">        <tr>      <td colspan=\"2\" class=\"sire \">NO. OF STARTERS: <br />11</td>      <td colspan=\"2\" class=\"sire \">NO. OF WINNERS: <br />9</td>       </tr>    <tr>      <td colspan=\"4\" class=\"sire \">BEST PERFORMER (RATED 80+):<br />PACKING ANGEL (4 wins / highest rating: 93)</td>      </tr>   <tr>      <td colspan=\"4\" class=\"sire \">PREFERRED DISTANCE:  <br />1400M - 2000M</td>      </tr>     <tr>      <td colspan=\"4\" class=\"sire \">SIRE ATTRIBUTES:  <br />Runners can handle a mile and beyond.</td>      </tr>           </table>   \n\n\n\n\n\n\n\n\n\n\n     <p><br /></p><h6>DAM HIGHLIGHTS: </h6>  <p /> <table class=\"blood\">        <tr>      <td width=\"200\">DAM: <br />SAVANITE </td>      <td width=\"200\">COLOUR: <br />NEW ZEALAND</td>      <td width=\"200\">YEAR OF BIRTH:<br />2010</td>      <td width=\"200\">COUNTRY OF ORIGIN:<br />NEW ZEALAND</td>   <td width=\"200\">BROODMARE SIRE: <br />SAVABEEL</td>    </tr>    <tr>      <td colspan=\"5\">RACING CAREER: <br />Won at 1300M.</td>           </tr>        <tr>      <td colspan=\"5\">PROGENY'S RACING PERFORMANCE: <br />Dam of seven named foals with STUNNING BUNDLE, six to race and three winners. SALTCOATS 5 wins from 1400M to 2100M.</td>      </tr>    <tr>      <td colspan=\"5\">DAM ATTRIBUTES:<br />Dam family members found SINGING STAR 8 wins from 1400M to 2400M with G2 Waikato Gold Cup. Also, BRAVE FLYER won thrice at 1200M and 1400M. Initially, family members can handle short distances, but once mature, they are suitable for running at a mile or further.</td>                </tr></table>       \n\n\n\n\n\n\n\n\n\n    <h6>SALES HISTORY: </h6>   <p><p>Sold as a yearling at AUD$ 110,000 in 2024 Inglis Classic Yearling Sale.</p></p>    <h6>COMMENTS AND PROSPECT: </h6>   <p><p>SHOCKING, the son of STREET CRY, was trained by Mark Kavanagh and collected 7 wins, 6 seconds and 2 thirds in 27 starts including G1 Melbourne Cup and Australian Cup with Corey Brown on board. He joined the stallion roaster in 2011 and stationed in New Zealand with 26 black types contests winner including New Zealand Horse of The Year EL VENCEDOR, 2-time G1 winner and Golden Eagle champion I’M THUNDERSTRUCK, 2016 New Zealand Oaks champion FANATIC who was transferred to David Hayes & Tom Dabernig’s yard and claimed Adelaide Cup, a G2 contest over 3200M. His fee in 2026 is NZD$ 8,000. </p><p>STUNNING BUNDLE was purchased by John Foote Bloodstock at AUD$ 110,000 as a yearling that owned by Price Bloodstock Management Ltd and trained by Patrick Payne in Australia with 9 jump-outs and 3 barrier trials. On his first trial over 800M on good going (20th May 2025), he tracked the pace and ran on around the wide turn to finish fourth. On his second trial over 1000M on soft going (11th Jun 2025), he settled in third position throughout and failed to quicken in the straight, finishing fourth. On his third trial over 1000M on good going (11th Dec, 2025), he stalked just behind the leaders and stayed on comfortably to finish third. Both his sire and his dam SAVANITE or even her other offspring, the pedigree strongly leans toward middle-to-long distances and tends to mature late. The brown gelding was given a series of trials before arriving in Hong Kong and should be most suited 1600M or upper in distance while Happy Valley is fine. </p>  </p>    </div>      </td>        </tr>      </table>\n"
+  },
+  {
+   "entry": {
+    "path": "/sitecore/content/Sites/JCRW/Local/NewHorse/26_27/20261001/L519",
+    "brand_no": "L519",
+    "horse_name": "GLORYSPEED",
+    "race_date": "2026-10-01",
+    "race_no": "11",
+    "horse_no": "7"
+   },
+   "html": " <table width=\"731\"><tr><td><p>&nbsp;</p></td></tr> <tr> <td> <table width=\"100%\"> <tr>     <td class=\"table_title\"><span><span class=\"horse_name\"><a href=\"/en-us/local/information/horse?HorseNo=L519\" target=\"_blank\">GLORYSPEED(L519)</a></span></span></td>           <td width=\"50%\" align=\"right\"><div class=\"newhorse-txt\" align=\"right\">Information and comment (as of 28/09/2026) </div></td>  </tr> </table> </td>  </tr> <tr>  <td><br />  <table class=\"blood\">      <tr>   <th>PROFILE HIGHLIGHTS :  </th>        </tr>     </table><div class=\"newhorse-txt\">COUNTRY OF ORIGIN: AUSTRALIA<br />COLOUR: BAY/BROWN<br />IMPORT TYPE: PP</div><br />\n\n\n\n\n\n\n\n\n\n\n\n<table class=\"blood\">            <tr>              <th colspan=\"6\">PEDIGREE:</th>              </tr>            <tr>              <td width=\"200\" rowspan=\"4\" class=\"sire \">I AM INVINCIBLE (AUS)<br />BAY 2004</td>              <td width=\"200\" rowspan=\"2\" class=\"sire \">INVINCIBLE SPIRIT (IRE)<br />BAY 1997</td>              <td width=\"200\" class=\"sire \">GREEN DESERT (USA)<br />BROWN 1983</td>            </tr>             <tr>              <td>RAFHA (GB)<br />BAY 1987</td>            </tr>            <tr>              <td rowspan=\"2\">CANNARELLE (AUS)<br />BAY 1998</td>              <td class=\"sire \">CANNY LAD (AUS)<br />BROWN 1987</td>            </tr>            <tr>              <td>COUNTESS PEDRILLE (AUS)<br />BAY 1994</td>            </tr>         \n\n\n\n\n\n\n\n\n  <tr>              <td width=\"200\" rowspan=\"4\">DIADEME (NZ)<br />BAY/BROWN 2008</td>              <td width=\"200\" rowspan=\"2\" class=\"sire \">SAVABEEL (AUS)<br />BROWN 2001</td>              <td width=\"200\" class=\"sire \">ZABEEL (NZ)<br />BAY 1986</td>            </tr>             <tr>              <td>SAVANNAH SUCCESS (AUS)<br />BROWN 1995</td>            </tr>            <tr>              <td rowspan=\"2\">BLING (NZ)<br />BROWN 2003</td>              <td class=\"sire \">O’REILLY (NZ)<br />BROWN 1993</td>            </tr>            <tr>              <td>NIGHT STAR (NZ)<br />BAY 1993</td>            </tr>          </table>   <div class=\"droplist right\"><img src=\"/general/-/media/Sites/JCRW/Page/newhorse/sire_dam_index_en\" /></div>              <div class=\"newhorse-txt\">     \n\n\n\n\n\n\n\n\n\n   <p><br /></p><h6>SIRE HIGHLIGHTS: </h6>  <p /> <table class=\"blood\">        <tr>      <td width=\"200\" class=\"sire \">SIRE: <br />I AM INVINCIBLE</td>      <td width=\"200\" class=\"sire \">COLOUR: <br />BAY</td>      <td width=\"200\" class=\"sire \">YEAR OF BIRTH: <br />2004</td>      <td width=\"200\" class=\"sire \">COUNTRY OF ORIGIN: <br />AUSTRALIA</td>    </tr>    <tr>      <td colspan=\"2\" class=\"sire \">CAREER WINS: <br />5</td>      <td colspan=\"2\" class=\"sire \">WINNING DISTANCE: <br />1000M-1100M</td>      </tr>        <tr>      <td colspan=\"4\" class=\"sire \">MAJOR VICTORIES: <br />DC McKay Stakes (GIII) , Australia</td>      </tr>    <tr>      <td class=\"sire \">AT STUD SINCE:<br />2010</td>   <td class=\"sire \">STUD FEE:<br />AUD$ 220,000 (2026)</td>   <td colspan=\"2\" class=\"sire \">NUMBER OF STAKES WINNERS: <br />127</td>          </tr>  </table>  \n\n\n\n\n\n\n\n\n  <p><br /></p><h6>SAME-SIRE RUNNERS' PERFORMANCE IN HONG KONG: </h6>  <p /> <table class=\"blood\">        <tr>      <td colspan=\"2\" class=\"sire \">NO. OF STARTERS: <br />58</td>      <td colspan=\"2\" class=\"sire \">NO. OF WINNERS: <br />35</td>       </tr>    <tr>      <td colspan=\"4\" class=\"sire \">BEST PERFORMER (RATED 80+):<br />WISHFUL THINKER (7 wins / highest rating: 120) *retired</td>      </tr>   <tr>      <td colspan=\"4\" class=\"sire \">PREFERRED DISTANCE:  <br />1000M-1200M</td>      </tr>     <tr>      <td colspan=\"4\" class=\"sire \">SIRE ATTRIBUTES:  <br />Speed-oriented, precocious, most effective at a mile or under.</td>      </tr>           </table>   \n\n\n\n\n\n\n\n\n\n\n     <p><br /></p><h6>DAM HIGHLIGHTS: </h6>  <p /> <table class=\"blood\">        <tr>      <td width=\"200\">DAM: <br />DIADEME </td>      <td width=\"200\">COLOUR: <br />BAY/BROWN</td>      <td width=\"200\">YEAR OF BIRTH:<br />2008</td>      <td width=\"200\">COUNTRY OF ORIGIN:<br />NEW ZEALAND</td>   <td width=\"200\">BROODMARE SIRE: <br />SAVABEEL</td>    </tr>    <tr>      <td colspan=\"5\">RACING CAREER: <br />7 wins at 1400M and 1600M with G1 New Zealand Thoroughbred Breeders’s stakes.</td>           </tr>        <tr>      <td colspan=\"5\">PROGENY'S RACING PERFORMANCE: <br />Dam of eight named foals, seven raced, four winners including GLORYSPEED won at 1200M. Former Hong Kong runner SHADOW MISSION won at 1100M in NZ and CONQUEROR won twice at 1400M in AUS.</td>      </tr>    <tr>      <td colspan=\"5\">DAM ATTRIBUTES:<br />Dam family found former G1 New Zealand 2000 Guineas winner EMBELLISH (sire by BULB GENERAL) won thrice from 1200M to 1600M. Family members generally excel at sprints early on, with their stamina stretching out to a mile or further as they mature.</td>                </tr></table>       \n\n\n\n\n\n\n\n\n\n    <h6>SALES HISTORY: </h6>   <p><p>Unsold as a yearling for not reaching AUD$ 500,000 in 2024 Magic Millions Gold Coast Yearling Sale. (The last bid was AUD$ 450,000.)</p></p>    <h6>COMMENTS AND PROSPECT: </h6>   <p><p>I AM INVINCIBLE recorded 5 wins, 1 second and 1 third in 13 attempts during his racing career, with winning distance from 1000M to 1100M. He took his first win in 2YO but could only race once in next year due to health issue. Luckily he got recovered in 4YO and notched 4 wins in 7 starts including a G3, and placed 2nd in G1 The Goodwood Handicap which was just beaten by star sprinter TAKEOVER TARGET. 127 of I AM INVINCIBLE next generation had celebrated the joy of black type races including dual G1 champion BRAZEN BEAU, HELLBENT, HOME AFFAIRS that all became stallion afterwards, also Myer Classic winner I AM A STAR and 10-time G1 winner IMPERATRIZ. The service fee of 3-time champion sire in 2026 is AUD$ 220,000.</p><p>GLORYSPEED was formerly known as ST EDWARD that owned by Gerry Harvey and trained by Mick Price & Michael Kent (Jnr) in Australia with 1 win and 1 second in 4 starts. As a 3YO, he finished as the runner-up on his debut at Mornington. In his next start, he competed over 1200M, tracking the leaders along the inside fence in handy position throughout before shifting outward around the turn to power past his rivals for a maiden victory at Moonee Valley. In his third outing, he contested the HKJC World Pool Red Anchor Stakes and finished 4th under Blake Shinn. In his final run before importing to Hong Kong, he stepped up in distance to a 1400M 3yo handicap and again finished 4th. His dam DIADEME was a winner of G1 New Zealand Thoroughbred Breeders' Stakes. Among her progeny, SHADOW MISSION won a Listed race in New Zealand but went winless in 5 starts after being imported to Hong Kong, while another sibling, CONQUEROR has managed only a runner-up finish from 9 starts in HK. Although his two half-brothers have been disappointing in Hong Kong, this gelding is by a different sire with early-maturing characteristics and suitability from 1200M to 1600M.</p>  </p>    </div>      </td>        </tr>      </table>\n"
+  }
+ ],
+ "index": [
+  {
+   "name": "20260927",
+   "versions": [
+    {
+     "version": 1
+    }
+   ],
+   "path": "/sitecore/content/Sites/JCRW/Local/NewHorse/26_27/20260927",
+   "children": [
+    {
+     "versions": [
+      {
+       "version": 1
+      }
+     ],
+     "name": "L481",
+     "path": "/sitecore/content/Sites/JCRW/Local/NewHorse/26_27/20260927/L481",
+     "raceDate": {
+      "dateValue": 1790438400000
+     },
+     "horseName": {
+      "value": "FOUR STARS ALIGN"
+     },
+     "raceNo": {
+      "value": "7"
+     },
+     "horseNo": {
+      "value": "5"
+     },
+     "brandNo": {
+      "value": "L481"
+     }
+    },
+    {
+     "versions": [
+      {
+       "version": 1
+      }
+     ],
+     "name": "L419",
+     "path": "/sitecore/content/Sites/JCRW/Local/NewHorse/26_27/20260927/L419",
+     "raceDate": {
+      "dateValue": 1790438400000
+     },
+     "horseName": {
+      "value": "HARVEST MOON"
+     },
+     "raceNo": {
+      "value": "4"
+     },
+     "horseNo": {
+      "value": "3"
+     },
+     "brandNo": {
+      "value": "L419"
+     }
+    }
+   ],
+   "date": 1790438400000
+  },
+  {
+   "name": "20260923",
+   "versions": [
+    {
+     "version": 1
+    }
+   ],
+   "path": "/sitecore/content/Sites/JCRW/Local/NewHorse/26_27/20260923",
+   "children": [],
+   "date": 1790092800000
+  },
+  {
+   "name": "20250907",
+   "versions": [
+    {
+     "version": 1
+    }
+   ],
+   "path": "/sitecore/content/Sites/JCRW/Local/NewHorse/25_26/20250907",
+   "children": [
+    {
+     "versions": [
+      {
+       "version": 1
+      }
+     ],
+     "name": "GOOD FORTUNE",
+     "path": "/sitecore/content/Sites/JCRW/Local/NewHorse/25_26/20250907/GOOD FORTUNE",
+     "raceDate": {
+      "dateValue": 1757174400000
+     },
+     "horseName": {
+      "value": "GOOD FORTUNE"
+     },
+     "raceNo": {
+      "value": "6"
+     },
+     "horseNo": {
+      "value": "7"
+     },
+     "brandNo": {
+      "value": "H349"
+     }
+    },
+    {
+     "versions": [
+      {
+       "version": 1
+      }
+     ],
+     "name": "VICTORY CHAMPION",
+     "path": "/sitecore/content/Sites/JCRW/Local/NewHorse/25_26/20250907/VICTORY CHAMPION",
+     "raceDate": {
+      "dateValue": 1757174400000
+     },
+     "horseName": {
+      "value": "VICTORY CHAMPION"
+     },
+     "raceNo": {
+      "value": "7"
+     },
+     "horseNo": {
+      "value": "4"
+     },
+     "brandNo": {
+      "value": "K240"
+     }
+    }
+   ],
+   "date": 1757174400000
+  }
+ ]
+}
