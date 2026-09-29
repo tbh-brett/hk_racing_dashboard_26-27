@@ -41,9 +41,14 @@ ARG SUPERCRONIC_SHA256_arm64=063799a43c1eac082d83ac59a43a6896b50d69aa1f533c2cc6a
 # Set by BuildKit. Defaulted so a plain `docker build` still works.
 ARG TARGETARCH=amd64
 
+# libgomp1 is the OpenMP runtime the LightGBM wheel links against and does not
+# carry (gbm-SPEC §2; checked in the 4.7.0 manylinux wheel, 29 Sep 2026). It is
+# installed by name, so apt marks it manual and the purge of curl and the
+# autoremove below leave it alone; the import check after the pip install
+# proves it on every build rather than on the first nightly fit.
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends ca-certificates curl tzdata; \
+    apt-get install -y --no-install-recommends ca-certificates curl tzdata libgomp1; \
     \
     case "${TARGETARCH}" in \
       amd64) ls_sha="$LITESTREAM_SHA256_amd64"; sc_sha="$SUPERCRONIC_SHA256_amd64" ;; \
@@ -78,7 +83,8 @@ WORKDIR /app
 # installable, so the package skeleton comes with it.
 COPY pyproject.toml README.md ./
 COPY hkrd/__init__.py hkrd/__init__.py
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir . \
+    && python -c "import lightgbm; print('lightgbm', lightgbm.__version__)"
 
 COPY hkrd/ hkrd/
 COPY web/ web/

@@ -67,8 +67,20 @@ primary_region = "sin"          # Singapore, and only because Hong Kong is no
     path = "/api/health"
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "2gb"                # numpy, scipy and pandas are resident, and
+  size = "shared-cpu-2x"        # gbm-SPEC §13.1, approved by Brett 29 Sep 2026.
+  memory = "4gb"                # The fundamental model's nightly fit peaks at
+                                # ~365 MB (inputs for the whole archive, then
+                                # LightGBM) and scoring a card at ~290 MB, on
+                                # top of everything below. On 2 GB, with ~590
+                                # MB free and no swap, two such jobs meeting
+                                # would kill the app on a race night; the
+                                # second core keeps pages quick while one runs.
+                                # Scaled with `fly scale vm shared-cpu-2x` and
+                                # `fly scale memory 4096` BEFORE the deploy
+                                # that carries this line, for the reason at
+                                # the end of this comment.
+                                #
+                                # Before the model: numpy, scipy and pandas are resident, and
                                 # the ET rebuild holds a season in memory.
                                 # 512mb OOMs during derive.
                                 #
