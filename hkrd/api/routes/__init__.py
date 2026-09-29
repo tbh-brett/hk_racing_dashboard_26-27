@@ -6,7 +6,7 @@ than by HTTP verb, so everything one page needs is in one file and adding a
 page adds a file instead of a section.
 """
 from hkrd.api.routes import (background, bets, blackbook, briefing, jobs,
-                             lookup, results, screen, tips, trials)
+                             lookup, model_gbm, results, screen, tips, trials)
 
 __all__ = ["background", "bets", "blackbook", "briefing", "jobs", "lookup",
-           "results", "screen", "tips", "trials"]
+           "model_gbm", "results", "screen", "tips", "trials"]

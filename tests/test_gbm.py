@@ -511,3 +511,45 @@ def test_the_web_process_never_loads_lightgbm() -> None:
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
                          cwd=ROOT, check=True)
     assert out.stdout.strip() == "False", out.stderr
+
+
+# ─── step 4: what the pages read ─────────────────────────────────────────────
+
+from hkrd.query import gbm as gbm_q  # noqa: E402
+
+
+def test_a_scratching_after_the_score_is_renormalised_on_read(tmp_path) -> None:
+    db, date = _scoring_db(tmp_path / "s.db")
+    score_gbm.score(date, db)
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.execute("UPDATE runners SET place_code = 'WV' WHERE race_date = ? AND horse_no = 5",
+                     (date,))
+    got = gbm_q.scores(date, conn=conn)
+    conn.close()
+    assert (1, 5) not in got and len(got) == 11
+    assert abs(sum(x["model_pct"] for x in got.values()) - 100) < 0.2
+    assert abs(sum(x["place_pct"] for x in got.values()) - 300) < 0.5
+    assert all(len(x["flags"]) <= gbm_q.MAX_FLAGS for x in got.values())
+    assert all("body weight" in " ".join(x["assumed"]) for x in got.values())
+
+
+def test_the_routes_answer_from_tables_or_say_what_is_missing(tmp_path, monkeypatch) -> None:
+    from fastapi.testclient import TestClient
+
+    from hkrd.api.app import app
+    db, date = _scoring_db(tmp_path / "s.db")
+    score_gbm.score(date, db)
+    monkeypatch.setenv("HKRD_DB", str(db))
+    client = TestClient(app)
+    body = client.get(f"/api/model/gbm/{date}/1").json()
+    assert len(body["runners"]) == 12 and body["going_assumed"]
+    assert all(r["market_pct"] is None and r["gap"] is None for r in body["runners"])
+    assert client.get(f"/api/model/gbm/{date}/9").status_code == 404
+    rec = client.get("/api/model/gbm/record").json()
+    assert rec["live"]["version"] == "test+1" and len(rec["groups"]) == 12
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.execute("UPDATE gbm_models SET promoted = 0")
+    conn.close()
+    assert client.get("/api/model/gbm/record").status_code == 404

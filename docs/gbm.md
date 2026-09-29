@@ -53,6 +53,18 @@ every apprentice on a card looked like a rider with no record: VOYAGE BOSS on 1 
 against the lab's 29.3%. `derive/features` now reads the card as a result would (23.3%; the rest
 is the tree count and the July 2026 ratings hole).
 
+**The Screen on the model** (§6). The Briefing's payload keeps its shape; its engine is
+`runner_gbm`. For and against are the factor groups at ×1.05 / ×0.95 and beyond (smaller pushes
+are bookkeeping), not the rider (its own line) or the race (the same for every runner). The
+set-up verdict reads the groups that describe today rather than the horse -- draw, weight,
+campaign, trip & track, pace & sectionals -- plus the rider against the field, at the old
+thresholds. `leader_x`, the old engine's lone-leader multiplier, is gone: the model learns that
+interaction itself, and the Briefing's lone-leader line now quotes the flag's measured record
+("price A/E 1.17 over 1,594 runs: a lead, not an edge"). The "trialled well" line stays, said
+as what the model cannot see. A card the model has not scored shows no chances rather than an
+old engine's. `record_screen` records only meetings the scoring model was not trained on, stamped
+with that model's version.
+
 **Flags read stored facts.** `runner_gbm.facts_json` carries what the five flags read, so
 `query/gbm` applies the rules (`model/gbm_record.FLAGS`) without rebuilding inputs in a request.
 

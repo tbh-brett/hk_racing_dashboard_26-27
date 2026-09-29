@@ -285,8 +285,39 @@ def db(tmp_path):
         conn.execute("INSERT INTO run_notes (horse_name, race_date, race_no, note, "
                      "written_at) VALUES ('PLAIN SAILING', ?, 1, 'needed it', ?)",
                      (JULY, JULY))
+        _scores(conn)
     yield conn
     conn.close()
+
+
+# The fundamental model's scores for TODAY, as jobs/score_gbm writes them.
+WIN = [0.25, 0.18, 0.14, 0.12, 0.10, 0.09, 0.07, 0.05]
+
+
+def _scores(conn) -> None:
+    import json
+    place = place_from_win(WIN, places=3)
+    conn.execute(
+        "INSERT INTO gbm_models (version, kind, trained_through, features_version, "
+        "params_json, rounds, model_text, record_json, promoted, promoted_at, created_at) "
+        "VALUES ('gbm-test', 'fundamental', ?, 'feat-1.0', '{}', 10, 'x', ?, 1, ?, ?)",
+        (JULY, json.dumps({"walk_forward": {"top4_has_winner": {"model": 0.6, "market": 0.7},
+                                            "test_races": 4148, "flags": [
+            {"flag": "lone_leader", "runs": 1594, "won": 219,
+             "model": {"ae": 1.21}, "price": {"ae": 1.17}}]}}), JULY, JULY))
+    for i, name in enumerate(NAMES):
+        lone = name == "LONE SPEED"
+        groups = {"form": 0.2 - 0.05 * i, "pace & sectionals": 0.3 if lone else -0.02,
+                  "draw": 0.0, "rider": 0.01}
+        facts = {"prep_run": 3, "n_prior": 5, "l1_place": 3, "vs": "ST_Turf",
+                 "l1_vs": "ST_Turf", "l2_vs": "ST_Turf", "l3_vs": "ST_Turf",
+                 "hab_early": 0.05 if lone else 0.5, "n_leaders": 1,
+                 "body_weight": "last run", "going": "declared"}
+        conn.execute(
+            "INSERT INTO runner_gbm (race_date, race_no, horse_no, stage, p_win, p_place, "
+            "contrib_json, facts_json, model_version, derive_version, inputs_key, scored_at) "
+            "VALUES (?, 1, ?, 'latest', ?, ?, ?, ?, 'gbm-test', 'feat-1.0', 'k', ?)",
+            (TODAY, i + 1, WIN[i], float(place[i]), json.dumps(groups), json.dumps(facts), JULY))
 
 
 def _one(races, name):
@@ -319,8 +350,21 @@ def test_the_meeting_shortlists_four_by_chance_to_place(db) -> None:
     assert [r["tier"] for r in runners[:4]] == ["SHORTLIST"] * 4
     assert all(r["tier"] in ("CASE", "FIELD") for r in runners[4:])
     lone = next(r for r in runners if r["horse_name"] == "LONE SPEED")
-    assert any(f["key"] == "leader_alone" for f in lone["for"])
+    assert any(f["key"] == "pace & sectionals" for f in lone["for"])
+    assert [f["key"] for f in lone["flags"]] == ["lone_leader"]
     assert out["races"][0]["pace"]["leaders"][0]["horse_name"] == "LONE SPEED"
+    assert out["version"] == "gbm-test" and out["fit"]["fitted"] == JULY
+    assert out["fit"]["top4_has_winner"] == {"screen": 0.6, "market": 0.7}
+
+
+def test_a_card_the_model_has_not_scored_has_no_chances(db) -> None:
+    with transaction(db):
+        db.execute("DELETE FROM runner_gbm")
+    out = screen_q.meeting(TODAY, conn=db)
+    race = out["races"][0]
+    assert not race["scored"] and out["version"] is None
+    assert all(r["win_pct"] is None and r["rank"] is None and r["tier"] == "FIELD"
+               for r in race["runners"])
 
 
 def test_a_close_defeat_is_named_with_the_draw_and_never_the_weight(db) -> None:
@@ -353,5 +397,4 @@ def test_the_route_404s_without_a_card(tmp_path, monkeypatch, db) -> None:
     assert client.get("/api/screen/2026-01-01").status_code == 404
     body = client.get(f"/api/screen/{TODAY}").json()
     assert body["races"][0]["race_no"] == 1
-    assert {f["key"] for f in body["factors"]} == {
-        f.key for f in model.FACTORS if f.shown}
+    assert [f["key"] for f in body["factors"]] == list(screen_q.gbm_q.GROUPS)

@@ -1,15 +1,17 @@
 """The Screen for one meeting — the Briefing's first section.
 
 Per race: every runner's chance to win and to place before any price exists
-(`model/screen`), the measured reasons for and against it, and the four the
-Screen would look at first. Around that, the manual layer the dashboard
+(the fundamental model, `runner_gbm` via `query/gbm` -- the engine since
+gbm-SPEC §6; `model/screen` is kept for its rider-rate helper and nothing
+else), the factor groups for and against it, and the four the Screen would
+look at first. Around that, the manual layer the dashboard
 already holds and nobody should have to go looking for: the blackbook entry
 and whether today's set-up suits it, the owner's own run and trial notes, the
 last start in HKJC's words, and the horses in the field it could turn around.
 
-THE SHORTLIST IS FOUR, and the page says why: walk-forward over four seasons
-the Screen's top four held the winner in `FIT["top4_has_winner"]` of races,
-against the closing market's top four in its own figure beside it. It is a
+THE SHORTLIST IS FOUR, and the page says why: walk-forward over five seasons
+the model's top four held the winner in the share its record gives
+(`top4_has_winner`), against the closing market's top four beside it. It is a
 list to read, not a list to back.
 
 HEAD-TO-HEAD, AND THE WEIGHT SWING IT LEAVES OUT. Measured over 91,856 pairs
@@ -30,6 +32,7 @@ from typing import Any
 
 from hkrd.model import screen as model
 from hkrd.query import blackbook_band
+from hkrd.query import gbm as gbm_q
 from hkrd.query.formguide import notes_for_horses
 from hkrd.query.screen_inputs import gather
 from hkrd.store.connect import Connection, get_conn
@@ -38,7 +41,8 @@ __all__ = ["meeting", "SHORTLIST", "CASE_AT", "SETUP_AT", "REVERSAL_MARGIN"]
 
 SHORTLIST = 4
 # Outside the shortlist, a horse "has a case" when its circumstances --
-# everything except the form rating and the rider -- are worth x1.2 or more.
+# everything except its own form record, the market's past view of it and the
+# rider -- are worth x1.2 or more.
 CASE_AT = 0.18
 # The blackbook set-up verdict: conditions worth x1.16 either way.
 SETUP_AT = 0.15
@@ -49,13 +53,17 @@ REVERSAL_DAYS = 365
 # winner finished in front again. The rest of the time the beaten horse
 # turned it round, and that is the figure the page shows.
 _REPEAT = ((1.0, 51), (2.0, 55))
-_SITUATION = {"PACE", "CHANGE", "CAMPAIGN", "TRIAL"}
+# The model's groups that describe today's circumstances rather than the horse.
+_SITUATION = ("draw", "weight", "campaign", "trip & track", "pace & sectionals")
+# A group is named for or against a runner at x1.05 or x0.95 and beyond;
+# smaller pushes are the model's bookkeeping, not reasons.
+_NAMED_AT = math.log(1.05)
+_NOT_REASONS = ("rider", "race")          # the rider has its own line; race is per race
 
 
-def _factor_line(key: str, value: float, why: str | None) -> dict[str, Any]:
-    f = model.BY_KEY[key]
-    return {"key": key, "group": f.group, "label": f.label, "why": why,
-            "x": round(f.multiplier ** value, 2), "caveat": f.caveat}
+def _group_line(key: str, x: float) -> dict[str, Any]:
+    return {"key": key, "group": key, "label": key.capitalize(), "why": None,
+            "x": x, "caveat": None}
 
 
 def _jrate(jockeys: dict, name: str | None, base: float) -> float:
@@ -131,26 +139,24 @@ def _pace(runners: list[dict[str, Any]]) -> dict[str, Any]:
           for s in ("Leader", "On-Pace", "Midfield", "Closer")}
     leaders = [{"horse_no": r["horse_no"], "horse_name": r["horse_name"],
                 "draw": r["draw"]} for r in by["Leader"]]
-    n = len(leaders)
-    key = "leader_alone" if n == 1 else "leader_pair" if n == 2 else "leader_crowd"
+    # leader_x was the old Screen's multiplier for a lone leader; the model
+    # learns that interaction itself (factor review §3.6), so there is no one
+    # number to quote. The Briefing omits the figure when it is absent.
     return {"leaders": leaders,
             "counts": {s: len(v) for s, v in by.items()},
             "unknown": sum(1 for r in runners if not r["style"]),
-            "leader_x": round(model.BY_KEY[key].multiplier, 2) if n else None}
+            "leader_x": None}
 
 
-def _setup(parts: dict[str, float], rider_vs_field: float
-           ) -> tuple[float, str, list[dict[str, Any]]]:
+def _setup(groups: dict[str, float]) -> tuple[float, str, list[dict[str, Any]]]:
     """How much today's circumstances are worth, apart from the horse's form:
-    the pace, the campaign, a trial, the changes since last start, and the
+    the draw, the weight, the campaign, the trip and track, the pace, and the
     rider against this field's riders. The verdict, and what made it."""
-    pieces = [{"label": model.BY_KEY[k].label, "x": round(math.exp(v), 2)}
-              for k, v in parts.items() if model.BY_KEY[k].group in _SITUATION]
-    if abs(rider_vs_field) >= 0.01:
-        pieces.append({"label": "Rider against this field's riders",
-                       "x": round(math.exp(rider_vs_field), 2)})
-    s = sum(v for k, v in parts.items() if model.BY_KEY[k].group in _SITUATION)
-    s += rider_vs_field
+    keys = [k for k in (*_SITUATION, "rider") if k in groups]
+    pieces = [{"label": ("Rider against this field's riders" if k == "rider"
+                         else k.capitalize()), "x": groups[k]}
+              for k in keys if abs(math.log(groups[k])) >= 0.01]
+    s = sum(math.log(groups[k]) for k in keys)
     verdict = ("FAVOURABLE" if s >= SETUP_AT else
                "AGAINST" if s <= -SETUP_AT else "NEUTRAL")
     return s, verdict, sorted(pieces, key=lambda p: -abs(math.log(p["x"])))
@@ -169,28 +175,27 @@ def _last_start(prev: dict[str, Any] | None) -> dict[str, Any] | None:
             "incident_comment": prev["incident_comment"]}
 
 
-def _runner(r: dict, sc: dict, race: dict, book: dict | None, notes: list,
-            reversals: list, rider_mean: float) -> dict[str, Any]:
-    shown = [(k, v) for k, v in sc["values"].items()
-             if v and model.BY_KEY[k].shown and k not in ("form", "jockey")]
-    lines = [_factor_line(k, v, sc["why"].get(k)) for k, v in shown]
-    rider_vs = sc["parts"].get("jockey", 0.0) - rider_mean
-    setup, verdict, pieces = _setup(sc["parts"], rider_vs)
+def _runner(r: dict, sc: dict | None, book: dict | None, notes: list,
+            reversals: list) -> dict[str, Any]:
+    groups = (sc or {}).get("groups", {})
+    lines = [_group_line(k, x) for k, x in groups.items()
+             if k not in _NOT_REASONS and abs(math.log(x)) >= _NAMED_AT]
+    setup, verdict, pieces = _setup(groups)
     trial = next((t for t in r["trials"]), None)
     return {
         "horse_no": r["horse_no"], "horse_name": r["horse_name"],
         "draw": r["draw"], "jockey": r["jockey"], "trainer": r["trainer"],
         "rating": r["rating"], "weight": r["actual_weight"], "gear": r["gear"],
         "style": r["style"], "style_runs": r["style_n"],
-        "sarr_rank": r["sarr_rank"],
-        "win_pct": round(100 * sc["win"], 1), "place_pct": round(100 * sc["place"], 1),
-        "rider": {"why": sc["why"].get("jockey"),
-                  "x_vs_field": round(math.exp(rider_vs), 2)},
+        "win_pct": sc["model_pct"] if sc else None,
+        "place_pct": sc["place_pct"] if sc else None,
+        "rider": {"why": None, "x_vs_field": groups.get("rider")},
         "for": sorted((x for x in lines if x["x"] > 1), key=lambda x: -x["x"]),
         "against": sorted((x for x in lines if x["x"] < 1), key=lambda x: x["x"]),
         "setup_x": round(math.exp(setup), 2), "setup": verdict, "setup_parts": pieces,
-        "case_x": round(math.exp(sum(
-            v for k, v in sc["parts"].items() if model.BY_KEY[k].group in _SITUATION)), 2),
+        "case_x": round(math.exp(sum(math.log(groups[k]) for k in _SITUATION
+                                     if k in groups)), 2),
+        "flags": (sc or {}).get("flags", []), "assumed": (sc or {}).get("assumed", []),
         "last_start": _last_start(r["prev"]),
         "trial": trial,
         "notes": notes,
@@ -215,33 +220,36 @@ def _book(b: dict[str, Any]) -> dict[str, Any]:
             "tags": sorted((b["tag_csv"] or "").split(",")) if b["tag_csv"] else []}
 
 
-def _race(block: dict, books: dict, notes: dict) -> dict[str, Any]:
+def _race(block: dict, books: dict, notes: dict, scores: dict) -> dict[str, Any]:
     race, runners = block["race"], block["runners"]
-    scored = model.score_race(race, runners)
     rev = _reversals(runners, race)
-    rider_mean = sum(s["parts"].get("jockey", 0.0) for s in scored) / len(scored)
-    lines = [_runner(r, s, race, books.get((race["race_no"], r["horse_no"])),
-                     notes.get(r["horse_name"], []), rev.get(r["horse_no"], []),
-                     rider_mean) for r, s in zip(runners, scored)]
-    order = sorted(lines, key=lambda x: -x["place_pct"])
-    form_order = sorted((x for x in lines if x["sarr_rank"]), key=lambda x: x["sarr_rank"])
-    form_pos = {x["horse_no"]: i + 1 for i, x in enumerate(form_order)}
+    lines = [_runner(r, scores.get((race["race_no"], r["horse_no"])),
+                     books.get((race["race_no"], r["horse_no"])),
+                     notes.get(r["horse_name"], []), rev.get(r["horse_no"], []))
+             for r in runners]
+    # Read in order of the chance to place; a runner the model has not scored
+    # (a late replacement) goes to the foot, named but not ranked.
+    order = sorted(lines, key=lambda x: (x["place_pct"] is None, -(x["place_pct"] or 0)))
+    by_win = sorted((x for x in lines if x["win_pct"] is not None), key=lambda x: -x["win_pct"])
+    win_pos = {x["horse_no"]: i + 1 for i, x in enumerate(by_win)}
     for i, x in enumerate(order):
-        x["rank"] = i + 1
-        x["form_rank"] = form_pos.get(x["horse_no"])
-        x["tier"] = ("SHORTLIST" if i < SHORTLIST else
-                     "CASE" if x["case_x"] >= math.exp(CASE_AT) else "FIELD")
+        scored = x["place_pct"] is not None
+        x["rank"] = i + 1 if scored else None
+        x["form_rank"] = win_pos.get(x["horse_no"])
+        x["tier"] = ("SHORTLIST" if scored and i < SHORTLIST else
+                     "CASE" if scored and x["case_x"] >= math.exp(CASE_AT) else "FIELD")
     return {**{k: race[k] for k in ("race_no", "venue", "course", "surface", "going",
                                      "distance", "race_class", "off_time", "field_size",
                                      "restricted")},
             "run": any(r["place"] is not None for r in runners),
+            "scored": any(x["place_pct"] is not None for x in lines),
             "pace": _pace(runners),
             "runners": order}
 
 
 def meeting(date: str, *, conn: Connection | None = None) -> dict[str, Any]:
     """The Screen for every race on one date. `races` is empty when no card
-    is stored for it."""
+    is stored for it; a card the model has not scored has no chances yet."""
     own = conn is None
     conn = conn or get_conn()
     try:
@@ -252,15 +260,17 @@ def meeting(date: str, *, conn: Connection | None = None) -> dict[str, Any]:
                  for b in blackbook_band.declared_on(date, conn=conn)}
         names = [r["horse_name"] for b in blocks for r in b["runners"]]
         notes = notes_for_horses(names, conn=conn)
-        races = [_race(b, books, notes) for b in blocks]
+        scores = gbm_q.scores(date, conn=conn)
+        races = [_race(b, books, notes, scores) for b in blocks]
+        version = next((x["model_version"] for x in scores.values()), None)
+        fit = gbm_q.version_fit(conn, version)
     finally:
         if own:
             conn.close()
     return {
-        "race_date": date, "version": model.VERSION,
-        "fit": {**model.FIT, "shortlist": SHORTLIST},
-        "factors": [{"key": f.key, "group": f.group, "label": f.label,
-                     "x": round(f.multiplier, 2), "runs": f.runs, "caveat": f.caveat}
-                    for f in model.FACTORS if f.shown],
+        "race_date": date, "version": version,
+        "fit": {**fit, "shortlist": SHORTLIST},
+        "factors": [{"key": k, "group": k, "label": k.capitalize(), "x": None,
+                     "runs": None, "caveat": None} for k in gbm_q.GROUPS],
         "races": races,
     }

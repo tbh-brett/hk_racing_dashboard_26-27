@@ -1,7 +1,7 @@
 """Screen route — who is a chance in each race, before there is a price.
 
 The Briefing's first section. Reads only; see query/screen for what the
-Screen weighs and model/screen for how each weight was measured.
+Screen reads and query/gbm for the model whose chances it shows.
 """
 from __future__ import annotations
 

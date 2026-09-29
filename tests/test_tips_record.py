@@ -147,9 +147,9 @@ def test_the_endpoint_answers_and_refuses_a_bad_date(db, monkeypatch):
 
 # ── jobs/record_screen ──────────────────────────────────────────────────────
 
-def fake_meeting(place_pcts: dict[int, list[float]]):
+def fake_meeting(place_pcts: dict[int, list[float]], fitted: str = "2026-01-01"):
     def meeting(date, *, conn=None):
-        return {"race_date": date, "races": [
+        return {"race_date": date, "version": "gbm-test", "fit": {"fitted": fitted}, "races": [
             {"race_no": n, "run": n in (1, 2), "runners": [
                 {"horse_no": i + 1, "rank": i + 1, "win_pct": p / 3,
                  "place_pct": p, "tier": "SHORTLIST" if i < 4 else "FIELD"}
@@ -160,15 +160,22 @@ def fake_meeting(place_pcts: dict[int, list[float]]):
 
 def test_a_meeting_inside_the_fit_is_not_recorded(db, monkeypatch):
     monkeypatch.setattr(record_screen.screen, "meeting",
-                        fake_meeting({1: [60, 40]}))
-    got = record_screen.record([model.FIT["fitted"]], db=db)
-    assert got.recorded == {} and "inside the Screen's fit" in got.skipped[0]
+                        fake_meeting({1: [60, 40]}, fitted=DATE))
+    got = record_screen.record([DATE], db=db)
+    assert got.recorded == {} and "inside the model's fit" in got.skipped[0]
 
 
 def test_the_first_record_is_kept_and_only_run_races(db, monkeypatch):
     conn = get_conn(db)
     with transaction(conn):
         conn.execute("DELETE FROM screen_pick")
+    conn.close()
+    assert record_screen.pending(db=db) == []          # nothing the model scored
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.execute("INSERT INTO runner_gbm (race_date, race_no, horse_no, stage, p_win, "
+                     "model_version, derive_version, inputs_key, scored_at) VALUES "
+                     "(?, 1, 1, 'latest', 0.5, 'gbm-test', 'feat-1.0', 'k', ?)", (DATE, DATE))
     conn.close()
     assert record_screen.pending(db=db) == [DATE]
     monkeypatch.setattr(record_screen.screen, "meeting",

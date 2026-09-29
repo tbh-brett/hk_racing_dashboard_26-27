@@ -44,6 +44,7 @@ _HK = dt.timezone(dt.timedelta(hours=8))
 LATE_FIRMING = 10.0     # % a price shortens in its last minutes to be a reason
 MARKET_APART = 6        # the Screen's top two, this far down the betting
 CONSENSUS = 3           # distinct sources on one horse
+_GOOD_TRIAL = ("STANDOUT", "POSITIVE")   # derive/trial_quality bands worth a reason
 ORDER_RULE = ("races with more different things to read first, then race "
               "order; a count of reasons, not a chance of anything")
 _MARKET = {"tote": "the tote", "ladbrokes": "Ladbrokes", "sportsbet": "Sportsbet",
@@ -163,9 +164,15 @@ def _reasons(race: dict, runners: list[dict], interviews: list[dict],
     pace = race["pace"]
     if len(pace["leaders"]) == 1:
         lead = pace["leaders"][0]
+        # The model's own flag carries what five seasons measured for a lone
+        # leader (model/gbm_flags); quoted as it is -- a lead, not an edge.
+        flag = next((f for r in runners if r["horse_no"] == lead["horse_no"]
+                     for f in r["screen"].get("flags", []) if f["key"] == "lone_leader"), None)
+        measured = (f" (price A/E {flag['price_ae']:.2f} over {flag['runs']:,} runs "
+                    "measured: a lead, not an edge)" if flag and flag.get("price_ae") else "")
         add("lone_leader", "computed",
             f"#{lead['horse_no']} {lead['horse_name']} is the only habitual "
-            f"leader (×{pace['leader_x']:.2f} measured)", lead["horse_no"])
+            f"leader{measured}", lead["horse_no"])
     for r in runners:
         sc = r["screen"]
         # Every race holds a book horse or two; one is a reason to study the
@@ -177,12 +184,16 @@ def _reasons(race: dict, runners: list[dict], interviews: list[dict],
             add("book", "computed", f"Your book: {who(r)} — "
                 + ("your conditions met" if book.get("on_conditions")
                    else "set-up FAVOURABLE")
-                + f", the Screen's {sc['rank']} of {len(runners)}",
+                + (f", the Screen's {sc['rank']} of {len(runners)}" if sc["rank"]
+                   else ", not scored by the model"),
                 r["horse_no"])
-        trial = next((f for f in sc["for"] if f["key"] == "trial_good"), None)
-        if trial and sc["tier"] != "FIELD":
+        # The model reads no trials (gbm-SPEC §14.9), so a good one since the
+        # last run is said as the thing its number cannot see.
+        trial, last = sc["trial"], sc["last_start"]
+        if (trial and trial["band"] in _GOOD_TRIAL and sc["tier"] != "FIELD"
+                and (not last or trial["trial_date"] > last["race_date"])):
             add("trial", "computed", f"{who(r)} trialled well since its last "
-                f"run (×{trial['x']:.2f}, one season measured)", r["horse_no"])
+                "run -- the model cannot see trials", r["horse_no"])
     cases = [r for r in runners if r["screen"]["tier"] == "CASE"]
     if cases:
         add("case", "computed", f"{len(cases)} outside the Screen's four with "
@@ -196,7 +207,7 @@ def _reasons(race: dict, runners: list[dict], interviews: list[dict],
         if k >= CONSENSUS:
             add("consensus", "said", f"{who(r)} backed by {k} sources",
                 r["horse_no"])
-        if k >= 2 and r["screen"]["rank"] > screen.SHORTLIST:
+        if k >= 2 and (r["screen"]["rank"] or 0) > screen.SHORTLIST:
             add("talked_up", "said", f"{who(r)}: {k} sources back it, the "
                 f"Screen ranks it {r['screen']['rank']} of {len(runners)}",
                 r["horse_no"])
@@ -223,7 +234,7 @@ def _reasons(race: dict, runners: list[dict], interviews: list[dict],
             add("late_money", "priced", f"{who(r)} firmed "
                 f"{abs(m['rush_pct']):.0f}% in the last {m['rush_minutes']:.0f} "
                 f"minutes", r["horse_no"])
-        if r["screen"]["rank"] <= 2 and (r["market_rank"] or 0) > MARKET_APART:
+        if 0 < (r["screen"]["rank"] or 0) <= 2 and (r["market_rank"] or 0) > MARKET_APART:
             add("market_apart", "priced", f"The Screen's {r['screen']['rank']} "
                 f"{who(r)} is {r['market_rank']} in the betting — where the "
                 f"two disagree, the tote has usually been right (A/E 0.85–0.91)",

@@ -25,41 +25,20 @@ import pandas as pd
 
 from hkrd.derive.probability import actual_over_expected
 from hkrd.model import gbm
+from hkrd.model.gbm_flags import FLAGS, flags
 
 __all__ = ["FLAGS", "flags", "walk_forward", "record", "calibration_check", "gate",
-           "align_shown", "meeting_row", "GATE_MEETINGS"]
+           "align_shown", "meeting_row", "GATE_MEETINGS", "DRAW_COURSES"]
 
 CAL_BANDS = [0, .02, .05, .08, .12, .18, .25, .35, .5, 1.0]
 GATE_BANDS = [0, .05, .10, .20, .35]
 GATE_POINTS, GATE_SE, GATE_T, GATE_MEETINGS = 0.03, 3.0, 1.2816, 8
-_TURF = ("ST_Turf", "HV_Turf")
-
-# The situations where five seasons say the model is off (§14.4). Rules read
-# the same ex-ante row the model does; `query/gbm` applies them to a card.
-FLAGS: dict[str, dict[str, str]] = {
-    "second_up_bad": {"label": "2nd-up after 7th+",
-                      "note": "second run of a preparation after finishing 7th or worse first-up"},
-    "awt_form": {"label": "AWT form", "note": "racing on turf with 2 of its last 3 runs on the AWT"},
-    "lone_leader": {"label": "lone leader",
-                    "note": "the only habitual leader in the field -- a lead, not an edge"},
-    "first_up": {"label": "first-up", "note": "the model cannot see its preparation"},
-    "no_hk": {"label": "no HK record", "note": "a placeholder, built from the card alone"},
-}
+# The draw courses the model gets wrong (§14.4, §14.6): the inside under-rated
+# at HV 1200, and the wrong way round on the ST 1000 straight.
+DRAW_COURSES = {"HV 1200": ("HV_Turf", 1200.0), "ST 1000 straight": ("ST_Turf", 1000.0)}
 
 
-def flags(frame: pd.DataFrame) -> pd.DataFrame:
-    """One boolean column per flag, ex-ante."""
-    awt = sum((frame[f"l{k}_vs"] == "ST_AWT").astype(int) for k in (1, 2, 3))
-    return pd.DataFrame({
-        "second_up_bad": (frame["prep_run"] == 2) & (frame["l1_place"] >= 7),
-        "awt_form": frame["vs"].isin(_TURF) & (awt >= 2),
-        "lone_leader": (frame["hab_early"] < 0.15) & (frame["n_leaders"] == 1),
-        "first_up": (frame["prep_run"] == 1) & (frame["n_prior"] > 0),
-        "no_hk": frame["n_prior"] == 0,
-    }, index=frame.index)
-
-
-_KEEP = ["race_id", "race_date", "horse_no", "season", "y", "won", "p_mkt", "vs", "dist",
+_KEEP = ["race_id", "race_date", "horse_no", "season", "y", "won", "p_mkt", "vs", "dist", "draw",
          "prep_run", "l1_place", "l1_vs", "l2_vs", "l3_vs", "hab_early", "n_leaders", "n_prior"]
 
 
@@ -112,9 +91,20 @@ def record(preds: pd.DataFrame) -> dict[str, Any]:
              "market_15_model_two_thirds": _row(preds[(preds["p_mkt"] >= 0.15) & (ratio < 2 / 3)])}
     fl = flags(preds)
     flag_rows = [_row(preds[fl[k]], flag=k, **FLAGS[k]) for k in FLAGS]
+    draw = []
+    for course, (vs, dist) in DRAW_COURSES.items():
+        on = (preds["vs"] == vs) & (preds["dist"] == dist)
+        for gates, lo, hi in (("1-2", 1, 2), ("11-14", 11, 14)):
+            draw.append(_row(preds[on & preds["draw"].between(lo, hi)], course=course, gates=gates))
+    ids, won = preds["race_id"], preds["won"] == 1
+    top4 = {}                       # races whose winner was in each side's first four
+    for who, col in (("model", "p_model"), ("market", "p_mkt")):
+        rank = preds.groupby("race_id")[col].rank(ascending=False, method="first")
+        top4[who] = float(((rank <= 4) & won).groupby(ids).any().mean())
     whole = gbm.evaluate(preds, "p_model")
     return {"seasons": seasons, "pooled": whole, "calibration": cal, "segments": segs,
             "gap_deciles": deciles, "gap_named": named, "flags": flag_rows,
+            "draw_courses": draw, "top4_has_winner": top4, "test_races": int(ids.nunique()),
             "test_seasons": [s["season"] for s in seasons]}
 
 

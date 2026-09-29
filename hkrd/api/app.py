@@ -51,7 +51,7 @@ auth.install(app)
 # it is WITHIN blackbook's — see the note there.
 for _module in (routes.lookup, routes.blackbook, routes.bets, routes.results,
                 routes.trials, routes.jobs, routes.tips, routes.screen,
-                routes.briefing, routes.background):
+                routes.briefing, routes.background, routes.model_gbm):
     app.include_router(_module.router)
 
 

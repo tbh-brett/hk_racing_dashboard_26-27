@@ -8,10 +8,12 @@ and its four beside every tipster. It reads the order recorded here, never a
 fresh one, because the weights move when the Screen is refitted and a refit
 would rescore every race it has already been judged on.
 
-ONLY RACES THE WEIGHTS NEVER SAW. The weights in force were fitted on every
-settled race up to `model.FIT["fitted"]`; scoring the Screen on those would be
-scoring it on its own homework. A meeting on or before that date is skipped,
-and the report says so.
+ONLY RACES THE MODEL NEVER SAW. Since gbm-SPEC §6 the Screen's chances are
+the fundamental model's, scored before the off (`runner_gbm`), and each
+meeting's scores name the model that made them. A meeting on or before the
+date that model was trained through would be the Screen marking its own
+homework: it is skipped, and the report says so. A meeting the model never
+scored has nothing to record.
 
 AS AT THE RACE. The inputs are read strictly before the meeting's date
 (`query/screen_inputs`), so recording after the result changes nothing the
@@ -26,7 +28,6 @@ import datetime as dt
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from hkrd.model import screen as model
 from hkrd.query import screen
 from hkrd.store import job_log, screen_picks
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
@@ -49,11 +50,15 @@ class RecordReport:
 
 
 def pending(*, db: Path | None = None) -> list[str]:
-    """Settled meetings after the fit that have a race not yet recorded."""
+    """Settled meetings the model scored that have a race not yet recorded."""
     conn = get_conn(db if db is not None else db_path())
     try:
         init_db(conn)
-        return screen_picks.unrecorded_dates(conn, model.FIT["fitted"])
+        first = conn.execute("SELECT min(race_date) FROM runner_gbm").fetchone()[0]
+        if first is None:
+            return []
+        before = (dt.date.fromisoformat(first) - dt.timedelta(days=1)).isoformat()
+        return screen_picks.unrecorded_dates(conn, before)
     finally:
         conn.close()
 
@@ -65,18 +70,23 @@ def record(dates: list[str], *, db: Path | None = None) -> RecordReport:
         init_db(conn)
         now = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
         for date in dates:
-            if date <= model.FIT["fitted"]:
+            m = screen.meeting(date, conn=conn)
+            fitted, version = m.get("fit", {}).get("fitted"), m.get("version")
+            if version is None:
+                report.skipped.append(f"{date}: the model did not score this meeting")
+                continue
+            if date <= fitted:
                 report.skipped.append(
-                    f"{date}: inside the Screen's fit (weights fitted "
-                    f"{model.FIT['fitted']}), so not a fair test of it")
+                    f"{date}: inside the model's fit (trained through "
+                    f"{fitted}), so not a fair test of it")
                 continue
             rows = [{"race_date": date, "race_no": race["race_no"],
                      "horse_no": x["horse_no"], "rank": x["rank"],
                      "win_pct": x["win_pct"], "place_pct": x["place_pct"],
-                     "tier": x["tier"], "version": model.VERSION,
-                     "fitted": model.FIT["fitted"], "recorded_at": now}
-                    for race in screen.meeting(date, conn=conn)["races"]
-                    if race["run"] for x in race["runners"]]
+                     "tier": x["tier"], "version": version,
+                     "fitted": fitted, "recorded_at": now}
+                    for race in m["races"]
+                    if race["run"] for x in race["runners"] if x["rank"] is not None]
             with transaction(conn):
                 report.recorded[date] = screen_picks.record(conn, rows)
                 job_log.record_source(conn, "record_screen", ok=True,
