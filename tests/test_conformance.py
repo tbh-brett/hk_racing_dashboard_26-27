@@ -89,10 +89,15 @@ EXTRA_SOURCES = {
 # page -> {design header: why the build does not carry it}
 # Every entry is a decision someone made on purpose, with the reason attached.
 DIVERGENCES: dict[str, dict[str, str]] = {
-    # Empty, and that is the point: every column the design declares is
-    # currently rendered. When one is deliberately dropped, it goes here with
-    # the reason, e.g.
-    #     "Race Day": {"SOME COLUMN": "dropped because <measurement>"},
+    # Every other column the design declares is rendered. A deliberate drop
+    # goes here with the reason that measured it out.
+    "Race Day": {
+        "SARR": "retired 2026-09-28 (gbm-SPEC §1): the fundamental model's MODEL% "
+                "replaces it -- R² 0.106 against SARR's 0.075 on the same 2,071 races",
+        "EDGE": "retired with SARR (gbm-SPEC §1, §10): a model-less-market column "
+                "that ranked and coloured the disagreement; GAP shows it neutral, "
+                "because where the model is keener the price has been right",
+    },
 }
 
 # Artboards with no tabular columns to check, each with the reason. An artboard

@@ -1,12 +1,15 @@
 /* Race Day — ported from web/design-source/Race Day.dc.html.
  *
  * The artboard's own structure, in order: race strip, blackbook band,
- * head-to-head band, race context bar, the 16-column card, a detail aside,
+ * head-to-head band, race context bar, the 17-column card, a detail aside,
  * and a footer of standing facts. Keyboard: arrows move the selected runner,
  * digits switch race.
  *
- * The market price leads because it ranks horses better than every model here
- * (AUC .785 against .727), which the footer states outright.
+ * The market price leads because it forecasts better than the model here --
+ * five seasons, R² 0.192 against 0.126 -- which the footer states from the
+ * model's own record. MODEL% is the fundamental model (gbm-SPEC §1), scored
+ * before any price; GAP is MODEL% less WIN% and is shown, never coloured or
+ * sorted: where the model has been keener than the price, the price was right.
  */
 import { api, num } from './api.js';
 import { el, $, DASH, MINUS, renderNav, habitualStyleBadge, styleOrdinal,
@@ -36,9 +39,10 @@ const COLS = [
   ['no', 'NO', 'c-num'], ['name', 'HORSE', ''], ['style', 'STYLE', ''],
   ['draw', 'DR', 'c-num'], ['jockey', 'JOCKEY', ''], ['trainer', 'TRAINER', ''],
   ['wt', 'WT', 'c-right'], ['odds', 'WIN / PLACE', 'c-right'],
-  ['move', 'MOVE · MONEY', 'c-right'], ['win', 'WIN%', 'c-right'],
-  ['mkt', 'MKT', 'c-num'], ['sarr', 'SARR', 'c-num'],
-  ['edge', 'EDGE', 'c-num'], ['fig', 'LAST-RUN FIGURE', ''],
+  ['move', 'MOVE · MONEY', 'c-right'], ['model', 'MODEL%', 'c-right'],
+  ['win', 'WIN%', 'c-right'], ['mkt', 'MKT', 'c-num'], ['gap', 'GAP', 'c-num'],
+  // Brett's READ goes between GAP and FLAGS when the reads ticket lands.
+  ['flags', 'FLAGS', ''], ['fig', 'LAST-RUN FIGURE', ''],
   ['last', 'LAST RUN', ''], ['bb', 'BB', 'c-num'],
 ];
 
@@ -684,10 +688,19 @@ function poolBox(bar, c) {
 
 /* ── card ────────────────────────────────────────────────────────────────── */
 
+// Drawn, never sorted. Sorting a card by the gap is a recommendation, and five
+// seasons say where the model is keener than the price, the price has been
+// right (gbm-SPEC §10); the flags are notes about the model, not a ranking.
+const NO_SORT = new Set(['gap', 'flags']);
+
 function renderHead() {
   $('card-head').replaceChildren(...COLS.map(([key, label, cls]) => {
     const th = el('th', cls);
     th.append(document.createTextNode(label));
+    if (key === 'gap') {
+      th.title = state.card?.model?.gap_note ?? 'MODEL% less WIN%, in points.';
+    }
+    if (NO_SORT.has(key)) return th;
     if (state.sort === key) {
       th.append(el('span', 'ind', state.sortDir > 0 ? '▲' : '▼'));
     }
@@ -725,8 +738,7 @@ function sortRunners(runners) {
       case 'move': return r.movement?.change_pct ?? 0;
       case 'win': return -(r.win_pct ?? 0);
       case 'mkt': return r.market_rank ?? 99;
-      case 'sarr': return r.sarr_rank ?? 99;
-      case 'edge': return r.rank_delta ?? 0;
+      case 'model': return -(r.model?.model_pct ?? 0);
       case 'fig': return -(r.last_run?.figure ?? 0);
       case 'last': return r.last_run?.days_ago ?? 9e9;
       case 'bb': return r.blackbook ? 0 : 1;
@@ -899,57 +911,52 @@ function sparkline(r) {
   return s;
 }
 
-/** The SARR rank, or the reason there is none.
- *
- *  A dash used to mean two different things. SOLID STATE on 2026-09-13 had a
- *  single run and the model needs two, which is a rule; a horse with twenty
- *  runs and no rank is a card nobody scored, which is a fault -- and every
- *  upcoming card sat in that state until someone pressed Card. They look alike
- *  as a dash and nothing like each other here, so the fault announces itself
- *  the next time rather than passing for a debutant.
- */
-function sarrCell(r) {
-  if (r.sarr_rank !== null && r.sarr_rank !== undefined) {
-    const sv = el('span', null, String(r.sarr_rank));
-    if (r.sarr_rank === 1) sv.style.color = 'var(--edge)';
-    return sv;
+/** MODEL% -- the fundamental model's chance, scored before any price exists
+ *  (query/gbm). The tooltip carries its place chance, the first read when the
+ *  card landed if the number has moved since, the groups that moved it most
+ *  against this field, and anything it had to assume. */
+function modelCell(r) {
+  const td = el('td', 'c-right model-cell');
+  const m = r.model;
+  if (!m) {
+    td.append(el('span', 'mv-none', DASH));
+    td.title = 'The model has not scored this runner.';
+    return td;
   }
-  const why = r.sarr_unrated;
-  if (!why) return el('span', null, DASH);
-  const tag = el('span', `sarr-why ${why.kind}`, why.label);
-  // `no_card_score` is a fact about the RACE and outranks the runner's own
-  // history: the model has not looked at this card at all, so a blank here
-  // says nothing about the horse yet.
-  tag.title = why.kind === 'no_card_score'
-    ? 'Nothing has scored this card, so no runner on it has a rating. '
-      + 'Press Card in the header to score it.'
-    : why.kind === 'unscored'
-      ? `${why.prior} prior runs, enough to rate, and no rating. `
-        + 'Press Card in the header to rescore this race.'
-      : `${why.prior === 0 ? 'No run' : `${why.prior} run`} in Hong Kong. `
-        + `SARR rates a horse from its history and needs ${why.needs}.`;
-  return tag;
+  td.append(el('span', 'v', `${num(m.model_pct, 1)}%`));
+  const moved = Object.entries(m.groups ?? {}).filter(([k]) => k !== 'race')
+    .sort((a, b) => Math.abs(Math.log(b[1])) - Math.abs(Math.log(a[1]))).slice(0, 3)
+    .map(([k, x]) => `${k} ×${x.toFixed(2)}`);
+  td.title = [`place ${m.place_pct}%`,
+    m.card_pct !== null && m.card_pct !== m.model_pct ? `first read ${m.card_pct}%` : null,
+    moved.length ? `moved most by ${moved.join(' · ')}` : null,
+    ...(m.assumed ?? [])].filter(Boolean).join('\n');
+  return td;
 }
 
+/** GAP -- MODEL% less WIN%, in points, in the page's ordinary text colour.
+ *  What five seasons found about it is the header's tooltip, read from the
+ *  model's record. */
+function gapCell(r) {
+  const td = el('td', 'c-num gap-cell');
+  const g = r.gap;
+  td.append(el('span', null, g === null || g === undefined ? DASH
+    : g > 0 ? `+${num(g, 1)}` : g < 0 ? `${MINUS}${num(-g, 1)}` : num(0, 1)));
+  return td;
+}
 
-function edgeCell(r) {
-  const td = el('td', 'c-num');
-  const box = el('div', 'edge-cell');
-  const d = r.rank_delta;
-  if (d === null || d === undefined) { box.append(el('span', 'v mv-none', DASH)); td.append(box); return td; }
-  // Negative means the model likes it more than the market does.
-  const colour = d <= -3 ? 'var(--edge)' : d >= 3 ? 'var(--text-faint)' : 'var(--text-dim)';
-  const v = el('span', 'v', d > 0 ? `+${d}` : String(d));
-  v.style.color = colour;
-  box.append(v);
-  const track = el('div', 'edge-track');
-  track.style.justifyContent = d < 0 ? 'flex-start' : 'flex-end';
-  const fill = el('i');
-  fill.style.width = `${Math.min(100, Math.abs(d) * 12)}%`;
-  fill.style.background = colour;
-  track.append(fill);
-  box.append(track);
-  td.append(box);
+/** FLAGS -- at most two, where five seasons say the model's number is
+ *  weakest, each with its measured record. A flag is not a bet either way. */
+function flagsCell(r) {
+  const td = el('td', 'flags-cell');
+  for (const f of r.model?.flags ?? []) {
+    const chip = el('span', 'flag-chip', f.label);
+    const measured = f.model_ae !== null && f.model_ae !== undefined
+      ? `five seasons, ${Number(f.runs).toLocaleString('en-US')} runs: model A/E `
+        + `${f.model_ae}, price A/E ${f.price_ae}` : null;
+    chip.title = [f.note, measured].filter(Boolean).join('\n');
+    td.append(chip);
+  }
   return td;
 }
 
@@ -1062,15 +1069,12 @@ function cardRow(r, index) {
   tr.append(od);
 
   tr.append(movementCell(r));
+  tr.append(modelCell(r));
   tr.append(el('td', 'c-right', r.win_pct !== null && r.win_pct !== undefined
     ? `${r.win_pct}%` : DASH));
   tr.append(el('td', 'c-num', String(r.market_rank ?? DASH)));
-
-  const sr = el('td', 'c-num');
-  sr.append(sarrCell(r));
-  tr.append(sr);
-
-  tr.append(edgeCell(r));
+  tr.append(gapCell(r));
+  tr.append(flagsCell(r));
 
   const fg = el('td');
   const f = el('div', 'fig-cell');
@@ -1282,34 +1286,35 @@ function renderDetail() {
   });
   host.append(shape);
 
-  const dis = el('section');
-  dis.append(el('h6', null, `MODEL vs MARKET · R${state.card.race_no}`));
-  const disagreements = rows
-    .filter((x) => x.rank_delta !== null && x.rank_delta !== undefined)
-    .sort((a, b) => a.rank_delta - b.rank_delta).slice(0, 3);
-  // Edge is the MODEL's rank minus the MARKET's, so it needs both. Before the
-  // market opens there is no second opinion to disagree with — and saying "no
-  // model ranks" then blamed the model for the market's absence, on a card
-  // whose SARR column was fully populated.
-  if (!disagreements.length) {
-    const rated = rows.some((x) => x.sarr_rank != null);
-    const priced = rows.some((x) => x.market_rank != null);
-    dis.append(el('div', 'empty',
-      !rated ? 'no model ranks — run the analysis'
-        : !priced ? 'no market yet — edge needs odds to disagree with'
-          : 'model and market agree'));
+  // WHY THE MODEL SAYS WHAT IT SAYS, for this runner: its groups against this
+  // field, its flags and what it assumed. Never a list of the card's biggest
+  // disagreements with the market -- ranking those is recommending by the gap.
+  const mo = el('section');
+  const m = r.model;
+  mo.append(el('h6', null, `MODEL · ${m ? `${num(m.model_pct, 1)}%` : 'NOT SCORED'}`
+    + (m && r.win_pct !== null && r.win_pct !== undefined ? ` · MARKET ${r.win_pct}%` : '')));
+  if (!m) mo.append(el('div', 'empty', 'the model has not scored this runner'));
+  Object.entries(m?.groups ?? {}).filter(([k]) => k !== 'race')
+    .sort((a, b) => b[1] - a[1])
+    .forEach(([k, x]) => {
+      const row = el('div', 'grp-row');
+      row.append(el('span', 'k', k));
+      const track = el('div', 'grp-track');
+      const bar = el('i', x >= 1 ? 'up' : 'down');
+      bar.style.width = `${Math.min(50, Math.abs(Math.log(x)) * 60)}%`;
+      track.append(bar);
+      row.append(track);
+      row.append(el('span', 'x', `×${x.toFixed(2)}`));
+      mo.append(row);
+    });
+  for (const f of m?.flags ?? []) mo.append(el('div', 'grp-note', `${f.label}: ${f.note}`));
+  for (const a of m?.assumed ?? []) mo.append(el('div', 'grp-note', a));
+  if (m && m.card_pct !== null && m.card_pct !== m.model_pct) {
+    mo.append(el('div', 'grp-note', `first read, when the card landed: ${m.card_pct}%`));
   }
-  disagreements.forEach((x) => {
-    const row = el('div', 'dis-row');
-    const e = el('span', 'e', x.rank_delta > 0 ? `+${x.rank_delta}` : String(x.rank_delta));
-    e.classList.add(x.rank_delta <= -3 ? 'strong' : 'quiet');
-    row.append(e);
-    row.append(el('span', null, `${x.horse_no} ${x.horse_name}`));
-    row.append(el('span', 'r',
-      `SARR ${x.sarr_rank ?? x.sarr_unrated?.label ?? DASH} · MKT ${x.market_rank ?? DASH}`));
-    dis.append(row);
-  });
-  host.append(dis);
+  const note = state.card?.model?.gap_note;
+  if (note) mo.append(el('div', 'grp-note', note));
+  host.append(mo);
 }
 
 /** One past run, as the panel shows it. Split out because the panel draws it
@@ -1486,7 +1491,20 @@ function renderFoot() {
   bits.push('STYLE IS THE HABIT OVER THE LAST 15 CLASSIFIED RUNS, '
     + 'WEIGHTED TO THE LATEST — NOT THE LAST RUN ALONE · '
     + 'SORTS LEADER → ON-PACE → MIDFIELD → CLOSER');
-  bits.push('MODEL AUC .727 · MARKET AUC .785');
+  const m = c?.model;
+  if (m?.version) {
+    const at = new Date(m.scored_at).toLocaleString('en-GB', {
+      timeZone: 'Asia/Hong_Kong', day: 'numeric', month: 'short',
+      hour: '2-digit', minute: '2-digit' }).toUpperCase();
+    bits.push(`MODEL ${m.version} · SCORED ${at}`
+      + (m.r2 !== null && m.r2 !== undefined
+        ? ` · FIVE SEASONS R² ${m.r2.toFixed(3)} AGAINST THE PRICE'S ${m.r2_market.toFixed(3)}`
+        : ''));
+  } else {
+    bits.push('THE MODEL HAS NOT SCORED THIS RACE');
+  }
+  if (m?.going_assumed) bits.push('GOING ASSUMED GOOD UNTIL HKJC PUBLISHES IT');
+  if (m?.draw_note) bits.push(m.draw_note.toUpperCase());
   foot.replaceChildren(...bits.map((b) => el('span', null, b)));
   foot.append(el('span', 'keys', '↑↓ runner · 1–9 race · click header to sort'));
 }

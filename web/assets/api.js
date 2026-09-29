@@ -232,6 +232,7 @@ export const api = {
   blendRaceLive: (date, no, weight) => getLive(
     `/model/blend/${date}/${no}` + (weight === undefined ? '' : `?weight=${weight}`)),
   modelBacktest: (q = '') => get(`/model/backtest${q ? `?${q}` : ''}`),
+  modelGbmRecord: () => get('/model/gbm/record'),
   status: () => get('/status'),
   rebuildEt: (months = 24) => post(`/jobs/rebuild-et?window_months=${months}`),
 };

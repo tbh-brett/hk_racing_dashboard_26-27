@@ -69,8 +69,9 @@ def test_card_carries_everything_the_page_needs(db):
     assert card["concentration"]["value"] is not None
     r = card["runners"][0]
     for key in ("win_odds", "market_rank", "movement", "sarr_rank",
-                "rank_delta", "last_run"):
+                "model", "gap", "last_run"):
         assert key in r
+    assert "rank_delta" not in r
 
 
 def test_market_rank_orders_by_price(db):
@@ -84,15 +85,28 @@ def test_market_rank_orders_by_price(db):
     assert by_no[3]["market_rank"] == 3      # 20.0
 
 
-def test_rank_delta_makes_disagreement_explicit(db):
-    """Where a model likes a horse more than the market does is the interesting
-    thing on the screen, so it is computed rather than left to the eye."""
+def test_the_gap_is_the_model_less_the_market_in_points_and_nothing_more(db):
+    """gbm-SPEC §1, §10: MODEL% beside WIN% and the difference between them,
+    shown and never ranked -- where the model is keener, the price has been
+    right. The ranked disagreement this replaced (SARR's rank less the
+    market's) is gone from the line."""
+    import json
     conn = get_conn(db)
+    with transaction(conn):
+        for no, p in ((1, 0.2), (2, 0.5), (3, 0.3)):
+            conn.execute(
+                "INSERT INTO runner_gbm (race_date, race_no, horse_no, stage, p_win, p_place, "
+                "contrib_json, facts_json, model_version, derive_version, inputs_key, "
+                "scored_at) VALUES ('2026-07-15', 1, ?, 'latest', ?, ?, '{}', ?, 'gbm-test', "
+                "'feat-1.0', 'k', '2026-07-14')",
+                (no, p, min(1.0, 2 * p), json.dumps({"n_prior": 3, "prep_run": 2,
+                                                     "body_weight": "declared",
+                                                     "going": "declared"})))
     card = raceday.build_card("2026-07-15", 1, conn=conn)
     conn.close()
-    by_no = {r["horse_no"]: r for r in card["runners"]}
-    assert by_no[2]["rank_delta"] == -1      # model 1, market 2
-    assert by_no[1]["rank_delta"] == 2       # model 3, market 1
+    for r in card["runners"]:
+        assert r["gap"] == round(r["model"]["model_pct"] - r["win_pct"], 1)
+    assert card["model"]["version"] == "gbm-test"
 
 
 def test_last_run_is_the_previous_race_not_todays(db):

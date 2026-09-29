@@ -15,8 +15,9 @@ import { el, $, DASH, renderNav, compactDate } from './vocab.js';
 import { context } from './context.js';
 import { Live } from './live.js';
 import { install as installPalette } from './palette.js';
+import { renderGbm } from './model-gbm.js';
 
-const VIEWS = [['sarr', 'SARR'], ['blend', 'BLEND'],
+const VIEWS = [['gbm', 'MODEL'], ['sarr', 'SARR'], ['blend', 'BLEND'],
                ['backtest', 'DOES IT BEAT THE PRICE'], ['et', 'ET'],
                ['all', 'ALL']];
 const WEIGHTS = [0, 0.1, 0.32, 1];
@@ -24,7 +25,7 @@ const WEIGHTS = [0, 0.1, 0.32, 1];
 
 const state = {
   date: null, race: 1, races: [], view: 'all', weight: null,
-  sarr: null, blend: null, et: null, backtest: null,
+  sarr: null, blend: null, et: null, backtest: null, gbm: undefined,
   sortS: { key: 'rank', dir: 1 }, sortB: { key: 'blended', dir: -1 },
 };
 
@@ -631,10 +632,12 @@ function render() {
   renderViewToggle();
   renderStrip();
   const show = (id, on) => { $(id).hidden = !on; };
+  show('sec-gbm', state.view === 'gbm' || state.view === 'all');
   show('sec-sarr', state.view === 'sarr' || state.view === 'all');
   show('sec-blend', state.view === 'blend' || state.view === 'all');
   show('sec-backtest', state.view === 'backtest' || state.view === 'all');
   show('sec-et', state.view === 'et' || state.view === 'all');
+  if (state.gbm !== undefined) renderGbm($('gbm-body'), $('gbm-foot'), state.gbm);
   renderSarr();
   renderBlend();
   renderBacktest();
@@ -679,6 +682,15 @@ async function loadBlend() {
                      ? '' : `?weight=${state.weight}`));
   liveBlend.seed(got.etag, got.pollAfter);
   renderBlend();
+}
+
+/** The model's record is one per live model, not per race: read once. A 404
+ *  is "no model promoted yet", which the section says rather than hiding. */
+async function loadGbm() {
+  state.gbm = await settle(api.modelGbmRecord(), (e) => {
+    $('gbm-foot').replaceChildren(el('span', 'warn', `model: ${e.message}`));
+  });
+  renderGbm($('gbm-body'), $('gbm-foot'), state.gbm);
 }
 
 async function loadBacktest() {
@@ -772,6 +784,7 @@ async function init() {
   const archive = Promise.all([
     settle(renderEtSummary(), () => {}),
     loadBacktest(),
+    loadGbm(),
   ]);
   context.onChange(onContext);
   await context.init();

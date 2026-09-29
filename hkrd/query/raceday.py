@@ -22,7 +22,7 @@ from typing import Any
 
 from hkrd.derive.probability import devig
 from hkrd.query import (background as background_q, blackbook as bb_q,
-                        gear as gear_q, h2h as h2h_q, market as market_q,
+                        gbm as gbm_q, gear as gear_q, h2h as h2h_q, market as market_q,
                         money as money_q, movement as movement_q,
                         pools as pools_q, rating as rating_q, vet as vet_q)
 from hkrd.query.race import (get_horse_form, get_race, habitual_styles,
@@ -164,6 +164,9 @@ def build_card(date: str, race_no: int, *,
                  for m in movement_q.split_move(date, race_no, conn=conn)}
         # Scraped since the first build and never read back until now.
         vet = vet_q.for_race(date, race_no, conn=conn)
+
+        # The fundamental model's chances, scored before any price (query/gbm).
+        model = gbm_q.scores(date, race_no, conn=conn)
 
         # Market rank by price, so model-versus-market disagreement is explicit
         # rather than something the reader has to work out.
@@ -309,9 +312,12 @@ def build_card(date: str, race_no: int, *,
                 "money_flow": flow.get(r.horse_no),
                 "vet": vet.get(r.horse_name, []),
                 "vet_form": vet_recent.get(r.horse_name, []),
-                # Negative means the model likes it more than the market does.
-                "rank_delta": (r.sarr_rank - m_rank
-                               if r.sarr_rank and m_rank else None),
+                # The model's chance, its groups, flags and what it assumed;
+                # and the gap to the market in points. Shown, never ranked or
+                # coloured: where the model is keener, the price has been right.
+                "model": (mine := model.get((race_no, r.horse_no))),
+                "gap": (round(mine["model_pct"] - win_pct[r.horse_no], 1)
+                        if mine and r.horse_no in win_pct else None),
                 "sarr_prior": prior_runs.get(r.horse_name, 0),
                 "background": backgrounds.get(r.horse_name),
                 "sarr_unrated": rating_q.unrated_reason(
@@ -364,6 +370,9 @@ def build_card(date: str, race_no: int, *,
                  "tags": sorted((b["tag_csv"] or "").split(","))
                          if b["tag_csv"] else []}
                 for b in booked.values()],
+            # Which model scored the race, the going it assumed, and the
+            # notes the page reads from the model's record (query/gbm).
+            "model": gbm_q.race_notes(date, race_no, conn=conn, got=model),
             "runners": runners,
         }
     finally:

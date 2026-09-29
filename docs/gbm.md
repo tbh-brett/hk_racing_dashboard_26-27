@@ -65,6 +65,12 @@ as what the model cannot see. A card the model has not scored shows no chances r
 old engine's. `record_screen` records only meetings the scoring model was not trained on, stamped
 with that model's version.
 
+**Two definitions of a leader.** The Race Day flag "lone leader" is the spec's (§14.4): mean
+first-call position in the front 15% over the last three runs, the only one in the field -- the
+definition its five-season record measures. The Briefing's "only habitual leader" line reads the
+dashboard's running style (derive/pace, field-scaled). The two usually agree; the Briefing quotes
+the flag's record only where they do, and names no figure where they do not.
+
 **Flags read stored facts.** `runner_gbm.facts_json` carries what the five flags read, so
 `query/gbm` applies the rules (`model/gbm_record.FLAGS`) without rebuilding inputs in a request.
 

@@ -145,3 +145,13 @@
 /* A bin under the minimum sample. Dimmed, never dropped — removing it hides
    how much of the reliability curve is unsupported. */
 .model-grid tr.thin td { color: var(--text-faint); }
+
+/* ── the MODEL view (model-gbm.js) ─────────────────────────────────────────── */
+.gbm-status { font-size: var(--fs-sm); letter-spacing: .04em; color: var(--text-2);
+              padding: 6px 0 10px; }
+.gbm-status .held { color: var(--alert); }
+.gbm-block { margin-bottom: 14px; }
+.gbm-title { font-size: var(--fs-sm); letter-spacing: .06em; color: var(--text-2);
+             padding: 4px 0; }
+.gbm-sub { color: var(--text-dim); }
+.gbm-note { color: var(--text-muted); padding: 0 0 14px; max-width: 72ch; }

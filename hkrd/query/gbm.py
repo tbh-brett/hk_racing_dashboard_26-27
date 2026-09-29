@@ -28,9 +28,12 @@ from hkrd.model.gbm_flags import FLAGS, flags
 from hkrd.query import pools
 from hkrd.store.connect import Connection, get_conn
 
-__all__ = ["live", "scores", "race", "record", "version_fit", "GROUPS", "MAX_FLAGS"]
+__all__ = ["live", "scores", "race", "race_notes", "record", "version_fit", "GROUPS",
+           "MAX_FLAGS"]
 
 MAX_FLAGS = 2
+_FACTS = ["prep_run", "n_prior", "l1_place", "vs", "l1_vs", "l2_vs", "l3_vs", "hab_early",
+          "n_leaders", "body_weight", "going"]
 
 _SCORES = """
 SELECT g.race_no, g.horse_no, u.horse_name, g.p_win, g.p_place, g.contrib_json,
@@ -108,7 +111,9 @@ def scores(date: str, race_no: int | None = None, *,
         if abs(total[x.index[0]] - 1.0) > 1e-9:       # someone came out after the score
             df.loc[x.index, "p_place_now"] = place_from_win(
                 x["p"].to_numpy(), places=3 if len(x) >= 7 else 2)
-    facts = pd.DataFrame([json.loads(f) for f in df["facts_json"]])
+    # A fact missing from a row leaves its flags unraised; it never voids the race.
+    facts = pd.DataFrame([json.loads(f or "{}") for f in df["facts_json"]]).reindex(
+        columns=_FACTS)
     chips = _runner_flags(facts, _flag_records(live(conn)))
     out = {}
     for i, r in df.iterrows():
@@ -149,6 +154,23 @@ def _draw_note(conn: Connection, date: str, race_no: int, model: dict | None) ->
     return f"The model reads the draw here wrongly ({course}, five seasons): {said}."
 
 
+def race_notes(date: str, race_no: int, *, conn: Connection,
+               got: dict | None = None) -> dict[str, Any]:
+    """What the page says about the race as a whole: which model scored it and
+    when, whether the going was assumed, the draw note for the two courses the
+    model reads wrongly, and the GAP note -- all from tables and the record."""
+    got = scores(date, race_no, conn=conn) if got is None else got
+    first = next(iter(got.values()), {})
+    model = live(conn)
+    wf = model["record"].get("walk_forward", {}) if model else {}
+    pooled = wf.get("pooled") or {}
+    return {"version": first.get("model_version"), "scored_at": first.get("scored_at"),
+            "going_assumed": bool(first.get("going_assumed")),
+            "draw_note": _draw_note(conn, date, race_no, model),
+            "gap_note": _gap_note(wf) if model else None,
+            "r2": pooled.get("r2"), "r2_market": pooled.get("r2_base")}
+
+
 def race(date: str, race_no: int, *, conn: Connection | None = None) -> dict[str, Any]:
     """One race for GET /api/model/gbm/{date}/{race_no}: the model beside the
     latest de-vigged market (none before prices exist) and the gap between."""
@@ -158,17 +180,16 @@ def race(date: str, race_no: int, *, conn: Connection | None = None) -> dict[str
         got = scores(date, race_no, conn=conn)
         market = {m["horse_no"]: m["win_pct"] for m in
                   pools.place_probabilities(date, race_no, conn=conn)["runners"]}
-        model = live(conn)
         runners = []
         for (_, no), x in sorted(got.items()):
             mkt = market.get(no)
             runners.append({**x, "market_pct": mkt,
                             "gap": None if mkt is None else round(x["model_pct"] - mkt, 1)})
-        first = runners[0] if runners else {}
-        return {"race_date": date, "race_no": race_no,
-                "model_version": first.get("model_version"), "scored_at": first.get("scored_at"),
-                "going_assumed": bool(first.get("going_assumed")),
-                "draw_note": _draw_note(conn, date, race_no, model), "runners": runners}
+        notes = race_notes(date, race_no, conn=conn, got=got)
+        return {"race_date": date, "race_no": race_no, "model_version": notes["version"],
+                "scored_at": notes["scored_at"], "going_assumed": notes["going_assumed"],
+                "draw_note": notes["draw_note"], "gap_note": notes["gap_note"],
+                "runners": runners}
     finally:
         if own:
             conn.close()
