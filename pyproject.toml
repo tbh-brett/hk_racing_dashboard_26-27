@@ -13,6 +13,11 @@ dependencies = [
     "beautifulsoup4>=4.12",
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",
+    # The fundamental model (hkrd/model/gbm). Pinned: a fit is only reproducible
+    # with the same build of the library, and the promotion gate must never
+    # compare two builds as if they were one (gbm-SPEC §14.10). The Linux wheel
+    # needs the OpenMP runtime, libgomp1, which the Dockerfile installs.
+    "lightgbm==4.7.0",
 ]
 
 [project.optional-dependencies]

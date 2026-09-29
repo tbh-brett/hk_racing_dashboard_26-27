@@ -1,0 +1,150 @@
+"""What the fundamental model has earned, and whether a new fit may replace it.
+
+THE RECORD is the walk-forward test (gbm-SPEC §7, §8): every season scored by a
+model trained only on seasons before it. The MODEL view, the GAP tooltip and the
+FLAGS tooltips read their numbers from it and from nowhere else -- a figure
+typed into a page is a figure nobody re-measures.
+
+THE GATE decides whether a new fit replaces the one on the page (§5). It fits
+the new recipe on races before the last eight settled meetings and asks, race
+by race over those meetings, whether it is worse than the benchmark: what the
+page actually showed for them, or -- until eight meetings have been shown --
+the current recipe fitted the same way. Worse means worse by more than chance
+(one-sided, 10%). Calibration is a sanity check only, at 3 points AND 3
+standard errors: over 426 eight-meeting windows of the five test seasons the
+literal "within 3 points" failed an honest model 65% of the time and "3 points
+and 2 SE" 8%, while this never did (29 Sep). A retrain that does not promote
+is a normal night, not an error; the page keeps the model it has.
+"""
+from __future__ import annotations
+
+from typing import Any
+
+import numpy as np
+import pandas as pd
+
+from hkrd.derive.probability import actual_over_expected
+from hkrd.model import gbm
+
+__all__ = ["FLAGS", "flags", "walk_forward", "record", "calibration_check", "gate",
+           "GATE_MEETINGS"]
+
+CAL_BANDS = [0, .02, .05, .08, .12, .18, .25, .35, .5, 1.0]
+GATE_BANDS = [0, .05, .10, .20, .35]
+GATE_POINTS, GATE_SE, GATE_T, GATE_MEETINGS = 0.03, 3.0, 1.2816, 8
+_TURF = ("ST_Turf", "HV_Turf")
+
+# The situations where five seasons say the model is off (§14.4). Rules read
+# the same ex-ante row the model does; `query/gbm` applies them to a card.
+FLAGS: dict[str, dict[str, str]] = {
+    "second_up_bad": {"label": "2nd-up after 7th+",
+                      "note": "second run of a preparation after finishing 7th or worse first-up"},
+    "awt_form": {"label": "AWT form", "note": "racing on turf with 2 of its last 3 runs on the AWT"},
+    "lone_leader": {"label": "lone leader",
+                    "note": "the only habitual leader in the field -- a lead, not an edge"},
+    "first_up": {"label": "first-up", "note": "the model cannot see its preparation"},
+    "no_hk": {"label": "no HK record", "note": "a placeholder, built from the card alone"},
+}
+
+
+def flags(frame: pd.DataFrame) -> pd.DataFrame:
+    """One boolean column per flag, ex-ante."""
+    awt = sum((frame[f"l{k}_vs"] == "ST_AWT").astype(int) for k in (1, 2, 3))
+    return pd.DataFrame({
+        "second_up_bad": (frame["prep_run"] == 2) & (frame["l1_place"] >= 7),
+        "awt_form": frame["vs"].isin(_TURF) & (awt >= 2),
+        "lone_leader": (frame["hab_early"] < 0.15) & (frame["n_leaders"] == 1),
+        "first_up": (frame["prep_run"] == 1) & (frame["n_prior"] > 0),
+        "no_hk": frame["n_prior"] == 0,
+    }, index=frame.index)
+
+
+_KEEP = ["race_id", "race_date", "horse_no", "season", "y", "won", "p_mkt", "vs", "dist",
+         "prep_run", "l1_place", "l1_vs", "l2_vs", "l3_vs", "hab_early", "n_leaders", "n_prior"]
+
+
+def walk_forward(frame: pd.DataFrame, seasons: list[int]) -> pd.DataFrame:
+    """Season S scored by a model that never saw it: trees chosen by early
+    stopping on S-1 (trained to S-2), then refitted on 2020-21 to S-1."""
+    out = []
+    season = frame["season"].to_numpy()
+    for s in seasons:
+        inner = (season >= (gbm.FIRST_TRAIN if s - 2 >= gbm.FIRST_TRAIN else 2019)) & (season <= s - 2)
+        rounds = gbm.choose_rounds(frame, inner, season == s - 1)
+        booster = gbm.fit(frame, (season >= gbm.FIRST_TRAIN) & (season < s), rounds=rounds)
+        te = frame.loc[season == s, _KEEP].copy()
+        te["p_model"] = gbm.predict(booster, frame, season == s)
+        te["rounds"] = rounds
+        out.append(te)
+    return pd.concat(out, ignore_index=True)
+
+
+def _ae(x: pd.DataFrame, col: str) -> dict[str, Any]:
+    return actual_over_expected(float(x[col].sum()), int(x["won"].sum()), len(x))
+
+
+def _row(x: pd.DataFrame, **label: Any) -> dict[str, Any]:
+    return {**label, "runs": len(x), "won": int(x["won"].sum()),
+            "model": _ae(x, "p_model"), "price": _ae(x, "p_mkt")}
+
+
+def record(preds: pd.DataFrame) -> dict[str, Any]:
+    """The walk-forward tables: by season, calibration, segments, gap deciles,
+    the two gap slices the GAP tooltip quotes, and the flags' records."""
+    seasons = [{"season": f"{s}-{(s + 1) % 100:02d}", "rounds": int(x["rounds"].iloc[0]),
+                **gbm.evaluate(x, "p_model")} for s, x in preds.groupby("season")]
+    cal = []
+    for col, who in (("p_model", "model"), ("p_mkt", "price")):
+        band = pd.cut(preds[col], CAL_BANDS)
+        for b, x in preds.groupby(band, observed=True):
+            cal.append({"who": who, "band": f"{b.left:.0%}-{b.right:.0%}", "runs": len(x),
+                        "said": float(x[col].mean()), "won": float(x["won"].mean())})
+    dband = pd.cut(preds["dist"], [0, 1200, 1650, 9999], labels=["sprint", "mid", "long"])
+    segs = [{"segment": f"{vs} {d}", **{k: v for k, v in gbm.evaluate(x, "p_model").items()
+                                         if k in ("races", "nll", "nll_base", "r2", "r2_base")}}
+            for (vs, d), x in preds.groupby([preds["vs"], dband], observed=True)]
+    gap = preds["p_model"] - preds["p_mkt"]
+    dec = pd.qcut(gap, 10, labels=False)
+    deciles = [_row(x, decile=int(d) + 1, gap_from=float(gap[x.index].min()),
+                    gap_to=float(gap[x.index].max())) for d, x in preds.groupby(dec)]
+    ratio = preds["p_model"] / preds["p_mkt"]
+    named = {"model_1_5x_price": _row(preds[ratio >= 1.5]),
+             "market_15_model_two_thirds": _row(preds[(preds["p_mkt"] >= 0.15) & (ratio < 2 / 3)])}
+    fl = flags(preds)
+    flag_rows = [_row(preds[fl[k]], flag=k, **FLAGS[k]) for k in FLAGS]
+    whole = gbm.evaluate(preds, "p_model")
+    return {"seasons": seasons, "pooled": whole, "calibration": cal, "segments": segs,
+            "gap_deciles": deciles, "gap_named": named, "flags": flag_rows,
+            "test_seasons": [s["season"] for s in seasons]}
+
+
+def calibration_check(p: np.ndarray, won: np.ndarray) -> list[dict[str, Any]]:
+    """Bands below 35% where the chances said and the wins disagree by more
+    than 3 points and more than 3 standard errors. Empty is a pass."""
+    bad = []
+    for lo, hi in zip(GATE_BANDS, GATE_BANDS[1:]):
+        m = (p >= lo) & (p < hi)
+        if not m.any():
+            continue
+        said, got = float(p[m].mean()), float(won[m].mean())
+        se = (said * (1 - said) / m.sum()) ** 0.5
+        if abs(got - said) > GATE_POINTS and abs(got - said) > GATE_SE * se:
+            bad.append({"band": f"{lo:.0%}-{hi:.0%}", "runs": int(m.sum()),
+                        "said": round(said, 4), "won": round(got, 4)})
+    return bad
+
+
+def gate(candidate_nll: np.ndarray, benchmark_nll: np.ndarray, p: np.ndarray,
+         won: np.ndarray, *, benchmark: str) -> dict[str, Any]:
+    """Promote unless the candidate is worse race by race beyond chance, or
+    plainly miscalibrated. Per race, positive `diff` means the candidate is worse."""
+    d = candidate_nll - benchmark_nll
+    se = float(d.std(ddof=1) / np.sqrt(len(d))) if len(d) > 1 else float("nan")
+    t = float(d.mean() / se) if se and se == se and se > 0 else 0.0
+    cal = calibration_check(p, won)
+    worse = t > GATE_T
+    reason = ("worse than " + benchmark + f" by {d.mean():.4f} a race (t {t:.2f})" if worse
+              else "calibration off in " + ", ".join(b["band"] for b in cal) if cal
+              else f"not worse than {benchmark} ({d.mean():+.4f} a race, t {t:.2f})")
+    return {"promote": not worse and not cal, "reason": reason, "benchmark": benchmark,
+            "races": len(d), "diff": float(d.mean()), "se": se, "t": t, "calibration": cal}

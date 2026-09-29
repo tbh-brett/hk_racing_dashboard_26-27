@@ -210,6 +210,8 @@ def test_load_reads_key_order_and_leaves_untagged_runs_unknown(tmp_path) -> None
     runs = load_runs(conn)
     conn.close()
     assert list(runs["horse_no"]) == [1, 2, 3]
+    # rating is NULL on every row here, as in any chunk before 2024: still a number
+    assert runs["rating"].dtype == float and runs["race_no"].dtype.kind == "i"
     assert runs.loc[1, "n_trouble"] == 1 and runs.loc[1, "keen"] == 0
     assert runs.loc[[0, 2], "n_trouble"].isna().all()
 
@@ -247,3 +249,129 @@ def test_a_meeting_cut_from_the_database_has_the_same_inputs(tmp_path) -> None:
     a, b = _rows(card, AS_OF), _rows(full, AS_OF)
     assert len(a) == report["card_runners"] > 0
     pd.testing.assert_frame_equal(a, b, check_exact=True, check_dtype=False)
+
+
+# ─── step 2: the model ───────────────────────────────────────────────────────
+
+from hkrd.jobs import fit_gbm  # noqa: E402
+from hkrd.model import gbm, gbm_record  # noqa: E402
+from hkrd.store import gbm as store  # noqa: E402
+
+
+def _frame(races: int = 480, field: int = 10, seed: int = 11, signal: float = 1.2,
+           start: str = "2020-09-06") -> pd.DataFrame:
+    """A model-ready frame: every input present, the winner drawn from a
+    softmax on the draw (inside is better), everything else noise."""
+    rng = np.random.default_rng(seed)
+    n = races * field
+    f = pd.DataFrame(rng.normal(size=(n, len(F.FEATURES))), columns=F.FEATURES)
+    f["draw"] = np.tile(np.arange(1, field + 1), races).astype(float)
+    f["vs"] = rng.choice(["ST_Turf", "HV_Turf", "ST_AWT"], n)
+    f["going_g"] = "G"
+    days = np.repeat(np.arange(races) // 8 * 4, field)
+    f["race_date"] = (pd.Timestamp(start) + pd.to_timedelta(days, "D")).strftime("%Y-%m-%d")
+    f["race_id"] = f["race_date"] + "_" + np.repeat(np.arange(races) % 8 + 1, field).astype(str)
+    f["season"] = F.season_of(pd.to_datetime(f["race_date"]))
+    races_ = gbm.Races(f["race_id"].to_numpy())
+    p = races_.softmax(-signal * f["draw"].to_numpy() / field)
+    winner = np.array([s + rng.choice(c, p=p[s:s + c]) for s, c in zip(races_.starts, races_.counts)])
+    f["won"] = 0.0
+    f.loc[winner, "won"] = 1.0
+    f["y"], f["p_mkt"] = f["won"], p
+    return f.sort_values(["race_id"], kind="stable").reset_index(drop=True)
+
+
+def test_the_race_softmax_gradient_is_the_derivative_of_the_race_loss() -> None:
+    races = gbm.Races(np.array(["a"] * 4 + ["b"] * 3))
+    y = np.array([0, 1, 0, 0, 0.5, 0.5, 0])          # a dead heat splits the win
+    s = np.random.default_rng(0).normal(size=7)
+    grad, hess = gbm._objective(races, y)(s, None)
+    loss = lambda v: races.nll(races.softmax(v), y).sum()  # noqa: E731
+    h = 1e-6
+    fd = np.array([(loss(s + h * e) - loss(s - h * e)) / (2 * h) for e in np.eye(7)])
+    assert np.allclose(grad, fd, atol=1e-6)
+    assert (hess > 0).all()
+
+
+def test_every_races_chances_add_to_one_and_places_to_the_places_paid() -> None:
+    f = _frame(races=320)
+    b = gbm.fit(f, rounds=30)
+    p = gbm.predict(b, f)
+    total = pd.Series(p).groupby(f["race_id"]).sum()
+    assert np.allclose(total, 1.0)
+    pl = gbm.place_chances(p, f["race_id"].to_numpy())
+    assert np.allclose(pd.Series(pl).groupby(f["race_id"]).sum(), 3.0)
+    assert (pl >= p - 1e-12).all() and (pl <= 1).all()
+
+
+def test_a_model_reloaded_from_its_text_scores_the_same() -> None:
+    f = _frame(races=320)
+    b = gbm.fit(f, rounds=30)
+    card = f.iloc[:40].copy()
+    card["vs"] = "HV_Turf"                            # one category seen: the codes must hold
+    again = gbm.from_text(b.model_to_string())
+    assert np.array_equal(gbm.predict(b, card), gbm.predict(again, card))
+    g = gbm.contributions(again, card)
+    assert list(g.columns) == list(F.GROUPS)
+    assert np.allclose(g.groupby(card["race_id"].to_numpy()).mean(), 0.0)
+
+
+def test_a_worse_model_is_not_promoted_and_a_same_one_is() -> None:
+    """gbm-SPEC §9: fewer trees than the live recipe is a worse model."""
+    f = _frame(races=1600, signal=2.5)
+    dates = sorted(f["race_date"].unique())
+    live = {"version": "live", "features_version": F.DERIVE_VERSION, "rounds": 150,
+            "params": gbm.recipe(150)}
+    worse = fit_gbm._gate(f, dates, 1, live)
+    assert not worse["promote"] and "worse" in worse["reason"]
+    same = fit_gbm._gate(f, dates, 150, live)
+    assert same["promote"] and same["same_recipe"]
+    assert fit_gbm._gate(f, dates, 150, None)["promote"]
+
+
+def test_calibration_fails_only_a_model_that_is_plainly_off() -> None:
+    rng = np.random.default_rng(5)
+    p = rng.uniform(0.01, 0.34, 20_000)
+    honest = (rng.uniform(size=p.size) < p).astype(float)
+    assert gbm_record.calibration_check(p, honest) == []
+    doubled = (rng.uniform(size=p.size) < np.clip(2 * p, 0, 1)).astype(float)
+    assert gbm_record.calibration_check(p, doubled)
+
+
+def test_the_flags_follow_their_rules() -> None:
+    f = pd.DataFrame({
+        "prep_run": [2, 2, 1, 1, 3], "l1_place": [7, 6, np.nan, 4, 1],
+        "n_prior": [5, 5, 0, 9, 9], "vs": ["ST_Turf", "HV_Turf", "ST_AWT", "ST_Turf", "ST_Turf"],
+        "l1_vs": ["ST_AWT", "ST_Turf", None, "ST_AWT", "ST_Turf"],
+        "l2_vs": ["ST_AWT", "ST_Turf", None, "ST_Turf", "ST_Turf"],
+        "l3_vs": ["HV_Turf", "ST_AWT", None, "ST_Turf", "ST_Turf"],
+        "hab_early": [0.1, 0.5, np.nan, 0.1, 0.2], "n_leaders": [1, 1, 1, 2, 0]})
+    fl = gbm_record.flags(f)
+    assert fl["second_up_bad"].tolist() == [True, False, False, False, False]
+    assert fl["awt_form"].tolist() == [True, False, False, False, False]
+    assert fl["lone_leader"].tolist() == [True, False, False, False, False]
+    assert fl["first_up"].tolist() == [False, False, False, True, False]
+    assert fl["no_hk"].tolist() == [False, False, True, False, False]
+
+
+def test_one_model_is_live_and_a_superseded_fit_gives_up_its_text(tmp_path) -> None:
+    conn = get_conn(tmp_path / "m.db")
+    init_db(conn)
+
+    def fit(v: str, at: str) -> dict:
+        return {"version": v, "kind": "fundamental", "trained_through": "2026-09-27",
+                "features_version": F.DERIVE_VERSION, "params": gbm.recipe(10), "rounds": 10,
+                "model_text": f"model {v}", "record": {"gate": {}}, "created_at": at}
+    with transaction(conn):
+        store.save_model(conn, fit("a", "2026-09-28T00:00:00"))
+        store.promote(conn, "a", at="2026-09-28T00:00:01")
+        store.save_model(conn, fit("b", "2026-09-29T00:00:00"))     # held back
+        store.save_model(conn, fit("c", "2026-09-30T00:00:00"))
+        store.save_model(conn, fit("c", "2026-09-30T00:00:00"))     # a re-run: one row
+        store.promote(conn, "c", at="2026-09-30T00:00:01")
+    assert store.live_model(conn)["version"] == "c"
+    assert conn.execute("SELECT count(*) FROM gbm_models").fetchone()[0] == 3
+    assert store.model_row(conn, "a")["model_text"] == "model a"     # was live: kept
+    assert store.model_row(conn, "b")["model_text"] == ""            # never live: released
+    assert store.model_row(conn, "a")["promoted_at"] is not None
+    conn.close()

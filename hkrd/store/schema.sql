@@ -889,3 +889,24 @@ CREATE TABLE IF NOT EXISTS race_tempo (
   PRIMARY KEY (race_date, race_no)
 );
 
+
+-- The fundamental model (jobs/fit_gbm): one row per fit, the model itself as
+-- LightGBM's text dump, so it lives in the one file and rides Litestream with
+-- everything else. NOT derived -- a fit is only reproducible with the same
+-- library build (params_json records it) -- so never dropped with the rest.
+-- `promoted` = 1 on the one row the pages read; `promoted_at` stays on every
+-- row that was ever live. `record_json` holds the walk-forward record and the
+-- gate's verdict on this fit.
+CREATE TABLE IF NOT EXISTS gbm_models (
+  version          TEXT PRIMARY KEY,      -- 'gbm-1.0+2026-09-27': recipe + trained through
+  kind             TEXT    NOT NULL,      -- 'fundamental' (phase 2 adds 'anchored')
+  trained_through  TEXT    NOT NULL,      -- last race_date in the training set
+  features_version TEXT    NOT NULL,      -- derive/features.DERIVE_VERSION
+  params_json      TEXT    NOT NULL,      -- model/gbm.recipe(): params, rounds, lightgbm
+  rounds           INTEGER NOT NULL,
+  model_text       TEXT    NOT NULL,      -- '' once superseded without being live
+  record_json      TEXT    NOT NULL,
+  promoted         INTEGER NOT NULL DEFAULT 0,
+  promoted_at      TEXT,
+  created_at       TEXT    NOT NULL
+);
