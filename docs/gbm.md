@@ -89,3 +89,15 @@ the flag's record only where they do, and names no figure where they do not.
 On this PC: inputs 5 s and 286 MB; a fit with the record built 32 s, carried 15 s; peak 365 MB
 (the lab's walk-forward alone: 564 MB); a card 5 s, unchanged 0.01 s. The Fly machine had
 ~590 MB free at idle with no swap; Brett approved `shared-cpu-2x` with 4 GB (§13.1) on 29 Sep.
+
+## The research copy (§14.9)
+
+Fly's database is the research copy. `.\ops\pull-db.ps1` pulls it to `hkrd-fly.db`
+(git-ignored) and keeps the previous pull as `hkrd-fly.prev.db`: SQLite's online backup at
+nice 19 into `/tmp` on the machine -- a reader, consistent at one moment -- then the download,
+then the copy deleted. Nothing is ever sent up. A Litestream restore would do the same without
+touching the machine, but needs the R2 keys on this PC; say so if that is wanted.
+
+Checked 29 Sep 2026 against HKJC's own list of trial days (`ingest/trials.list_days`): every
+trial day since 2 September is on Fly -- 16 days, 3-29 Sep; 29 Sep arrived with the 20:00
+scrape. The PC's `hkrd.db` stops at 2 September for trials and 9 September for results.
