@@ -26,7 +26,8 @@ from . import coerce
 from .connect import Connection
 
 __all__ = ["load_runs", "settled_dates", "save_model", "promote", "live_model",
-           "model_row", "TROUBLE_TAGS", "WIDE_TAGS", "VET_TAGS"]
+           "model_row", "card_facts", "unrun_dates", "scored_keys", "write_scores",
+           "shown", "scored_dates", "TROUBLE_TAGS", "WIDE_TAGS", "VET_TAGS"]
 
 # What each stewards' count in the model means. The tag names are
 # `derive/tags`' vocabulary; a tag not listed here is not a model input.
@@ -161,3 +162,82 @@ def model_row(conn: Connection, version: str | None = None) -> dict[str, Any] | 
     r = (conn.execute(sql + "WHERE version = ?", (version,)) if version else
          conn.execute(sql + "ORDER BY created_at DESC LIMIT 1")).fetchone()
     return _shape(r)
+
+
+# ─── runner_gbm ──────────────────────────────────────────────────────────────
+
+_UNRUN = ("NOT EXISTS (SELECT 1 FROM runners x WHERE x.race_date = r.race_date "
+          "AND x.race_no = r.race_no AND x.place IS NOT NULL)")
+
+
+def card_facts(conn: Connection, date: str) -> list[dict[str, Any]]:
+    """Every runner still declared on the day's unrun races, with the race
+    facts a score depends on: what `score_gbm` fingerprints before it builds
+    anything. Scratched runners (W codes) are not in the field."""
+    rows = conn.execute(f"""
+        SELECT u.race_no, u.horse_no, u.horse_name, u.draw, u.jockey, u.trainer,
+               u.actual_weight, u.declared_weight, u.rating,
+               r.venue, r.surface, r.course, r.distance, r.race_class, r.going
+          FROM runners u JOIN races r USING (race_date, race_no)
+         WHERE u.race_date = ? AND coalesce(u.place_code, '') NOT LIKE 'W%' AND {_UNRUN}
+         ORDER BY u.race_no, u.horse_no""", (date,)).fetchall()
+    return [dict(x) for x in rows]
+
+
+def unrun_dates(conn: Connection, *, today: str) -> list[str]:
+    """Meetings from today on with at least one race not yet run."""
+    return [r[0] for r in conn.execute(f"""
+        SELECT DISTINCT r.race_date FROM races r
+         WHERE r.race_date >= ? AND {_UNRUN} ORDER BY r.race_date""", (today,))]
+
+
+def scored_keys(conn: Connection, date: str) -> set[str]:
+    """The inputs fingerprints the day's 'latest' scores were made from."""
+    return {r[0] for r in conn.execute(
+        "SELECT DISTINCT inputs_key FROM runner_gbm WHERE race_date = ? AND stage = 'latest'",
+        (date,))}
+
+
+_SCORE_COLS = ("race_date", "race_no", "horse_no", "stage", "p_win", "p_place", "contrib_json",
+               "facts_json", "model_version", "derive_version", "inputs_key", "scored_at")
+
+
+def write_scores(conn: Connection, rows: list[dict[str, Any]]) -> dict[str, int]:
+    """One meeting's scores for its unrun races. 'latest' is the whole answer
+    for each race it names: a runner scratched since the last score leaves it.
+    'card' is written once: a race already on the record keeps its first read."""
+    out = {"latest": 0, "card": 0}
+    if not rows:
+        return out
+    date = coerce.to_date(rows[0]["race_date"])
+    races = sorted({int(r["race_no"]) for r in rows})
+    conn.execute(f"DELETE FROM runner_gbm WHERE race_date = ? AND stage = 'latest' "
+                 f"AND race_no IN ({', '.join('?' * len(races))})", (date, *races))
+    sql = (f"INSERT INTO runner_gbm ({', '.join(_SCORE_COLS)}) "
+           f"VALUES ({', '.join('?' * len(_SCORE_COLS))}) ON CONFLICT DO NOTHING")
+    for stage in ("latest", "card"):
+        before = conn.total_changes
+        conn.executemany(sql, [(
+            date, int(r["race_no"]), int(r["horse_no"]), stage, float(r["p_win"]),
+            float(r["p_place"]), json.dumps(r["contrib"]), json.dumps(r["facts"]),
+            r["model_version"], r["derive_version"], r["inputs_key"], r["scored_at"])
+            for r in rows])
+        out[stage] = conn.total_changes - before
+    return out
+
+
+def shown(conn: Connection, dates: list[str], *, stage: str = "latest") -> pd.DataFrame:
+    """What the page showed for these meetings: the 'latest' score at the off,
+    or with `stage='card'` the first read, when the card landed."""
+    cols = ["race_date", "race_no", "horse_no", "p_win", "model_version"]
+    if not dates:
+        return pd.DataFrame(columns=cols)
+    return pd.read_sql(
+        f"SELECT {', '.join(cols)} FROM runner_gbm WHERE stage = ? "
+        f"AND race_date IN ({', '.join('?' * len(dates))})", conn, params=[stage, *dates])
+
+
+def scored_dates(conn: Connection) -> list[str]:
+    """Every meeting the model has scored."""
+    return [r[0] for r in conn.execute(
+        "SELECT DISTINCT race_date FROM runner_gbm ORDER BY race_date")]

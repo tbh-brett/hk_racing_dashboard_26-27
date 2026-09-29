@@ -20,10 +20,11 @@ in gbm-SPEC §8 and §14.2, and held to equal it value for value
 A CARD is a meeting not yet run. Every declared runner on it is kept except the
 scratched (`W` place codes), and every result column on it is blanked here,
 whatever the table holds -- so a price or a placing written early can never
-reach the model. Everything else is history, and history is starters only.
-
-Vectorised where the lab looped per horse: the same pandas window functions,
-per group, so the port equals the lab bit for bit rather than nearly.
+reach the model. A card also names an apprentice with the claim, "H Y Yuen
+(-7)", beside the weight before it; a result names the rider and the weight
+carried, and that is what the model learned, so the card is read the same way.
+Everything else is history, and history is starters only. Vectorised where the
+lab looped per horse, with the same pandas window functions: bit for bit.
 """
 from __future__ import annotations
 
@@ -94,9 +95,8 @@ FACTS = ["l1_place", "l1_vs", "l2_vs", "l3_vs"]
 _KEEP = ["race_date", "race_no", "horse_no", "horse_name", "race_id", "season", "is_card",
          "y", "won", "top3", "p_mkt"]
 # Blanked on a card: nothing about a race that has not been run is an outcome.
-_RESULT = ["place", "place_code", "finish_time", "lengths_behind", "win_odds",
-           "running_positions", "early_dev", "late_dev",
-           "n_trouble", "n_wide", "n_vet", "eased", "weakened", "keen"]
+_RESULT = ["place", "place_code", "finish_time", "lengths_behind", "win_odds", "running_positions",
+           "early_dev", "late_dev", "n_trouble", "n_wide", "n_vet", "eased", "weakened", "keen"]
 # Only the lags something reads (the lab built 78 and used 39).
 _LAGS = {
     1: ["pos_frac", "lbw", "fmrp", "early_frac", "late_gain", "beat_mkt", "logp_run",
@@ -116,8 +116,7 @@ _NEW_PREP_DAYS = 60   # a break this long starts a new preparation
 
 def season_of(dates: pd.Series) -> np.ndarray:
     """HK seasons start in September; August belongs to the season ahead."""
-    y = dates.dt.year
-    return np.where(dates.dt.month >= 8, y, y - 1)
+    return np.where(dates.dt.month >= 8, dates.dt.year, dates.dt.year - 1)
 
 
 def class_num(c: object) -> float:
@@ -183,6 +182,8 @@ def build(runs: pd.DataFrame, card_dates: Iterable[str] = ()) -> pd.DataFrame:
     del runs, card, scratched     # the caller's frame is not needed again; let it go
     r["is_card"] = r["race_date"].isin(cards)
     r.loc[r["is_card"], _RESULT] = np.nan
+    r["actual_weight"] -= r["jockey"].str.extract(r"\(-(\d+)\)\s*$")[0].astype(float).fillna(0)
+    r["jockey"] = r["jockey"].str.replace(r"\s*\(-\d+\)\s*$", "", regex=True)
     r["date"] = pd.to_datetime(r["race_date"])
     r["season"] = season_of(r["date"])
     r["race_id"] = r["race_date"] + "_" + r["race_no"].astype(str).str.zfill(2)
@@ -196,7 +197,6 @@ def build(runs: pd.DataFrame, card_dates: Iterable[str] = ()) -> pd.DataFrame:
     r["dist"] = r["distance"].astype(float)
     r["draw_frac"] = (r["draw"] - 1) / span
     r["going_g"] = r["going"].fillna("G").str.upper().str[:2]
-    # Raw text is most of the frame's memory; each column goes once it is read.
     r = r.drop(columns=["race_class", "venue", "surface", "distance", "going", "place_code"])
 
     # ---- the closing market: the benchmark, and an input only once lagged

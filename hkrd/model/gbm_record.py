@@ -27,7 +27,7 @@ from hkrd.derive.probability import actual_over_expected
 from hkrd.model import gbm
 
 __all__ = ["FLAGS", "flags", "walk_forward", "record", "calibration_check", "gate",
-           "GATE_MEETINGS"]
+           "align_shown", "meeting_row", "GATE_MEETINGS"]
 
 CAL_BANDS = [0, .02, .05, .08, .12, .18, .25, .35, .5, 1.0]
 GATE_BANDS = [0, .05, .10, .20, .35]
@@ -148,3 +148,35 @@ def gate(candidate_nll: np.ndarray, benchmark_nll: np.ndarray, p: np.ndarray,
               else f"not worse than {benchmark} ({d.mean():+.4f} a race, t {t:.2f})")
     return {"promote": not worse and not cal, "reason": reason, "benchmark": benchmark,
             "races": len(d), "diff": float(d.mean()), "se": se, "t": t, "calibration": cal}
+
+
+def align_shown(results: pd.DataFrame, shown: pd.DataFrame) -> np.ndarray | None:
+    """The chances the page showed, for the runners that started, renormalised
+    over them (a horse scratched after the last score held some). None unless
+    every starter has one: a benchmark with holes is not a benchmark."""
+    key = ["race_date", "race_no", "horse_no"]
+    m = results[key + ["race_id"]].merge(shown[key + ["p_win"]], on=key, how="left")
+    if m.empty or m["p_win"].isna().any():
+        return None
+    return (m["p_win"] / m.groupby("race_id")["p_win"].transform("sum")).to_numpy()
+
+
+def meeting_row(results: pd.DataFrame, latest: np.ndarray,
+                card: np.ndarray | None) -> dict[str, Any]:
+    """One settled meeting against its result (gbm-SPEC §13.4): what the page
+    showed at the off, the first read when the card landed, and the price."""
+    races = gbm.Races(results["race_id"].to_numpy())
+    y, unif = results["y"].to_numpy(), np.log(races.counts).sum()
+    ids, won = results["race_id"].to_numpy(), results["won"].to_numpy() == 1
+
+    def rank(p: np.ndarray) -> np.ndarray:
+        return pd.Series(p).groupby(ids).rank(ascending=False, method="first").to_numpy()
+    r_model, r_mkt = rank(latest), rank(results["p_mkt"].to_numpy())
+    return {"date": str(results["race_date"].iloc[0]), "races": len(races.starts),
+            "r2_model": float(1 - races.nll(latest, y).sum() / unif),
+            "r2_card": None if card is None else float(1 - races.nll(card, y).sum() / unif),
+            "r2_market": float(1 - races.nll(results["p_mkt"].to_numpy(), y).sum() / unif),
+            "top_pick_won": int((won & (r_model == 1)).sum()),
+            "favourite_won": int((won & (r_mkt == 1)).sum()),
+            "winner_top3_model": int((won & (r_model <= 3)).sum()),
+            "winner_top3_market": int((won & (r_mkt <= 3)).sum())}

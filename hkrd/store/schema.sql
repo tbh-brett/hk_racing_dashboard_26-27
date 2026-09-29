@@ -910,3 +910,28 @@ CREATE TABLE IF NOT EXISTS gbm_models (
   promoted_at      TEXT,
   created_at       TEXT    NOT NULL
 );
+
+-- What the fundamental model said about each declared runner (jobs/score_gbm).
+-- Two rows a runner. 'card' is the first score, when the card landed: written
+-- once and never rewritten, the night-before read on the record before any
+-- price existed. 'latest' is rewritten whenever the card's inputs (field,
+-- riders, weights, body weights, going) or the live model change, and stops
+-- when the race is run -- so at the off it is what the page showed. NOT
+-- droppable like a derived table: neither row can be rebuilt as it stood, only
+-- replayed (jobs/replay_gbm). p_win sums to 1 over the field scored; a
+-- scratching after that is renormalised by the reader (query/gbm).
+CREATE TABLE IF NOT EXISTS runner_gbm (
+  race_date      TEXT    NOT NULL,
+  race_no        INTEGER NOT NULL,
+  horse_no       INTEGER NOT NULL,
+  stage          TEXT    NOT NULL,      -- card | latest
+  p_win          REAL    NOT NULL,
+  p_place        REAL,                  -- Harville-Henery on p_win (derive/probability)
+  contrib_json   TEXT,                  -- the twelve groups, log x vs this field
+  facts_json     TEXT,                  -- what the flags read, and what was assumed
+  model_version  TEXT    NOT NULL,
+  derive_version TEXT    NOT NULL,
+  inputs_key     TEXT    NOT NULL,      -- the card's declared facts + model, hashed
+  scored_at      TEXT    NOT NULL,
+  PRIMARY KEY (race_date, race_no, horse_no, stage)
+);

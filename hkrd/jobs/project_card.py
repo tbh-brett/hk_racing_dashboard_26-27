@@ -239,11 +239,18 @@ def main(argv: list[str] | None = None) -> int:
         # exits 1 on a quiet Tuesday trains everyone to ignore it.
         print("  no card waiting to be projected")
         return 0
+    # Imported here, not at the top: `scrape_meeting` imports this module to
+    # project a card inside the Card button's request, and LightGBM must never
+    # load in the web process (gbm-SPEC §6).
+    from hkrd.jobs import score_gbm
     failed = False
     for date in dates:
         report = project(date, a.db, min_prior=a.min_prior)
         print(report.render())
-        failed = failed or bool(report.errors)
+        # the fundamental model's chances for the same card (skipped if unchanged)
+        scored = score_gbm.score(date, a.db)
+        print(scored.render())
+        failed = failed or bool(report.errors) or bool(scored.errors)
     return 1 if failed else 0
 
 

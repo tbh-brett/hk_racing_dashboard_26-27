@@ -31,7 +31,7 @@ from pathlib import Path
 from hkrd.ingest import corunning, racecard
 from hkrd.ingest._client import FetchError, NotFound
 from hkrd.ingest.standards import StandardsError
-from hkrd.jobs import derive_all, record_screen, scrape_corunning, scrape_standards, scrape_meeting as scrape_job
+from hkrd.jobs import derive_all, fit_gbm, record_screen, score_gbm, scrape_corunning, scrape_standards, scrape_meeting as scrape_job
 from hkrd.store import job_log
 from hkrd.store.connect import db_path, get_conn, init_db
 
@@ -91,6 +91,9 @@ class NightlyReport:
     # Settled meetings whose Screen order was recorded for the sources'
     # record (jobs/record_screen). Once per meeting, after its results.
     screened: list[str] = field(default_factory=list)
+    # The fundamental model: a refit once a meeting has settled, and the cards
+    # it scored (jobs/fit_gbm, jobs/score_gbm). Said every time it acts.
+    model: list[str] = field(default_factory=list)
     # Meetings whose comments on running HKJC has not written yet. Not an
     # error and not a warning -- it is the normal state of a meeting for its
     # first week -- but said, so a quiet night explains itself.
@@ -119,6 +122,7 @@ class NightlyReport:
             lines.append(f"    {c}")
         for s in self.screened:
             lines.append(f"  screen recorded    {s}")
+        lines += [f"  model              {m}" for m in self.model]
         if self.pending_comments:
             lines.append(f"  comments pending   {len(self.pending_comments):>6}"
                          "   (HKJC writes these up days after the meeting)")
@@ -135,9 +139,9 @@ class NightlyReport:
         """What goes in job_runs.detail and, from there, onto the page."""
         if self.errors:
             return f"{len(self.errors)} error(s): {self.errors[0][:160]}"
-        if self.scraped or self.scored_cards or self.screened:
+        if self.scraped or self.scored_cards or self.screened or self.model:
             return "; ".join([*self.scraped, *self.scored_cards,
-                              *self.screened])
+                              *self.screened, *self.model])
         if self.pending_comments:
             return ("waiting on HKJC's comments on running for "
                     + ", ".join(self.pending_comments))
@@ -378,8 +382,29 @@ def run(db: Path | None = None, *, today: dt.date | None = None,
         # After the full derive, so a card is ranked against any results that
         # landed earlier in this same run.
         _score_cards(report, cards, db=db)
+        _model(report, db=db, today=today.isoformat())
         _record_screen(report, db=db)
     return report
+
+
+def _model(report: NightlyReport, *, db: Path | None, today: str) -> None:
+    """The fundamental model. Refit once a meeting has settled since the live
+    model was trained (jobs/fit_gbm, behind its gate; a fit it holds back is a
+    normal night), then score every card still to run (jobs/score_gbm: a card
+    whose declared facts have not changed costs one query)."""
+    try:
+        if fit_gbm.pending(db, today=today):
+            fit = fit_gbm.run(db, today=today)
+            # a database too young to fit is "not available", like a source
+            (report.warnings if fit.skipped else report.model).append(fit.render())
+            report.errors.extend(f"model fit: {e}" for e in fit.errors)
+        got = score_gbm.score_pending(db, today=today)
+    except Exception as exc:                       # noqa: BLE001 - recorded
+        report.errors.append(f"model: {type(exc).__name__}: {exc}")
+        return
+    report.model += got.scored
+    report.warnings += got.notes
+    report.errors.extend(f"model score: {e}" for e in got.errors)
 
 
 def _record_screen(report: NightlyReport, *, db: Path | None) -> None:

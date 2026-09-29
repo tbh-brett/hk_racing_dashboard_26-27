@@ -171,6 +171,20 @@ def test_a_meeting_scored_as_a_card_has_the_inputs_it_has_once_run() -> None:
     pd.testing.assert_frame_equal(as_card, as_run, check_exact=True, check_dtype=False)
 
 
+def test_a_cards_apprentice_is_read_as_the_results_name_him() -> None:
+    """The card: "J TWO (-7)" at 127 lb. The result: "J TWO" carrying 120. The
+    model learned the second, so the first must read as it (1 Oct 2026, H Y Yuen)."""
+    arc, date = _with_card(_archive())
+    plain = arc.copy()
+    claimed = arc.copy()
+    on = (claimed["race_date"] == date) & (claimed["horse_no"] <= 4)
+    claimed.loc[on, "jockey"] = claimed.loc[on, "jockey"] + " (-7)"
+    claimed.loc[on, "actual_weight"] = claimed.loc[on, "actual_weight"] + 7
+    a = _rows(F.build(plain, card_dates=(date,)), date)
+    b = _rows(F.build(claimed, card_dates=(date,)), date)
+    pd.testing.assert_frame_equal(a, b, check_exact=True)
+
+
 def test_a_scratched_runner_is_not_in_the_field() -> None:
     arc, date = _with_card(_archive())
     out = arc["race_date"].eq(date) & arc["horse_no"].eq(3)
@@ -270,7 +284,9 @@ def _frame(races: int = 480, field: int = 10, seed: int = 11, signal: float = 1.
     f["going_g"] = "G"
     days = np.repeat(np.arange(races) // 8 * 4, field)
     f["race_date"] = (pd.Timestamp(start) + pd.to_timedelta(days, "D")).strftime("%Y-%m-%d")
-    f["race_id"] = f["race_date"] + "_" + np.repeat(np.arange(races) % 8 + 1, field).astype(str)
+    f["race_no"] = np.repeat(np.arange(races) % 8 + 1, field)
+    f["horse_no"] = np.tile(np.arange(1, field + 1), races)
+    f["race_id"] = f["race_date"] + "_" + f["race_no"].astype(str)
     f["season"] = F.season_of(pd.to_datetime(f["race_date"]))
     races_ = gbm.Races(f["race_id"].to_numpy())
     p = races_.softmax(-signal * f["draw"].to_numpy() / field)
@@ -322,11 +338,25 @@ def test_a_worse_model_is_not_promoted_and_a_same_one_is() -> None:
     dates = sorted(f["race_date"].unique())
     live = {"version": "live", "features_version": F.DERIVE_VERSION, "rounds": 150,
             "params": gbm.recipe(150)}
-    worse = fit_gbm._gate(f, dates, 1, live)
+    none = store.shown(None, [])
+    worse = fit_gbm._gate(f, dates, 1, live, none)
     assert not worse["promote"] and "worse" in worse["reason"]
-    same = fit_gbm._gate(f, dates, 150, live)
+    same = fit_gbm._gate(f, dates, 150, live, none)
     assert same["promote"] and same["same_recipe"]
-    assert fit_gbm._gate(f, dates, 150, None)["promote"]
+    assert fit_gbm._gate(f, dates, 150, None, none)["promote"]
+
+
+def test_once_the_page_has_shown_the_window_that_is_the_benchmark() -> None:
+    f = _frame(races=1600, signal=2.5)
+    dates = sorted(f["race_date"].unique())
+    live = {"version": "live", "features_version": F.DERIVE_VERSION, "rounds": 150,
+            "params": gbm.recipe(150)}
+    window = f[f["race_date"].isin(dates[-8:])]
+    flat = window[["race_date", "race_no", "horse_no"]].assign(p_win=0.1)   # a page that knew nothing
+    v = fit_gbm._gate(f, dates, 150, live, flat)
+    assert v["benchmark"] == "what the page showed" and v["promote"] and v["diff"] < 0
+    holed = fit_gbm._gate(f, dates, 150, live, flat.iloc[1:])             # one starter missing
+    assert holed["benchmark"].startswith("the live recipe")
 
 
 def test_calibration_fails_only_a_model_that_is_plainly_off() -> None:
@@ -375,3 +405,109 @@ def test_one_model_is_live_and_a_superseded_fit_gives_up_its_text(tmp_path) -> N
     assert store.model_row(conn, "b")["model_text"] == ""            # never live: released
     assert store.model_row(conn, "a")["promoted_at"] is not None
     conn.close()
+
+
+# ─── step 3: scoring a card ──────────────────────────────────────────────────
+
+from hkrd.jobs import score_gbm  # noqa: E402
+
+_RACE_COLS = ["race_date", "race_no", "venue", "surface", "distance", "race_class", "going"]
+_RUNNER_COLS = ["race_date", "race_no", "horse_no", "horse_name", "place", "place_code",
+                "finish_time", "lengths_behind", "draw", "jockey", "trainer", "actual_weight",
+                "declared_weight", "rating", "win_odds", "running_positions"]
+
+
+def _scoring_db(path: Path) -> tuple[Path, str]:
+    """The synthetic archive in a real database, a card after it with no
+    results, no body weights and no going, and a live model fitted on it."""
+    arc, date = _with_card(_archive())
+    on = arc["race_date"] == date
+    arc.loc[on, ["place", "finish_time", "lengths_behind", "win_odds", "running_positions",
+                 "declared_weight"]] = None
+    arc.loc[on, "going"] = None
+    arc.loc[on & (arc["horse_no"] == 2), "jockey"] = "J TWO (-7)"
+    conn = get_conn(path)
+    init_db(conn)
+    with transaction(conn):
+        races = arc[_RACE_COLS].drop_duplicates(["race_date", "race_no"])
+        conn.executemany(f"INSERT INTO races ({', '.join(_RACE_COLS)}) VALUES "
+                         f"({', '.join('?' * len(_RACE_COLS))})",
+                         races.astype(object).where(races.notna(), None).values.tolist())
+        run = arc[_RUNNER_COLS].astype(object)
+        conn.executemany(f"INSERT INTO runners ({', '.join(_RUNNER_COLS)}) VALUES "
+                         f"({', '.join('?' * len(_RUNNER_COLS))})",
+                         run.where(run.notna(), None).values.tolist())
+    frame = F.build(load_runs(conn))
+    hist = frame[~frame["is_card"]].reset_index(drop=True)
+    booster = gbm.fit(hist, rounds=20)
+    with transaction(conn):
+        store.save_model(conn, {"version": "test+1", "kind": gbm.KIND,
+                                "trained_through": hist["race_date"].max(),
+                                "features_version": F.DERIVE_VERSION, "params": gbm.recipe(20),
+                                "rounds": 20, "model_text": booster.model_to_string(),
+                                "record": {}, "created_at": "2026-02-20T00:00:00"})
+        store.promote(conn, "test+1", at="2026-02-20T00:00:01")
+    conn.close()
+    return path, date
+
+
+def _scores(db: Path, date: str, stage: str = "latest") -> pd.DataFrame:
+    conn = get_conn(db)
+    try:
+        return pd.read_sql("SELECT * FROM runner_gbm WHERE race_date = ? AND stage = ? "
+                           "ORDER BY race_no, horse_no", conn, params=(date, stage))
+    finally:
+        conn.close()
+
+
+def test_a_card_is_scored_once_and_again_only_when_it_changes(tmp_path) -> None:
+    db, date = _scoring_db(tmp_path / "s.db")
+    first = score_gbm.score(date, db)
+    assert first.scored and not first.errors
+    latest, card = _scores(db, date), _scores(db, date, "card")
+    assert len(latest) == len(card) == 12
+    assert np.isclose(latest["p_win"].sum(), 1.0)
+    assert (latest["p_place"] >= latest["p_win"]).all()
+    facts = [__import__("json").loads(f) for f in latest["facts_json"]]
+    assert {f["going"] for f in facts} == {"assumed"}
+    assert {f["body_weight"] for f in facts} <= {"last run", "median"}
+    again = score_gbm.score(date, db)
+    assert again.unchanged == [date] and not again.scored
+    assert _scores(db, date)["scored_at"].tolist() == latest["scored_at"].tolist()
+
+
+def test_a_scratching_rescores_the_race_and_the_first_read_stays(tmp_path) -> None:
+    db, date = _scoring_db(tmp_path / "s.db")
+    score_gbm.score(date, db)
+    card_before = _scores(db, date, "card")
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.execute("UPDATE runners SET place_code = 'WV' WHERE race_date = ? AND horse_no = 5",
+                     (date,))
+    conn.close()
+    assert score_gbm.score(date, db).scored
+    latest = _scores(db, date)
+    assert 5 not in set(latest["horse_no"]) and np.isclose(latest["p_win"].sum(), 1.0)
+    pd.testing.assert_frame_equal(_scores(db, date, "card"), card_before)
+
+
+def test_no_live_model_is_a_note_not_an_error(tmp_path) -> None:
+    db, date = _scoring_db(tmp_path / "s.db")
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.execute("UPDATE gbm_models SET promoted = 0")
+    conn.close()
+    got = score_gbm.score(date, db)
+    assert not got.errors and got.notes and not got.scored
+
+
+def test_the_web_process_never_loads_lightgbm() -> None:
+    """gbm-SPEC §6: pages read runner_gbm. The Card button runs scrape_meeting
+    and project_card inside a request, so neither may pull the model in."""
+    import subprocess
+    import sys
+    code = ("import sys, hkrd.api.app, hkrd.jobs.scrape_meeting, hkrd.jobs.project_card; "
+            "print('lightgbm' in sys.modules)")
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                         cwd=ROOT, check=True)
+    assert out.stdout.strip() == "False", out.stderr
