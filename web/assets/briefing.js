@@ -21,7 +21,6 @@ import { renderDesk, renderPanels } from './briefing-desk.js';
 import { renderPhone } from './briefing-phone.js';
 import { renderRecord } from './briefing-record.js';
 import { renderBackgroundRecord } from './briefing-background.js';
-import { renderTalk } from './briefing-talk.js';
 
 const LIVE_EVERY = 60e3;          // race day, a race still to run
 const QUIET_EVERY = 10 * 60e3;    // otherwise: sources land on a clock of hours
@@ -189,7 +188,7 @@ function render() {
   if (!d || !d.races) {
     renderBar(null);
     renderNow(null);
-    ['bf-talk', 'bf-desk', 'bf-phone', 'bf-panels'].forEach((id) => $(id).replaceChildren());
+    ['bf-desk', 'bf-phone', 'bf-panels'].forEach((id) => $(id).replaceChildren());
     return;
   }
   const view = buildView(d, state.ui);
@@ -197,7 +196,6 @@ function render() {
   renderBar(view);
   renderNow(view);
   const ctx = { date: d.race_date, act };
-  renderTalk($('bf-talk'), d.talk, ctx, d.stage);
   renderDesk($('bf-desk'), view, ctx);
   renderPhone($('bf-phone'), view, ctx);
   renderPanels($('bf-panels'), view, ctx);

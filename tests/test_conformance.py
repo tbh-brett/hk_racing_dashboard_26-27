@@ -78,8 +78,7 @@ SERVER_LABELS = {
 EXTRA_SOURCES = {
     "briefing.js": ["briefing-desk.js", "briefing-phone.js", "briefing-model.js",
                     "briefing-format.js", "briefing-record.js",
-                    "briefing-background.js", "background.js",
-                    "briefing-talk.js"],
+                    "briefing-background.js", "background.js"],
     "bets.js": ["bets-entry.js"],
     "form-guide.js": ["review.js"],
     "results.js": ["review.js"],

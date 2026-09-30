@@ -125,7 +125,8 @@ def _stage(date: str, now: dt.datetime, clock: list[dict],
 
 def _runner(s: dict, tip: dict | None, odds: dict | None, zh: str | None,
             move: dict | None, mrank: int | None, priced: bool,
-            bg: dict | None = None) -> dict[str, Any]:
+            bg: dict | None = None,
+            sections: list[dict] | None = None) -> dict[str, Any]:
     ident = ("horse_no", "horse_name", "draw", "jockey", "trainer", "rating",
              "weight", "gear", "style")
     gear_first = [g[:-1] for g in (s["gear"] or "").replace(",", " ").split()
@@ -141,6 +142,9 @@ def _runner(s: dict, tip: dict | None, odds: dict | None, zh: str | None,
         "support": None if not tip else {
             "sources": tip["supporters"], "top_picks": tip["top_picks"],
             "interviewed": tip["interviewed"], "backed_by": tip["backed_by"]},
+        # Every section of a pundit's video that names it: the talk about
+        # jockeys, stables and the meeting around it (query/tips_talk).
+        "sections": sections or [],
         "price": odds if priced else None,
         "market_rank": mrank,
         "move": None if not move or not move.get("observed") else {
@@ -277,6 +281,7 @@ def _meeting(conn: Connection, date: str, now: dt.datetime) -> dict[str, Any]:
     # day (module docstring).
     priced = any(tips["captured"].values())
 
+    sections = tips_talk.by_runner(date, conn=conn)
     bgs = background.for_horses(
         [s["horse_name"] for sr in scr["races"] for s in sr["runners"]
          if s["starts"] < background.EARLY_STARTS], conn=conn)
@@ -295,7 +300,9 @@ def _meeting(conn: Connection, date: str, now: dt.datetime) -> dict[str, Any]:
         runners = [_runner(s, picks.get(s["horse_no"]), odds.get(s["horse_no"]),
                            zh.get(s["horse_name"]), moves.get(s["horse_no"]),
                            mrank.get(s["horse_no"]), priced,
-                           bgs.get(s["horse_name"])) for s in sr["runners"]]
+                           bgs.get(s["horse_name"]),
+                           sections.get((no, s["horse_no"])))
+                   for s in sr["runners"]]
         tipped = {b["source"] for p in tr["picks"] for b in p["backed_by"]}
         conc = market.concentration(date, no, conn=conn) if tote_in else None
         fav = (next(r for r in runners if r["horse_no"] == wins[0][1])
@@ -342,9 +349,6 @@ def _meeting(conn: Connection, date: str, now: dt.datetime) -> dict[str, Any]:
         "books": tips["books"], "captured": tips["captured"],
         "edges": tips["edges"] if race_day else [],
         "source_status": tips["source_status"],
-        # What each pundit's video discussed, section by section, with the
-        # runners each section names (query/tips_talk).
-        "talk": tips_talk.talk(date, conn=conn),
         "races": races,
     }
 

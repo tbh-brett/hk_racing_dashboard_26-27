@@ -1,4 +1,4 @@
-"""query/tips_talk — what a pundit's video discussed, section by section.
+"""query/tips_talk — each section of a pundit's video, under every runner it names.
 
 The meeting is the real 1 Oct 2026 card (`roster_20261001.json`, with its
 Chinese names), and the video the real 10.1 賽馬Fact Check preview's opening
@@ -74,26 +74,18 @@ def read(db: Path, fn, *a, **k):
         conn.close()
 
 
-def test_every_section_arrives_with_the_runners_it_names_identified(db):
-    [video] = read(db, tips_talk.talk, DATE)
-    assert (video["source"], video["label"], video["video_id"]) == \
-        ("factcheck", "賽馬Fact Check", "I0joWiohg54")
-    assert [int(s["t"]) for s in video["sections"]] == [21, 214]
-    stable = video["sections"][1]
-    assert stable["head"] == "伍鵬志被喻為季初最大發現"
-    assert "累積連勝六日保持開季未斷纜" in stable["text"]
-    assert [(r["race_no"], r["horse_no"], r["horse_name"])
-            for r in stable["runners"]] == [(1, 5, "GOOD FORTUNE"),
-                                              (9, 11, "DROMBEG BANNER")]
-    # The jockey and trainer ride along: they say who 伍鵬志 is.
-    assert stable["runners"][0]["trainer"] and stable["runners"][0]["jockey"]
-    assert stable["unlinked"] == []
-
-
-def test_the_videos_picks_come_after_its_sections(db):
-    [video] = read(db, tips_talk.talk, DATE)
-    assert [(p["race_no"], p["horse_no"], p["heard"], p["t"])
-            for p in video["picks"]] == [(1, 5, True, 351), (1, 1, True, 355)]
+def test_each_section_sits_under_every_runner_it_names(db):
+    got = read(db, tips_talk.by_runner, DATE)
+    # 伍鵬志's section names his two runners, and sits under both.
+    for key in ((1, 5), (9, 11)):                # GOOD FORTUNE, DROMBEG BANNER
+        [section] = got[key]
+        assert section["head"] == "伍鵬志被喻為季初最大發現"
+        assert "累積連勝六日保持開季未斷纜" in section["text"]
+        assert (section["label"], int(section["t"])) == ("賽馬Fact Check", 214)
+        assert section["url"].endswith("v=I0joWiohg54&t=214s")
+    # RAGING BLIZZARD: named in the opening survey, discussed nowhere.
+    assert [s["head"] for s in got[(3, 1)]] == ["10月1日星期四國慶日"]
+    assert set(got) == {(1, 5), (9, 11), (3, 1), (3, 7)}
 
 
 def test_a_section_is_counted_as_one_not_as_a_quote(db):
@@ -110,4 +102,4 @@ def test_a_section_and_a_comment_on_the_same_second_are_two_rows():
 
 
 def test_a_meeting_with_no_sections_has_nothing_to_show(db):
-    assert read(db, tips_talk.talk, "2026-10-04") == []
+    assert read(db, tips_talk.by_runner, "2026-10-04") == {}

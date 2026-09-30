@@ -184,7 +184,7 @@ where a runner's Chinese name is known: HKJC serves no race card for a
 past meeting, so 6 to 16 Sep resolve only the horses whose names were
 learned from later cards.
 
-## What a video discussed: `talk`
+## What a video discussed: sections, under each runner
 
 Brett, 30 Sep: "whatever is discussed is summarised, identified and included
 on the dashboard". Fact Check's previews talk about jockeys, stables and the
@@ -195,13 +195,17 @@ day racing — and the per-horse quotes left all of that out.
 `tools/extract_factcheck.py` now keeps every section of a preview (the
 subtitles split where the video pauses for five seconds; a one-line heading
 joins the section after it) as a quote on no runner, `topic` 'section', with
-the card's Chinese names of the runners it names. `query/tips_talk` gives,
-per video, each section's first clause as its heading, the whole text, and
-every runner it names **identified** — race, number, name, jockey and
-trainer from the card, which says who 「巴度」 or 「伍鵬志」 is — then the
-tipster's picks from the tail. The Briefing draws it above the races
-(`briefing-talk.js`): open before race day, folded to its title from race day
-on; each horse opens its race and runner.
+the card's Chinese names of the runners it names. `query/tips_talk` hands
+each section to every runner it names, and the Briefing shows it in that
+runner's SAID column beside the source's own comment and picks: folded to
+its first line, marked as context (dotted, never a vote), with the horse's
+own comment cut to 〔…上面〕 so it is not read twice, and "named in it, not
+counted" where the source said nothing else about the horse. So VICTORY
+CHAMPION carries the Badel section and GOOD FORTUNE 伍鵬志's.
+
+It was drawn first as a panel of its own above the races (30 Sep, v52);
+Brett, the same evening: the runner's expanded row, source and quote, is the
+place for it, and the panel came out.
 
 Two extraction fixes came with it, measured on the 9.23, 9.27 and 10.1
 previews: a name right after 比 / 贏 / 勝 / 輸俾 / 擊敗 (optionally with 廐侶)
@@ -231,4 +235,5 @@ was "already on disk" to every run after — so 1 Oct had no Fact Check until
    30 Sep, 「後上鬥贏錶之銀河」 (another horse beat 錶之銀河) filed a quote under
    SILVERY GALAXY (R8 #1), and two one-line mentions (嘉嘉友福 at 1:19,
    包裝天王 at 1:22) counted as featured. The race has run, so its tips are
-   kept as they stood; removing them is a hand edit on the server.
+   kept as they stood. The SILVERY GALAXY row was removed by hand on 30 Sep
+   at Brett's request (quote gKRxEjlKMUI:170); the two mentions stay.

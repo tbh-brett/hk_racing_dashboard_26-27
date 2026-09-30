@@ -368,6 +368,23 @@ function runnerView(x, r, { books, srcIn, saidOf, isBooked, cap, toteEarly, ctx 
              words: words(b.words), url: b.url, tl: t !== null ? clock(t) : 'page',
              noWordsMsg: b.heard ? 'named aloud, no commentary captured' : 'pick only, no commentary' };
   });
+  // The section of a pundit's video it was named in: what was said about
+  // the jockey, the stable and the meeting around it (query/tips_talk). A
+  // section is context, never a vote, so it is drawn as shown-not-counted.
+  (x.sections || []).forEach((sec) => {
+    const own = (sup ? sup.backed_by : []).filter((b) => b.source === sec.source);
+    // The horse's own comment is already drawn above: in the section it
+    // becomes 〔…上面〕, and what is left is what was said around it.
+    let text = sec.text;
+    own.forEach((b) => (b.words || []).forEach((w) => {
+      const said = (w.text || '').replace(/。$/, '');
+      if (said) text = text.replace(said, '〔…上面〕');
+    }));
+    srcs.push({ m: { t: AB[sec.source] || sec.source, tone: 'shown', heard: false }, voice: false,
+                who: `${sec.label} · section${own.length ? '' : ' · named in it, not counted'}`,
+                words: words([{ text, url: sec.url, t: sec.t }]),
+                url: sec.url, tl: clock(sec.t), noWordsMsg: '' });
+  });
   const ls = s.last_start;
   const last = ls ? {
     head: `${ls.place ?? DASH} of ${ls.field_size ?? DASH} · ${ls.venue} ${ls.distance}m · `
