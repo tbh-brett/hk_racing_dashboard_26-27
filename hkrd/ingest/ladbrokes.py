@@ -64,15 +64,22 @@ def fetch_race(event_id: str, *, session=None) -> dict[str, Any]:
     return rec
 
 
+def _offered(v: object) -> float | None:
+    """Ladbrokes writes "TBA" as 0 (measured 30 Sep, the evening before the
+    1 Oct meeting; it had been blank an hour earlier): not a price."""
+    return float(v) if isinstance(v, (int, float)) and v > 1.0 else None
+
+
 def prices(rec: dict[str, Any]) -> list[dict[str, Any]]:
-    """One row per runner: number, Ladbrokes' name, fixed win and place."""
+    """One row per runner: number, Ladbrokes' name, fixed win and place —
+    None where no price is offered yet."""
     out = []
     for r in rec.get("runners") or []:
         odds = r.get("odds") or {}
         out.append({"horse_no": r.get("runner_number"),
                     "name": (r.get("name") or "").upper(),
-                    "win": odds.get("fixed_win"),
-                    "place": odds.get("fixed_place"),
+                    "win": _offered(odds.get("fixed_win")),
+                    "place": _offered(odds.get("fixed_place")),
                     "scratched": bool(r.get("is_scratched"))})
     return out
 

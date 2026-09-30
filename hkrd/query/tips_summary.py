@@ -134,17 +134,23 @@ def summary(date: str, *, conn: Connection | None = None,
 
 
 def _fixed(conn: Connection, date: str) -> tuple[dict, dict]:
-    """(book -> race -> horse -> price row, book -> latest capture)."""
+    """(book -> race -> horse -> price row, book -> latest capture).
+
+    Only rows with a price count, in the capture chosen and in the time it
+    reports: the evening before 1 Oct Ladbrokes served every runner as "TBA",
+    stored as no price, and a capture of nothing read as its market open."""
     fixed: dict[str, dict[int, dict[int, dict]]] = {}
     at: dict[str, str] = {}
     for f in conn.execute(
             "SELECT f.bookmaker, f.race_no, f.horse_no, f.win, f.place, "
             "       f.captured_at FROM fixed_odds f "
             "JOIN (SELECT bookmaker, race_no, max(captured_at) m FROM fixed_odds "
-            "      WHERE race_date = ? GROUP BY bookmaker, race_no) l "
+            "      WHERE race_date = ? AND (win IS NOT NULL OR place IS NOT NULL) "
+            "      GROUP BY bookmaker, race_no) l "
             "  ON l.bookmaker = f.bookmaker AND l.race_no = f.race_no "
             " AND l.m = f.captured_at "
-            "WHERE f.race_date = ? AND f.scratched = 0", (date, date)):
+            "WHERE f.race_date = ? AND f.scratched = 0 "
+            "  AND (f.win IS NOT NULL OR f.place IS NOT NULL)", (date, date)):
         book = f["bookmaker"]
         fixed.setdefault(book, defaultdict(dict))[f["race_no"]][f["horse_no"]] \
             = dict(f)

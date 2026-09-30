@@ -147,6 +147,30 @@ def test_the_day_before_the_preview_lands_and_no_price_is_invented(db, lad,
     assert s["books"] == [] and "ladbrokes" not in s["captured"]
 
 
+def test_a_price_of_zero_is_tba_not_a_market(db, lad, monkeypatch):
+    """By 18:00 the same evening the feed wrote "TBA" as 0, not blank; the
+    18:00 run stored a capture of nothing and the Briefing read LB as in."""
+    zero = copy.deepcopy(lad)
+    for r in zero["runners"]:
+        r["odds"] = {"fixed_win": 0, "fixed_place": 0}
+    monkeypatch.setattr(scrape_fixed_odds.ladbrokes, "fetch_race",
+                        lambda *a, **k: copy.deepcopy(zero))
+    got = scrape_fixed_odds.scrape(DATE, db=db, ahead=True)
+    assert (got.prices, got.tips) == (0, 4)
+    # And the rows that run DID store are read as what they are.
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.execute("INSERT INTO fixed_odds (bookmaker, race_date, race_no, "
+                     "horse_no, captured_at, win, place, scratched) VALUES "
+                     "('ladbrokes', ?, 6, 1, '2026-09-22T10:00:00+00:00', NULL, "
+                     "NULL, 0)", (DATE,))
+    try:
+        s = tips_summary.summary(DATE, conn=conn)
+    finally:
+        conn.close()
+    assert s["books"] == [] and "ladbrokes" not in s["captured"]
+
+
 def test_tomorrow_not_listed_yet_is_quiet(db, monkeypatch):
     monkeypatch.setattr(scrape_fixed_odds.ladbrokes, "race_ids", lambda *a, **k: {})
     got = scrape_fixed_odds.scrape(DATE, db=db, ahead=True)
