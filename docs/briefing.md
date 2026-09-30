@@ -233,7 +233,7 @@ was "already on disk" to every run after — so 1 Oct had no Fact Check until
    by script. It posted nothing for 27 Sep.
 3. **A 27 Sep Fact Check row is known to be wrong and is kept.** Before
    30 Sep, 「後上鬥贏錶之銀河」 (another horse beat 錶之銀河) filed a quote under
-   SILVERY GALAXY (R8 #1), and two one-line mentions (嘉嘉友福 at 1:19,
+   GALAXY PATCH (R8 #1), and two one-line mentions (嘉嘉友福 at 1:19,
    包裝天王 at 1:22) counted as featured. The race has run, so its tips are
-   kept as they stood. The SILVERY GALAXY row was removed by hand on 30 Sep
+   kept as they stood. The GALAXY PATCH row was removed by hand on 30 Sep
    at Brett's request (quote gKRxEjlKMUI:170); the two mentions stay.
