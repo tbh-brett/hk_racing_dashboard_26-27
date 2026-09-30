@@ -70,10 +70,7 @@ def main(argv: list[str] | None = None) -> int:
               f"runner) · picks {got['selections']} · quarantined "
               f"{got['quarantined']} ({reasons}) · removed {got['removed']}"
               + (f" · {got['settled']} kept as at the off"
-                 if got.get("settled") else "")
-              + (f" · prices {got['prices']} ({len(got['prices_skipped'])} "
-                 f"not stored)" if got.get("prices") or
-                 got.get("prices_skipped") else ""))
+                 if got.get("settled") else ""))
     return 1 if failed else 0
 
 

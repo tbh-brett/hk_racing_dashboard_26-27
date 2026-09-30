@@ -100,7 +100,9 @@ USAGE
     python harvest_youtube.py --channel UCQAbEL38om9qqgVHGuK5BSg \
            --lang yue zh-HK --season-year 2026 --out ./raw/bryan
 
-Re-running is safe and cheap: a video already on disk is skipped.
+Re-running is safe and cheap: a video already on disk is skipped — unless it
+was read before its captions were ready, which is asked again for a week
+(`incomplete`).
 
 OUTPUT  —  <out>/<video_id>.json
 
@@ -575,6 +577,37 @@ def fetch_video(video_id: str, *, session: requests.Session,
     }
 
 
+# A video read too soon after it went up is read again, for this long after
+# its upload. Measured 28 Sep 2026: Fact Check's 10.1 preview went up at 20:00
+# HKT and the 20:31 run found its human subtitle track listed but serving
+# nothing — still processing. Saved with no captions, it was "already on
+# disk" to every run after, and the meeting had no Fact Check at all.
+RETRY_DAYS = 7
+
+
+def incomplete(target: Path, *, today: dt.date | None = None) -> bool:
+    """True when the stored record should be fetched again: it has no
+    captions, or a human track that stops short with no speech-to-text tail
+    to finish it (the tail is where Fact Check's picks are, and YouTube makes
+    the auto track after the upload). Only while the upload is recent: a
+    video that never gets captions is asked about for a week, not forever."""
+    try:
+        rec = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return True
+    short = (rec.get("caption_kind") == "manual"
+             and (rec.get("caption_coverage") or 0) < 0.9
+             and not rec.get("asr_filled_segments"))
+    if rec.get("segments") and not short:
+        return False
+    try:
+        age = ((today or dt.date.today())
+               - dt.date.fromisoformat((rec.get("published") or "")[:10])).days
+    except ValueError:
+        return True
+    return age <= RETRY_DAYS
+
+
 def dated_near(race_date: str | None, published: str | None) -> str | None:
     """A yearless title's date, in whichever year puts it nearest the upload.
 
@@ -704,7 +737,7 @@ def main(argv: list[str] | None = None) -> int:
                 continue
 
             target = args.out / f"{it['id']}.json"
-            if target.exists() and not args.force:
+            if target.exists() and not args.force and not incomplete(target):
                 tally["skipped"] += 1
                 continue
 

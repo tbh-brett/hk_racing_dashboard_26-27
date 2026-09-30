@@ -417,19 +417,6 @@ export function saidBlock(x, { compact = false } = {}) {
     col.append(s);
   });
   if (!x.srcs.length && !compact) col.append(el('div', 'bf-nosaid', x.noSaidMsg));
-  if (x.form) {
-    const f = el('div', 'bf-form');
-    f.append(el('span', 'lab', 'R&S FORM'));
-    const t = el('span', 'txt', `${x.form.text} `);
-    t.append(el('span', 'dim', 'form, not counted'));
-    f.append(t);
-    if (x.form.url && !compact) {
-      const a = link(x.form.url, '▸ page', 'go');
-      a.target = '_blank';
-      f.append(a);
-    }
-    col.append(f);
-  }
   return col;
 }
 

@@ -9,8 +9,8 @@ Singapore as well as a home PC (measured 2026-09-23). For each HK race:
   race.tips      those four as runner ids, IN ORDER — the ranking is data,
                  not something to infer from the prose
 
-Both are Racing & Sports' work, the same words Sportsbet carries under that
-name, and are stored as that source (`ingest.racing_sports`).
+Both are Racing & Sports' work, and are stored as that source
+(`ingest.racing_sports`).
   runners[]      fixed win and place prices now
 
 Returns plain dicts, as ingest/ does. The numbers are Ladbrokes' own and its

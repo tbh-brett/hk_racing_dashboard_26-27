@@ -4,10 +4,10 @@
     python -m hkrd.jobs.scrape_fixed_odds             # today's meeting, if any
 
 Ladbrokes answers the Fly machine directly, so unlike the YouTube sources
-this runs on the server's own schedule. Sportsbet refuses the server (403,
-measured 2026-09-23) and is read from the PC instead, by
-`tools/harvest_sportsbet.py`; Unibet's racing prices come from an app whose
-feed has not been found.
+this runs on the server's own schedule. It is the one bookmaker read:
+Sportsbet carried the same Racing & Sports words, refused both machines from
+24 Sep, and was taken out on 30 Sep; Unibet's racing prices come from an app
+whose feed has not been found.
 
 Two things per race, and both are checked against the stored HKJC card:
 
@@ -17,9 +17,8 @@ Two things per race, and both are checked against the stored HKJC card:
            comparison cannot survive — so a runner that disagrees is left
            out and named in the report.
   TIPS     the top four in order, each with its reason, and the race's
-           whole comment. They are Racing & Sports' words, which Sportsbet
-           carries too, so they are stored as that source and counted once
-           (`ingest.racing_sports`). Sent through `import_tips` like every
+           whole comment. They are Racing & Sports' words, stored as that
+           source (`ingest.racing_sports`). Sent through `import_tips` like every
            other source — the same checks, the same quarantine, and the
            latest capture replacing the one before.
 """

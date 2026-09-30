@@ -90,3 +90,38 @@ def test_an_undatable_preview_title_is_flagged_not_filtered():
 def test_the_year_comes_from_the_upload(parsed, published, want):
     from harvest_youtube import dated_near
     assert dated_near(parsed, published) == want
+
+
+# ── a video read before its captions were ready ─────────────────────────────
+
+def _stored(tmp_path, **rec):
+    import json
+    p = tmp_path / "v.json"
+    p.write_text(json.dumps({"published": "2026-09-28T05:00:08-07:00", **rec}),
+                 encoding="utf-8")
+    return p
+
+
+def test_a_video_stored_without_captions_is_asked_again(tmp_path):
+    # Fact Check's 10.1 preview, read at 20:31 on 28 Sep, 31 minutes after
+    # it went up: the subtitle track was listed and served nothing.
+    import datetime as dt
+    from harvest_youtube import incomplete
+    empty = _stored(tmp_path, segments=[], caption_kind="manual")
+    assert incomplete(empty, today=dt.date(2026, 9, 30))
+    # A week on it stops asking: some videos never get captions.
+    assert not incomplete(empty, today=dt.date(2026, 10, 9))
+
+
+def test_a_short_human_track_waits_for_its_speech_to_text_tail(tmp_path):
+    import datetime as dt
+    from harvest_youtube import incomplete
+    seg = [{"t": 1.0, "text": "x"}]
+    short = _stored(tmp_path, segments=seg, caption_kind="manual",
+                    caption_coverage=0.62, asr_filled_segments=0)
+    assert incomplete(short, today=dt.date(2026, 9, 30))
+    done = _stored(tmp_path, segments=seg, caption_kind="manual",
+                   caption_coverage=0.62, asr_filled_segments=36)
+    assert not incomplete(done, today=dt.date(2026, 9, 30))
+    whole = _stored(tmp_path, segments=seg, caption_kind="asr", caption_coverage=1.0)
+    assert not incomplete(whole, today=dt.date(2026, 9, 30))

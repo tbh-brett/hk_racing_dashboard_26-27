@@ -149,4 +149,62 @@ def test_the_payload_it_builds_passes_the_dashboards_contract(rec, roster,
     payload = ex.extract(DATE, tmp_path, roster)
     parsed = tips_payload.parse(payload)
     assert parsed.sources == ["factcheck"]
-    assert (len(parsed.quotes), len(parsed.selections)) == (3, 3)
+    said = [q for q in parsed.quotes if q["topic"] != "section"]
+    parts = [q for q in parsed.quotes if q["topic"] == "section"]
+    assert (len(said), len(parsed.selections)) == (3, 3)
+    # The excerpt's subtitles are one stretch: one section, on no runner.
+    assert len(parts) == 1 and parts[0]["race_no"] is None
+
+
+# ── 10.1: sections, and the horse another was measured against ──────────────
+#
+# `factcheck_20261001_excerpt.json` is the real 10.1 preview's opening survey
+# and 伍鵬志's section; `roster_20261001.json` is the card the dashboard
+# served on 30 Sep.
+
+@pytest.fixture(scope="module")
+def oct1() -> tuple[dict, ex.Card]:
+    return load("factcheck_20261001_excerpt.json"), ex.Card(load("roster_20261001.json"))
+
+
+def test_the_horse_a_trial_time_is_measured_against_opens_no_comment(oct1):
+    """「只比廐侶飛鷹翱翔在另一組所造的最快時間慢四線」 is GOOD FORTUNE's time
+    against its stablemate's. Read as opening a DROMBEG BANNER comment, it
+    handed that horse GOOD FORTUNE's 7yo maiden win and its 125lb."""
+    rec, card = oct1
+    quotes = {(q["race_no"], q["horse_no"]): q for q in ex.quotes_from(rec, card, AT)}
+    good_fortune, drombeg = quotes[(1, 5)], quotes[(9, 11)]
+    assert "七歲馬開鑼日勝後開竅大熟" in good_fortune["quote"]
+    assert "負125磅" in good_fortune["quote"]
+    assert drombeg["quote"].startswith("至於飛鷹翱翔透過試閘提升狀態")
+    assert "125磅" not in drombeg["quote"]
+
+
+def test_a_horse_named_once_in_passing_is_not_featured(oct1):
+    """「包括當時亞軍精算暴雪」 in the opening survey: RAGING BLIZZARD (R3 #1)
+    is named, not discussed."""
+    rec, card = oct1
+    assert (3, 1) not in {(q["race_no"], q["horse_no"])
+                          for q in ex.quotes_from(rec, card, AT)}
+
+
+def test_every_section_is_kept_with_the_runners_it_names(oct1):
+    rec, card = oct1
+    parts = ex.sections_from(rec, card, AT)
+    assert [int(p["t_start"]) for p in parts] == [21, 214]
+    assert parts[0]["horse_said"] == "精算暴雪、魔術控制"
+    assert parts[1]["horse_said"] == "同有運、飛鷹翱翔"
+    # 伍鵬志's run of six meetings: about no one horse, and kept.
+    assert parts[1]["quote"].startswith("伍鵬志被喻為季初最大發現")
+    assert {(p["race_no"], p["horse_no"], p["topic"]) for p in parts} == \
+        {(None, None, "section")}
+    assert parts[1]["url"] == "https://www.youtube.com/watch?v=I0joWiohg54&t=214s"
+
+
+def test_a_heading_said_before_a_pause_joins_the_section_after_it():
+    from extract_factcheck import sections
+    seg = lambda t, text: {"t": t, "text": text}
+    rec = {"segments": [seg(0, "甲"), seg(2, "乙"), seg(9, "講番主題賽事"),
+                        seg(15, "丙"), seg(17, "丁")]}
+    assert [[s["text"] for s in part] for part in sections(rec)] == \
+        [["甲", "乙"], ["講番主題賽事", "丙", "丁"]]

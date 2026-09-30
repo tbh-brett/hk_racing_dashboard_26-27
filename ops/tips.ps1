@@ -9,12 +9,10 @@
 
       1. harvest   the newest Fact Check previews to raw\factcheck, the
                    newest Racing To Win previews and interviews to
-                   raw\rtw, and
-                   Sportsbet's fixed odds and Racing & Sports comments
-                   for the next meeting to out\ (Sportsbet refuses the
-                   server)
-                   and Horse Detective's latest Threads posts to
-                   raw\threads
+                   raw\rtw, and Horse Detective's latest Threads posts
+                   to raw\threads. (Racing & Sports and Ladbrokes' prices
+                   are read by the server; Sportsbet was taken out on
+                   30 Sep.)
       2. extract   quotes and picks for every upcoming meeting, to out\
       3. push      those to the dashboard, which replaces what each source
                    said before with what it says now
@@ -79,16 +77,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "  harvest reported a problem; carrying on with what is on disk" -ForegroundColor Yellow
 }
 
-Head "1c. harvest  Sportsbet (fixed odds + Racing & Sports comments)"
-# Written to out\ and sent with the rest in step 3. Sportsbet has refused
-# this PC as well as the server since 24 Sep; when it does, this step says
-# so and the run carries on without it.
-& $py tools\harvest_sportsbet.py
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "  Sportsbet reported a problem; carrying on without it" -ForegroundColor Yellow
-}
-
-Head "1d. harvest  Horse Detective (Threads, via Open RSS)"
+Head "1c. harvest  Horse Detective (Threads, via Open RSS)"
 # The feed only ever shows the latest four posts, and nothing that has
 # scrolled off can be fetched again, so every run reads it. Its picks go
 # up on race-day morning (11:49 on 13 Sep): the 10:00 run can miss one.

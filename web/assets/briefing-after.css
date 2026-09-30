@@ -158,3 +158,49 @@
   /* The sources' record drops A/E on a phone; here it is the point. */
   .bf-bgrow .c-ae { display: block; }
 }
+
+/* ── what the pundits discussed (briefing-talk.js) ─────────────────────── */
+
+.bf-talk { padding: 10px 14px 12px; border-bottom: 1px solid var(--line-2); }
+.bf-talk:empty { display: none; }
+.bf-talk-cap {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-bottom: 4px;
+  font-family: var(--font-mono); font-size: 10px;
+}
+.bf-talk-cap .l { letter-spacing: .12em; color: var(--tip); font-weight: 600; }
+.bf-talk-cap .r { color: var(--text-dim); }
+.bf-talk-cap { cursor: pointer; }
+.bf-talk-cap .fold { color: var(--text-dim); }
+.bf-talk-cap .at { margin-left: auto; }
+.bf-talk.folded { padding-bottom: 6px; }
+.bf-talk .at { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); white-space: nowrap; }
+.bf-talk-row {
+  display: grid; grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 4px 12px; align-items: start; padding: 6px 0; border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+.bf-talk-row:hover { background: var(--run-hover); }
+.bf-talk-row .head { font-size: 13px; color: var(--text); }
+.bf-talk-row .text, .bf-talk-row .note {
+  margin-top: 2px; font-size: 12px; line-height: 1.5; color: var(--text-muted);
+  display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
+}
+.bf-talk-row.open .text { display: block; color: var(--text-2); }
+.bf-talk-row.picks { cursor: default; }
+.bf-talk-row .runners { display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start; }
+.bf-talk .rn {
+  display: inline-flex; align-items: baseline; gap: 5px; max-width: 100%;
+  padding: 2px 6px; border: 1px solid color-mix(in srgb, var(--tip) 35%, transparent);
+  background: none; color: var(--text-2); cursor: pointer; text-align: left;
+  font-family: var(--font-mono); font-size: 11px;
+}
+.bf-talk .rn:hover { border-color: var(--tip); }
+.bf-talk .rn .id { color: var(--tip); }
+.bf-talk .rn .nm { color: var(--text); font-weight: 600; }
+.bf-talk .rn .who { color: var(--text-dim); font-size: 10px; }
+.bf-talk .also { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); }
+
+@media (max-width: 999px) {
+  .bf-talk-row { grid-template-columns: 44px minmax(0, 1fr); }
+  .bf-talk-row .runners { grid-column: 2; }
+}

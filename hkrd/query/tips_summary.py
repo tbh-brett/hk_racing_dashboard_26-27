@@ -16,7 +16,7 @@ WHAT COUNTS AS SUPPORT, per source, and nothing else does:
 Racing & Sports is ONE source however many bookmakers print it: Ladbrokes'
 race comment and Sportsbet's "Expert Tips by Racing & Sports" are the same
 words and the same four horses (`ingest.racing_sports`). Its line on every
-runner is form, not support, and travels as `form`.
+runner came from Sportsbet alone, which was taken out on 30 Sep.
 
 全方位Bryan is not counted: his one quote on 23 Sep was about a trip being
 too SHORT for the horse, and a mention with no way to read its direction
@@ -52,12 +52,12 @@ from hkrd.store.connect import Connection, get_conn
 __all__ = ["summary", "EDGE_AT", "BOOKS"]
 
 EDGE_AT = 0.05            # an edge worth listing: +5% or better
-BOOKS = ("ladbrokes", "sportsbet", "unibet")
+BOOKS = ("ladbrokes", "unibet")
 _HK = dt.timezone(dt.timedelta(hours=8))
-_RS, _RS_FORM = "racing_sports", "racing_sports_form"
+_RS = "racing_sports"
 _LABEL = {"factcheck": "賽馬Fact Check", "rtw_interview": "Racing To Win interview",
           "rtw_preview": "Racing To Win preview", _RS: "Racing & Sports",
-          _RS_FORM: "Racing & Sports", "bryan": "全方位Bryan", "oncc": "on.cc",
+          "bryan": "全方位Bryan", "oncc": "on.cc",
           "threads": "神探賽馬 Horse Detective"}
 # The sources the Briefing expects on every meeting, in the order it lists
 # them. One that has not published yet is listed as pending, not left out.
@@ -206,22 +206,16 @@ def _summary(conn: Connection, date: str, *,
         entry["words"].append({"text": q["quote"], "en": q["quote_en"],
                                "t": q["t_start"], "url": q["url"]})
 
-    # What Racing & Sports wrote: the race's paragraph, and a line on each
-    # runner. Context for the race, not support for a horse.
+    # What Racing & Sports wrote about each race: context for the race, not
+    # support for a horse.
     comments: dict[int, list[dict]] = defaultdict(list)
-    form: dict[tuple[int, int], dict] = {}
     for q in conn.execute(
-            "SELECT source, speaker, race_no, horse_no, quote, url "
-            "FROM connections_quote WHERE race_date = ? AND race_no IS NOT NULL "
-            "  AND source IN (?, ?) ORDER BY race_no, horse_no",
-            (date, _RS, _RS_FORM)):
-        if q["source"] == _RS and q["horse_no"] is None:
-            comments[q["race_no"]].append({
-                "source": q["source"], "source_label": _LABEL[_RS],
-                "who": q["speaker"], "text": q["quote"], "url": q["url"]})
-        elif q["source"] == _RS_FORM and q["horse_no"] is not None:
-            form[(q["race_no"], q["horse_no"])] = {"text": q["quote"],
-                                                   "url": q["url"]}
+            "SELECT source, speaker, race_no, quote, url FROM connections_quote "
+            "WHERE race_date = ? AND race_no IS NOT NULL AND horse_no IS NULL "
+            "  AND source = ? ORDER BY race_no", (date, _RS)):
+        comments[q["race_no"]].append({
+            "source": q["source"], "source_label": _LABEL[_RS],
+            "who": q["speaker"], "text": q["quote"], "url": q["url"]})
 
     fixed, fixed_at = _fixed(conn, date)
     books = [b for b in BOOKS if b in fixed]
@@ -262,8 +256,7 @@ def _summary(conn: Connection, date: str, *,
                     "supporters": supporters,
                     "top_picks": sum(1 for b in who if b["rank"] == 1),
                     "interviewed": any(b["kind"] == "connections" for b in who),
-                    "backed_by": sorted(who, key=_by_weight),
-                    "form": form.get((race_no, no)), "odds": odds})
+                    "backed_by": sorted(who, key=_by_weight), "odds": odds})
             for side in ("tote", *books):
                 ev = odds[side]["value_pct"]
                 if ev is None or ev < 100 * EDGE_AT:
@@ -289,8 +282,6 @@ def _summary(conn: Connection, date: str, *,
                                             in prices[b].items()})
                              for b in books}},
             "comments": comments.get(race_no, []),
-            "form": [dict(v, horse_no=no) for (r, no), v in sorted(form.items())
-                     if r == race_no],
             "interviews": [dict(i, horse_name=runners[(race_no, i["horse_no"])]
                                 ["horse_name"]) for i in interviews[race_no]],
             "picks": picks,
@@ -316,12 +307,11 @@ def _source_status(conn: Connection, date: str) -> list[dict[str, Any]]:
     stats: dict[str, dict[str, Any]] = {}
 
     def entry(source: str) -> dict[str, Any]:
-        key = _RS if source == _RS_FORM else source
-        return stats.setdefault(key, {
-            "source": key, "label": _LABEL.get(key, key), "fetched_at": None,
-            "picks": 0, "heard": 0, "quotes": 0, "featured": 0,
-            "interviews": 0, "runner_lines": 0, "races": set(), "held": 0,
-            "held_reasons": {}})
+        return stats.setdefault(source, {
+            "source": source, "label": _LABEL.get(source, source),
+            "fetched_at": None, "picks": 0, "heard": 0, "quotes": 0,
+            "sections": 0, "featured": 0, "interviews": 0, "races": set(),
+            "held": 0, "held_reasons": {}})
 
     for s in conn.execute(
             "SELECT source, count(*) n, sum(caption_kind = 'asr') heard, "
@@ -335,6 +325,7 @@ def _source_status(conn: Connection, date: str) -> list[dict[str, Any]]:
         e["races"].update(int(x) for x in (s["races"] or "").split(",") if x)
     for q in conn.execute(
             "SELECT source, count(*) n, max(fetched_at) at, "
+            "       count(CASE WHEN topic = 'section' THEN 1 END) sections, "
             "       count(DISTINCT CASE WHEN horse_no IS NOT NULL "
             "             THEN race_no || '-' || horse_no END) horses, "
             "       count(DISTINCT CASE WHEN horse_no IS NOT NULL "
@@ -344,10 +335,8 @@ def _source_status(conn: Connection, date: str) -> list[dict[str, Any]]:
             "FROM connections_quote WHERE race_date = ? GROUP BY source",
             (date,)):
         e = entry(q["source"])
-        if q["source"] == _RS_FORM:
-            e["runner_lines"] += q["n"]
-        else:
-            e["quotes"] += q["n"]
+        e["quotes"] += q["n"] - q["sections"]
+        e["sections"] += q["sections"]
         if q["source"] == "factcheck":
             e["featured"] += q["horses"]
         elif q["source"] == "rtw_interview":
@@ -368,7 +357,7 @@ def _source_status(conn: Connection, date: str) -> list[dict[str, Any]]:
         out.append(dict(e, races=len(e["races"]),
                         fetched_at=_hk(e["fetched_at"]),
                         published=bool(e["picks"] or e["quotes"]
-                                       or e["runner_lines"])))
+                                       or e["sections"])))
     return out
 
 

@@ -14,10 +14,6 @@ with no number at all is kept, at race level or unplaced, because an
 unresolved quote is still true. A wrong number is not: a trainer's quote
 under the wrong horse is worse than no row.
 
-Fixed odds ride along for a bookmaker only the PC can reach. A price is kept
-only where the bookmaker's number AND its name agree with the card, and a
-price that does not is named in the report, not quarantined: it is not
-anyone's opinion to review, just a runner the two sides disagree about.
 """
 from __future__ import annotations
 
@@ -32,7 +28,7 @@ from typing import Any
 
 from hkrd.derive import names
 from hkrd.ingest.tips_payload import PayloadError, parse
-from hkrd.store import fixed_odds, job_log, tips
+from hkrd.store import job_log, tips
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
 __all__ = ["run", "ImportReport", "PayloadError", "MIN_CONFIDENCE"]
@@ -52,13 +48,13 @@ class ImportReport:
     # Of `quotes`, how many are stored against no runner — race-level, or
     # not placed at all. A push where this is every quote is a resolver that
     # has stopped resolving, and would otherwise read as a healthy count.
+    # A section of a video (`topic` 'section') is on no runner by design and
+    # is not counted here.
     unplaced_quotes: int = 0
     # Rows an earlier push stored that this one no longer has — left out of
     # it, or quarantined by it. The latest push for a source replaces it.
     removed: int = 0
     reasons: Counter = field(default_factory=Counter)
-    prices: int = 0
-    prices_skipped: list[str] = field(default_factory=list)
     # Rows this push carried for races already off that were stored already,
     # and so were left exactly as they stood at the off.
     settled: int = 0
@@ -69,8 +65,7 @@ class ImportReport:
                 "quarantined": self.quarantined,
                 "quarantine_reasons": dict(sorted(self.reasons.items())),
                 "unplaced_quotes": self.unplaced_quotes,
-                "removed": self.removed, "prices": self.prices,
-                "prices_skipped": self.prices_skipped}
+                "removed": self.removed}
 
     def render(self) -> str:
         lines = [f"  tips               {self.race_date}",
@@ -86,10 +81,6 @@ class ImportReport:
         if self.settled:
             lines.append(f"  kept as at the off {self.settled:>6}   "
                          f"(races already run: not rewritten)")
-        if self.prices or self.prices_skipped:
-            lines.append(f"  fixed prices       {self.prices:>6}   "
-                         f"({len(self.prices_skipped)} not stored)")
-            lines += [f"    {s}" for s in self.prices_skipped[:12]]
         return "\n".join(lines)
 
 
@@ -193,10 +184,7 @@ def _import(conn, body: object) -> ImportReport:
     # Two rows on one key would store as one, and which survived would be
     # whichever came last. That is a bug in the extractor, so it is refused.
     dupes = (_duplicates(quote_ids, "quote_id")
-             + _duplicates(sel_keys, "selection")
-             + _duplicates([(f["bookmaker"], f["race_no"], f["horse_no"],
-                             f["captured_at"]) for f in payload.fixed_odds],
-                           "price"))
+             + _duplicates(sel_keys, "selection"))
     if dupes:
         raise PayloadError(dupes)
 
@@ -214,7 +202,7 @@ def _import(conn, body: object) -> ImportReport:
             report.reasons[reason] += 1
         else:
             quotes.append(q)
-            if q["horse_no"] is None:
+            if q["horse_no"] is None and q["topic"] != "section":
                 report.unplaced_quotes += 1
 
     for s, key in zip(payload.selections, sel_keys):
@@ -231,17 +219,6 @@ def _import(conn, body: object) -> ImportReport:
     for r in payload.quarantine:
         report.reasons[r["reason"]] += 1
 
-    prices = []
-    for f in payload.fixed_odds:
-        ours = races.get(f["race_no"], {}).get(f["horse_no"])
-        if ours is None or names.similarity(f["name_seen"], ours) \
-                < names.SPELLED_ALIKE:
-            report.prices_skipped.append(
-                f"{f['bookmaker']} R{f['race_no']} #{f['horse_no']} "
-                f"{f['name_seen']}: the card has {ours or 'no such runner'}")
-        else:
-            prices.append(f)
-
     with transaction(conn, immediate=True):
         # A race that has gone off keeps what was said before it: rows for
         # it are added if new and never rewritten (store/tips docstring).
@@ -256,7 +233,6 @@ def _import(conn, body: object) -> ImportReport:
             conn, [s for s in sels if s["race_no"] not in off])
         report.settled = len(off_q) - added_q + len(off_s) - added_s
         report.quarantined = tips.upsert_quarantine(conn, held)
-        report.prices = fixed_odds.upsert_fixed_odds(conn, prices)
         # The latest push is the source's whole answer for this meeting.
         report.removed = tips.replace_absent(
             conn, payload.race_date, payload.sources,
@@ -269,7 +245,7 @@ def _import(conn, body: object) -> ImportReport:
             detail=(f"{report.race_date} · {report.quotes} quotes · "
                     f"{report.selections} selections · "
                     f"{report.quarantined} quarantined · "
-                    f"{report.removed} removed · {report.prices} prices"))
+                    f"{report.removed} removed"))
     return report
 
 

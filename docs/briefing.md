@@ -16,15 +16,15 @@ a source; the combined data is built before the new design.
 
 ```
  COMPUTED                    SAID                               PRICED
- (the server)                (this PC → the server)             (the server, and this PC)
+ (the server)                (this PC → the server)             (the server)
 
  HKJC card, results,         ops/tips.ps1 — task "HKRD tips",   jobs/scrape_odds — the tote,
  trials, stewards            10:00 and 20:30 daily              on the server's schedule
    │  jobs/scrape_meeting      │ harvest_youtube  FC, RTW          │
    ▼                           │ harvest_threads  Horse Detective  │ jobs/scrape_fixed_odds —
- derive/  SARR, pace,          │ harvest_sportsbet (refused        │ Ladbrokes prices and the
-          tags, trials         │   since 24 Sep)                   │ Racing & Sports tips
-   ▼                           ▼                                   │ (not yet on a schedule)
+ derive/  SARR, pace,          │                                   │ Ladbrokes prices and the
+          tags, trials         │                                   │ Racing & Sports tips,
+   ▼                           ▼                                   │ every 30 min on race day
  model/screen              extract_tips → push_tips                │
    ▼                           ▼  POST /api/tips/import            │
  query/screen              jobs/import_tips — every number       │
@@ -40,9 +40,16 @@ a source; the combined data is built before the new design.
                   GET /api/briefing/{date}
 ```
 
-The PC does what the server cannot: YouTube, Threads' feed and Sportsbet all
-refuse the Fly machine and answer a home connection. Everything the PC sends
-goes through the same import and the same checks.
+The PC does what the server cannot: YouTube and Threads' feed refuse the Fly
+machine and answer a home connection. Everything the PC sends goes through
+the same import and the same checks.
+
+**Sportsbet was taken out on 30 Sep** (Brett): it printed the same Racing &
+Sports words and picks as Ladbrokes, it had refused this PC as well as the
+server since 24 Sep, and it was the only source of the per-runner "R&S FORM"
+line (Ladbrokes' feed has the field and leaves it empty for Hong Kong), which
+went with it. The tips payload no longer carries prices; Ladbrokes' come from
+the server's own capture.
 
 ## The answer: `GET /api/briefing/{date}`
 
@@ -64,8 +71,8 @@ What it adds on top of its parts:
   |---|---|---|
   | 賽馬Fact Check | 20:00 two nights before | four meetings (ops/tips.ps1) |
   | Racing To Win preview and interviews | about 16:00 the day before | the tips work (ops/tips.ps1) |
-  | HKJC tote | about midday the day before, thin until race day | AGENTS.md |
-  | Racing & Sports, Ladbrokes, Sportsbet | by race-day morning | **seen once** (23 Sep) |
+  | HKJC tote | read from midnight on race day | `jobs/scrape_odds`: the day-before pool is a handful of bets and is not captured, so a clock expecting it at noon the day before read "overdue" every time (fixed 30 Sep) |
+  | Racing & Sports, Ladbrokes | by race-day morning | **seen once** (23 Sep) |
   | 神探賽馬 Horse Detective | race-day morning, when it posts at all | one post (13 Sep, 11:49) |
 
 - **`reasons`** per race, each of one kind:
@@ -177,6 +184,38 @@ where a runner's Chinese name is known: HKJC serves no race card for a
 past meeting, so 6 to 16 Sep resolve only the horses whose names were
 learned from later cards.
 
+## What a video discussed: `talk`
+
+Brett, 30 Sep: "whatever is discussed is summarised, identified and included
+on the dashboard". Fact Check's previews talk about jockeys, stables and the
+meeting as much as about any one horse — the 10.1 preview on Badel back from
+suspension with 羅富全's three rides, 伍鵬志's six meetings in a row, 希斯's
+day racing — and the per-horse quotes left all of that out.
+
+`tools/extract_factcheck.py` now keeps every section of a preview (the
+subtitles split where the video pauses for five seconds; a one-line heading
+joins the section after it) as a quote on no runner, `topic` 'section', with
+the card's Chinese names of the runners it names. `query/tips_talk` gives,
+per video, each section's first clause as its heading, the whole text, and
+every runner it names **identified** — race, number, name, jockey and
+trainer from the card, which says who 「巴度」 or 「伍鵬志」 is — then the
+tipster's picks from the tail. The Briefing draws it above the races
+(`briefing-talk.js`): open before race day, folded to its title from race day
+on; each horse opens its race and runner.
+
+Two extraction fixes came with it, measured on the 9.23, 9.27 and 10.1
+previews: a name right after 比 / 贏 / 勝 / 輸俾 / 擊敗 (optionally with 廐侶)
+is the horse another was measured against or beat, and opens no comment
+(「只比廐侶飛鷹翱翔…」 had handed DROMBEG BANNER GOOD FORTUNE's 7yo maiden win
+and 125lb); and a single line on its own is a mention, not a segment
+(「包括當時亞軍精算暴雪」), shown in its section and not counted as featured.
+
+A video read before its captions were ready is asked again for a week
+(`harvest_youtube.incomplete`): the 10.1 preview was read at 20:31 on 28 Sep,
+31 minutes after it went up, with its subtitle track listed and empty, and
+was "already on disk" to every run after — so 1 Oct had no Fact Check until
+30 Sep.
+
 ## Open items
 
 1. **Conditional polling.** The race-day re-read is a full answer each
@@ -188,7 +227,8 @@ learned from later cards.
    the feed's build date and says STALE past two days. Nothing here can make
    the service rebuild, and Threads' robots.txt forbids reading the profile
    by script. It posted nothing for 27 Sep.
-3. **Sportsbet has refused this PC too since 24 Sep.** Racing & Sports'
-   tips and race comment still come through Ladbrokes, which the server now
-   captures every half hour through the day (`ops/crontab`); Sportsbet's
-   prices and its form line on every runner do not arrive.
+3. **A 27 Sep Fact Check row is known to be wrong and is kept.** Before
+   30 Sep, 「後上鬥贏錶之銀河」 (another horse beat 錶之銀河) filed a quote under
+   SILVERY GALAXY (R8 #1), and two one-line mentions (嘉嘉友福 at 1:19,
+   包裝天王 at 1:22) counted as featured. The race has run, so its tips are
+   kept as they stood; removing them is a hand edit on the server.

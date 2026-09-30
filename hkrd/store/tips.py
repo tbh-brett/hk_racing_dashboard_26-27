@@ -51,13 +51,17 @@ QUARANTINE_COLS = ("quarantine_id", "source", "race_date", "race_no", "raw",
 # ── keys ─────────────────────────────────────────────────────────────────────
 
 def quote_id(row: Row) -> str:
-    """'<video_id>:<int(t_start)>', so a re-push lands on the same row.
+    """'<video_id>:<int(t_start)>', so a re-push lands on the same row —
+    with ':s' after it for a whole section of the video.
 
     A quote with no timestamp has no place in its video to be keyed by, and
     falls back to a hash of what it says and where it came from.
     """
     if row.get("video_id") and row.get("t_start") is not None:
-        return f"{row['video_id']}:{int(float(row['t_start']))}"
+        # A section of a video (`topic` 'section') can start on the same
+        # second as the first comment in it; it is a row of its own.
+        tail = ":s" if row.get("topic") == "section" else ""
+        return f"{row['video_id']}:{int(float(row['t_start']))}{tail}"
     digest = hashlib.sha1("\x00".join(
         str(row.get(k) or "") for k in ("source", "url", "quote")
     ).encode("utf-8")).hexdigest()

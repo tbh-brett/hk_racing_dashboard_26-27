@@ -35,7 +35,8 @@ import datetime as dt
 from dataclasses import dataclass
 from typing import Any
 
-from hkrd.query import background, market, money, movement, screen, tips_summary
+from hkrd.query import (background, market, money, movement, screen, tips_summary,
+                        tips_talk)
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["meeting", "CLOCK", "Due", "LATE_FIRMING", "MARKET_APART"]
@@ -47,8 +48,8 @@ CONSENSUS = 3           # distinct sources on one horse
 _GOOD_TRIAL = ("trial_standout", "trial_positive")   # model/gbm_unseen facts worth a reason
 ORDER_RULE = ("races with more different things to read first, then race "
               "order; a count of reasons, not a chance of anything")
-_MARKET = {"tote": "the tote", "ladbrokes": "Ladbrokes", "sportsbet": "Sportsbet",
-           "unibet": "Unibet", "books": "the bookmakers"}
+_MARKET = {"tote": "the tote", "ladbrokes": "Ladbrokes", "unibet": "Unibet",
+           "books": "the bookmakers"}
 
 
 @dataclass(frozen=True)
@@ -71,14 +72,13 @@ CLOCK = (
         "posts about 16:00 the day before"),
     Due("rtw_interview", "Racing To Win interviews", "said", 1, "16:00",
         "post with the preview, about 16:00 the day before"),
-    Due("tote", "HKJC tote", "priced", 1, "12:00",
-        "opens about midday the day before, thin until race day"),
+    Due("tote", "HKJC tote", "priced", 0, "00:30",
+        "read from midnight on race day; the day-before pool is a handful "
+        "of bets, and is not captured"),
     Due("racing_sports", "Racing & Sports", "said", 0, "09:00",
         "arrives with the bookmakers' markets; up by race-day morning once"),
     Due("ladbrokes", "Ladbrokes", "priced", 0, "09:00",
         "fixed odds; up by race-day morning once"),
-    Due("sportsbet", "Sportsbet", "priced", 0, "09:00",
-        "fixed odds, read from the PC only"),
     Due("threads", "神探賽馬 Horse Detective", "said", None, None,
         "posts on race-day morning when it posts at all"),
 )
@@ -123,9 +123,9 @@ def _stage(date: str, now: dt.datetime, clock: list[dict],
             else "voices" if "said" in landed else "cold")
 
 
-def _runner(s: dict, tip: dict | None, form: dict | None, odds: dict | None,
-            zh: str | None, move: dict | None, mrank: int | None,
-            priced: bool, bg: dict | None = None) -> dict[str, Any]:
+def _runner(s: dict, tip: dict | None, odds: dict | None, zh: str | None,
+            move: dict | None, mrank: int | None, priced: bool,
+            bg: dict | None = None) -> dict[str, Any]:
     ident = ("horse_no", "horse_name", "draw", "jockey", "trainer", "rating",
              "weight", "gear", "style")
     gear_first = [g[:-1] for g in (s["gear"] or "").replace(",", " ").split()
@@ -141,7 +141,6 @@ def _runner(s: dict, tip: dict | None, form: dict | None, odds: dict | None,
         "support": None if not tip else {
             "sources": tip["supporters"], "top_picks": tip["top_picks"],
             "interviewed": tip["interviewed"], "backed_by": tip["backed_by"]},
-        "form_line": form,
         "price": odds if priced else None,
         "market_rank": mrank,
         "move": None if not move or not move.get("observed") else {
@@ -285,20 +284,18 @@ def _meeting(conn: Connection, date: str, now: dt.datetime) -> dict[str, Any]:
     for sr in scr["races"]:
         no = sr["race_no"]
         tr = by_race.get(no) or {"picks": [], "interviews": [], "comments": [],
-                                 "form": [], "odds": {}, "overround": {}}
+                                 "odds": {}, "overround": {}}
         picks = {p["horse_no"]: p for p in tr["picks"]}
-        form = {f["horse_no"]: {"text": f["text"], "url": f["url"]}
-                for f in tr["form"]}
         odds = tr.get("odds") or {}
         wins = sorted((o["tote"]["win"], n) for n, o in odds.items()
                       if o["tote"]["win"])
         mrank = {n: i + 1 for i, (_, n) in enumerate(wins)}
         moves = ({m["horse_no"]: m for m in movement.split_move(
             date, no, off_time=sr["off_time"], conn=conn)} if tote_in else {})
-        runners = [_runner(s, picks.get(s["horse_no"]), form.get(s["horse_no"]),
-                           odds.get(s["horse_no"]), zh.get(s["horse_name"]),
-                           moves.get(s["horse_no"]), mrank.get(s["horse_no"]),
-                           priced, bgs.get(s["horse_name"])) for s in sr["runners"]]
+        runners = [_runner(s, picks.get(s["horse_no"]), odds.get(s["horse_no"]),
+                           zh.get(s["horse_name"]), moves.get(s["horse_no"]),
+                           mrank.get(s["horse_no"]), priced,
+                           bgs.get(s["horse_name"])) for s in sr["runners"]]
         tipped = {b["source"] for p in tr["picks"] for b in p["backed_by"]}
         conc = market.concentration(date, no, conn=conn) if tote_in else None
         fav = (next(r for r in runners if r["horse_no"] == wins[0][1])
@@ -345,6 +342,9 @@ def _meeting(conn: Connection, date: str, now: dt.datetime) -> dict[str, Any]:
         "books": tips["books"], "captured": tips["captured"],
         "edges": tips["edges"] if race_day else [],
         "source_status": tips["source_status"],
+        # What each pundit's video discussed, section by section, with the
+        # runners each section names (query/tips_talk).
+        "talk": tips_talk.talk(date, conn=conn),
         "races": races,
     }
 

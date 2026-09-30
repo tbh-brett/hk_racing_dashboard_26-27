@@ -699,7 +699,7 @@ CREATE INDEX IF NOT EXISTS ix_hnz_zh ON horse_name_zh(name_zh);
 -- horse ends up carrying a trainer's endorsement. The foreign keys only bite
 -- when the number is there, which is exactly when it has to be real.
 CREATE TABLE IF NOT EXISTS connections_quote (
-  quote_id     TEXT    PRIMARY KEY,   -- '<video_id>:<int(t_start)>'
+  quote_id     TEXT    PRIMARY KEY,   -- '<video_id>:<int(t_start)>', ':s' for a section
   race_date    TEXT    NOT NULL,
   race_no      INTEGER,               -- NULL when unresolved
   horse_no     INTEGER,               -- NULL when unresolved

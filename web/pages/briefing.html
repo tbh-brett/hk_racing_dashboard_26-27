@@ -23,6 +23,7 @@
 <link rel="modulepreload" href="../assets/briefing-model.js">
 <link rel="modulepreload" href="../assets/briefing-phone.js">
 <link rel="modulepreload" href="../assets/briefing-record.js">
+<link rel="modulepreload" href="../assets/briefing-talk.js">
 <link rel="modulepreload" href="../assets/briefing-unseen.js">
 <link rel="modulepreload" href="../assets/briefing.js">
 <link rel="modulepreload" href="../assets/context.js">
@@ -51,6 +52,10 @@
 <!-- Worth studying first, then the rest in race order. Desktop and phone read
      the same view; the stylesheet shows one. -->
 <main class="bf-page">
+  <!-- What each pundit's video discussed, section by section, every runner it
+       names linked to its race. briefing-talk.js. -->
+  <section class="bf-talk" id="bf-talk"></section>
+
   <section class="bf-desk" id="bf-desk"></section>
   <section class="bf-phone" id="bf-phone"></section>
 

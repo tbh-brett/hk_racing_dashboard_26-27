@@ -24,8 +24,8 @@ export const STAGE_NAME = {
   cold: 'TWO DAYS OUT', voices: 'NIGHT BEFORE', priced: 'DAY BEFORE · TOTE OPEN',
   race_day: 'RACE DAY', settled: 'SETTLED',
 };
-export const BOOKS = ['tote', 'ladbrokes', 'sportsbet'];
-export const BK = { tote: 'TOTE', ladbrokes: 'LB', sportsbet: 'SB' };
+export const BOOKS = ['tote', 'ladbrokes'];
+export const BK = { tote: 'TOTE', ladbrokes: 'LB' };
 export const STYLE_SHORT = { Leader: 'LD', 'On-Pace': 'OP', Midfield: 'MF', Closer: 'CL' };
 export const STYLES = ['Leader', 'On-Pace', 'Midfield', 'Closer'];
 /* Which reason leads a race: an interview first, then a disagreement between
@@ -66,7 +66,7 @@ function clockItem(c, asOf, status, toteEarly) {
     if (st.featured) bits.push(`${st.featured} featured`);
     if (st.interviews) bits.push(plural(st.interviews, 'interview'));
     if (st.quotes) bits.push(plural(st.quotes, 'quote'));
-    if (st.runner_lines) bits.push(`${st.runner_lines} form lines`);
+    if (st.sections) bits.push(plural(st.sections, 'section'));
     if (st.heard) bits.push(`${st.heard} heard`);
     if (st.races) bits.push(plural(st.races, 'race'));
     if (st.held) bits.push(`${st.held} held for review`);
@@ -431,7 +431,6 @@ function runnerView(x, r, { books, srcIn, saidOf, isBooked, cap, toteEarly, ctx 
     noSaidMsg: srcIn ? `None of the ${srcIn} sources that tipped this race named it.`
       : `No source has published on this race yet${ctx.nextSaid
         ? ` · ${ctx.nextSaid.label} due ${when(ctx.nextSaid.due, ctx.asOf)}` : ''}.`,
-    form: x.form_line || null,
     pt,
     priceHead: books.map((k) => `${BK[k]} ${cap[k] ? hm(cap[k]) : ''}`).join(' · ')
       + (x.market_rank ? ` · MARKET RANK ${x.market_rank}` : ''),

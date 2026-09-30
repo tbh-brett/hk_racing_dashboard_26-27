@@ -61,7 +61,10 @@ def test_two_days_out_is_the_card_and_what_is_due(db):
     clock = {c["key"]: c for c in out["clock"]}
     assert clock["factcheck"]["state"] == "due"
     assert clock["factcheck"]["due"] == "2026-09-25T20:00"
-    assert clock["tote"]["due"] == "2026-09-26T12:00"
+    # The odds job reads the tote from midnight on race day, never the day
+    # before (jobs/scrape_odds): due at noon the day before, it read
+    # "overdue" on every Briefing the day before a meeting.
+    assert clock["tote"]["due"] == "2026-09-27T00:30"
     assert clock["threads"]["state"] == "irregular"
     race = out["races"][0]
     assert race["market"] is None

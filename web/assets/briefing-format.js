@@ -8,7 +8,7 @@ import { DASH, MINUS } from './vocab.js';
 
 export const AB = {
   factcheck: 'FC', rtw_preview: 'RTW', rtw_interview: 'INT', tote: 'TOTE',
-  racing_sports: 'R&S', ladbrokes: 'LB', sportsbet: 'SB', threads: 'HD', bryan: 'BRY',
+  racing_sports: 'R&S', ladbrokes: 'LB', threads: 'HD', bryan: 'BRY',
 };
 /* The voices counted as support. Anything else a source said is shown with
  * "shown, not counted" and a dotted mark. */

@@ -88,8 +88,9 @@
 30 7  * * *   nice -n 19 python -m hkrd.jobs.sync_horse_names --pending --db /data/hkrd.db
 30 13 * * *   nice -n 19 python -m hkrd.jobs.sync_horse_names --pending --db /data/hkrd.db
 # Ladbrokes' fixed odds, and the Racing & Sports tips and race comment it
-# carries, for the Briefing. Ladbrokes answers this machine (Sportsbet does
-# not, and is read from the owner's PC). Every half hour through the racing
+# carries, for the Briefing. Ladbrokes answers this machine, and is the one
+# feed for Racing & Sports (Sportsbet carried the same words and was taken
+# out on 30 Sep). Every half hour through the racing
 # day: its prices are the second market beside the tote, and they are not
 # pruned any more than the tote's are. A day with no meeting stored is a quiet
 # no-op, not a failure — the job only acts on today's card.
