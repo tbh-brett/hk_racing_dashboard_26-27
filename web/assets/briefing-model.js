@@ -18,6 +18,7 @@ import {
   tFromUrl, when, words,
 } from './briefing-format.js';
 import { agentShort, backgroundView } from './background.js';
+import { unseenChips, unseenView } from './briefing-unseen.js';
 
 export const STAGE_NAME = {
   cold: 'TWO DAYS OUT', voices: 'NIGHT BEFORE', priced: 'DAY BEFORE · TOTE OPEN',
@@ -336,7 +337,6 @@ function runnerView(x, r, { books, srcIn, saidOf, isBooked, cap, toteEarly, ctx 
   const bb = x.blackbook;
   const p = x.price;
   const sup = x.support;
-  const keys = new Set([...(s.for || []), ...(s.against || [])].map((f) => f.key));
   const cells = books.map((k) => {
     const q = p && p[k];
     return { v: q && q.win ? px(q.win) : DASH, on: !!(q && q.win),
@@ -354,8 +354,10 @@ function runnerView(x, r, { books, srcIn, saidOf, isBooked, cap, toteEarly, ctx 
   }
   const chips = [];
   (x.gear_first || []).forEach((g) => chips.push({ t: `1ST ${g}`, tone: 'gear' }));
-  if (keys.has('prev_vet')) chips.push({ t: 'VET', tone: 'vet' });
-  if (keys.has('trainer_change')) chips.push({ t: 'NEW TR', tone: 'violet' });
+  // VET, NEW TR and a trial since the last run, read from the Screen's own
+  // fields (briefing-unseen): keyed on the old Screen's factor names, the
+  // first two had stopped appearing when the model replaced it.
+  chips.push(...unseenChips(s));
 
   const srcs = (sup ? sup.backed_by : []).map((b) => {
     const conn = b.kind === 'connections';
@@ -415,6 +417,7 @@ function runnerView(x, r, { books, srcIn, saidOf, isBooked, cap, toteEarly, ctx 
     againstList: (s.against || []).map((f) => ({ why: f.why || f.label, x: `×${f.x}`, title: f.label,
                                                  mild: Math.abs(Math.log(f.x)) < MILD })),
     last, trial,
+    unseen: unseenView(s),
     // Where it came from, for its first five HK starts (query/background).
     bg: x.background ? backgroundView(x.background, s.starts ?? 0) : null,
     agent: x.background && (x.background.agents || []).length

@@ -16,6 +16,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 from hkrd.derive.probability import _position_probabilities, place_from_win
 from hkrd.model import screen as model
+from hkrd.model.gbm_unseen import UNSEEN
 from hkrd.model.screen_fit import choice_sets, fit, win_probabilities
 from hkrd.query import screen as screen_q
 from hkrd.query.screen_inputs import gather
@@ -398,3 +399,97 @@ def test_the_route_404s_without_a_card(tmp_path, monkeypatch, db) -> None:
     body = client.get(f"/api/screen/{TODAY}").json()
     assert body["races"][0]["race_no"] == 1
     assert [f["key"] for f in body["factors"]] == list(screen_q.gbm_q.GROUPS)
+
+
+# ── what the model cannot see, and a Screen kept until its inputs change ──
+
+def test_a_trial_since_the_last_run_is_named_beside_the_model(db) -> None:
+    out = screen_q.meeting(TODAY, conn=db)
+    star = _one(out["races"], "TRIAL STAR")
+    line = next(u for u in star["unseen"] if u["key"].startswith("trial_"))
+    assert line["trial"]["trial_date"] == "2026-09-10"
+    # the record here predates the table: the line is said, without a figure
+    assert line["model_ae"] is None and line["runs"] is None
+    plain = _one(out["races"], "PLAIN SAILING")
+    assert plain["unseen"] == [] and plain["vet"] is False
+
+
+def test_the_records_figure_travels_with_the_line(db) -> None:
+    import json
+    rec = json.loads(db.execute("SELECT record_json FROM gbm_models").fetchone()[0])
+    rec["walk_forward"]["unseen"] = [
+        {"fact": k, "runs": 192, "won": 41, "model": {"ae": 2.01, "ae_lo": 1.39, "ae_hi": 2.62},
+         "price": {"ae": 1.35}, "seasons": ["2025-26"]} for k in UNSEEN]
+    with transaction(db):
+        db.execute("UPDATE gbm_models SET record_json = ?", (json.dumps(rec),))
+    line = _one(screen_q.meeting(TODAY, conn=db)["races"], "TRIAL STAR")["unseen"][0]
+    assert (line["model_ae"], line["price_ae"], line["runs"]) == (2.01, 1.35, 192)
+
+
+def test_a_new_stable_and_a_vet_finding_are_marked(db) -> None:
+    with transaction(db):
+        db.execute("UPDATE runners SET trainer = 'NEW HAND' WHERE race_date = ? "
+                   "AND horse_name = 'PLAIN SAILING'", (TODAY,))
+        db.execute("INSERT INTO runner_tags (race_date, race_no, horse_no, tag, confidence) "
+                   "SELECT race_date, race_no, horse_no, 'lame_fore', 0.9 FROM runners "
+                   "WHERE race_date = ? AND horse_name = 'CLOSE WINNER'", (JULY,))
+    out = screen_q.meeting(TODAY, conn=db)
+    plain = _one(out["races"], "PLAIN SAILING")
+    assert [u["key"] for u in plain["unseen"]] == ["new_stable"]
+    assert plain["unseen"][0]["from_trainer"] == "T"
+    assert _one(out["races"], "CLOSE WINNER")["vet"] is True
+
+
+def test_the_screen_is_kept_until_something_it_reads_changes(db) -> None:
+    first = screen_q.meeting(TODAY, conn=db)
+    assert screen_q.meeting(TODAY, conn=db) is first
+    with transaction(db):
+        db.execute("UPDATE runners SET draw = 14 WHERE race_date = ? AND horse_no = 3", (TODAY,))
+    second = screen_q.meeting(TODAY, conn=db)
+    assert second is not first
+    assert next(r for r in second["races"][0]["runners"] if r["horse_no"] == 3)["draw"] == 14
+    for change in (
+        "UPDATE blackbook SET reasoning = 'wants a lead' WHERE id = 'bb_1'",
+        "INSERT INTO blackbook_tags (id, tag) VALUES ('bb_1', 'traffic')",
+        "INSERT INTO run_notes (horse_name, race_date, race_no, note, written_at) "
+        "VALUES ('TRIAL STAR', '2026-07-01', 1, 'fresh up', '2026-09-26T10:00')",
+        "UPDATE runner_gbm SET scored_at = '2026-09-27T09:00', p_win = 0.3 WHERE horse_no = 1",
+        "INSERT INTO trials (trial_date, trial_no, horse_name, place, venue) "
+        "VALUES ('2026-09-24', 2, 'PLAIN SAILING', 1, 'ST')",
+        "UPDATE runners SET place = 1 WHERE race_date = '2026-09-27' AND horse_no = 2",
+    ):
+        before = screen_q.meeting(TODAY, conn=db)
+        with transaction(db):
+            db.execute(change)
+        assert screen_q.meeting(TODAY, conn=db) is not before, change
+
+
+def test_the_screen_is_never_kept_past_its_limit(db, monkeypatch) -> None:
+    first = screen_q.meeting(TODAY, conn=db)
+    monkeypatch.setattr(screen_q, "_KEEP_FOR", 0.0)
+    assert screen_q.meeting(TODAY, conn=db) is not first
+
+
+def test_two_databases_never_share_a_screen(db, tmp_path) -> None:
+    other = get_conn(tmp_path / "other.db")
+    db.backup(other)
+    with transaction(other):
+        other.execute("UPDATE runners SET draw = 13 WHERE race_date = ? AND horse_no = 4", (TODAY,))
+    mine, theirs = screen_q.meeting(TODAY, conn=db), screen_q.meeting(TODAY, conn=other)
+    assert _one(mine["races"], "CLOSE LOSER")["draw"] == 1
+    assert _one(theirs["races"], "CLOSE LOSER")["draw"] == 13
+    other.close()
+
+
+def test_the_briefing_leaves_the_kept_screen_as_it_found_it(db) -> None:
+    import json
+
+    from hkrd.query import briefing
+    kept = json.dumps(screen_q.meeting(TODAY, conn=db), sort_keys=True, default=str)
+    got = briefing.meeting(TODAY, conn=db)
+    briefing.meeting(TODAY, conn=db)
+    assert json.dumps(screen_q.meeting(TODAY, conn=db), sort_keys=True, default=str) == kept
+    # the model cannot see trials, so a good one is a reason at any rank
+    said = [x for x in got["races"][0]["reasons"] if x["key"] == "trial"]
+    assert [x["horse_no"] for x in said] == [_one(got["races"], "TRIAL STAR")["horse_no"]]
+    assert "cannot see" in said[0]["text"]

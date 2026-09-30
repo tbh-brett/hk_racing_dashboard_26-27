@@ -26,9 +26,10 @@ never stored one -- which is a gap in the archive, not in HKJC.
 """
 from __future__ import annotations
 
+import functools
 from typing import Any
 
-from hkrd.derive.trial_quality import BANDS, rate
+from hkrd.derive.trial_quality import BANDS, rate as _rate
 from hkrd.query.types import format_race_time
 from hkrd.store.coerce import NO_COMMENT_PREFIX
 from hkrd.store.connect import Connection, get_conn
@@ -70,6 +71,17 @@ def _split(text: str | None, cast) -> tuple:
         except (TypeError, ValueError):
             continue
     return tuple(out)
+
+
+@functools.lru_cache(maxsize=32_768)
+def rate(*, place: int | None, field_size: int, margin: float | None = None,
+         comment: str | None = None) -> dict[str, Any]:
+    """`derive/trial_quality.rate`, remembered. A rating is a pure function of
+    these four, and the Screen re-rates every declared horse's last three
+    trials on each read -- a third of its time on 30 Sep 2026 went to matching
+    the same comments against the same phrases. Callers copy the top level and
+    never change what they are given."""
+    return _rate(place=place, field_size=field_size, margin=margin, comment=comment)
 
 
 def _runner(row, field_size: int, best: float | None) -> dict[str, Any]:

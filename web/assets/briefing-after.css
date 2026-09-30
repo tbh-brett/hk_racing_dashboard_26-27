@@ -48,6 +48,25 @@
 .bf-setup-flat { color: var(--text-muted); }
 .bf-rev-why { letter-spacing: 0; color: var(--text-dim); }
 
+/* ── not in the model (briefing-unseen) ────────────────────────────────────
+ * What the model cannot see, and its flags: one line each, the record on the
+ * right. Green or red is the direction the record points against the model,
+ * the same grammar as the reasons above; nothing here is a price or a gap. */
+.bf-unseen { margin-top: 9px; }
+.bf-unseen-row {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px;
+  font-size: 12px; line-height: 1.45; color: var(--text-2); cursor: help;
+}
+.bf-unseen-row .k {
+  flex: none; width: 46px; font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: .06em; color: var(--text-muted);
+}
+.bf-unseen-row .h { font-weight: 600; }
+.bf-unseen-row.for .h { color: var(--win); }
+.bf-unseen-row.against .h { color: var(--loss); }
+.bf-unseen-row .w { color: var(--text-dim); }
+.bf-unseen-row .m { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); }
+
 /* ── the sources' record ──────────────────────────────────────────────── */
 
 .bf-record { padding: 12px 14px 18px; border-top: 1px solid var(--line-2); }

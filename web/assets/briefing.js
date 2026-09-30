@@ -46,20 +46,22 @@ async function loadRecord() {
   const ran = state.data ? state.data.races.filter((r) => r.run).length : 0;
   if (ran === state.recordRan) return;
   state.recordRan = ran;
+  // Both records at once: they answer different questions and neither waits
+  // on the other.
+  const bgRead = api.backgroundRecord().catch((e) => (
+    { error: `The background record could not be read — ${e.message}` }));
   try {
     state.record = await api.tipsRecord();
   } catch (e) {
     state.record = { error: `The sources' record could not be read — ${e.message}` };
   }
   renderRecord($('bf-record'), state.record);
-  let bg;
-  try {
-    bg = await api.backgroundRecord();
-  } catch (e) {
-    bg = { error: `The background record could not be read — ${e.message}` };
-  }
-  renderBackgroundRecord($('bf-bgrec'), bg);
+  renderBackgroundRecord($('bf-bgrec'), await bgRead);
 }
+
+/** The first read, asked for as the page opens when the URL names the date
+ *  (main): it then travels beside the page's context instead of behind it. */
+let early = null;
 
 async function load({ quiet = false } = {}) {
   const date = context.date;
@@ -72,7 +74,9 @@ async function load({ quiet = false } = {}) {
   if (!date) { render(); return; }
   if (!quiet) { state.error = null; render(); }
   try {
-    const got = await api.briefing(date, asOf);
+    const first = early && early.date === date ? await early.read : null;
+    early = null;
+    const got = first ?? await api.briefing(date, asOf);
     if (context.date !== date) return;          // the meeting changed meanwhile
     state.data = got;
     state.error = null;
@@ -202,6 +206,10 @@ async function main() {
   // The meeting in the header opens the palette on MEETINGS, and so does
   // ⌘K; both only send an event, and without this nothing here heard it.
   installPalette();
+  const named = params.get('date');
+  if (/^\d{4}-\d{2}-\d{2}$/.test(named ?? '')) {
+    early = { date: named, read: api.briefing(named, asOf).catch(() => null) };
+  }
   await context.init();
   renderNav($('nav'), 'briefing.html');
   state.ui = fresh(firstRace);

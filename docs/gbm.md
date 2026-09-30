@@ -101,3 +101,68 @@ touching the machine, but needs the R2 keys on this PC; say so if that is wanted
 Checked 29 Sep 2026 against HKJC's own list of trial days (`ingest/trials.list_days`): every
 trial day since 2 September is on Fly -- 16 days, 3-29 Sep; 29 Sep arrived with the 20:00
 scrape. The PC's `hkrd.db` stops at 2 September for trials and 9 September for results.
+
+## What the model cannot see, beside it (30 Sep 2026)
+
+Brett asked whether the old Screen's qualitative side -- trials, vet findings, a new stable,
+the stewards' tags -- should come back now the model is the engine. Tested on Fly's copy of
+29 Sep over 3,365 races, 2022-23 to 26/27, every season scored by engines that had never
+seen it:
+
+| | old Screen (screen-1.0) | model | closing price |
+|---|---|---|---|
+| R² | 0.112 | 0.129 | 0.194 |
+| top pick won | 24.8% | 26.3% | 30.9% |
+| winner in the top 4 | 62.4% | 63.6% | 70.9% |
+
+- **Standalone** the model is ahead in every season.
+- **Mixed** into one number (a stacked logit, weights fitted on earlier seasons) the old
+  Screen adds nothing: +0.0006 a race, se 0.0036. The model plus the old Screen's named facts
+  as an offset: the same.
+- **Side by side** they share a top pick 61% of the time, and where they differ the model's
+  won 20.3% against 16.6%. But the horses in the Screen's four and not the model's won 1.22x
+  what the model gave -- and that is a handful of facts, not the Screen as a whole. Against the
+  model: a STANDOUT trial since the last run 2.0x, POSITIVE 1.31x, NEGATIVE 0.63x (2025-26
+  on, the only trials the archive holds); a new stable 1.36x; second-up after a bad first-up
+  0.73x and the lone leader 1.20x (already the model's flags). Everything else -- first-up,
+  debut, beaten, wide, an excuse, draw moves, rating moves, class, first-time gear, the card's
+  vet notes -- came out at about 1.00: the model carries it. Against the price, all of them sit
+  near 1.00.
+- Trials on held-out meetings (2025-26 split into alternate meetings): +0.0087 a race, t 1.5 --
+  promising, not proven, and flattered: `derive/trial_quality`'s phrases were chosen on the
+  same season's results.
+
+So the facts are said beside the number and never added to it. `model/gbm_unseen` defines
+them (a trial since the last run within 60 days, the old Screen's window; a different trainer
+from the last start), `jobs/fit_gbm` measures each against the walk-forward chances into the
+record's `unseen` table, and the Briefing shows them under NOT IN THE MODEL with that figure,
+its range and the price's -- or "not measured yet" until a record holds the table. A record
+built before `unseen` existed is rebuilt at the next fit, not carried. The model's flags join
+the same block (the Briefing never drew them before), and a good trial is a Briefing reason
+at any rank, because the rank cannot see it. Trials go into the model itself only when the
+archive holds two seasons of them.
+
+The VET and NEW TR chips had stopped appearing when the model replaced the Screen: they were
+keyed on the old factor names. They read the Screen's own `vet` and `unseen` fields now.
+
+## Speed (30 Sep 2026)
+
+Measured on the machine after v50: the Briefing's API 220-300 ms, 95% of it rebuilding the
+Screen on every read (every minute on race day); Race Day ~45 ms a race; the Model Analysis
+backtest ~1 s. CPU steal over the first 42 minutes: 1.6 s -- Fly was not throttling. From
+Brett's PC a round trip to Singapore is ~45 ms, and the Briefing waited on seven in series.
+
+- `query/screen.meeting` keeps the finished Screen per database and date until a fingerprint
+  of what it reads changes (the card, its results and scores, the model, the history's new
+  rows, trials, notes, the blackbook), and ten minutes at most. The fingerprint costs ~2 ms.
+- `query/gbm.scores` reads plain rows (the pandas row loops were 40% of the Screen), and the
+  live model's record is parsed once per model.
+- A trial's rating is remembered (`query/trials.rate`): the same comments were matched against
+  the same phrases on every read.
+- Every page names its modules up front (`<link rel="modulepreload">`, kept true by
+  `tests/test_web_preload.py`); the page context asks for the named date's card beside the
+  meeting list; the Briefing asks for its own data at once and for its two records together.
+- Model Analysis opens on MODEL and reads each other view the first time it is shown.
+
+On this PC, same data: the Screen 121 ms to 2 ms when nothing has changed (~100 ms when it has),
+the Briefing 125 ms to 6 ms; the Briefing's load went from seven waves of requests to three.

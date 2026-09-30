@@ -10,6 +10,7 @@
  */
 import { el, classCell, styleClass } from './vocab.js';
 import { backgroundBlock } from './background.js';
+import { unseenBlock } from './briefing-unseen.js';
 
 /* ── shared pieces ──────────────────────────────────────────────────────── */
 
@@ -345,6 +346,7 @@ export function screenBlock(x, { compact = false } = {}) {
     reasons.append(c);
   });
   col.append(reasons);
+  if (x.unseen.length) col.append(unseenBlock(x.unseen, { compact }));
   if (x.hasBB && !compact) {
     const bb = el('div', `bf-bookbox${x.bbSys ? ' sys' : ''}`);
     bb.append(el('div', 'hd', `${x.bbSys ? 'SYSTEM BOOK' : 'YOUR BOOK'} · ${x.bbHead}`),

@@ -44,7 +44,7 @@ _HK = dt.timezone(dt.timedelta(hours=8))
 LATE_FIRMING = 10.0     # % a price shortens in its last minutes to be a reason
 MARKET_APART = 6        # the Screen's top two, this far down the betting
 CONSENSUS = 3           # distinct sources on one horse
-_GOOD_TRIAL = ("STANDOUT", "POSITIVE")   # derive/trial_quality bands worth a reason
+_GOOD_TRIAL = ("trial_standout", "trial_positive")   # model/gbm_unseen facts worth a reason
 ORDER_RULE = ("races with more different things to read first, then race "
               "order; a count of reasons, not a chance of anything")
 _MARKET = {"tote": "the tote", "ladbrokes": "Ladbrokes", "sportsbet": "Sportsbet",
@@ -188,12 +188,16 @@ def _reasons(race: dict, runners: list[dict], interviews: list[dict],
                    else ", not scored by the model"),
                 r["horse_no"])
         # The model reads no trials (gbm-SPEC §14.9), so a good one since the
-        # last run is said as the thing its number cannot see.
-        trial, last = sc["trial"], sc["last_start"]
-        if (trial and trial["band"] in _GOOD_TRIAL and sc["tier"] != "FIELD"
-                and (not last or trial["trial_date"] > last["race_date"])):
-            add("trial", "computed", f"{who(r)} trialled well since its last "
-                "run -- the model cannot see trials", r["horse_no"])
+        # last run is said as the thing its number cannot see -- at any rank,
+        # because the rank cannot see it either -- with what such trials have
+        # been worth against the model, from its record (model/gbm_unseen).
+        good = next((u for u in sc.get("unseen", []) if u["key"] in _GOOD_TRIAL), None)
+        if good:
+            worth = (f": trials like it won {good['model_ae']:.2f}x what the model gave "
+                     f"over {good['runs']:,} runs, the price {good['price_ae']:.2f}x"
+                     if good.get("model_ae") and good.get("price_ae") else "")
+            add("trial", "computed", f"{who(r)} has a {good['label']} since its last run, "
+                f"which the model cannot see{worth}", r["horse_no"])
     cases = [r for r in runners if r["screen"]["tier"] == "CASE"]
     if cases:
         add("case", "computed", f"{len(cases)} outside the Screen's four with "

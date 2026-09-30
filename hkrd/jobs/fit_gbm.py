@@ -12,7 +12,9 @@ before each meeting beat one frozen in July by 0.031 a race). In order:
    Fly's copy of 29 Sep; the curve is flat from ~350 to ~420).
 3. The fit on everything from 2020-21 to the last settled meeting.
 4. The walk-forward record, rebuilt only when the recipe or the seasons it
-   covers change (a minute of work); otherwise carried from the last fit.
+   covers change, or it predates a table the pages read (a minute of work);
+   otherwise carried from the last fit. It includes what the facts the model
+   cannot see were worth against it (`model/gbm_unseen`).
 5. The gate (`model/gbm_record.gate`): the new recipe fitted on races before
    the last eight meetings, against what the page showed for them -- until it
    has shown eight, the live recipe fitted the same way. The first is promoted.
@@ -32,10 +34,11 @@ import numpy as np
 import pandas as pd
 
 from hkrd.derive import features
-from hkrd.model import gbm, gbm_record
+from hkrd.model import gbm, gbm_record, gbm_unseen
+from hkrd.query import trial_bands
 from hkrd.store import gbm as store
 from hkrd.store import job_log
-from hkrd.store.connect import get_conn, init_db, transaction
+from hkrd.store.connect import Connection, get_conn, init_db, transaction
 
 __all__ = ["run", "pending", "main", "FitReport"]
 
@@ -134,6 +137,29 @@ def _meetings(conn, frame: pd.DataFrame, prior: list[dict]) -> list[dict]:
     return [rows[d] for d in sorted(rows)]
 
 
+def _carries(prior: dict | None, recipe: dict, seasons: list[int]) -> bool:
+    """May the last fit's walk-forward record stand for this one? Only when
+    it was built by this recipe on these inputs over these seasons, and holds
+    every table the pages read -- a record from before `unseen` is rebuilt."""
+    if prior is None:
+        return False
+    wf = prior["record"].get("walk_forward", {})
+    return (_same_recipe(recipe, prior["params"])
+            and prior["features_version"] == features.DERIVE_VERSION
+            and "unseen" in wf
+            and wf.get("test_seasons") == [f"{s}-{(s + 1) % 100:02d}" for s in seasons])
+
+
+def _mark_unseen(frame: pd.DataFrame, starts: pd.DataFrame, conn: Connection) -> None:
+    """A column per fact the model cannot see, on every row of `frame`, so
+    the walk-forward carries them into the record."""
+    key = ["race_date", "race_no", "horse_no"]
+    marks = gbm_unseen.mark(starts, trial_bands.bands(conn=conn)).set_index(key)
+    got = marks.reindex(pd.MultiIndex.from_frame(frame[key]))
+    for k in gbm_unseen.UNSEEN:
+        frame[k] = got[k].eq(True).to_numpy()          # a row never marked is False
+
+
 def _seasons(dates: list[str]) -> set[int]:
     return {int(s) for s in features.season_of(pd.Series(pd.to_datetime(dates)))} if dates else set()
 
@@ -167,7 +193,13 @@ def run(db: Path | None = None, *, through: str | None = None, rebuild_record: b
                               f"seasons before the latest ({len(dates)} meetings held)")
             return report
         last = dates[-1]
-        frame = features.build(store.load_runs(conn, through=last))
+        runs = store.load_runs(conn, through=last)
+        # Every start, for what the model cannot see (a trainer against the
+        # last start's); a scratched runner never ran for anyone.
+        starts = runs.loc[~runs["place_code"].fillna("").str.startswith("W"),
+                          ["race_date", "race_no", "horse_no", "horse_name", "trainer"]]
+        frame = features.build(runs)
+        del runs
         frame = frame[~frame["is_card"]].reset_index(drop=True)
         season = frame["season"].to_numpy()
         inner = (season >= gbm.FIRST_TRAIN) & (season <= now - 2)
@@ -183,15 +215,11 @@ def run(db: Path | None = None, *, through: str | None = None, rebuild_record: b
         live = store.live_model(conn)
         prior = live or store.model_row(conn)
         seasons = list(range(2021, now))
-        carry = (prior is not None and not rebuild_record
-                 and _same_recipe(recipe, prior["params"])
-                 and prior["features_version"] == features.DERIVE_VERSION
-                 and prior["record"].get("walk_forward", {}).get("test_seasons")
-                 == [f"{s}-{(s + 1) % 100:02d}" for s in seasons])
-        if carry:
+        if not rebuild_record and _carries(prior, recipe, seasons):
             wf = prior["record"]["walk_forward"]
             report.record = f"carried from {prior['version']}"
         else:
+            _mark_unseen(frame, starts, conn)
             wf = gbm_record.record(gbm_record.walk_forward(frame, seasons))
             report.record = "built"
         window = dates[-gbm_record.GATE_MEETINGS:]

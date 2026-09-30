@@ -26,6 +26,7 @@ import pandas as pd
 from hkrd.derive.probability import actual_over_expected
 from hkrd.model import gbm
 from hkrd.model.gbm_flags import FLAGS, flags
+from hkrd.model.gbm_unseen import UNSEEN
 
 __all__ = ["FLAGS", "flags", "walk_forward", "record", "calibration_check", "gate",
            "align_shown", "meeting_row", "GATE_MEETINGS", "DRAW_COURSES"]
@@ -51,7 +52,9 @@ def walk_forward(frame: pd.DataFrame, seasons: list[int]) -> pd.DataFrame:
         inner = (season >= (gbm.FIRST_TRAIN if s - 2 >= gbm.FIRST_TRAIN else 2019)) & (season <= s - 2)
         rounds = gbm.choose_rounds(frame, inner, season == s - 1)
         booster = gbm.fit(frame, (season >= gbm.FIRST_TRAIN) & (season < s), rounds=rounds)
-        te = frame.loc[season == s, _KEEP].copy()
+        # The facts the model cannot see ride along when the fit marked them
+        # (jobs/fit_gbm), so the record can say what each is worth against it.
+        te = frame.loc[season == s, _KEEP + [k for k in UNSEEN if k in frame]].copy()
         te["p_model"] = gbm.predict(booster, frame, season == s)
         te["rounds"] = rounds
         out.append(te)
@@ -91,6 +94,11 @@ def record(preds: pd.DataFrame) -> dict[str, Any]:
              "market_15_model_two_thirds": _row(preds[(preds["p_mkt"] >= 0.15) & (ratio < 2 / 3)])}
     fl = flags(preds)
     flag_rows = [_row(preds[fl[k]], flag=k, **FLAGS[k]) for k in FLAGS]
+    # What the model cannot see (model/gbm_unseen): wins against its chance and
+    # the price's. A trial row holds only the seasons that have trials.
+    unseen = [{**_row(preds[preds[k]], fact=k, **UNSEEN[k]),
+               "seasons": sorted({f"{s}-{(s + 1) % 100:02d}" for s in preds.loc[preds[k], "season"]})}
+              for k in UNSEEN if k in preds]
     draw = []
     for course, (vs, dist) in DRAW_COURSES.items():
         on = (preds["vs"] == vs) & (preds["dist"] == dist)
@@ -103,7 +111,7 @@ def record(preds: pd.DataFrame) -> dict[str, Any]:
         top4[who] = float(((rank <= 4) & won).groupby(ids).any().mean())
     whole = gbm.evaluate(preds, "p_model")
     return {"seasons": seasons, "pooled": whole, "calibration": cal, "segments": segs,
-            "gap_deciles": deciles, "gap_named": named, "flags": flag_rows,
+            "gap_deciles": deciles, "gap_named": named, "flags": flag_rows, "unseen": unseen,
             "draw_courses": draw, "top4_has_winner": top4, "test_races": int(ids.nunique()),
             "test_seasons": [s["season"] for s in seasons]}
 

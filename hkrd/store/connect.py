@@ -12,7 +12,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-__all__ = ["get_conn", "transaction", "init_db", "db_path", "Connection",
+__all__ = ["get_conn", "transaction", "init_db", "db_path", "db_file", "Connection",
            "StoreError", "CACHE_KIB", "MMAP_BYTES"]
 
 # Layers above store/ need to name a connection in a type hint without
@@ -69,6 +69,13 @@ def get_conn(path: str | Path | None = None) -> sqlite3.Connection:
     # read costing a syscall.
     conn.execute(f"PRAGMA mmap_size = {MMAP_BYTES}")
     return conn
+
+
+def db_file(conn: sqlite3.Connection) -> str:
+    """The file behind a connection, "" for an in-memory database. A cache in
+    query/ keys on it, so two databases in one process never share an entry."""
+    row = conn.execute("PRAGMA database_list").fetchone()
+    return row[2] or ""
 
 
 @contextmanager

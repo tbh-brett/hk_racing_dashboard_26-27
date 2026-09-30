@@ -2,12 +2,23 @@
 
 Per race: every runner's chance to win and to place before any price exists
 (the fundamental model, `runner_gbm` via `query/gbm` -- the engine since
-gbm-SPEC §6; `model/screen` is kept for its rider-rate helper and nothing
+gbm-SPEC §6; `model/screen` is kept for its rider-rate helper and vet tags, nothing
 else), the factor groups for and against it, and the four the Screen would
-look at first. Around that, the manual layer the dashboard
-already holds and nobody should have to go looking for: the blackbook entry
-and whether today's set-up suits it, the owner's own run and trial notes, the
-last start in HKJC's words, and the horses in the field it could turn around.
+look at first. Beside the number, never in it, what the model cannot see
+(`model/gbm_unseen`: a trial since the last run, a new stable), each with what
+it has been worth against the model. Around that, the manual layer the
+dashboard already holds and nobody should have to go looking for: the
+blackbook entry and whether today's set-up suits it, the owner's own run and
+trial notes, the last start in HKJC's words, and the horses in the field it
+could turn around.
+
+KEPT UNTIL SOMETHING IT READS CHANGES. The Briefing re-reads every minute on
+race day and every ten minutes otherwise, and rebuilding the Screen was 95% of
+its time on 30 Sep 2026 while almost nothing under it had moved. `meeting`
+keeps the finished Screen per database and date against a fingerprint of what
+it reads -- the card, its results and scores, the model, the history's
+derived rows, trials, and the owner's notes and blackbook -- and for ten
+minutes at most, for a change no fingerprint names.
 
 THE SHORTLIST IS FOUR, and the page says why: walk-forward over five seasons
 the model's top four held the winner in the share its record gives
@@ -28,14 +39,16 @@ from __future__ import annotations
 
 import datetime as dt
 import math
+import time
 from typing import Any
 
+from hkrd.model import gbm_unseen
 from hkrd.model import screen as model
 from hkrd.query import blackbook_band
 from hkrd.query import gbm as gbm_q
 from hkrd.query.formguide import notes_for_horses
 from hkrd.query.screen_inputs import gather
-from hkrd.store.connect import Connection, get_conn
+from hkrd.store.connect import Connection, db_file, get_conn
 
 __all__ = ["meeting", "SHORTLIST", "CASE_AT", "SETUP_AT", "REVERSAL_MARGIN"]
 
@@ -175,9 +188,30 @@ def _last_start(prev: dict[str, Any] | None) -> dict[str, Any] | None:
             "incident_comment": prev["incident_comment"]}
 
 
+def _unseen(r: dict, date: str, records: dict[str, dict]) -> list[dict[str, Any]]:
+    """What the model cannot see about this runner, each with its record
+    against the model and the price (None where the record predates it)."""
+    prev = r["prev"] or {}
+    out = []
+    for key, trial in gbm_unseen.facts(date, prev.get("race_date"), r["trainer"],
+                                       prev.get("trainer"), r["trials"]):
+        rec = records.get(key) or {}
+        mod, price = rec.get("model") or {}, rec.get("price") or {}
+        out.append({"key": key, **gbm_unseen.UNSEEN[key],
+                    "trial": trial and {k: trial.get(k) for k in
+                                        ("trial_date", "place", "field_size", "band", "comment")},
+                    "from_trainer": prev.get("trainer") if key == "new_stable" else None,
+                    "runs": rec.get("runs"), "won": rec.get("won"),
+                    "model_ae": mod.get("ae"), "model_lo": mod.get("ae_lo"),
+                    "model_hi": mod.get("ae_hi"), "price_ae": price.get("ae"),
+                    "seasons": rec.get("seasons")})
+    return out
+
+
 def _runner(r: dict, sc: dict | None, book: dict | None, notes: list,
-            reversals: list) -> dict[str, Any]:
+            reversals: list, date: str, records: dict[str, dict]) -> dict[str, Any]:
     groups = (sc or {}).get("groups", {})
+    prev_tags = set((r["prev"] or {}).get("tags") or ())
     lines = [_group_line(k, x) for k, x in groups.items()
              if k not in _NOT_REASONS and abs(math.log(x)) >= _NAMED_AT]
     setup, verdict, pieces = _setup(groups)
@@ -196,6 +230,10 @@ def _runner(r: dict, sc: dict | None, book: dict | None, notes: list,
         "case_x": round(math.exp(sum(math.log(groups[k]) for k in _SITUATION
                                      if k in groups)), 2),
         "flags": (sc or {}).get("flags", []), "assumed": (sc or {}).get("assumed", []),
+        "unseen": _unseen(r, date, records),
+        # A real veterinary finding on the last start: the Briefing's VET chip.
+        # The model reads it (its `trouble & vet` group); the chip is for the eye.
+        "vet": bool(prev_tags & model.VET_BAD),
         "last_start": _last_start(r["prev"]),
         "trial": trial,
         "notes": notes,
@@ -220,12 +258,14 @@ def _book(b: dict[str, Any]) -> dict[str, Any]:
             "tags": sorted((b["tag_csv"] or "").split(",")) if b["tag_csv"] else []}
 
 
-def _race(block: dict, books: dict, notes: dict, scores: dict) -> dict[str, Any]:
+def _race(block: dict, books: dict, notes: dict, scores: dict,
+          records: dict[str, dict]) -> dict[str, Any]:
     race, runners = block["race"], block["runners"]
     rev = _reversals(runners, race)
     lines = [_runner(r, scores.get((race["race_no"], r["horse_no"])),
                      books.get((race["race_no"], r["horse_no"])),
-                     notes.get(r["horse_name"], []), rev.get(r["horse_no"], []))
+                     notes.get(r["horse_name"], []), rev.get(r["horse_no"], []),
+                     race["race_date"], records)
              for r in runners]
     # Read in order of the chance to place; a runner the model has not scored
     # (a late replacement) goes to the foot, named but not ranked.
@@ -247,26 +287,92 @@ def _race(block: dict, books: dict, notes: dict, scores: dict) -> dict[str, Any]
             "runners": order}
 
 
+# Everything `meeting` reads, as one row of text and counts: the date's own
+# rows in full (a card is ~150 lines), the rest by what changes when they do.
+# Results landing for an earlier meeting add comment, tag and style rows (their
+# rowids, not a scan: max(computed_at) alone cost 6 ms); a derive rewriting
+# rows in place is what the ten-minute limit is for. The owner's layer is small
+# enough to read whole.
+# `||` and coalesce rather than concat_ws: the image's SQLite is 3.40.
+_FINGERPRINT = """
+SELECT
+ (SELECT group_concat(k, '|') FROM (SELECT race_no || ',' || horse_no || ',' || horse_name
+    || ',' || coalesce(draw, '') || ',' || coalesce(jockey, '') || ',' || coalesce(trainer, '')
+    || ',' || coalesce(actual_weight, '') || ',' || coalesce(rating, '') || ','
+    || coalesce(gear, '') || ',' || coalesce(place, '') || ',' || coalesce(place_code, '')
+    || ',' || coalesce(lengths_behind, '') || ',' || coalesce(win_odds, '') AS k
+    FROM runners WHERE race_date = :d ORDER BY race_no, horse_no)),
+ (SELECT group_concat(k, '|') FROM (SELECT race_no || ',' || coalesce(venue, '') || ','
+    || coalesce(course, '') || ',' || coalesce(surface, '') || ',' || coalesce(going, '')
+    || ',' || coalesce(distance, '') || ',' || coalesce(race_class, '') || ','
+    || coalesce(off_time, '') || ',' || coalesce(restricted, '') AS k
+    FROM races WHERE race_date = :d ORDER BY race_no)),
+ (SELECT count(*) || ',' || total(sarr) || ',' || total(sarr_rank)
+    FROM runner_sarr WHERE race_date = :d),
+ (SELECT count(*) || ',' || coalesce(max(scored_at), '') || ',' || total(p_win)
+    FROM runner_gbm WHERE race_date = :d),
+ (SELECT coalesce(max(version || promoted_at || created_at || length(record_json)), '')
+    FROM gbm_models WHERE promoted = 1),
+ (SELECT max(rowid) FROM runners), (SELECT max(rowid) FROM runner_comments),
+ (SELECT max(rowid) FROM runner_tags),
+ (SELECT max(rowid) FROM runner_pace),
+ (SELECT count(*) || ',' || coalesce(max(rowid), '') FROM trials),
+ (SELECT count(*) || ',' || coalesce(max(written_at), '') FROM trial_notes),
+ (SELECT count(*) || ',' || coalesce(max(written_at), '') FROM run_notes),
+ (SELECT group_concat(k, '|') FROM (SELECT id || ',' || horse_name || ',' || coalesce(status, '')
+    || ',' || coalesce(confidence, '') || ',' || coalesce(reasoning, '') || ','
+    || coalesce(added_date, '') || ',' || coalesce(closed_date, '') || ','
+    || coalesce(closed_reason, '') || ',' || coalesce(origin, '') || ','
+    || coalesce(adopted_date, '') AS k FROM blackbook ORDER BY id)),
+ (SELECT group_concat(k, '|') FROM (SELECT id || ',' || tag AS k FROM blackbook_tags
+    ORDER BY id, tag)),
+ (SELECT group_concat(k, '|') FROM (SELECT trigger_id || ',' || id || ',' || kind || ','
+    || op || ',' || coalesce(value, '') AS k FROM blackbook_trigger ORDER BY trigger_id))
+"""
+_KEEP_FOR = 600.0         # seconds: the most a change no fingerprint names can go unseen
+_KEEP_DATES = 8
+_KEPT: dict[tuple[str, str], tuple[float, tuple, dict[str, Any]]] = {}
+
+
 def meeting(date: str, *, conn: Connection | None = None) -> dict[str, Any]:
     """The Screen for every race on one date. `races` is empty when no card
-    is stored for it; a card the model has not scored has no chances yet."""
+    is stored for it; a card the model has not scored has no chances yet.
+
+    The same object goes to every caller until something it reads changes
+    (module docstring), so callers read it and never write into it."""
     own = conn is None
     conn = conn or get_conn()
     try:
-        blocks = gather(date, conn=conn)
-        if not blocks:
-            return {"race_date": date, "races": []}
-        books = {(b["race_no"], b["horse_no"]): _book(b)
-                 for b in blackbook_band.declared_on(date, conn=conn)}
-        names = [r["horse_name"] for b in blocks for r in b["runners"]]
-        notes = notes_for_horses(names, conn=conn)
-        scores = gbm_q.scores(date, conn=conn)
-        races = [_race(b, books, notes, scores) for b in blocks]
-        version = next((x["model_version"] for x in scores.values()), None)
-        fit = gbm_q.version_fit(conn, version)
+        where = db_file(conn)
+        mark = tuple(conn.execute(_FINGERPRINT, {"d": date}).fetchone())
+        kept = _KEPT.get((where, date))
+        if where and kept and kept[1] == mark and time.monotonic() - kept[0] < _KEEP_FOR:
+            return kept[2]
+        out = _meeting(conn, date)
     finally:
         if own:
             conn.close()
+    if where:
+        _KEPT.pop((where, date), None)
+        _KEPT[(where, date)] = (time.monotonic(), mark, out)
+        while len(_KEPT) > _KEEP_DATES:
+            del _KEPT[next(iter(_KEPT))]
+    return out
+
+
+def _meeting(conn: Connection, date: str) -> dict[str, Any]:
+    blocks = gather(date, conn=conn)
+    if not blocks:
+        return {"race_date": date, "races": []}
+    books = {(b["race_no"], b["horse_no"]): _book(b)
+             for b in blackbook_band.declared_on(date, conn=conn)}
+    names = [r["horse_name"] for b in blocks for r in b["runners"]]
+    notes = notes_for_horses(names, conn=conn)
+    scores = gbm_q.scores(date, conn=conn)
+    records = gbm_q.unseen_records(gbm_q.live(conn))
+    races = [_race(b, books, notes, scores, records) for b in blocks]
+    version = next((x["model_version"] for x in scores.values()), None)
+    fit = gbm_q.version_fit(conn, version)
     return {
         "race_date": date, "version": version,
         "fit": {**fit, "shortlist": SHORTLIST},

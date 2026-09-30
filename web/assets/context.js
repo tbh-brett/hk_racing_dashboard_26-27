@@ -389,6 +389,12 @@ class MeetingContext {
   /** Called once per page. Resolves the meeting from the URL, then the latest.
    *  Pages get a fully populated context before their first render. */
   async init() {
+    const url = MeetingContext._readUrl();
+    // The card for a date the URL names is asked for BESIDE the meeting list,
+    // not after it: every page's first data waits on it, and one more round
+    // trip in series is ~45 ms from Hong Kong on every load. Used only if the
+    // date survives the checks below; a failure falls back to asking again.
+    const early = url.date ? api.raceDayMeeting(url.date).catch(() => null) : null;
     const [meetings, status, freshness] = await Promise.all([
       api.meetings(60).catch(() => []),
       api.status().catch(() => null),
@@ -398,7 +404,6 @@ class MeetingContext {
     this.status = status;
     this.freshness = freshness;
 
-    const url = MeetingContext._readUrl();
     // A DATE IN THE URL IS TRUSTED UNTIL THE SERVER SAYS OTHERWISE. This used
     // to require the date to appear in `meetings`, which holds the 60 most
     // recent — a reasonable guard when the archive was 178 meetings and a
@@ -415,7 +420,9 @@ class MeetingContext {
     this.date = url.date ?? fallback;
 
     if (this.date) {
-      await this._loadMeeting();
+      const got = early && this.date === url.date ? await early : null;
+      if (got) this.summary = got;
+      else await this._loadMeeting();
       if (!this.races.length && this.date !== fallback) {
         this.date = fallback;
         if (this.date) await this._loadMeeting();

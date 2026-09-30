@@ -206,6 +206,9 @@
 .bf-chip.t-gear { color: var(--gear-first); border-color: color-mix(in srgb, var(--gear-first) 40%, transparent); }
 .bf-chip.t-vet { color: var(--loss-dim); border-color: color-mix(in srgb, var(--loss-dim) 40%, transparent); }
 .bf-chip.t-violet { color: var(--violet); border-color: color-mix(in srgb, var(--violet) 40%, transparent); }
+/* a trial since the last run, which the model cannot see (briefing-unseen) */
+.bf-chip.t-trial { color: var(--win); border-color: color-mix(in srgb, var(--win) 40%, transparent); }
+.bf-chip.t-trial-neg { color: var(--loss); border-color: color-mix(in srgb, var(--loss) 40%, transparent); }
 .bf-bbtag { padding: 0 4px; line-height: 14px; color: var(--book); background: var(--book-ground); }
 .bf-bbtag.sys { color: var(--book-sys); background: var(--book-sys-ground); }
 .bf-tag {

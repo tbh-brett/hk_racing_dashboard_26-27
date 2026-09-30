@@ -24,7 +24,7 @@ const WEIGHTS = [0, 0.1, 0.32, 1];
 
 
 const state = {
-  date: null, race: 1, races: [], view: 'all', weight: null,
+  date: null, race: 1, races: [], view: 'gbm', weight: null,
   sarr: null, blend: null, et: null, backtest: null, gbm: undefined,
   sortS: { key: 'rank', dir: 1 }, sortB: { key: 'blended', dir: -1 },
 };
@@ -35,7 +35,7 @@ function renderViewToggle() {
   $('view-toggle').replaceChildren(...VIEWS.map(([key, label]) => {
     const b = el('button', null, label);
     b.setAttribute('aria-pressed', String(state.view === key));
-    b.addEventListener('click', () => { state.view = key; render(); });
+    b.addEventListener('click', () => { state.view = key; render(); ensure(); });
     return b;
   }));
 }
@@ -701,31 +701,58 @@ async function loadBacktest() {
 }
 
 
-async function loadRace() {
-  const [sarr, et] = await Promise.all([
-    settle(api.sarrRace(state.date, state.race),
-      (e) => { $('sarr-foot').replaceChildren(el('span', 'warn', `sarr: ${e.message}`)); }),
-    settle(api.etRace(state.date, state.race),
-      (e) => { $('et-body').replaceChildren(el('tr', null, `failed to load: ${e.message}`)); }),
-  ]);
-  state.sarr = sarr;
-  state.et = et;
-  await loadBlend();
+/* A view's data is read the first time the view is shown, not when the page
+ * opens. The page opens on MODEL; the backtest (~1 s on Fly) and a race's SARR
+ * (~0.4 s) used to be asked for on every visit whether anyone looked or not,
+ * and on one Python process they held the model's own request up behind them.
+ * ALL still shows, and so reads, everything. */
+const shows = (v) => state.view === v || state.view === 'all';
+const asked = { backtest: false, etSummary: false, sarr: null, et: null, blend: null };
+
+async function ensure() {
+  const race = state.date && state.race ? `${state.date}/${state.race}` : null;
+  const jobs = [];
+  if (shows('backtest') && !asked.backtest) { asked.backtest = true; jobs.push(loadBacktest()); }
+  if (shows('et') && !asked.etSummary) {
+    asked.etSummary = true;
+    jobs.push(settle(renderEtSummary(), () => {}));
+  }
+  if (race && shows('sarr') && asked.sarr !== race) {
+    asked.sarr = race;
+    jobs.push(settle(api.sarrRace(state.date, state.race), (e) => {
+      $('sarr-foot').replaceChildren(el('span', 'warn', `sarr: ${e.message}`));
+    }).then((got) => { state.sarr = got; }));
+  }
+  if (race && shows('et') && asked.et !== race) {
+    asked.et = race;
+    jobs.push(settle(api.etRace(state.date, state.race), (e) => {
+      $('et-body').replaceChildren(el('tr', null, `failed to load: ${e.message}`));
+    }).then((got) => { state.et = got; }));
+  }
+  if (race && shows('blend') && asked.blend !== race) { asked.blend = race; jobs.push(loadBlend()); }
+  await Promise.all(jobs);
   render();
+}
+
+/** A new race or meeting: what was read for the last one no longer holds. */
+function forget() {
+  liveBlend.stop();
+  state.sarr = null;
+  state.blend = null;
+  state.et = null;
+  asked.sarr = asked.et = asked.blend = null;
 }
 
 async function onContext(_ctx, what) {
   state.date = context.date;
   state.races = context.races;
   state.race = context.race;
+  forget();
   if (what === 'date') {
-    state.sarr = null;
-    state.blend = null;
-    state.et = null;
     render();
     return;
   }
-  await loadRace();
+  await ensure();
 }
 
 async function onRebuild() {
@@ -748,9 +775,10 @@ async function onRebuild() {
     // re-renders the global strip rather than a page-local copy.
     context.status = await api.status().catch(() => context.status);
     context.render();
-    // The backtest is over the whole archive, not this race, so it loads once
-    // rather than on every race change.
-    await Promise.all([renderEtSummary(), loadBacktest(), loadRace()]);
+    // The rebuild changed what every view reads: each is read again as shown.
+    forget();
+    asked.backtest = asked.etSummary = false;
+    await ensure();
   } catch (e) {
     out.className = 'job-result err';
     out.textContent = `rebuild failed: ${e.message}`;
@@ -774,21 +802,17 @@ async function init() {
   $('rebuild-et').addEventListener('click', onRebuild);
   document.addEventListener('keydown', onKey);
 
-  // The two archive-wide panels — the ET reference summary and the backtest —
-  // do not depend on which meeting is chosen, so they load ALONGSIDE it rather
-  // than in front of it. Awaiting them first put four sequential round trips
-  // between the click and the first section appearing, and over a Hong
-  // Kong-to-Singapore link that is long enough to read as "it did not show all
-  // the models", with a second click looking like the fix because by then
-  // everything was warm. They are still only loaded once, not per race.
-  const archive = Promise.all([
-    settle(renderEtSummary(), () => {}),
-    loadBacktest(),
-    loadGbm(),
-  ]);
+  // The model's record does not depend on which meeting is chosen, so it
+  // loads ALONGSIDE the meeting rather than in front of it: awaited first, it
+  // put round trips between the click and the first section appearing. The
+  // other views load when shown (`ensure`).
+  const archive = loadGbm();
   context.onChange(onContext);
   await context.init();
-  await Promise.all([onContext(context, 'meeting'), archive]);
+  state.date = context.date;
+  state.races = context.races;
+  state.race = context.race;
+  await Promise.all([ensure(), archive]);
 }
 
 init();

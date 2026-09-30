@@ -10,6 +10,11 @@ loads the model (gbm-SPEC §6), and adds only three things at read time:
   record from the live model's walk-forward, never a typed number (§14.4);
 - what was assumed: a body weight carried from the last run, the going.
 
+It is on every page's path, so it reads plain rows: the pandas row loops it
+began with were two fifths of the Briefing's time on 30 Sep 2026, and the live
+model's record -- the same few hundred KB of JSON on every read -- is parsed
+once per model rather than once per call.
+
 THE GAP IS SHOWN, NEVER RECOMMENDED. Nothing here sorts or ranks by it, and
 its note says what five seasons found: where the model is keener than the
 price, the price has been right (§10, §14.5).
@@ -20,16 +25,18 @@ import json
 import math
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from hkrd.derive.features import GROUPS, TIME
 from hkrd.derive.probability import place_from_win
 from hkrd.model.gbm_flags import FLAGS, flags
+from hkrd.model.gbm_unseen import UNSEEN
 from hkrd.query import pools
-from hkrd.store.connect import Connection, get_conn
+from hkrd.store.connect import Connection, db_file, get_conn
 
-__all__ = ["live", "scores", "race", "race_notes", "record", "version_fit", "GROUPS",
-           "MAX_FLAGS"]
+__all__ = ["live", "scores", "race", "race_notes", "record", "version_fit", "unseen_records",
+           "GROUPS", "MAX_FLAGS"]
 
 MAX_FLAGS = 2
 _FACTS = ["prep_run", "n_prior", "l1_place", "vs", "l1_vs", "l2_vs", "l3_vs", "hab_early",
@@ -48,18 +55,43 @@ SELECT g.race_no, g.horse_no, u.horse_name, g.p_win, g.p_place, g.contrib_json,
 """
 
 
+# One entry: the promoted model of the database last asked about. Read-only
+# for callers -- the same object goes to every one of them.
+_LIVE: dict[tuple, dict[str, Any]] = {}
+
+
 def live(conn: Connection) -> dict[str, Any] | None:
-    """The promoted model: its version, dates and record (not its text)."""
+    """The promoted model: its version, dates and record (not its text).
+    Parsed once per model; a refit, a promotion or a rebuilt record is a new
+    key, and an in-memory database is never remembered."""
+    head = conn.execute("SELECT version, promoted_at, created_at, length(record_json) AS n "
+                        "FROM gbm_models WHERE promoted = 1").fetchone()
+    if head is None:
+        return None
+    where = db_file(conn)
+    key = (where, head["version"], head["promoted_at"], head["created_at"], head["n"])
+    if where and key in _LIVE:
+        return _LIVE[key]
     r = conn.execute("SELECT version, trained_through, promoted_at, rounds, params_json, "
                      "features_version, record_json FROM gbm_models WHERE promoted = 1"
                      ).fetchone()
-    if r is None:
-        return None
-    return {"version": r["version"], "trained_through": r["trained_through"],
-            "promoted_at": r["promoted_at"], "rounds": r["rounds"],
-            "features_version": r["features_version"],
-            "lightgbm": json.loads(r["params_json"]).get("lightgbm"),
-            "record": json.loads(r["record_json"])}
+    got = {"version": r["version"], "trained_through": r["trained_through"],
+           "promoted_at": r["promoted_at"], "rounds": r["rounds"],
+           "features_version": r["features_version"],
+           "lightgbm": json.loads(r["params_json"]).get("lightgbm"),
+           "record": json.loads(r["record_json"])}
+    if where:
+        _LIVE.clear()
+        _LIVE[key] = got
+    return got
+
+
+def unseen_records(model: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    """What each fact the model cannot see has been worth against it, from the
+    live model's record (`model/gbm_unseen`). Empty for a record built before
+    the table existed: the page then names the fact without a figure."""
+    rows = (model or {}).get("record", {}).get("walk_forward", {}).get("unseen", [])
+    return {r["fact"]: r for r in rows if r.get("fact") in UNSEEN}
 
 
 def version_fit(conn: Connection, version: str | None) -> dict[str, Any]:
@@ -81,16 +113,16 @@ def _flag_records(model: dict[str, Any] | None) -> dict[str, dict]:
     return {r["flag"]: r for r in rows}
 
 
-def _runner_flags(facts: pd.DataFrame, records: dict[str, dict]) -> list[list[dict]]:
-    fl = flags(facts)
-    out = []
-    for _, row in fl.iterrows():
-        on = [k for k in FLAGS if bool(row[k])][:MAX_FLAGS]
-        out.append([{"key": k, **FLAGS[k],
-                     "runs": records.get(k, {}).get("runs"),
-                     "model_ae": records.get(k, {}).get("model", {}).get("ae"),
-                     "price_ae": records.get(k, {}).get("price", {}).get("ae")} for k in on])
-    return out
+def _runner_flags(facts: list[dict[str, Any]], records: dict[str, dict]) -> list[list[dict]]:
+    """Each runner's raised flags, at most two. The rules run once over the
+    whole meeting (`model/gbm_flags`, the one definition the record measured);
+    only the reading of the answer is per runner."""
+    keys = list(FLAGS)
+    raised = flags(pd.DataFrame(facts).reindex(columns=_FACTS)).to_numpy(dtype=bool)
+    chip = {k: {"key": k, **FLAGS[k], "runs": records.get(k, {}).get("runs"),
+                "model_ae": records.get(k, {}).get("model", {}).get("ae"),
+                "price_ae": records.get(k, {}).get("price", {}).get("ae")} for k in keys}
+    return [[dict(chip[k]) for k, on in zip(keys, row) if on][:MAX_FLAGS] for row in raised]
 
 
 def scores(date: str, race_no: int | None = None, *,
@@ -98,26 +130,28 @@ def scores(date: str, race_no: int | None = None, *,
     """Each runner still in its race: the model's win and place chance (as
     percentages), the first read when the card landed, the twelve groups as
     "x vs this field", its flags and what was assumed. Empty when unscored."""
-    rows = conn.execute(_SCORES.format(race="AND g.race_no = ?" if race_no else ""),
-                        (date, race_no) if race_no else (date,)).fetchall()
+    rows = [dict(r) for r in conn.execute(
+        _SCORES.format(race="AND g.race_no = ?" if race_no else ""),
+        (date, race_no) if race_no else (date,)) if not r["scratched"]]
     if not rows:
         return {}
-    df = pd.DataFrame([dict(r) for r in rows])
-    df = df[df["scratched"] == 0].reset_index(drop=True)
-    total = df.groupby("race_no")["p_win"].transform("sum")
-    df["p"] = df["p_win"] / total
-    df["p_place_now"] = df["p_place"]
-    for rn, x in df.groupby("race_no"):
-        if abs(total[x.index[0]] - 1.0) > 1e-9:       # someone came out after the score
-            df.loc[x.index, "p_place_now"] = place_from_win(
-                x["p"].to_numpy(), places=3 if len(x) >= 7 else 2)
+    by_race: dict[int, list[dict[str, Any]]] = {}
+    for r in rows:
+        by_race.setdefault(r["race_no"], []).append(r)
+    for field in by_race.values():
+        total = sum(r["p_win"] for r in field)
+        place = [r["p_place"] for r in field]
+        if abs(total - 1.0) > 1e-9:                   # someone came out after the score
+            place = place_from_win(np.array([r["p_win"] / total for r in field]),
+                                   places=3 if len(field) >= 7 else 2)
+        for r, q in zip(field, place):
+            r["p"], r["p_place_now"] = r["p_win"] / total, float(q)
     # A fact missing from a row leaves its flags unraised; it never voids the race.
-    facts = pd.DataFrame([json.loads(f or "{}") for f in df["facts_json"]]).reindex(
-        columns=_FACTS)
+    facts = [json.loads(r["facts_json"] or "{}") for r in rows]
     chips = _runner_flags(facts, _flag_records(live(conn)))
     out = {}
-    for i, r in df.iterrows():
-        f = facts.iloc[i]
+    for i, r in enumerate(rows):
+        f = facts[i]
         assumed = []
         if f.get("body_weight") == "last run":
             assumed.append("body weight: last run's")
