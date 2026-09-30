@@ -24,7 +24,7 @@ a source; the combined data is built before the new design.
    ▼                           │ harvest_threads  Horse Detective  │ jobs/scrape_fixed_odds —
  derive/  SARR, pace,          │                                   │ Ladbrokes prices and the
           tags, trials         │                                   │ Racing & Sports tips,
-   ▼                           ▼                                   │ every 30 min on race day
+   ▼                           ▼                                   │ every 30 min, today and tomorrow
  model/screen              extract_tips → push_tips                │
    ▼                           ▼  POST /api/tips/import            │
  query/screen              jobs/import_tips — every number       │
@@ -72,7 +72,8 @@ What it adds on top of its parts:
   | 賽馬Fact Check | 20:00 two nights before | four meetings (ops/tips.ps1) |
   | Racing To Win preview and interviews | about 16:00 the day before | the tips work (ops/tips.ps1) |
   | HKJC tote | read from midnight on race day | `jobs/scrape_odds`: the day-before pool is a handful of bets and is not captured, so a clock expecting it at noon the day before read "overdue" every time (fixed 30 Sep) |
-  | Racing & Sports, Ladbrokes | by race-day morning | **seen once** (23 Sep) |
+  | Racing & Sports (on Ladbrokes) | by 17:33 the day before | **seen once** (30 Sep, all 11 races); the Ladbrokes job reads today's and tomorrow's meeting every half hour since 30 Sep — before, it read today's only and the preview landed at 08:00 on race day |
+  | Ladbrokes prices | by race-day morning | "TBA" the evening before (30 Sep); a runner with no price stores none |
   | 神探賽馬 Horse Detective | race-day morning, when it posts at all | one post (13 Sep, 11:49) |
 
 - **`reasons`** per race, each of one kind:

@@ -1,13 +1,21 @@
 """Capture Ladbrokes' fixed odds, and the Racing & Sports tips it carries.
 
     python -m hkrd.jobs.scrape_fixed_odds --date 2026-09-23
-    python -m hkrd.jobs.scrape_fixed_odds             # today's meeting, if any
+    python -m hkrd.jobs.scrape_fixed_odds             # today's meeting and tomorrow's
 
 Ladbrokes answers the Fly machine directly, so unlike the YouTube sources
 this runs on the server's own schedule. It is the one bookmaker read:
 Sportsbet carried the same Racing & Sports words, refused both machines from
 24 Sep, and was taken out on 30 Sep; Unibet's racing prices come from an app
 whose feed has not been found.
+
+THE DAY BEFORE, TOO. The scheduled run used to ask about today's meeting
+only, so Racing & Sports' preview — on Ladbrokes for all eleven 1 Oct races by
+17:33 on 30 Sep, with no prices yet — reached the Briefing at 08:00 on race
+day. It asks about tomorrow's card as well now. Before Ladbrokes lists the
+meeting the answer is a quiet "not listed yet", not an error; a runner with no
+price ("TBA") stores no price, so the Briefing does not read a market as open
+that is not.
 
 Two things per race, and both are checked against the stored HKJC card:
 
@@ -52,11 +60,13 @@ class FixedOddsReport:
     tips_held: int = 0
     skipped: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
-    idle: bool = False      # asked about today, and today has no meeting
+    idle: bool = False      # no meeting stored, or not listed by Ladbrokes yet
+    note: str = ""          # why it was idle
 
     @property
     def ok(self) -> bool:
-        return not self.errors and bool(self.prices)
+        # The day before, a run with the tips and no prices yet is a success.
+        return not self.errors and bool(self.prices or self.tips)
 
     def render(self) -> str:
         lines = [f"  fixed odds         {self.date} {self.venue} (ladbrokes)",
@@ -73,11 +83,15 @@ class FixedOddsReport:
 
 
 def scrape(date: str, *, venue: str | None = None, db: Path | None = None,
-           session=None, idle_if_no_card: bool = False) -> FixedOddsReport:
-    """`idle_if_no_card`: the scheduled run asks about today every half
-    hour, and most days hold no meeting. That is a quiet day, not a failure,
-    and is neither logged as one nor sent to Ladbrokes. A date asked for by
-    name with no card stored is still an error."""
+           session=None, idle_if_no_card: bool = False,
+           ahead: bool = False) -> FixedOddsReport:
+    """`idle_if_no_card`: the scheduled run asks about today and tomorrow
+    every half hour, and most days hold no meeting. That is a quiet day, not
+    a failure, and is neither logged as one nor sent to Ladbrokes. A date
+    asked for by name with no card stored is still an error.
+
+    `ahead`: the meeting is tomorrow's, and Ladbrokes not listing it yet is
+    the normal state of the morning before, not a failure."""
     report = FixedOddsReport(date=date)
     conn = get_conn(db if db is not None else db_path())
     try:
@@ -86,7 +100,7 @@ def scrape(date: str, *, venue: str | None = None, db: Path | None = None,
         report.venue = venue or tips.meeting_venue(conn, date) or ""
         if not card or not report.venue:
             if idle_if_no_card:
-                report.idle = True
+                report.idle, report.note = True, "no meeting stored"
                 return report
             report.errors.append(f"{date}: no card stored — scrape the "
                                  f"meeting first")
@@ -97,6 +111,9 @@ def scrape(date: str, *, venue: str | None = None, db: Path | None = None,
             report.errors.append(f"ladbrokes meeting list: {exc}")
             return report
         if not ids:
+            if ahead:
+                report.idle, report.note = True, "not listed by Ladbrokes yet"
+                return report
             report.errors.append(f"Ladbrokes lists no {report.venue} meeting "
                                  f"on {date}")
             return report
@@ -123,6 +140,9 @@ def scrape(date: str, *, venue: str | None = None, db: Path | None = None,
                         f"R{race_no} #{p['horse_no']} {p['name']}: the card "
                         f"has {ours or 'no such runner'}")
                     continue
+                if p["win"] is None and p["place"] is None \
+                        and not p["scratched"]:
+                    continue                    # "TBA": no market yet
                 rows.append({"bookmaker": "ladbrokes", "race_date": date,
                              "race_no": race_no, "captured_at": now, **p})
             url = ladbrokes.page_url(rec)
@@ -158,17 +178,26 @@ def scrape(date: str, *, venue: str | None = None, db: Path | None = None,
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--date", default=None, help="YYYY-MM-DD; default today")
+    ap.add_argument("--date", default=None,
+                    help="YYYY-MM-DD; default today's meeting and tomorrow's")
     ap.add_argument("--venue", default=None, help="HV or ST; default the card's")
     ap.add_argument("--db", type=Path, default=None)
     a = ap.parse_args(argv)
-    date = a.date or dt.datetime.now(_HK).date().isoformat()
-    report = scrape(date, venue=a.venue, db=a.db, idle_if_no_card=not a.date)
-    if report.idle:
-        print(f"  fixed odds         {date}: no meeting stored for today")
-        return 0
-    print(report.render())
-    return 0 if report.ok else 1
+    if a.date:
+        report = scrape(a.date, venue=a.venue, db=a.db)
+        print(report.render())
+        return 0 if report.ok else 1
+    today = dt.datetime.now(_HK).date()
+    failed = False
+    for day in (today, today + dt.timedelta(days=1)):
+        date = day.isoformat()
+        report = scrape(date, db=a.db, idle_if_no_card=True, ahead=day != today)
+        if report.idle:
+            print(f"  fixed odds         {date}: {report.note}")
+            continue
+        print(report.render())
+        failed |= not report.ok
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

@@ -90,10 +90,11 @@
 # Ladbrokes' fixed odds, and the Racing & Sports tips and race comment it
 # carries, for the Briefing. Ladbrokes answers this machine, and is the one
 # feed for Racing & Sports (Sportsbet carried the same words and was taken
-# out on 30 Sep). Every half hour through the racing
-# day: its prices are the second market beside the tote, and they are not
-# pruned any more than the tote's are. A day with no meeting stored is a quiet
-# no-op, not a failure — the job only acts on today's card.
+# out on 30 Sep). Every half hour, for TODAY'S meeting and TOMORROW'S: the
+# Racing & Sports preview is up the day before (all eleven 1 Oct races by
+# 17:33 on 30 Sep), and its prices are the second market beside the tote,
+# not pruned any more than the tote's are. A day with no meeting stored, or
+# a meeting Ladbrokes has not listed yet, is a quiet no-op, not a failure.
 */30 8-22 * * *   nice -n 19 python -m hkrd.jobs.scrape_fixed_odds --db /data/hkrd.db
 # Where each new import came from: HKJC's "Intro to New Horses", for the
 # Briefing's and Race Day's background line and the background record. A

@@ -122,6 +122,53 @@ def test_a_price_under_the_wrong_name_is_not_stored(db, lad, monkeypatch):
     assert any("the card has JUMBO BLESSING" in s for s in got.skipped)
 
 
+# ── the day before ──────────────────────────────────────────────────────────
+#
+# 30 Sep 2026, 17:33: Racing & Sports' preview for every 1 Oct race on
+# Ladbrokes, every price "TBA". The scheduled run read today's meeting only,
+# so the preview reached the Briefing at 08:00 on race day.
+
+def test_the_day_before_the_preview_lands_and_no_price_is_invented(db, lad,
+                                                                    monkeypatch):
+    early = copy.deepcopy(lad)
+    for r in early["runners"]:
+        r["odds"] = {"fixed_win": None, "fixed_place": None}
+    monkeypatch.setattr(scrape_fixed_odds.ladbrokes, "fetch_race",
+                        lambda *a, **k: copy.deepcopy(early))
+    got = scrape_fixed_odds.scrape(DATE, db=db, ahead=True)
+    assert (got.prices, got.tips, got.ok) == (0, 4, True)
+    assert rows(db, "SELECT count(*) FROM fixed_odds") == [(0,)]
+    conn = get_conn(db)
+    try:
+        s = tips_summary.summary(DATE, conn=conn)
+    finally:
+        conn.close()
+    # No Ladbrokes market read as open: the Briefing's clock says not in.
+    assert s["books"] == [] and "ladbrokes" not in s["captured"]
+
+
+def test_tomorrow_not_listed_yet_is_quiet(db, monkeypatch):
+    monkeypatch.setattr(scrape_fixed_odds.ladbrokes, "race_ids", lambda *a, **k: {})
+    got = scrape_fixed_odds.scrape(DATE, db=db, ahead=True)
+    assert got.idle and not got.errors and got.note == "not listed by Ladbrokes yet"
+    today = scrape_fixed_odds.scrape(DATE, db=db)
+    assert today.errors and not today.idle
+
+
+def test_the_scheduled_run_asks_about_today_and_tomorrow(monkeypatch):
+    asked = []
+
+    def fake(date, **k):
+        asked.append((date, k.get("ahead")))
+        return scrape_fixed_odds.FixedOddsReport(date=date, idle=True, note="x")
+    monkeypatch.setattr(scrape_fixed_odds, "scrape", fake)
+    assert scrape_fixed_odds.main([]) == 0
+    assert [a for _, a in asked] == [False, True]
+    import datetime as dt
+    d0, d1 = (dt.date.fromisoformat(d) for d, _ in asked)
+    assert d1 - d0 == dt.timedelta(days=1)
+
+
 def test_running_the_job_twice_leaves_one_set_of_tips(db):
     scrape_fixed_odds.scrape(DATE, db=db)
     scrape_fixed_odds.scrape(DATE, db=db)

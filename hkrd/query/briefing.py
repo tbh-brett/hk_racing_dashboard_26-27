@@ -75,8 +75,9 @@ CLOCK = (
     Due("tote", "HKJC tote", "priced", 0, "00:30",
         "read from midnight on race day; the day-before pool is a handful "
         "of bets, and is not captured"),
-    Due("racing_sports", "Racing & Sports", "said", 0, "09:00",
-        "arrives with the bookmakers' markets; up by race-day morning once"),
+    Due("racing_sports", "Racing & Sports", "said", 1, "18:00",
+        "on Ladbrokes by 17:33 the day before (seen 30 Sep); read every "
+        "half hour from 08:00 the day before"),
     Due("ladbrokes", "Ladbrokes", "priced", 0, "09:00",
         "fixed odds; up by race-day morning once"),
     Due("threads", "神探賽馬 Horse Detective", "said", None, None,
