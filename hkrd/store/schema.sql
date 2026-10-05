@@ -360,6 +360,11 @@ CREATE TABLE IF NOT EXISTS blackbook (
   -- picks) while the owner's record gains the horses they chose to keep.
   origin       TEXT NOT NULL DEFAULT 'owner',
   adopted_date TEXT,
+  -- The day the owner said "keep following it" after it went stale
+  -- (`query/book_tier.TESTED_STARTS` starts since it was booked). Its starts
+  -- are counted again from here; the entry, its date and its record are not
+  -- touched.
+  renewed_date TEXT,
   -- 'memo' when the user typed a date, 'matched' when it was recovered from the
   -- horse's own runs, 'system' when `jobs/auto_book` wrote it. The page must be
   -- able to tell them apart.
@@ -483,6 +488,12 @@ CREATE TABLE IF NOT EXISTS trial_notes (
   trial_no   INTEGER NOT NULL,
   note       TEXT    NOT NULL,
   written_at TEXT    NOT NULL,
+  -- Two optional taps beside the words, so "was it asked, and what did it
+  -- find" is read as the owner meant it rather than guessed from wording:
+  -- notes on horses asked and responding beat the tote by the most of any
+  -- (docs/book-tiers.md). NULL is "not said", never "no".
+  asked      INTEGER,                 -- 1 asked | 0 not asked
+  response   TEXT,                    -- strong | fair | none
   PRIMARY KEY (horse_name, trial_date, trial_no)
 );
 

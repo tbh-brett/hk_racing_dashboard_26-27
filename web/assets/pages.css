@@ -490,6 +490,7 @@ select:hover, .btn:hover { background: var(--line-2); color: var(--text); }
 .badge.active { color: var(--page-accent); border-color: var(--page-accent-ground); background: var(--pop-act); }
 .badge.won_out { color: var(--win); border-color: var(--win); }
 .badge.retired { color: var(--loss); border-color: var(--h2h-rule); }
+.badge.stale { color: var(--text-dim); border-color: var(--line); margin-left: 4px; }
 .act-btn {
   font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted);
   border: 1px solid var(--line-3); background: none; padding: 1px 7px;
@@ -690,6 +691,8 @@ select:hover, .btn:hover { background: var(--line-2); color: var(--text); }
 .review .tag[aria-pressed="true"] { color: var(--book); border-color: var(--book-ground); background: var(--pop-act); }
 .review .hint { font-family: var(--font-mono); font-size: 9px; color: var(--book-dim); line-height: 1.4; }
 .review .err { color: var(--alert); font-size: var(--fs-sm); margin-top: 6px; }
+.review .taps { align-items: center; flex-wrap: wrap; gap: 4px; }
+.review .taps .meta { font-family: var(--font-mono); font-size: 9px; color: var(--book-dim); margin: 0 2px 0 6px; }
 
 
 /* ── the window, and which book ──────────────────────────────────────────────

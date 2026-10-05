@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Body, HTTPException
 
-from hkrd.query import bets as bets_q, blackbook as bb_q, period
+from hkrd.query import bets as bets_q, blackbook as bb_q, book_tier, period
 
 router = APIRouter()
 
@@ -18,7 +18,13 @@ def blackbook_list(status: str | None = None, tag: str | None = None) -> dict:
     """The list view. `runs_since` and `record since` are derived from the
     runners table, not from what anyone remembered to log."""
     entries = bb_q.list_entries(status=status, tag=tag)
+    # STALE: a live entry with `book_tier.TESTED_STARTS` starts since it was
+    # booked or renewed. Muted on race day; the list offers RENEW beside CLOSE.
+    stale = book_tier.stale_entries()
+    for e in entries:
+        e["stale_starts"] = stale.get(e["id"])
     return {"entries": entries, "count": len(entries),
+            "stale": len(stale), "stale_after": book_tier.TESTED_STARTS,
             "filters": {"status": status, "tag": tag}}
 
 
@@ -85,6 +91,20 @@ def adopt_blackbook_entry(entry_id: str) -> dict:
 
     try:
         return write_notes.adopt(entry_id)
+    except KeyError as exc:
+        raise HTTPException(404, f"no blackbook entry {exc.args[0]}") from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@router.post("/api/blackbook/{entry_id}/renew")
+def renew_blackbook_entry(entry_id: str) -> dict:
+    """Keep following a stale entry: its starts are counted again from today.
+    Nothing else about it changes."""
+    from hkrd.jobs import write_notes
+
+    try:
+        return write_notes.renew(entry_id)
     except KeyError as exc:
         raise HTTPException(404, f"no blackbook entry {exc.args[0]}") from exc
     except ValueError as exc:

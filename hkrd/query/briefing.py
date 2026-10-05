@@ -177,14 +177,31 @@ def _reasons(race: dict, runners: list[dict], interviews: list[dict],
         add("lone_leader", "computed",
             f"#{lead['horse_no']} {lead['horse_name']} is the only habitual "
             f"leader{measured}", lead["horse_no"])
+    # The book's horses worth a bet (query/book_tier): the owner's trial note
+    # since the last run, or a STANDOUT trial. Named first and once, because
+    # that is the one book reason with a record clear of the price.
+    marked = [r for r in runners if (r["screen"].get("book_tier") or {}).get("tier")
+              in ("NOTE", "STANDOUT")]
+    for tier, head in (("NOTE", "Your trial note"), ("STANDOUT", "Standout trial")):
+        these = [r for r in marked if r["screen"]["book_tier"]["tier"] == tier]
+        if not these:
+            continue
+        rec = these[0]["screen"]["book_tier"].get("record") or {}
+        add("book", "computed",
+            f"{head}{'s' if len(these) > 1 else ''}: "
+            + ", ".join(who(r) for r in these)
+            + (f" (since {rec['since'][:7]} that tier won {rec['won']} of "
+               f"{rec['runs']}, the tote expected {rec['expected']})"
+               if rec.get("runs") else ""),
+            these[0]["horse_no"])
     for r in runners:
         sc = r["screen"]
         # Every race holds a book horse or two; one is a reason to study the
         # race only when today suits it — its set-up, or the conditions the
         # owner wrote for it.
         book = r["blackbook"] or {}
-        if book.get("live") and (sc["setup"] == "FAVOURABLE"
-                                 or book.get("on_conditions")):
+        if r not in marked and book.get("live") and (sc["setup"] == "FAVOURABLE"
+                                                     or book.get("on_conditions")):
             add("book", "computed", f"Your book: {who(r)} — "
                 + ("your conditions met" if book.get("on_conditions")
                    else "set-up FAVOURABLE")
@@ -312,7 +329,7 @@ def _meeting(conn: Connection, date: str, now: dt.datetime) -> dict[str, Any]:
             **{k: sr[k] for k in ("race_no", "venue", "course", "surface",
                                   "going", "distance", "race_class",
                                   "restricted", "off_time", "field_size",
-                                  "run", "pace")},
+                                  "run", "pace", "book_line")},
             "off_time": sr["off_time"] or tr.get("off_time"),
             "minutes_to_off": _minutes_to(date, sr["off_time"]
                                           or tr.get("off_time"), now)

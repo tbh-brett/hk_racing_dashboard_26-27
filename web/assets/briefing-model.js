@@ -302,6 +302,7 @@ function raceView(r, ctx) {
         ? `${Math.round(mk.concentration * 100)}% ${mk.band || ''}` : '',
       pool: mk.win_pool ? moneyS(mk.win_pool) : DASH } : null,
     poolBits, reasons, kindCounts, firstReason: reasons[0] ? reasons[0].text : '',
+    bookLine: r.book_line || null,
     pace, shortlist, slCompact: shortlist.map((x) => `#${x.no} ${x.place}`).join(' · '),
     interviews: ivs.map((iv) => {
       const rr = r.runners.find((z) => z.horse_no === iv.horse_no);
@@ -434,6 +435,9 @@ function runnerView(x, r, { books, srcIn, saidOf, isBooked, cap, toteEarly, ctx 
     againstList: (s.against || []).map((f) => ({ why: f.why || f.label, x: `×${f.x}`, title: f.label,
                                                  mild: Math.abs(Math.log(f.x)) < MILD })),
     last, trial,
+    // Which of the book's horses to back (query/book_tier), with the owner's
+    // trial note behind a TRIAL NOTE tier.
+    bookTier: s.book_tier || null,
     unseen: unseenView(s),
     // Where it came from, for its first five HK starts (query/background).
     bg: x.background ? backgroundView(x.background, s.starts ?? 0) : null,

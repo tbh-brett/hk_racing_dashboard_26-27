@@ -21,7 +21,7 @@ from dataclasses import replace
 from typing import Any
 
 from hkrd.derive.probability import devig
-from hkrd.query import (background as background_q, blackbook as bb_q,
+from hkrd.query import (background as background_q, blackbook as bb_q, book_tier,
                         gbm as gbm_q, gear as gear_q, h2h as h2h_q, market as market_q,
                         money as money_q, movement as movement_q,
                         pools as pools_q, rating as rating_q, vet as vet_q)
@@ -155,6 +155,7 @@ def build_card(date: str, race_no: int, *,
         conc = market_q.concentration(date, race_no, conn=conn)
         booked = {b["horse_name"]: b
                   for b in bb_q.for_race(date, race_no, conn=conn)}
+        tiers = book_tier.for_meeting(date, conn=conn)
         # `split_move`, not `price_movement`: same three fields the card
         # already reads, plus the last ten minutes on their own. A horse that
         # sat all day and was let go 22% in the run-in reads as FLAT on a
@@ -295,6 +296,9 @@ def build_card(date: str, race_no: int, *,
                     "tags": sorted((book["tag_csv"] or "").split(","))
                             if book["tag_csv"] else [],
                 } if book else None,
+                # Which of the book's horses to back (query/book_tier) -- set
+                # for a noted horse outside the book too.
+                "book_tier": tiers.get((race_no, r.horse_no)),
                 "win_pct": win_pct.get(r.horse_no),
                 "spark": pts, "spark_dot": [dot_x, dot_y],
                 "spark_points_n": len(series.get(r.horse_no, [])),

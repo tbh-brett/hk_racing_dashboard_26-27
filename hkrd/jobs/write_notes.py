@@ -23,8 +23,11 @@ from hkrd.store.connect import db_path, get_conn, transaction
 
 __all__ = ["save_note", "delete_note", "save_trial_note",
            "delete_trial_note", "promote_to_blackbook", "insert_entry",
-           "next_entry_id", "set_status", "set_triggers", "adopt",
-           "close_tested", "add_system_note", "SYSTEM_NOTE"]
+           "next_entry_id", "set_status", "set_triggers", "adopt", "renew",
+           "close_tested", "add_system_note", "SYSTEM_NOTE", "RESPONSES"]
+
+#: The trial note's second tap: what the horse found when it was asked.
+RESPONSES = ("strong", "fair", "none")
 
 
 def _now() -> str:
@@ -68,7 +71,8 @@ def delete_note(horse_name: str, race_date: str, race_no: int, *,
 
 
 def save_trial_note(horse_name: str, trial_date: str, trial_no: int,
-                    note: str, *, db: Path | None = None) -> dict:
+                    note: str, *, asked: int | None = None,
+                    response: str | None = None, db: Path | None = None) -> dict:
     """Write or replace the note on one trial run.
 
     Its own table, not a row in `run_notes`. A trial and a race share a date
@@ -76,10 +80,22 @@ def save_trial_note(horse_name: str, trial_date: str, trial_no: int,
     second note written would silently replace the first. They are also
     different kinds of observation: "cruised, never asked" is about intent,
     which is what a trial is for, and it must not read as a comment on a race.
+
+    `asked` (1 or 0) and `response` (`RESPONSES`) are the two optional taps
+    beside the words; None is "not said". A save carries both every time, so
+    clearing a tap is saving it as None.
+
+    `written_at` moves only when the WORDS change. It is what says a note was
+    written before the race it is counted for (`query/book_tier`), so adding
+    a tap to an old note must not make it read as written after the fact.
     """
     text = (note or "").strip()
     if not text:
         raise ValueError("a note needs text; use delete_trial_note to remove one")
+    if asked not in (None, 0, 1):
+        raise ValueError("asked is 1, 0 or empty")
+    if response not in (None, *RESPONSES):
+        raise ValueError(f"response is one of {', '.join(RESPONSES)}, or empty")
     horse = horse_name.strip().upper()
     conn = get_conn(db if db is not None else db_path())
     try:
@@ -87,12 +103,20 @@ def save_trial_note(horse_name: str, trial_date: str, trial_no: int,
         with transaction(conn):
             conn.execute(
                 "INSERT INTO trial_notes (horse_name, trial_date, trial_no, "
-                "note, written_at) VALUES (?, ?, ?, ?, ?) "
+                "note, written_at, asked, response) VALUES (?, ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT (horse_name, trial_date, trial_no) DO UPDATE SET "
-                "note = excluded.note, written_at = excluded.written_at",
-                (horse, trial_date, trial_no, text, written))
+                "written_at = CASE WHEN trial_notes.note = excluded.note "
+                "THEN trial_notes.written_at ELSE excluded.written_at END, "
+                "note = excluded.note, "
+                "asked = excluded.asked, response = excluded.response",
+                (horse, trial_date, trial_no, text, written, asked, response))
+            written = conn.execute(
+                "SELECT written_at FROM trial_notes WHERE horse_name = ? "
+                "AND trial_date = ? AND trial_no = ?",
+                (horse, trial_date, trial_no)).fetchone()[0]
         return {"horse_name": horse, "trial_date": trial_date,
-                "trial_no": trial_no, "note": text, "written_at": written}
+                "trial_no": trial_no, "note": text, "written_at": written,
+                "asked": asked, "response": response}
     finally:
         conn.close()
 
@@ -408,6 +432,42 @@ def adopt(entry_id: str, *, db: Path | None = None) -> dict:
                              "WHERE id = ?", (entry_id,))
         return dict(conn.execute(
             "SELECT id, horse_name, status, origin, adopted_date "
+            "FROM blackbook WHERE id = ?", (entry_id,)).fetchone())
+    finally:
+        conn.close()
+
+
+def renew(entry_id: str, *, today: str | None = None,
+          db: Path | None = None) -> dict:
+    """Keep following a stale entry: its starts are counted again from today.
+
+    An entry goes STALE (`query/book_tier.TESTED_STARTS` starts since it was
+    booked) and is muted on race day, never closed -- closing stays the
+    owner's button. Renewing is the other answer to the same question. The
+    entry, its date, its reasoning and its record are untouched; only the
+    count restarts. A system entry is renewed by adopting it first, since
+    the system closes its own entries at the end of their test.
+    """
+    from datetime import date
+
+    today = today or date.today().isoformat()
+    conn = get_conn(db if db is not None else db_path())
+    try:
+        with transaction(conn):
+            row = conn.execute(
+                "SELECT status, origin, adopted_date FROM blackbook WHERE id = ?",
+                (entry_id,)).fetchone()
+            if row is None:
+                raise KeyError(entry_id)
+            if row["status"] != "active":
+                raise ValueError("only a live entry can be renewed; this one is closed")
+            if row["origin"] == "system" and row["adopted_date"] is None:
+                raise ValueError("adopt this system entry first; the system "
+                                 "closes its own entries after their test")
+            conn.execute("UPDATE blackbook SET renewed_date = ? WHERE id = ?",
+                         (today, entry_id))
+        return dict(conn.execute(
+            "SELECT id, horse_name, status, origin, adopted_date, renewed_date "
             "FROM blackbook WHERE id = ?", (entry_id,)).fetchone())
     finally:
         conn.close()

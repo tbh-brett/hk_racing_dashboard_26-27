@@ -344,7 +344,8 @@ def save_trial_note(body: dict = Body(...)) -> dict:
     try:
         return write_notes.save_trial_note(
             body["horse_name"], body["trial_date"], int(body["trial_no"]),
-            body.get("note", ""))
+            body.get("note", ""), asked=body.get("asked"),
+            response=body.get("response") or None)
     except KeyError as exc:
         raise HTTPException(422, f"missing field: {exc.args[0]}") from exc
     except ValueError as exc:

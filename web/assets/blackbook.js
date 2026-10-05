@@ -16,6 +16,7 @@ import { el, $, DASH, MINUS, renderNav, periodPicker, accountPicker,
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 import { isSystem, inBook, BOOKS, systemLine } from './book-origin.js';
+import { renewButton, staleBadge } from './book-renew.js';
 
 
 const COLS = [
@@ -416,6 +417,8 @@ function entryRow(e) {
 
   const st = el('div');
   st.append(el('span', `badge ${e.status}`, e.status.replace('_', ' ').toUpperCase()));
+  const stale = staleBadge(e);
+  if (stale) st.append(stale);
   row.append(st);
 
   const acts = el('div', 'acts');
@@ -438,6 +441,8 @@ function entryRow(e) {
     row.append(acts);
     return row;
   }
+  const renew = renewButton(e, { busy: state.busy, render });
+  if (renew) acts.append(renew);
   if (e.status !== 'won_out') acts.append(statusButton(e, 'won_out', 'WON OUT'));
   if (e.status !== 'retired') acts.append(statusButton(e, 'retired', 'RETIRE', 'retire'));
   if (e.status !== 'active') acts.append(statusButton(e, 'active', 'REOPEN'));

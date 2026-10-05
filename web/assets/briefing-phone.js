@@ -7,6 +7,7 @@
  * opening to its reasons, what was said and every market's price.
  */
 import { el, classCell } from './vocab.js';
+import { bookLineEl, tierChip } from './book-tier.js';
 import {
   wordRows, markEl, chipEl, kindEl, paceBar, styleEl, link, nameEl, bar,
   interviewBox, screenBlock, saidBlock, priceBlock,
@@ -87,6 +88,8 @@ function card(r, ctx) {
 
 function opened(r, ctx) {
   const box = el('div', `bf-popen${r.run ? ' bf-after' : ''}`);
+  const bookLine = bookLineEl(r.bookLine);
+  if (bookLine) box.append(bookLine);
   r.interviews.forEach((iv) => box.append(interviewBox(iv)));
   if (r.poolBits.length) {
     const pools = el('div', 'pools');
@@ -120,7 +123,9 @@ function opened(r, ctx) {
               el('span', `w44 px${x.mPriceMost ? ' most' : ''}`, x.mPrice));
     const l2 = el('div', 'l2');
     l2.append(styleEl(x), el('span', `tier${x.top ? ' top' : ''}`, x.tier));
-    if (x.hasBB) {
+    const chip = tierChip(x.bookTier);
+    if (chip) l2.append(chip);
+    else if (x.hasBB) {
       l2.append(el('span', `bf-bbtag${x.bbSys ? ' sys' : ''}`,
                    `${x.bbSys ? 'SYS' : 'BB'} ${x.setup}`));
     }

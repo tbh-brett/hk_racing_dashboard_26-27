@@ -190,6 +190,12 @@ If a task seems to need a violation, stop and say so rather than working around 
   quadruple, and the 11 IS 6 + 4 + 1 — and each of those costs the PRODUCT of its legs' own
   combination counts. A 2X1 over a QQP banker-with-four and a single place is eight lines,
   not one. All of it is in `query/tickets.py`, checked against the account statement.
+- **The owner's trial note is the one book signal clear of the price; HKJC's words are
+  not.** Measured 5 Oct 2026: notes written before the next start, 12 won of 61 where
+  the tote expected 6.3; HKJC's comments, stewards' keywords and trial comments clear
+  1.00 no more often than chance. So `query/book_tier` reads a trial note whether or
+  not the horse is booked, and it is the only tier drawn as a bet. Its `written_at` is
+  the proof the note preceded the race: a tap added later must never move it.
 - **A race is over when HKJC shuts the pool, not when the card said it would go off.** The
   capture used to run for thirty minutes past the SCHEDULED off on every race — thousands of
   rows a meeting recording a market that could no longer move, and still wrong for a delayed

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from hkrd.query import (blackbook as bb_q, market as market_q,
+from hkrd.query import (blackbook as bb_q, book_tier, market as market_q,
                         movement as movement_q)
 from hkrd.store.connect import Connection, get_conn
 
@@ -35,6 +35,12 @@ def meeting_blackbook(date: str, *, conn: Connection | None = None
     conn = conn or get_conn()
     try:
         entries = bb_q.declared_on(date, conn=conn)
+        # A trial note counts whether or not the horse is booked (owner, 5 Oct
+        # 2026; query/book_tier), so a noted horse outside the book is in the
+        # band too, as a row of its own with its note as the reason.
+        tiers = book_tier.for_meeting(date, conn=conn)
+        entries += _noted(conn, date, tiers, {(e["race_no"], e["horse_no"])
+                                              for e in entries})
         if not entries:
             return {"race_date": date, "entries": [], "count": 0}
 
@@ -91,11 +97,30 @@ def meeting_blackbook(date: str, *, conn: Connection | None = None
                 # to report, and 0% would read as a market that held steady.
                 "change_pct": move["change_pct"] if move else None,
                 "observed": bool(move and move["observed"]),
+                "book_tier": tiers.get((e["race_no"], e["horse_no"])),
             })
         return {"race_date": date, "entries": out, "count": len(out)}
     finally:
         if own:
             conn.close()
+
+
+def _noted(conn: Connection, date: str, tiers: dict, booked: set) -> list[dict[str, Any]]:
+    """Runners with the owner's trial note since their last run and no book
+    entry, shaped as the band's entries: live, owner's, the note the reason."""
+    want = [k for k, t in tiers.items() if t["tier"] == "NOTE" and k not in booked]
+    if not want:
+        return []
+    cards = {(r["race_no"], r["horse_no"]): dict(r) for r in conn.execute(
+        "SELECT race_no, horse_no, horse_name, draw, win_odds FROM runners "
+        "WHERE race_date = ?", (date,))}
+    return [{**cards[k], "id": None, "status": "active", "confidence": None,
+             "added_date": tiers[k]["note"]["written_at"][:10],
+             "closed_date": None, "closed_reason": None, "origin": "note",
+             "adopted_date": None, "reasoning": tiers[k]["note"]["note"],
+             "on_conditions": False, "conditions_text": "", "live_at_race": True,
+             "booked_before_race": True, "tag_csv": "trial_note"}
+            for k in want if k in cards]
 
 
 def meeting_summary(date: str, *, conn: Connection | None = None) -> dict[str, Any]:

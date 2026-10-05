@@ -69,9 +69,11 @@ export function trialSubject(trial) {
     title: 'TRIAL NOTE',
     label: `${trial.trial_date} T${trial.trial_no}`,
     detail: `${trial.trial_date} T${trial.trial_no}${cond ? ` · ${cond}` : ''}`,
-    save: (horseName, note) => api.saveTrialNote({
+    // The two taps travel with every save, so clearing one saves it empty.
+    save: (horseName, note, taps = {}) => api.saveTrialNote({
       horse_name: horseName, trial_date: trial.trial_date,
       trial_no: trial.trial_no, note,
+      asked: taps.asked ?? null, response: taps.response ?? null,
     }),
     // `source_trial_no`, never `source_race_no` — a trial written into the
     // race column makes the book link back to a race that was never run.
@@ -119,11 +121,12 @@ export function renderReview(host, {
   row.append(input);
   const save = el('button', 'act', 'SAVE');
   const err = el('div', 'err');
+  const taps = subj.kind === 'trial' ? tapsRow(existingNote) : null;
   save.addEventListener('click', async () => {
     save.disabled = true;
     err.textContent = '';
     try {
-      onSaved(await subj.save(horseName, input.value));
+      onSaved(await subj.save(horseName, input.value, taps?.value()));
     } catch (e) {
       err.textContent = e.message;
       save.disabled = false;
@@ -131,6 +134,7 @@ export function renderReview(host, {
   });
   row.append(save);
   host.append(row);
+  if (taps) host.append(taps.node);
   host.append(err);
 
   // A note is a record, the book is a judgement. One deliberate click.
@@ -148,11 +152,42 @@ export function renderReview(host, {
                                onPromoted, onClose }));
     });
     sep.append(open);
-    sep.append(el('div', 'hint', 'a note is a record · the book is a judgement'));
+    // A trial note is flagged on race day whether or not the horse is booked
+    // (query/book_tier): it is the one note with a record clear of the price.
+    sep.append(el('div', 'hint', subj.kind === 'trial'
+      ? 'a trial note is flagged on race day, booked or not'
+      : 'a note is a record · the book is a judgement'));
   }
   host.append(sep);
   input.focus();
   return input;
+}
+
+/** The trial note's two optional taps: was the horse asked, and what did it
+ *  find. Notes on horses asked and responding beat the tote by the most of
+ *  any (docs/book-tiers.md), so the page reads it as said, not from wording.
+ *  A second click on the lit choice clears it. */
+function tapsRow(existing) {
+  const pick = { asked: existing?.asked ?? null, response: existing?.response ?? null };
+  const node = el('div', 'row taps');
+  const group = (label, key, choices) => {
+    node.append(el('span', 'meta', label));
+    choices.forEach(([text, value]) => {
+      const b = el('button', 'tag', text);
+      b.setAttribute('aria-pressed', String(pick[key] === value));
+      b.addEventListener('click', () => {
+        pick[key] = pick[key] === value ? null : value;
+        node.querySelectorAll(`[data-k="${key}"]`).forEach((x) =>
+          x.setAttribute('aria-pressed', String(x.dataset.v === String(pick[key]))));
+      });
+      b.dataset.k = key;
+      b.dataset.v = String(value);
+      node.append(b);
+    });
+  };
+  group('ASKED', 'asked', [['NO', 0], ['YES', 1]]);
+  group('RESPONSE', 'response', [['STRONG', 'strong'], ['FAIR', 'fair'], ['NONE', 'none']]);
+  return { node, value: () => ({ ...pick }) };
 }
 
 function promoteForm({ horseName, subject, noteInput, onPromoted, onClose }) {

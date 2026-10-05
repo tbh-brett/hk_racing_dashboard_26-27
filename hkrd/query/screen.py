@@ -44,7 +44,7 @@ from typing import Any
 
 from hkrd.model import gbm_unseen
 from hkrd.model import screen as model
-from hkrd.query import blackbook_band
+from hkrd.query import blackbook_band, book_tier
 from hkrd.query import gbm as gbm_q
 from hkrd.query.formguide import notes_for_horses
 from hkrd.query.screen_inputs import gather
@@ -209,7 +209,8 @@ def _unseen(r: dict, date: str, records: dict[str, dict]) -> list[dict[str, Any]
 
 
 def _runner(r: dict, sc: dict | None, book: dict | None, notes: list,
-            reversals: list, date: str, records: dict[str, dict]) -> dict[str, Any]:
+            reversals: list, date: str, records: dict[str, dict],
+            tier: dict | None = None) -> dict[str, Any]:
     groups = (sc or {}).get("groups", {})
     prev_tags = set((r["prev"] or {}).get("tags") or ())
     lines = [_group_line(k, x) for k, x in groups.items()
@@ -239,6 +240,9 @@ def _runner(r: dict, sc: dict | None, book: dict | None, notes: list,
         "notes": notes,
         "reversals": reversals,
         "blackbook": book,
+        # Which of the book's horses to back (query/book_tier): one tier per
+        # runner, read off the owner's trial notes as well as the book.
+        "book_tier": tier,
         "result": r["place"],
         # Hong Kong starts before this one: the Briefing shows a horse's
         # background for its first few (query/background).
@@ -259,13 +263,14 @@ def _book(b: dict[str, Any]) -> dict[str, Any]:
 
 
 def _race(block: dict, books: dict, notes: dict, scores: dict,
-          records: dict[str, dict]) -> dict[str, Any]:
+          records: dict[str, dict], tiers: dict) -> dict[str, Any]:
     race, runners = block["race"], block["runners"]
     rev = _reversals(runners, race)
     lines = [_runner(r, scores.get((race["race_no"], r["horse_no"])),
                      books.get((race["race_no"], r["horse_no"])),
                      notes.get(r["horse_name"], []), rev.get(r["horse_no"], []),
-                     race["race_date"], records)
+                     race["race_date"], records,
+                     tiers.get((race["race_no"], r["horse_no"])))
              for r in runners]
     # Read in order of the chance to place; a runner the model has not scored
     # (a late replacement) goes to the foot, named but not ranked.
@@ -284,6 +289,7 @@ def _race(block: dict, books: dict, notes: dict, scores: dict,
             "run": any(r["place"] is not None for r in runners),
             "scored": any(x["place_pct"] is not None for x in lines),
             "pace": _pace(runners),
+            "book_line": book_tier.race_line(lines),
             "runners": order}
 
 
@@ -323,7 +329,8 @@ SELECT
     || ',' || coalesce(confidence, '') || ',' || coalesce(reasoning, '') || ','
     || coalesce(added_date, '') || ',' || coalesce(closed_date, '') || ','
     || coalesce(closed_reason, '') || ',' || coalesce(origin, '') || ','
-    || coalesce(adopted_date, '') AS k FROM blackbook ORDER BY id)),
+    || coalesce(adopted_date, '') || ',' || coalesce(renewed_date, '') AS k
+    FROM blackbook ORDER BY id)),
  (SELECT group_concat(k, '|') FROM (SELECT id || ',' || tag AS k FROM blackbook_tags
     ORDER BY id, tag)),
  (SELECT group_concat(k, '|') FROM (SELECT trigger_id || ',' || id || ',' || kind || ','
@@ -370,7 +377,8 @@ def _meeting(conn: Connection, date: str) -> dict[str, Any]:
     notes = notes_for_horses(names, conn=conn)
     scores = gbm_q.scores(date, conn=conn)
     records = gbm_q.unseen_records(gbm_q.live(conn))
-    races = [_race(b, books, notes, scores, records) for b in blocks]
+    tiers = book_tier.for_meeting(date, conn=conn)
+    races = [_race(b, books, notes, scores, records, tiers) for b in blocks]
     version = next((x["model_version"] for x in scores.values()), None)
     fit = gbm_q.version_fit(conn, version)
     return {

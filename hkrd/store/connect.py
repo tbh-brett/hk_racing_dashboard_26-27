@@ -143,6 +143,23 @@ def _migrate(conn: sqlite3.Connection) -> None:
         _migrate_blackbook_prefs(conn)
         _migrate_blackbook_origin(conn)
         _migrate_races_restricted(conn)
+        _migrate_book_tiers(conn)
+
+
+def _migrate_book_tiers(conn: sqlite3.Connection) -> None:
+    """`blackbook.renewed_date` and the trial note's two taps.
+
+    All three are NULL on every existing row, which is what each means when
+    nothing was said: never renewed, and no tap recorded.
+    """
+    cols = _columns(conn, "blackbook")
+    if cols and "renewed_date" not in cols:
+        conn.execute("ALTER TABLE blackbook ADD COLUMN renewed_date TEXT")
+    cols = _columns(conn, "trial_notes")
+    if cols and "asked" not in cols:
+        conn.execute("ALTER TABLE trial_notes ADD COLUMN asked INTEGER")
+    if cols and "response" not in cols:
+        conn.execute("ALTER TABLE trial_notes ADD COLUMN response TEXT")
 
 
 def _migrate_blackbook_origin(conn: sqlite3.Connection) -> None:

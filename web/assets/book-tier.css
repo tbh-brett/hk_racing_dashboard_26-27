@@ -1,0 +1,17 @@
+/* book-tier.css — the book's tiers (book-tier.js), on every page with a card.
+ * Only TRIAL NOTE is drawn as an action; the quiet tiers sit back. */
+.bt { display: inline-block; padding: 0 4px; line-height: 14px; font-family: var(--font-mono);
+      font-size: 10px; letter-spacing: .06em; white-space: nowrap; cursor: help; }
+.bt-note     { color: var(--bg); background: var(--win); }
+.bt-standout { color: var(--book-sys); background: var(--book-sys-ground); }
+.bt-excuse   { color: var(--incident); border: 1px solid var(--incident); line-height: 12px; }
+.bt-quiet, .bt-stale, .bt-run_note { color: var(--text-dim); border: 1px solid var(--line); line-height: 12px; }
+
+.bt-line { margin: 8px 0 6px; padding: 6px 10px; font-size: 12px; line-height: 1.45;
+           border-left: 2px solid var(--line); color: var(--text-muted); }
+.bt-line-back     { border-left-color: var(--win); color: var(--text); }
+.bt-line-consider { border-left-color: var(--book-sys); }
+
+.bt-noteline { margin-top: 6px; font-size: 12px; line-height: 1.45; color: var(--text); }
+.bt-noteline .cap { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; color: var(--win); }
+.bt-noteline .taps { color: var(--text-muted); }

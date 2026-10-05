@@ -266,9 +266,10 @@ def recent_batches(*, limit: int = 12, venue: str | None = None,
 
 def _notes(conn: Connection, date: str, trial_no: int) -> dict[str, dict]:
     """Notes written on one batch, by horse."""
-    return {r["horse_name"]: {"note": r["note"], "written_at": r["written_at"]}
+    return {r["horse_name"]: {"note": r["note"], "written_at": r["written_at"],
+                              "asked": r["asked"], "response": r["response"]}
             for r in conn.execute(
-                "SELECT horse_name, note, written_at FROM trial_notes "
+                "SELECT horse_name, note, written_at, asked, response FROM trial_notes "
                 "WHERE trial_date = ? AND trial_no = ?", (date, trial_no))}
 
 
@@ -289,8 +290,8 @@ def notes_for_horses(names: list[str], *, conn: Connection | None = None
         marks = ",".join("?" * len(names))
         out: dict[str, list[dict[str, Any]]] = {}
         for r in conn.execute(
-                f"SELECT horse_name, trial_date, trial_no, note, written_at "
-                f"FROM trial_notes WHERE horse_name IN ({marks}) "
+                f"SELECT horse_name, trial_date, trial_no, note, written_at, "
+                f"asked, response FROM trial_notes WHERE horse_name IN ({marks}) "
                 f"ORDER BY trial_date DESC, trial_no DESC",
                 [n.strip().upper() for n in names]):
             out.setdefault(r["horse_name"], []).append(dict(r))
@@ -432,8 +433,8 @@ def for_horses(names: list[str], *, before: str | None = None, limit: int = 2,
         # is what you want in front of you when the horse turns up in a race.
         notes = {(n["horse_name"], n["trial_date"], n["trial_no"]): dict(n)
                  for n in conn.execute(
-                     f"SELECT horse_name, trial_date, trial_no, note, written_at "
-                     f"FROM trial_notes WHERE horse_name IN ({marks})",
+                     f"SELECT horse_name, trial_date, trial_no, note, written_at, "
+                     f"asked, response FROM trial_notes WHERE horse_name IN ({marks})",
                      [n.strip().upper() for n in names])}
         kept = []
         for row in rows:

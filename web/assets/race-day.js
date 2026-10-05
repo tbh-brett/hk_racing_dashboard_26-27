@@ -20,6 +20,7 @@ import { Live } from './live.js';
 import { anchoredPanel } from './overlay.js';
 import { install as installPalette } from './palette.js';
 import { isSystem } from './book-origin.js';
+import { tierChip, tierRank } from './book-tier.js';
 import { agentShort, backgroundBlock, backgroundView } from './background.js';
 
 const svg = (tag, attrs) => {
@@ -195,7 +196,9 @@ function renderBlackbookBand() {
   // in the expanded grid below, muted and labelled with why they closed.
   const all = declared.filter(isLiveBooking);
   const closed = declared.filter((e) => !isLiveBooking(e));
-  const here = all.filter((e) => e.race_no === state.race);
+  // Trial-note horses first (query/book_tier): the order a crowded race reads in.
+  const here = all.filter((e) => e.race_no === state.race)
+    .sort((x, y) => tierRank(x.book_tier) - tierRank(y.book_tier));
   const rest = all.filter((e) => e.race_no !== state.race);
 
   const row = el('div', 'band-row');
@@ -230,6 +233,8 @@ function renderBlackbookBand() {
       if (isSystem(e)) item.classList.add('sys');
       if (!roomy) item.classList.add('tight');
       item.append(el('span', 'name', `${e.horse_no} ${e.horse_name}`));
+      const tc = tierChip(e.book_tier);
+      if (tc) item.append(tc);
       item.append(el('span', 'od', num(e.win_odds)));
       const mv = bbMove(e);
       item.append(el('span', `pct ${mv.cls}`, mv.text));
@@ -257,6 +262,7 @@ function renderBlackbookBand() {
       if (!e.booked_before_race) chip.classList.add('bb-stale');
       chip.append(el('span', 'r', `R${e.race_no}`));
       chip.append(el('span', 'name', `${e.horse_no} ${e.horse_name}`));
+      if (e.book_tier?.tier === 'NOTE') chip.append(tierChip(e.book_tier));
       const mv = bbMove(e);
       chip.append(el('span', `pct ${mv.cls}`, mv.text));
       chip.addEventListener('click', () => selectRace(e.race_no));
@@ -979,6 +985,8 @@ function cardRow(r, index) {
   if (isLiveBooking(r.blackbook)) nm.classList.add('booked');
   if (isLiveBooking(r.blackbook) && isSystem(r.blackbook)) nm.classList.add('sys');
   box.append(nm);
+  const tier = tierChip(r.book_tier);
+  if (tier) box.append(tier);
   // The FIRST tag in the array was an arbitrary pick — the order the deriver
   // happened to write them in — so a horse that bled last start showed
   // "contact" and the finding never reached the page at all. `tripTagChips`

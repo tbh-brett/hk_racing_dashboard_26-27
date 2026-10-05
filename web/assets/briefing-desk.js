@@ -11,6 +11,8 @@
 import { el, classCell, styleClass } from './vocab.js';
 import { backgroundBlock } from './background.js';
 import { unseenBlock } from './briefing-unseen.js';
+import { bookLineEl, noteLine, tierChip } from './book-tier.js';
+import { shortDate } from './briefing-format.js';
 
 /* ── shared pieces ──────────────────────────────────────────────────────── */
 
@@ -236,6 +238,8 @@ function raceDetail(r, ctx) {
   });
   top.append(link(`raceday.html?date=${ctx.date}&race=${r.no}`, 'RACE DAY CARD ▸', 'card'));
   box.append(top);
+  const bookLine = bookLineEl(r.bookLine);
+  if (bookLine) box.append(bookLine);
 
   r.interviews.forEach((iv) => box.append(interviewBox(iv)));
   r.comments.forEach((cm) => {
@@ -275,7 +279,9 @@ function raceDetail(r, ctx) {
     const sc = el('span', 'sc');
     sc.append(bar(x.bar, x.top ? 'top' : ''), el('span', 'pl', x.place), el('span', 'wn', x.win));
     const bb = el('span', 'bb');
-    if (x.hasBB) {
+    const chip = tierChip(x.bookTier);
+    if (chip) bb.append(chip);
+    else if (x.hasBB) {
       bb.append(el('span', `bf-bbtag${x.bbSys ? ' sys' : ''}`, x.bbSys ? 'SYS' : 'BB'),
                 el('span', `bf-setup-${x.setupTone}`, ` ${x.setup}`));
     }
@@ -375,6 +381,8 @@ export function screenBlock(x, { compact = false } = {}) {
              document.createTextNode(` ${x.trial.comment}`));
     col.append(t);
   }
+  const mine = x.bookTier && x.bookTier.tier === 'NOTE' ? noteLine(x.bookTier, shortDate) : null;
+  if (mine) col.append(mine);
   if (x.bg) col.append(backgroundBlock(x.bg, { compact }));
   x.notes.forEach((n) => {
     const t = el('div', 'bf-note');
