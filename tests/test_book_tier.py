@@ -143,6 +143,22 @@ def test_three_starts_since_booking_is_stale_and_renewing_restarts_it(tmp_path):
     assert bt.stale_entries(today=CARD, conn=conn) == {}
 
 
+def test_a_win_since_booking_restarts_the_count(tmp_path):
+    # LUCK IS BACK, 6 Oct: booked in May, won at 32.0 on 13 Sep, and was still
+    # marked stale for its starts since May. A win is the thesis paying.
+    path, conn = _db(tmp_path)
+    with transaction(conn):
+        _card(conn)
+        _race(conn, "2026-09-06", 9, [(1, "BOOKED", 6, 12.0)])
+        _race(conn, "2026-09-13", 9, [(1, "BOOKED", 1, 32.0)])
+        _race(conn, "2026-09-23", 9, [(1, "BOOKED", 5, 5.1)])
+        _entry(conn, "bb_0001", "BOOKED", "2026-05-04", tags=["traffic"])
+    tiers = bt.for_meeting(CARD, conn=conn, with_record=False)
+    assert tiers[(7, 2)]["starts"] == 1
+    assert tiers[(7, 2)]["tier"] == "EXCUSE"
+    assert bt.stale_entries(today=CARD, conn=conn) == {}
+
+
 def test_the_run_an_entry_was_booked_from_is_not_one_of_its_starts(tmp_path):
     path, conn = _db(tmp_path)
     with transaction(conn):

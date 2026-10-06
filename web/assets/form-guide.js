@@ -19,6 +19,7 @@ import { el, $, DASH, MINUS, renderNav, styleClass, styleOrdinal,
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 import { loadTags, renderReview, trialSubject } from './review.js';
+import { isSystem } from './book-origin.js';
 
 
 /* The trend tint's threshold, measured rather than chosen. Over 12,540 six-run
@@ -247,13 +248,21 @@ function flagsFor(runner) {
     const live = isLiveBooking(bb);
     const onDay = live && bb.conditions_text && bb.on_conditions;
     out.push(live
-      ? { kind: onDay ? 'bb on-cond' : 'bb',
+      ? { kind: `${onDay ? 'bb on-cond' : 'bb'}${isSystem(bb) ? ' sys' : ''}`,
           text: onDay ? bb.conditions_text.toUpperCase() : 'BLACKBOOK',
           title: onDay
             ? `booked for ${bb.conditions_text}, and today is that race`
             : null,
           bb }
       : { kind: 'bb closed', text: bookingStatus(bb), bb });
+  }
+  // The two tiers that ask for something (query/book_tier): the owner's trial
+  // note since the last run -- booked or not -- and a STANDOUT trial.
+  const tier = state.guide?.tiers?.[runner.horse_name];
+  if (tier?.tier === 'NOTE' || tier?.tier === 'STANDOUT') {
+    out.push({ kind: `tier-${tier.tier.toLowerCase()}`,
+               text: tier.tier === 'NOTE' ? 'TRIAL NOTE' : 'STANDOUT',
+               title: tier.note ? `your note, ${tier.note.trial_date}: ${tier.note.note}` : tier.label });
   }
 
   const runs = history(runner);
@@ -350,7 +359,8 @@ function horseRow(runner) {
   const live = isLiveBooking(bb);
   const open = state.open.has(runner.horse_no);
 
-  const row = el('div', `fg-row${open ? ' open' : ''}${live ? ' booked' : ''}`);
+  const sys = live && isSystem(bb);
+  const row = el('div', `fg-row${open ? ' open' : ''}${live ? ' booked' : ''}${sys ? ' sys' : ''}`);
   row.setAttribute('role', 'row');
   row.addEventListener('click', () => toggleHorse(runner.horse_no));
   row.addEventListener('mouseenter', () => focusHorse(runner));
@@ -359,7 +369,7 @@ function horseRow(runner) {
 
   const nameCell = el('div', 'name-cell');
   nameCell.append(el('span', 'caret', open ? '▼' : '▶'));
-  const nm = el('span', `nm${live ? ' booked' : ''}`, runner.horse_name);
+  const nm = el('span', `nm${live ? ' booked' : ''}${sys ? ' sys' : ''}`, runner.horse_name);
   if (bb && !live) nm.title = closedNote(bb) ?? '';
   nameCell.append(nm);
   row.append(nameCell);
@@ -1003,8 +1013,8 @@ function renderAside() {
   const bb = state.guide?.blackbook?.[runner.horse_name];
   const hd = el('div', 'fit-hd');
   hd.append(el('span', 'no', String(runner.horse_no)));
-  hd.append(el('span', `nm${isLiveBooking(bb) ? ' booked' : ''}`,
-                runner.horse_name));
+  hd.append(el('span', `nm${isLiveBooking(bb) ? ' booked' : ''}`
+                + `${isLiveBooking(bb) && isSystem(bb) ? ' sys' : ''}`, runner.horse_name));
   hd.append(el('span', 'odds', runner.win_odds ? num(runner.win_odds, 1) : DASH));
 
   const race = state.guide.race;
@@ -1404,9 +1414,16 @@ async function loadRace() {
     api.trialsForHorses(names, state.date).catch(() => ({ trials: {} })),
   ]);
   state.guide.blackbook = {};
+  state.guide.tiers = {};
   (book?.entries ?? [])
     .filter((e) => e.race_no === state.race)
-    .forEach((e) => { state.guide.blackbook[e.horse_name] = e; });
+    .forEach((e) => {
+      if (e.book_tier) state.guide.tiers[e.horse_name] = e.book_tier;
+      // A noted horse outside the book rides in the same list for Race Day's
+      // band; here it must not read as booked, or the note form would refuse
+      // to book it ("already in the blackbook").
+      if (e.origin !== 'note') state.guide.blackbook[e.horse_name] = e;
+    });
   state.notes = notes.notes ?? {};
   state.trials = trials.trials ?? {};
   render();

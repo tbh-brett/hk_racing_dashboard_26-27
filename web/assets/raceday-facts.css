@@ -1,0 +1,22 @@
+/* raceday-facts.css — the second line of a Race Day runner: the facts.
+ * Its own sheet because raceday.css is past the 600-line cap. */
+/* ── the facts under a horse's name ────────────────────────────────────────
+ * Owner, 6 Oct: the horse cell carried up to eight boxed chips in five styles
+ * on one line. Now it is two lines: the name with the book's tier (the one
+ * box, because it is the one that asks for a decision), then every fact as
+ * plain coloured text, soundness first, a dot between. Each keeps its own
+ * colour, tooltip and vet panel; only the boxes went. */
+.facts {
+  display: flex; flex-wrap: wrap; align-items: baseline; margin-top: 2px;
+  font-size: 10px; line-height: 1.35; letter-spacing: .03em; text-transform: uppercase;
+}
+.facts > * + *::before { content: '·'; margin: 0 5px; color: var(--text-faint); }
+.facts .trip, .facts .gear-chip, .facts .bf-agent, .facts .trip-more,
+.facts .trips > * {
+  border: 0; padding: 0; background: none; font-size: inherit;
+}
+.facts .trips { display: inline-flex; gap: 4px; }
+.facts .trip.vet { font-weight: 600; }
+.facts .gear-chip.trial-withheld { font-style: italic; }
+.facts .bf-agent { color: var(--text-dim); }
+.horse .bt { font-size: 9px; line-height: 13px; }

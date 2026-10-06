@@ -13,7 +13,8 @@ my book" no longer told the owner which one to back. Measured that day
                 wide trip, a slow start, a riding error
     QUIET       booked for anything else (improvement, a      0.86    197
                 closing sectional, outran its price ...)
-    STALE       three starts since it was booked or renewed   0.82     75
+    STALE       three starts without a win since it was       0.82     75
+                booked, renewed or last won
 
 and HKJC's own words, read phrase by phrase, beat the price no more often than
 chance. What the owner sees in a trial video is the one thing here the market
@@ -60,10 +61,15 @@ ACTION = {"NOTE": "back", "STANDOUT": "consider", "EXCUSE": "watch",
           "QUIET": "quiet", "STALE": "quiet", "RUN_NOTE": "quiet"}
 EXCUSE_TAGS = frozenset({"traffic", "bad_draw", "bad_run", "slow_start",
                          "jockey_error"})
-# An entry with this many starts since it was booked (or renewed) has been
-# asked its question; the same number the system's own entries are tested over
-# (`query/auto_book.TESTED_RUNS`). Stale is muted, never closed: closing is the
-# owner's button, renewing restarts the count.
+# An entry with this many starts without a win -- counted from the day it was
+# booked, renewed, or last won since booking -- has been asked its question
+# and not answered it; the same number the system's own entries are tested
+# over (`query/auto_book.TESTED_RUNS`). A WIN restarts the count (owner, 6 Oct:
+# LUCK IS BACK won at 32.0 on 13 Sep and was still marked stale for its six
+# starts since May). Measured on results to 4 Oct, stale by this rule ran at
+# A/E 0.90 against 0.99 for the rest of the book; without the reset, 1.03 --
+# it is housekeeping, not a signal. Stale is muted, never closed: closing is
+# the owner's button, renewing restarts the count too.
 TESTED_STARTS = 3
 # The owner's book as it stands began in April 2026; nothing before is a run
 # of this book.
@@ -125,14 +131,34 @@ def _marks(n: int) -> str:
 
 
 def _runs(conn: Connection, names: list[str], before: str) -> dict[str, list[tuple]]:
-    """Every finished run per horse before `before`, oldest first."""
+    """Every finished run per horse before `before`, oldest first, as
+    (race_date, race_no, place)."""
     out: dict[str, list[tuple]] = defaultdict(list)
     for r in conn.execute(
-            f"SELECT horse_name, race_date, race_no FROM runners "
+            f"SELECT horse_name, race_date, race_no, place FROM runners "
             f"WHERE horse_name IN ({_marks(len(names))}) AND race_date < ? "
             f"AND place IS NOT NULL ORDER BY race_date, race_no", [*names, before]):
-        out[r[0]].append((r[1], r[2]))
+        out[r[0]].append((r[1], r[2], r[3]))
     return out
+
+
+def _starts(entry: dict, past: list[tuple], before: str) -> int:
+    """Starts without a win before `before`, counted from the day the entry
+    was booked (the run it was written from left out), or renewed -- a renewal
+    only once it has happened -- and restarted by every win since. One count
+    for the race-day tier and the Blackbook page's STALE mark."""
+    renewed = entry["renewed_date"] if (entry["renewed_date"]
+                                        and entry["renewed_date"] < before) else None
+    n = 0
+    for d, no, place in past:
+        if d >= before:
+            break
+        if (d <= renewed if renewed else d < entry["added_date"]):
+            continue
+        if d == entry["source_date"] and no == entry["source_race_no"]:
+            continue
+        n = 0 if place == 1 else n + 1
+    return n
 
 
 def _entries(conn: Connection, names: list[str]) -> dict[str, list[dict]]:
@@ -223,14 +249,7 @@ def _tiers(conn: Connection, runs: list[dict]) -> dict[tuple, dict]:
                       key=lambda e: e["added_date"], reverse=True)
         live.sort(key=lambda e: e["origin"] != "owner" and not e["adopted_date"])
         entry = live[0] if live else None
-        starts = 0
-        if entry:
-            start = entry["renewed_date"] if (entry["renewed_date"]
-                                              and entry["renewed_date"] < date) else None
-            starts = sum(1 for d, no in past[:i]
-                         if (d > start if start else d >= entry["added_date"])
-                         and not (d == entry["source_date"]
-                                  and no == entry["source_race_no"]))
+        starts = _starts(entry, past, date) if entry else 0
         standout = next((s for s in standouts.get(name, [])
                          if (last is None or s["trial_date"] > last)
                          and s["trial_date"] < date), None) if entry else None
@@ -377,8 +396,9 @@ def record(*, conn: Connection | None = None) -> dict[str, dict[str, Any]]:
 
 def stale_entries(*, today: str | None = None, conn: Connection | None = None
                   ) -> dict[str, int]:
-    """{entry id: starts since booked or renewed} for every live entry that
-    has reached TESTED_STARTS -- the Blackbook page's Stale mark."""
+    """{entry id: starts without a win since booked, renewed or last won}
+    for every live entry that has reached TESTED_STARTS -- the Blackbook
+    page's Stale mark."""
     today = today or dt.date.today().isoformat()
     own = conn is None
     conn = conn or get_conn()
@@ -393,12 +413,10 @@ def stale_entries(*, today: str | None = None, conn: Connection | None = None
     finally:
         if own:
             conn.close()
+    end = (dt.date.fromisoformat(today) + dt.timedelta(days=1)).isoformat()
     out = {}
     for e in live:
-        start = e["renewed_date"]
-        n = sum(1 for d, no in history.get(e["horse_name"], [])
-                if (d > start if start else d >= e["added_date"])
-                and not (d == e["source_date"] and no == e["source_race_no"]))
+        n = _starts(e, history.get(e["horse_name"], []), end)
         if n >= TESTED_STARTS:
             out[e["id"]] = n
     return out

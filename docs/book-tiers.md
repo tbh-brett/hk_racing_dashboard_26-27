@@ -67,7 +67,7 @@ One per runner, in this order (`book_tier.classify`), as at the off:
 |---|---|---|---|
 | TRIAL NOTE | the owner's trial note on a trial since the last run, written before the off — **booked or not** | 13 / 66, 1.84 | green: back it to win, flat |
 | STANDOUT | in the book, a STANDOUT trial since the last run | 5 / 19, 1.33 | orchid: consider |
-| STALE | in the book, 3+ starts since it was booked or renewed | 6 / 75, 0.82 | muted |
+| STALE | in the book, 3+ starts without a win since it was booked, renewed or last won | 6 / 75, 0.82 | muted |
 | EXCUSE | in the book for traffic, draw, wide trip, slow start, riding error | 25 / 244, 1.12 | copper: watch |
 | QUIET | in the book for anything else | 16 / 197, 0.86 | muted |
 | RUN NOTE | not in the book, the owner's note on its last start | 0 / 6 | muted |
@@ -88,7 +88,11 @@ record from 7 Oct on is the test.
   #7, #10 to win, flat (your trial notes since their last run); 2 quiet.* No
   page-level block (docs: briefing-no-new-panels). The race's `book` reason
   names the trial-note horses once, with the tier's record.
-- **An entry with 3 starts since booking is muted as STALE, never closed.**
+- **An entry with 3 starts without a win is muted as STALE, never closed.** A
+  win restarts the count (owner, 6 Oct: LUCK IS BACK won at 32.0 on 13 Sep and
+  was still marked stale for its six starts since May). On results to 4 Oct,
+  stale by this rule ran at A/E 0.90 against 0.99 for the rest of the book —
+  1.03 without the reset — so it is housekeeping, not a betting signal.
   The Blackbook list marks it and offers RENEW beside RETIRE; renewing counts
   its starts again from that day (`blackbook.renewed_date`). A system entry is
   adopted before it can be renewed — the system closes its own after their
@@ -121,3 +125,18 @@ and read what was ready: 23 Sep's results at 07:40 on 29 Sep (the morning
 after HKJC's comments on running), trial days 28 and 29 Sep at 20:30 the same
 evenings. A meeting waits for its comments on running (5-8 days, backstop 8);
 a trial day is read the evening it is finished.
+
+## After the first week (6 Oct)
+
+Results to 4 Oct: TRIAL NOTE 16 won of 92 where 10.3 were expected (A/E 1.55,
+down from 1.84). 1 Oct carried 19 trial-note horses after the 28-29 Sep batch
+of notes and 3 won (CAVAMAZING 38.0, CIRRUS SPEED 12.0, KA YING LIGHTNING
+4.7); 4 Oct carried 7, none won, three ran second.
+
+Also on 6 Oct: the Form Guide draws a system entry in orchid like every other
+page, keeps a noted horse outside the book out of its booked set (it was
+reading Race Day's band list, which carries them), and flags TRIAL NOTE and
+STANDOUT. Race Day reads one step smaller; a runner's facts (vet, trip, gear,
+agent) sit on a second line as plain coloured text, with the book's tier the
+only box; the side panel's horses-met rows are two short lines, the draw and
+rider swing read from the horse's own side.

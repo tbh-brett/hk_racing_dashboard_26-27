@@ -253,13 +253,21 @@
 
 /* ── card ────────────────────────────────────────────────────────────────── */
 
+/* One step down the type scale for the page's own content (owner, 6 Oct:
+   "smaller fonts"). Scoped to the bands, the race bar and the card so the
+   shared chrome reads the same on every page; everything below that sizes
+   with the --fs tokens follows. */
+.band, .race-bar, .card-wrap {
+  --fs-xs: 9px; --fs-sm: 11px; --fs: 12px; --fs-md: 13px;
+}
 .card-wrap { display: flex; align-items: stretch; min-height: calc(100vh - 240px); }
 .card-scroll { flex: 1; min-width: 0; overflow: auto; }
-table.card { width: 100%; border-collapse: collapse; font-family: var(--font-mono); }
+table.card { width: 100%; border-collapse: collapse; font-family: var(--font-mono);
+             font-size: var(--fs); }
 table.card th {
   position: sticky; top: 0; z-index: 2; background: var(--surface);
-  font-size: 10px; font-weight: 500; letter-spacing: .1em; color: var(--text-muted);
-  padding: 7px 8px; border-bottom: 1px solid var(--line-2);
+  font-size: 9px; font-weight: 500; letter-spacing: .1em; color: var(--text-muted);
+  padding: 6px 7px; border-bottom: 1px solid var(--line-2);
   white-space: nowrap; cursor: pointer; user-select: none;
 }
 table.card th:hover { color: var(--text); background: var(--surface-2); }
@@ -267,7 +275,7 @@ table.card th .ind { font-size: 8px; color: var(--edge); margin-left: 4px; }
 table.card tbody tr { border-bottom: 1px solid var(--line); }
 table.card tbody tr:hover { background: var(--row-hover); }
 table.card tbody tr[aria-selected="true"] { background: var(--row-hover); }
-table.card td { padding: 6px 8px; }
+table.card td { padding: 5px 7px; }
 .c-num { text-align: center; }
 .c-right { text-align: right; }
 .td-no { text-align: center; border-left: 3px solid transparent; }
@@ -284,7 +292,7 @@ table.card td { padding: 6px 8px; }
   color: var(--alert); border-color: var(--alert); font-weight: 600;
   cursor: help;
 }
-.odds-win { font-size: 16px; font-weight: 600; line-height: 1.05; }
+.odds-win { font-size: 14px; font-weight: 600; line-height: 1.05; }
 .odds-place { font-size: var(--fs-sm); color: var(--text-faint); line-height: 1.15; }
 .mv { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
 .mv .prev { font-size: var(--fs-sm); color: var(--text-dim); }
@@ -357,11 +365,11 @@ table.card td { padding: 6px 8px; }
   padding: 9px 12px; border-bottom: 1px solid var(--line-2);
   font-family: var(--font-mono);
 }
-.detail .dh .no { font-size: 16px; font-weight: 600; }
-.detail .dh .nm { font-size: 14px; font-weight: 600; }
-.detail .dh .od { margin-left: auto; font-size: 16px; font-weight: 600; }
+.detail .dh .no { font-size: 14px; font-weight: 600; }
+.detail .dh .nm { font-size: 13px; font-weight: 600; }
+.detail .dh .od { margin-left: auto; font-size: 14px; font-weight: 600; }
 .detail h6 {
-  margin: 0 0 6px; font-family: var(--font-mono); font-size: 10px;
+  margin: 0 0 6px; font-family: var(--font-mono); font-size: 9px;
   letter-spacing: .1em; color: var(--text-muted); font-weight: 500;
 }
 .detail table { width: 100%; border-collapse: collapse;
@@ -473,15 +481,25 @@ table.card td { padding: 6px 8px; }
 #detail .bb-meta .tag {
   color: var(--book); border: 1px solid var(--book-ground); padding: 0 4px;
 }
+/* Two short lines per horse met (owner, 6 Oct): who and the record, then the
+   last meeting and what has swung since. One line of four pieces wrapped into
+   a jumble in a panel this narrow. */
 #detail .met-row {
-  display: flex; align-items: baseline; gap: var(--sp-2);
-  min-height: 17px; font-size: var(--fs-xs); color: var(--text-muted);
+  padding: 3px 0; border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
 }
+#detail .met-row:last-child { border-bottom: 0; }
+#detail .met-top { display: flex; align-items: baseline; gap: 6px; }
+#detail .met-top .no { width: 16px; text-align: right; color: var(--text-dim); flex: none; }
 #detail .met-row .v2 {
   color: var(--text-2); overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: nowrap; min-width: 0;
 }
-#detail .met-row .rec { margin-left: auto; color: var(--text); font-weight: 600; }
+#detail .met-row .rec { margin-left: auto; color: var(--text); font-weight: 600; flex: none; }
+#detail .met-sub {
+  display: flex; flex-wrap: wrap; gap: 0 8px; padding-left: 22px;
+  font-size: 10px; line-height: 1.4;
+}
 /* What each pool holds. Beside concentration, which says how the money is
    DIVIDED — the two are independent, and a strongly concentrated race can be a
    $90,000 market. */
@@ -568,6 +586,7 @@ table.card td { padding: 6px 8px; }
    the rider has swung toward the beaten horse since (query/h2h). */
 #detail .met-row .k.turn-for { color: var(--win); }
 #detail .met-row .k.turn-held { color: var(--text-2); }
+#detail .met-row .k.turn-against { color: var(--loss-dim); }
 
 
 /* WHO the weight change favours, said in words. The gap either side of the
@@ -622,10 +641,11 @@ table.card td { padding: 6px 8px; }
  * colour here would be a recommendation. */
 .model-cell .v { font-family: var(--font-mono); }
 .gap-cell { color: var(--text-dim); font-family: var(--font-mono); }
-.flags-cell { white-space: nowrap; }
-.flag-chip { display: inline-block; font-size: 9px; letter-spacing: .04em;
-             padding: 1px 4px; margin-right: 3px; border: 1px solid var(--line);
-             border-radius: 2px; color: var(--text-muted); }
+.flags-cell { white-space: nowrap; font-size: 10px; }
+/* Plain text like the facts under the horse's name, not a box: on this page
+   only the book's tier is a box (owner, 6 Oct). */
+.flag-chip { display: inline; color: var(--text-muted); cursor: help; }
+.flag-chip + .flag-chip::before { content: '·'; margin: 0 5px; color: var(--text-faint); }
 .grp-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
 .grp-row .k { width: 112px; color: var(--text-muted); }
 .grp-row .x { width: 44px; text-align: right; font-family: var(--font-mono); }
@@ -635,3 +655,4 @@ table.card td { padding: 6px 8px; }
 .grp-track i.up { left: 50%; }
 .grp-track i.down { right: 50%; }
 .grp-note { color: var(--text-muted); padding-top: 4px; }
+

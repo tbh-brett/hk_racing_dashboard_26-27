@@ -509,7 +509,10 @@ function renderH2HBand() {
     if (p.turn?.length) {
       const lt = el('div', 'h2h-meta');
       lt.append(el('span', 'k', 'SINCE'));
-      lt.append(el('span', 'for', p.turn.join(' · ')));
+      const swung = el('span', 'for', p.turn.map((t) => t.replace(' relatively', '')
+        .replace(/^drawn /, 'draw ')).join(' · '));
+      swung.title = p.turn.join(', ');
+      lt.append(swung);
       c.append(lt);
     }
 
@@ -987,6 +990,11 @@ function cardRow(r, index) {
   box.append(nm);
   const tier = tierChip(r.book_tier);
   if (tier) box.append(tier);
+  // LINE 2: the facts, as plain coloured text, soundness first (owner, 6 Oct:
+  // eight boxed chips in five styles on one line was unreadable). The book's
+  // tier above is the only box left, because it is the only one that asks for
+  // a decision. Each fact keeps its tooltip or panel.
+  const facts = el('div', 'facts');
   // The FIRST tag in the array was an arbitrary pick — the order the deriver
   // happened to write them in — so a horse that bled last start showed
   // "contact" and the finding never reached the page at all. `tripTagChips`
@@ -1006,7 +1014,7 @@ function cardRow(r, index) {
       + `${worst.runs_ago === 1 ? 'last start' : `${worst.runs_ago} runs ago`}`
       + `, ${compactDate(worst.race_date)}`
       + (worst.comment ? `\n\n${worst.comment}` : '');
-    box.append(chip);
+    facts.append(chip);
   }
   // Trouble only. The findings are on the chip above; showing them twice made
   // the row say "LAME HIND lame hind" and pushed the traffic note — a
@@ -1015,7 +1023,6 @@ function cardRow(r, index) {
     comment: r.last_run?.comment ?? null,
     limit: 1, cls: 'trip',
   });
-  if (trip) box.append(trip);
   // Vet records have been scraped into the database since the first build and
   // were never read back — brief 07 §2 puts a compact badge here, expanding on
   // click. Significant and routine read differently on purpose: a passed
@@ -1039,14 +1046,16 @@ function cardRow(r, index) {
     // to the trigger, so calling it from a click handler would stack a fresh
     // pair of listeners on every click.
     openVet(chip, r, vet);
-    box.append(chip);
+    facts.append(chip);
   }
-  gearChips(r).forEach((c) => box.append(c));
+  if (trip) facts.append(trip);
+  gearChips(r).forEach((c) => facts.append(c));
   // The agent the import came through, for its first five HK starts.
   if (r.background?.agents?.length) {
-    box.append(el('span', 'bf-agent', `AG ${agentShort(r.background.agents[0])}`));
+    facts.append(el('span', 'bf-agent', `AG ${agentShort(r.background.agents[0])}`));
   }
   name.append(box);
+  if (facts.childElementCount) name.append(facts);
   tr.append(name);
 
   // HOW THE HORSE RUNS — the habit, not the last run's style. This column read
@@ -1192,14 +1201,18 @@ function renderDetail() {
     sec.append(el('h6', null, "MET TODAY'S FIELD BEFORE"));
     met.forEach((p) => {
       const mine = p.a_no === r.horse_no;
+      // Two short lines rather than one long one (owner, 6 Oct): who and the
+      // record, then the last meeting and what has swung since.
       const row = el('div', 'met-row');
-      row.append(el('span', 'v2',
-        `v ${mine ? p.b_no : p.a_no} ${mine ? p.b_name : p.a_name}`));
+      const top = el('div', 'met-top');
+      top.append(el('span', 'no', String(mine ? p.b_no : p.a_no)),
+                 el('span', 'v2', mine ? p.b_name : p.a_name));
       // The record read from THIS horse's side. Printed as stored it would
       // say 2-1 to a horse that has lost twice.
       const rec = String(p.record ?? '').split('-');
-      row.append(el('span', 'rec',
+      top.append(el('span', 'rec',
         mine ? p.record : `${rec[1] ?? ''}-${rec[0] ?? ''}`));
+      row.append(top);
       // WHO WAS BEATEN, from this horse's side, and what has moved since in
       // the beaten horse's favour. The weight is left out on purpose: it
       // follows the rating (query/h2h).
@@ -1211,9 +1224,19 @@ function renderDetail() {
         k.title = `from a margin like this, the horse beaten finished in front next `
           + `time ${100 - p.repeat_pct}% of the time`
           + (p.turn?.length ? `; since then the beaten horse is ${p.turn.join(', ')}` : '');
-        row.append(k);
-        if (p.turn?.length) row.append(el('span', 'k turn-for', p.turn.length === 2
-          ? 'draw + rider' : p.turn[0].split(' ')[0] === 'drawn' ? 'draw' : 'rider'));
+        const sub = el('div', 'met-sub');
+        sub.append(k);
+        if (p.turn?.length) {
+          // Read from THIS horse's side: a swing toward the horse it beat is
+          // against it, and must not wear the colour that says "for".
+          const what = p.turn.length === 2 ? 'draw + rider'
+            : p.turn[0].startsWith('drawn') ? 'draw' : 'rider';
+          const swing = el('span', `k ${beaten ? 'turn-for' : 'turn-against'}`,
+            `${what} for ${beaten ? 'it' : 'them'}`);
+          swing.title = k.title;
+          sub.append(swing);
+        }
+        row.append(sub);
       }
       sec.append(row);
     });
