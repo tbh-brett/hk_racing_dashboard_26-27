@@ -140,7 +140,18 @@ def upsert_runners(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
             "dead_heat", "finish_time", "lengths_behind", "draw", "jockey", "trainer",
             "actual_weight", "declared_weight", "gear", "rating", "win_odds",
             "section_times", "running_positions"]
-    return _upsert(conn, "runners", cols, ["race_date", "race_no", "horse_no"], prepared)
+    n = _upsert(conn, "runners", cols, ["race_date", "race_no", "horse_no"], prepared)
+    # A horse that finished was not withdrawn. The card records a withdrawal
+    # as WX before the race (`jobs/scrape_meeting.store_card`), and a result's
+    # blank code cannot overwrite it under the rule above -- so a placing
+    # clears it here, and a card that marked the wrong horse cannot outlive
+    # the result.
+    conn.executemany(
+        "UPDATE runners SET place_code = NULL WHERE race_date = ? AND race_no = ? "
+        "AND horse_no = ? AND place IS NOT NULL AND place_code LIKE 'W%'",
+        [(p["race_date"], p["race_no"], p["horse_no"]) for p in prepared
+         if p["place"] is not None])
+    return n
 
 
 def upsert_dividends(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:

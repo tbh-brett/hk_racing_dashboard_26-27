@@ -26,7 +26,7 @@ from . import coerce
 from .connect import Connection
 
 __all__ = ["load_runs", "settled_dates", "save_model", "promote", "live_model",
-           "model_row", "card_facts", "unrun_dates", "scored_keys", "write_scores",
+           "model_row", "card_facts", "unrun_races", "unrun_dates", "scored_keys", "write_scores",
            "shown", "scored_dates", "TROUBLE_TAGS", "WIDE_TAGS", "VET_TAGS"]
 
 # What each stewards' count in the model means. The tag names are
@@ -166,8 +166,15 @@ def model_row(conn: Connection, version: str | None = None) -> dict[str, Any] | 
 
 # ─── runner_gbm ──────────────────────────────────────────────────────────────
 
+# A race has gone when HKJC shut its pool (`market_close`, written by the odds
+# capture the minute it sees a pool stop selling at the off) or a result is
+# stored -- `store/tips.races_gone_off`'s rule. A result alone is not enough:
+# results arrive at 19:00, and on 2026-10-04 the 13:01 run rescored race 1,
+# off at 12:30, so 'latest' was no longer what the page showed at the off.
 _UNRUN = ("NOT EXISTS (SELECT 1 FROM runners x WHERE x.race_date = r.race_date "
-          "AND x.race_no = r.race_no AND x.place IS NOT NULL)")
+          "AND x.race_no = r.race_no AND x.place IS NOT NULL) "
+          "AND NOT EXISTS (SELECT 1 FROM market_close m WHERE m.race_date = r.race_date "
+          "AND m.race_no = r.race_no)")
 
 
 def card_facts(conn: Connection, date: str) -> list[dict[str, Any]]:
@@ -182,6 +189,13 @@ def card_facts(conn: Connection, date: str) -> list[dict[str, Any]]:
          WHERE u.race_date = ? AND coalesce(u.place_code, '') NOT LIKE 'W%' AND {_UNRUN}
          ORDER BY u.race_no, u.horse_no""", (date,)).fetchall()
     return [dict(x) for x in rows]
+
+
+def unrun_races(conn: Connection, date: str) -> list[int]:
+    """One meeting's races still to run: pool not shut, no result stored."""
+    return [r[0] for r in conn.execute(
+        f"SELECT r.race_no FROM races r WHERE r.race_date = ? AND {_UNRUN} "
+        "ORDER BY r.race_no", (date,))]
 
 
 def unrun_dates(conn: Connection, *, today: str) -> list[str]:

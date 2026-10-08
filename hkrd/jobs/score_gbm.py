@@ -8,8 +8,11 @@ product -- and again whenever what HKJC has declared changes: a scratching, a
 change of rider, the body weights and the going on race morning. Called by
 `nightly` and `project_card` on every run; the card's declared facts and the
 live model are fingerprinted first (`store/gbm.card_facts`), so a card that
-has not changed costs one query and builds nothing. A race that has been run
-is never scored again: its 'latest' row is what the page showed at the off.
+has not changed costs one query and builds nothing. A race that has gone off
+-- its pool shut, or its result stored -- is never scored again: its 'latest'
+row is what the page showed at the off. Through race day `raceday_card`
+re-reads the races still to run, so a late rider change or withdrawal is
+scored before the off rather than missed until 19:00.
 
 WHAT IS ASSUMED, AND SAID (§13.2). A card published days ahead has no body
 weights and no going. Body weight: the last run's (`derive/features`), and for

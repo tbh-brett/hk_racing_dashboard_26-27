@@ -12,7 +12,7 @@ build departs from them or had to decide something they left open.
 | Model | `model/gbm.py`, `model/gbm_record.py` | the lab's predictions bit for bit on the lab's inputs |
 | Fit | `jobs/fit_gbm.py` → `gbm_models` | §8 on the PC archive: pooled R² 0.1255 (0.126), every season within 0.0016 |
 | Replay | `jobs/replay_gbm.py` | §14.2 on Fly's copy: 0.1417 / 0.1404 (0.145 / 0.143), top three 29 (29), top pick 14 (16) |
-| Scoring | `jobs/score_gbm.py` → `runner_gbm`; hooks in `jobs/nightly`, `jobs/project_card` | tests/test_gbm.py |
+| Scoring | `jobs/score_gbm.py` → `runner_gbm`; hooks in `jobs/nightly`, `jobs/project_card`, `jobs/raceday_card` | tests/test_gbm.py, tests/test_raceday_card.py |
 
 Re-run the replay after any change to the inputs or the model:
 `python -m hkrd.jobs.replay_gbm --db <a copy of Fly's database>`. Never run `fit_gbm` against a
@@ -42,9 +42,10 @@ for me".)
 
 **Two scores a runner.** `runner_gbm.stage`: `card` is the first score, when the card lands —
 written once, never rewritten, the night-before read on the record before any price. `latest` is
-rewritten whenever the card's declared facts or the live model change, and stops when the race is
-run, so at the off it is what the page showed. §3's primary key had one row a runner; §14.3 asked
-to keep both.
+rewritten whenever the card's declared facts or the live model change, and stops when HKJC shuts
+the race's pool (`market_close`) or its result is stored, so at the off it is what the page
+showed. §3's primary key had one row a runner; §14.3 asked to keep both. (Until 8 Oct it stopped
+only at the result, which arrives at 19:00; see "Race day" below.)
 
 **Card riders.** A card names an apprentice with the claim — "H Y Yuen (-7)" at 122 lb — where a
 result names the rider and the weight carried, 115. The model learned the second, and the replay
@@ -73,6 +74,26 @@ the flag's record only where they do, and names no figure where they do not.
 
 **Flags read stored facts.** `runner_gbm.facts_json` carries what the five flags read, so
 `query/gbm` applies the rules (`model/gbm_record.FLAGS`) without rebuilding inputs in a request.
+
+**Retraining after every meeting, measured (6 Oct 2026).** §14.8 put the gain over a model frozen
+in July at 0.031 ± 0.014 a race, on 46 replay races. Over the five walk-forward seasons (4,148
+races, each meeting predicted only by trees grown before it, on Fly's copy of 4 Oct) it is
++0.0053 ± 0.0024 a race (R² 0.1254 → 0.1276), against +0.0062 ± 0.0023 for a refit every eighth
+meeting; every meeting against monthly is −0.0009 ± 0.0015. The direction holds and the size is a
+sixth of §14.8's. Extra history stops paying after about three seasons (trained on 1 → 2 → 3 → 4
+→ 5 seasons before 2025-26: +0.029, +0.009, −0.005, +0.005 a race), so what a retrain adds is this
+season's runs, not more data. The nightly retrain stays: it costs 30 s and is no worse than any
+other cadence. A retrain moves a card's chances about 0.5 points a runner, less than a change of
+LightGBM seed on the same data (0.7–0.8).
+
+**Race day (8 Oct 2026).** On 4 Oct the 13:01 nightly rescored race 1, off at 12:30, because a race
+counted as run only once its result was stored; and nothing re-read the card between 13:00 and
+19:00, so race 8 was shown for the rider the card named at 13:01 (FOREVER FOLKS, 6.7%; under
+A Atzeni, who rode it, 7.6%). Now: a race whose pool has shut is never scored again
+(`store/gbm._UNRUN`, the tips layer's rule); `jobs/raceday_card` re-reads the card for the races
+still to run every 20 minutes from 10:00 to 22:40 and re-scores what changed; and the card scrape
+stores a runner the card marks withdrawn as `WX`, so it leaves the field before the off rather
+than at the result. A placing clears a `WX` (`store/upsert.upsert_runners`).
 
 ## Not done in phase 1
 

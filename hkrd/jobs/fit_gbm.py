@@ -3,8 +3,10 @@
     python -m hkrd.jobs.fit_gbm [--db PATH] [--through YYYY-MM-DD] [--record]
     python -m hkrd.jobs.fit_gbm --promote VERSION      # by hand, after review
 
-One fit a night after a meeting settles (gbm-SPEC §5, §14.8: a model retrained
-before each meeting beat one frozen in July by 0.031 a race). In order:
+One fit a night after a meeting settles (gbm-SPEC §5). Measured over five
+walk-forward seasons, retraining before every meeting beats one fit a season by
+0.005 a race and ties a monthly refit -- not §14.8's 0.031, which was 46 races
+(docs/gbm.md). It is kept because it costs 30 s and is never worse. In order:
 
 1. The inputs for every settled run (`derive/features`).
 2. How many trees: early stopping on the most recent season not in progress,

@@ -59,6 +59,14 @@
 20 12 * * *   nice -n 19 python -m hkrd.jobs.project_card --pending --db /data/hkrd.db
 20 18 * * *   nice -n 19 python -m hkrd.jobs.project_card --pending --db /data/hkrd.db
 
+# Race day: the card re-read for the races still to run, and the model's
+# chances re-scored if it changed. Before this, a rider change after the 13:00
+# nightly reached nothing until 19:00 -- 2026-10-04 race 8 was shown for a rider
+# who did not ride it. Every 20 minutes from 10:00 to 22:40, so before a Sha Tin
+# afternoon and through a Happy Valley evening. On any other day it is one
+# query and an exit; a race that has gone off is never fetched again.
+*/20 10-22 * * *   nice -n 19 python -m hkrd.jobs.raceday_card --db /data/hkrd.db
+
 # Barrier trials. A separate line because they are a different source on a
 # different schedule, and folding them into `nightly` would mean a failed
 # race-day scrape takes the trials down with it.

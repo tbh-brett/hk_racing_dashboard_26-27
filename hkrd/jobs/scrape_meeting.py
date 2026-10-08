@@ -106,7 +106,7 @@ def scrape_meeting(date: str, venue: str, *, post_race: bool = False,
     try:
         card = racecard_ingest.fetch_meeting(date, venue, max_races=max_races,
                                              session=session)
-        report.declared = _store_card(db, card)
+        report.declared = store_card(db, card)
         report.warnings.extend(f"racecard: {e}" for e in card["errors"])
         # Kept to check the results against. See `_is_same_meeting`.
         for race in card["races"]:
@@ -434,9 +434,16 @@ def _open(db: Path | None):
     return conn
 
 
-def _store_card(db: Path | None, card: dict) -> int:
+def store_card(db: Path | None, card: dict) -> int:
     """The declared field. Written through the same upsert the results use, so
-    a race scraped twice is one set of rows rather than two."""
+    a race scraped twice is one set of rows rather than two.
+
+    A runner the card marks withdrawn is stored as WX, the code every reader
+    takes for "not in the field" (the model scores the field without it, the
+    page spreads its chance over the rest). It was parsed and dropped here
+    until 2026-10-08, so a horse withdrawn on race day stayed in the model's
+    field until the results came in. The result's own code replaces WX, and a
+    placing clears it (`upsert_runners`)."""
     written = 0
     conn = _open(db)
     try:
@@ -454,6 +461,7 @@ def _store_card(db: Path | None, card: dict) -> int:
                     "actual_weight": r.get("actual_weight"),
                     "declared_weight": r.get("declared_weight"),
                     "rating": r.get("rating"), "gear": r.get("gear"),
+                    "place": "WX" if r.get("scratched") else None,
                 } for r in race["runners"]])
     finally:
         conn.close()

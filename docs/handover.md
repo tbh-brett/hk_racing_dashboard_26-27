@@ -33,7 +33,7 @@ building on it. Python 3.11+; the first PC runs 3.13. One test drives
 | repo | `github.com/tbh-brett/hk_racing_dashboard_26-27`, branch `main`. **Public.** |
 | production | `https://hkrd.fly.dev` — Fly app `hkrd`, one machine in `sin`, SQLite at `/data/hkrd.db` on a volume, Litestream to Cloudflare R2 every 10 s |
 | deploying | **manual**, from a Windows checkout: `Deploy to Fly.bat` → `ops/deploy.ps1` → `fly deploy`. There is no CI. Pushing to `main` deploys nothing |
-| schedule | `ops/crontab` on the machine: `nightly` five times a day, `project_card --pending` three, `scrape_trials` two, `scrape_odds` every minute |
+| schedule | `ops/crontab` on the machine: `nightly` five times a day, `project_card --pending` three, `scrape_trials` two, `scrape_odds` every minute, `raceday_card` every 20 minutes 10:00–22:40 (one query on a day with no racing) |
 | design | `web/design-source/*.dc.html`, never hand-edited; the round trip is `docs/design-loop.md`. Speed Map has no export |
 | runbook | `docs/deploy.md` — restore, logs, what each error means |
 | first PC | `C:\Users\tbhbr\hk_racing_dashboard_26-27` — **not on `main`**, see §6 |
