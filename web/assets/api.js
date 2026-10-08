@@ -146,6 +146,7 @@ export const api = {
   periods: () => get('/periods'),
   seasons: () => get('/seasons'),
   saveTrialNote: (body) => post('/trial-notes', body),
+  trialsForMeeting: (date) => get(`/trials/meeting/${date}`),
   // Entry. `prebet` prices a ticket without writing it; `placeBet` writes.
   betAccounts: () => get('/bets/accounts'),
   betRaceday: (date, account) => get(

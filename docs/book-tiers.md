@@ -106,7 +106,10 @@ record from 7 Oct on is the test.
 ## How to note and book now
 
 1. Write a trial note on every trial that catches the eye, booked or not. The
-   note alone puts the horse on race day.
+   note alone puts the horse on race day. Trials page, DECLARED (8 Oct): the
+   meeting in the header by race, each declared runner with its trials since
+   its last run, a replay and the note form on every line; TO WATCH narrows it
+   to the ones with no note yet (`query/trial_card`, `web/assets/trials-card.js`).
 2. Look for the horse that was asked and found more, especially one that did
    not win and got a bland official comment. An easy trial winner is priced.
    Use the two taps.

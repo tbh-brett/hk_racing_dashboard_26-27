@@ -44,6 +44,17 @@ def trials_calibration() -> dict:
     return trial_calibration.calibration()
 
 
+@router.get("/api/trials/meeting/{date}")
+def trials_for_meeting(date: str) -> dict:
+    """Every declared runner's recent trials, race by race, as at the card --
+    the DECLARED view. 404 when no card is stored for the date."""
+    from hkrd.query import trial_card
+    body = trial_card.meeting(date)
+    if not body["races"]:
+        raise HTTPException(404, f"no card stored for {date}")
+    return body
+
+
 @router.get("/api/trials/batch/{date}/{trial_no}")
 def trials_batch(date: str, trial_no: int, venue: str | None = None) -> dict:
     """One batch. `venue` separates two that share a number.

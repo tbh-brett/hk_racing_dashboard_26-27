@@ -1,0 +1,79 @@
+/* trials-card.css — the Trials page's DECLARED view (trials-card.js): the
+ * meeting in the header, by race, each declared runner with its recent trials.
+ * The quality marks (.q-*), the chips and the note form are the page's own,
+ * from trials.css and pages.css. */
+
+.tc-controls {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 8px 14px; border-bottom: 1px solid var(--line-2); background: var(--page-band);
+}
+.tc-controls .chip-label.bordered { margin-left: 8px; }
+
+.tc-race { border-bottom: 1px solid var(--line-2); }
+.tc-race-head {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  padding: 8px 14px; background: var(--page-band); border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-dim);
+}
+.tc-race-head .rn { color: var(--page-accent); font-weight: 600; font-size: var(--fs); }
+.tc-race-head .off { color: var(--text-2); }
+.tc-race-head .k { font-size: var(--fs-xs); letter-spacing: .08em; color: var(--page-dim); }
+.tc-race-head .right {
+  margin-left: auto; color: var(--tr-accent); text-decoration: none;
+  font-size: var(--fs-xs); letter-spacing: .06em;
+}
+.tc-race-head .right:hover { color: var(--text); }
+
+/* One runner: its line, then its trials under it. */
+.tc-runner { padding: 4px 0 6px; border-bottom: 1px solid var(--line); }
+.tc-head {
+  display: flex; align-items: baseline; gap: 10px; padding: 3px 14px;
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-dim);
+  white-space: nowrap;
+}
+.tc-head .no { width: 22px; text-align: right; color: var(--text-muted); font-weight: 600; }
+.tc-head .nm { color: var(--text); font-weight: 600; font-size: var(--fs); }
+.tc-head .nm.booked { color: var(--book); }
+.tc-head .nm.booked.sys { color: var(--book-sys); }
+.tc-head .meta { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
+.tc-head .tc-last { color: var(--text-dim); }
+.tc-head .tc-debut { color: var(--edge); letter-spacing: .06em; }
+.tc-head .cnt { margin-left: auto; color: var(--text-faint); font-size: var(--fs-xs); letter-spacing: .06em; }
+
+.tc-trial {
+  display: grid; align-items: center;
+  grid-template-columns: 58px 62px 16px 18px 40px 40px 52px 92px minmax(200px, 1fr) 62px;
+  gap: 10px; min-height: 22px; padding: 0 14px 0 50px;
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
+  white-space: nowrap;
+}
+.tc-trial:hover { background: var(--page-hover); }
+.tc-trial.open { background: var(--page-hover); }
+/* Run before the horse's last start: context for the preparation, not news. */
+.tc-trial.before { opacity: .55; }
+.tc-trial .d { color: var(--text-2); }
+.tc-trial .where { color: var(--page-accent); }
+.tc-trial .tc-play { color: var(--tr-accent); text-decoration: none; }
+.tc-trial .tc-play:hover { color: var(--text); }
+.tc-trial .fin { text-align: right; color: var(--text-2); }
+.tc-trial .fin.won { color: var(--win); font-weight: 600; }
+.tc-trial .mgn { text-align: right; }
+.tc-trial .gear { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; }
+.tc-trial .jk { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; }
+.tc-trial .cm { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; }
+.tc-trial .sc-btn {
+  background: none; border: 1px solid var(--line-2); border-radius: 0;
+  color: var(--text-dim); font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: .06em; padding: 1px 5px; cursor: pointer; justify-self: end;
+}
+.tc-trial .sc-btn:hover { color: var(--text); border-color: var(--tr-accent); }
+.tc-trial .sc-btn.has { color: var(--win); border-color: var(--win); }
+
+.tc-form { margin: 4px 14px 6px 50px; padding: 8px 10px; background: var(--pop); border: 1px solid var(--pop-rule); }
+
+/* The rest of the field, accounted for in one line. */
+.tc-quiet {
+  padding: 6px 14px 8px 46px; font-family: var(--font-mono); font-size: var(--fs-xs);
+  color: var(--text-faint); line-height: 1.6;
+}
+.tc-quiet .k { color: var(--page-dim); letter-spacing: .08em; margin-right: 8px; }

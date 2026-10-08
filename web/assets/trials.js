@@ -32,10 +32,13 @@ import { renderReview, trialSubject, loadTags } from './review.js';
 import { install as installPalette } from './palette.js';
 import { isSystem } from './book-origin.js';
 import { attachHorseSearch } from './horse-search.js';
+import { card, cardStats, loadCard, renderCard } from './trials-card.js';
 
 
-const VIEWS = [['batches', 'BATCHES'], ['flagged', 'FLAGGED'],
-               ['calibration', 'DOES IT HOLD']];
+// DECLARED is the meeting in the header read by race: every declared runner's
+// recent trials (trials-card.js). The other three are the trial mornings.
+const VIEWS = [['batches', 'BATCHES'], ['declared', 'DECLARED'],
+               ['flagged', 'FLAGGED'], ['calibration', 'DOES IT HOLD']];
 
 const BANDS = ['STANDOUT', 'POSITIVE', 'NEUTRAL', 'NEGATIVE', 'UNTESTED'];
 const VENUES = [['all', 'ALL'], ['ST', 'ST'], ['HV', 'HV']];
@@ -76,12 +79,14 @@ const state = {
 
 function renderViewToggle() {
   const n = countShown();
-  const counts = { batches: state.batches.length, flagged: n.flagged };
+  const counts = { batches: state.batches.length, flagged: n.flagged,
+                   declared: card.data?.counts?.to_watch };
   $('view-toggle').replaceChildren(...VIEWS.map(([key, label]) => {
     const b = el('button', null, label);
     if (counts[key] !== undefined) b.append(el('span', 'n', ` ${counts[key]}`));
     b.setAttribute('aria-pressed', String(state.view === key));
-    b.addEventListener('click', () => { state.view = key; render(); });
+    if (key === 'declared') b.title = 'the meeting in the header, by race: number is trials to watch';
+    b.addEventListener('click', () => { state.view = key; showView(); });
     return b;
   }));
 }
@@ -806,14 +811,18 @@ function renderCalibration() {
 function renderSummary() {
   const host = $('tr-sum');
   host.replaceChildren();
-  const c = state.calibration;
-  if (!c) return;
   const stat = (value, label) => {
     const box = el('span');
     box.append(el('b', null, value));
     box.append(document.createTextNode(` ${label}`));
     return box;
   };
+  if (state.view === 'declared') {
+    cardStats().forEach(([v, k]) => host.append(stat(String(v), k)));
+    return;
+  }
+  const c = state.calibration;
+  if (!c) return;
   // WHAT IS ON SCREEN, not what is in the archive. The artboard's counts read
   // as a summary of the slice being looked at — "44 runs screened, 18
   // flagged" — and a lifetime figure under the same words would be a
@@ -851,12 +860,27 @@ function render() {
   renderViewToggle();
   renderSummary();
   VIEWS.forEach(([key]) => { $(`view-${key}`).hidden = state.view !== key; });
-  const filtersApply = state.view !== 'calibration';
+  const filtersApply = state.view === 'batches' || state.view === 'flagged';
   document.querySelector('.filter-bar').hidden = !filtersApply;
   document.querySelector('.chip-bar').hidden = !filtersApply;
   if (state.view === 'batches') (state.horse ? renderHorse() : renderBatches());
   if (state.view === 'flagged') renderFlagged();
   if (state.view === 'calibration') renderCalibration();
+  if (state.view === 'declared') renderCard($('declared'), render);
+}
+
+/** Switch view, loading the meeting's trials the first time DECLARED is
+ *  asked for, and keeping the address so a reload lands on the same view. */
+async function showView() {
+  const url = new URL(window.location.href);
+  if (state.view === 'declared') url.searchParams.set('view', 'declared');
+  else url.searchParams.delete('view');
+  window.history.replaceState(null, '', url);
+  render();
+  if (state.view === 'declared' && card.date !== context.date) {
+    await loadCard(context.date);
+    render();
+  }
 }
 
 function wireSearch() {
@@ -925,9 +949,17 @@ async function boot() {
   // it sent us here instead of to the Form Guide. Open its record straight
   // away rather than showing the recent mornings and making it be found.
   const wanted = params.get('horse');
+  if (params.get('view') === 'declared') state.view = 'declared';
   installPalette();
   await context.init();
+  // DECLARED follows the meeting in the header, like every page.
+  context.onChange(async () => {
+    if (state.view !== 'declared') { card.date = null; return; }
+    await loadCard(context.date, { force: true });
+    render();
+  });
   render();
+  if (state.view === 'declared') await showView();
   await load();
   if (wanted) {
     const input = $('search');
