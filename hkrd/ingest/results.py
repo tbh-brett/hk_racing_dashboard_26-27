@@ -26,7 +26,7 @@ from hkrd.ingest._client import FetchError, fetch_html, urls
 
 __all__ = ["ResultsError", "VoidRace", "parse_race_header", "parse_results_table",
            "parse_sectional_table", "parse_sectional_page",
-           "parse_incident_report", "fetch_sectionals",
+           "parse_incident_report", "fetch_incidents", "fetch_sectionals",
            "fetch_race", "fetch_meeting", "meeting_venue"]
 
 
@@ -415,6 +415,19 @@ def fetch_race(date: str, venue: str, race_no: int, *, session=None) -> dict[str
             # rather than merged into them: it is a different fact with a
             # different source, and `runner_comments` stores it as one.
             "incidents": parse_incident_report(html, source=source)}
+
+
+def fetch_incidents(date: str, venue: str, race_no: int, *, session=None
+                    ) -> list[dict[str, Any]]:
+    """One race's stewards' report and nothing else -- `jobs/repair`'s
+    `stewards` kind. The same results page `fetch_race` reads, without the
+    second request for sectionals: an archived meeting already has its result,
+    and what it lacks is this table. [] when the page carries none."""
+    query = date.replace("-", "/")
+    html = fetch_html(urls.localresults, {"racedate": query, "Racecourse": venue,
+                                          "RaceNo": str(race_no)}, session=session)
+    return parse_incident_report(
+        html, source=f"{urls.localresults} {date} {venue} R{race_no}")
 
 
 # Sha Tin or Happy Valley, as the page writes them.
