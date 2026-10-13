@@ -136,3 +136,31 @@ def test_a_failed_fetch_reports_rather_than_writing_nothing_quietly(db, monkeypa
     report = scrape_corunning.scrape("2026-07-15", db=db, session=Dead())
     assert report.errors
     assert report.comments == 0
+
+
+def test_a_void_race_is_not_asked_for_and_does_not_lose_the_card(db):
+    """2025-11-15 R8 was declared void: no result, and HKJC has no comments
+    table for it. Asking raised, and the rest of the card was lost with it --
+    a missing minor input voiding a whole result. A void race AFTER the last
+    result (2025-09-21 R9) is not asked for either: the card is read to its
+    last race with a result."""
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.execute("UPDATE runners SET place = NULL WHERE race_no = 1")
+    conn.close()
+    asked = []
+    empty = "<html><p>No information.</p></html>"
+
+    class Session(_FakeSession):
+        def get(self, url, params=None, timeout=None):
+            no = int(params["raceno"])
+            asked.append(no)
+            if no in (1, 3):
+                return _FakeResponse(200, empty)
+            return super().get(url, params, timeout)
+
+    report = scrape_corunning.scrape("2026-07-15", db=db, session=Session(races=3))
+    assert report.void == [1] and not report.errors
+    assert asked == [2]
+    assert report.comments > 0
+    assert "void, not asked  R1" in report.render()

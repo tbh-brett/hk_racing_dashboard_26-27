@@ -176,7 +176,7 @@ def fetch(date: str, race_no: int, *, session=None) -> list[dict[str, Any]]:
     return parse_corunning(html, source=url_for(date, race_no))
 
 
-def fetch_meeting(date: str, *, max_races: int = 11,
+def fetch_meeting(date: str, *, max_races: int = 11, skip: frozenset[int] = frozenset(),
                   session=None) -> dict[int, list[dict[str, Any]]]:
     """Every race on a card, keyed by race number.
 
@@ -188,9 +188,15 @@ def fetch_meeting(date: str, *, max_races: int = 11,
     500 as the end of the card reports a short meeting instead of an outage.
     Likewise a race that exists but cannot be parsed raises: that is a layout
     change and must be seen, not skipped.
+
+    `skip` names races the caller knows have no page to read -- a race that
+    was declared void has no comments table, and reading it would raise for
+    the whole card. The walk carries on past them.
     """
     out: dict[int, list[dict[str, Any]]] = {}
     for race_no in range(1, max_races + 1):
+        if race_no in skip:
+            continue
         try:
             html = fetch_html(CORUNNING_URL, {"date": date.replace("-", ""),
                                               "raceno": race_no}, session=session)

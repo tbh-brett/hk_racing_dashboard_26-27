@@ -50,6 +50,11 @@ class CoRunningReport:
     # placeholder. Not an error -- that is every meeting's first week -- but a
     # count, so a run that stored no real comment says why.
     pending: int = 0
+    # Races inside a settled card with no result -- declared void. HKJC has no
+    # comments table for one, and asking used to raise and lose the rest of
+    # the card with it (2025-11-15 R8; and 2025-09-21, whose void race 9 came
+    # after its last result).
+    void: list[int] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
     def render(self) -> str:
@@ -57,24 +62,44 @@ class CoRunningReport:
                  f"  comments stored  {self.comments:>6}",
                  f"  lane tags        {self.lane_tags:>6}",
                  f"  not yet written  {self.pending:>6}"]
+        if self.void:
+            lines.append(f"  void, not asked  {', '.join(f'R{n}' for n in self.void)}")
         if self.errors:
             lines.append(f"  ERRORS           {len(self.errors):>6}")
             lines += [f"    {e}" for e in self.errors[:10]]
         return "\n".join(lines)
 
 
+def _card_extent(conn, date: str, max_races: int) -> tuple[int, list[int]]:
+    """(the last race to ask for, the void races before it).
+
+    A card with results is read up to its last race that has one, and a race
+    inside it with no result is void: there are no runners to hang a comment
+    on, and HKJC has no table for it. A card with no results at all is left
+    alone -- a meeting still to run, or still landing."""
+    settled = {r[0] for r in conn.execute(
+        "SELECT DISTINCT race_no FROM runners WHERE race_date = ? "
+        "AND place IS NOT NULL", (date,))}
+    if not settled:
+        return max_races, []
+    last = min(max_races, max(settled))
+    return last, sorted(set(range(1, last + 1)) - settled)
+
+
 def scrape(date: str, *, db: Path | None = None,
            max_races: int = 11, session=None) -> CoRunningReport:
     report = CoRunningReport()
-    try:
-        meeting = corunning.fetch_meeting(date, max_races=max_races, session=session)
-    except (FetchError, corunning.CoRunningError) as e:
-        report.errors.append(str(e))
-        return report
-
     conn = get_conn(db if db is not None else db_path())
     try:
         init_db(conn)
+        last, report.void = _card_extent(conn, date, max_races)
+        try:
+            meeting = corunning.fetch_meeting(date, max_races=last,
+                                              skip=frozenset(report.void),
+                                              session=session)
+        except (FetchError, corunning.CoRunningError) as e:
+            report.errors.append(str(e))
+            return report
         with transaction(conn):
             for race_no, rows in meeting.items():
                 report.races += 1
