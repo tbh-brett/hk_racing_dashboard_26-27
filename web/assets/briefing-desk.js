@@ -205,12 +205,18 @@ function featRow(r, ctx) {
 function quietRow(r, ctx) {
   const row = el('div', `bf-quiet e-${r.edge || 'none'}${r.open ? ' open' : ''}`);
   row.addEventListener('click', () => ctx.act.race(r.no));
+  // Class and distance get a line of their own under the time, as in a
+  // featured row: on one line a countdown like "in 11h 40m" ran them into
+  // the next column.
   const a = el('div', 'c-id');
-  a.append(el('span', 'lbl', r.label), el('span', 'off', r.off),
-           el('span', `mins${r.minsStrong ? ' strong' : ''}`, r.mins));
+  const top = el('div', 'top');
+  top.append(el('span', 'lbl', r.label), el('span', 'off', r.off),
+             el('span', `mins${r.minsStrong ? ' strong' : ''}`, r.mins));
+  const meta = el('div', 'meta');
   const cls = classCell(r.raceClass, { restricted: r.restricted });
-  if (cls) a.append(cls);
-  a.append(el('span', 'dist', r.dist));
+  if (cls) meta.append(cls);
+  meta.append(el('span', 'dist', r.dist));
+  a.append(top, meta);
   const b = el('div', 'c-why');
   b.append(el('span', 'counts', r.kindCounts), el('span', 'first', r.firstReason));
   const c = el('div', 'c-pace');

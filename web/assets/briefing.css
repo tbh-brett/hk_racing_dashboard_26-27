@@ -142,7 +142,9 @@
 .bf-four .r { text-align: right; white-space: nowrap; }
 .bf-four .r .dim { font-size: 10px; }
 
-.bf-quiet .c-id { display: flex; align-items: baseline; gap: 6px; padding: 0 9px 0 11px; white-space: nowrap; }
+.bf-quiet .c-id { padding: 4px 9px 4px 11px; min-width: 0; }
+.bf-quiet .c-id .top, .bf-quiet .c-id .meta { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+.bf-quiet .c-id .meta { margin-top: 1px; line-height: 1.2; }
 .bf-quiet .lbl { font-size: 13px; font-weight: 600; color: var(--text-2); }
 .bf-quiet .off { font-size: 12px; color: var(--text-muted); }
 .bf-quiet .dist { font-size: 10px; color: var(--text-dim); }
