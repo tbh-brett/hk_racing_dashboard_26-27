@@ -109,12 +109,30 @@ def test_the_card_records_a_withdrawn_runner_as_wx(tmp_path) -> None:
     conn = get_conn(db)
     init_db(conn)
     conn.close()
+    warned: list[str] = []
     scrape_meeting.store_card(db, {"races": [{
-        "race": {"race_date": "2026-10-11", "race_no": 4, "venue": "ST"}, "runners": runners}]})
+        "race": {"race_date": "2026-10-11", "race_no": 4, "venue": "ST"}, "runners": runners}]}, warned)
     conn = get_conn(db)
     got = dict(conn.execute("SELECT horse_no, place_code FROM runners").fetchall())
     conn.close()
-    assert got[9] == "WX" and all(v is None for k, v in got.items() if k != 9)
+    assert got[9] == "WX" and all(v is None for k, v in got.items() if k != 9) and not warned
+
+
+def test_a_card_that_withdraws_most_of_a_field_is_not_believed(tmp_path) -> None:
+    """2026-10-14 race 5, read in the minute its delayed start went off,
+    marked the whole field withdrawn. No race has ever lost more than three."""
+    db = tmp_path / "c.db"
+    conn = get_conn(db)
+    init_db(conn)
+    conn.close()
+    runners = [{"race_no": 5, "horse_no": n, "horse_name": f"H{n}", "scratched": True} for n in range(1, 13)]
+    warned: list[str] = []
+    scrape_meeting.store_card(db, {"races": [{
+        "race": {"race_date": "2026-10-14", "race_no": 5, "venue": "HV"}, "runners": runners}]}, warned)
+    conn = get_conn(db)
+    codes = {r[0] for r in conn.execute("SELECT place_code FROM runners")}
+    conn.close()
+    assert codes == {None} and warned and "not believed" in warned[0]
 
 
 def test_a_card_withdrawal_gives_way_to_the_result(tmp_path) -> None:

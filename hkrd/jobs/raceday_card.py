@@ -48,6 +48,7 @@ class RacedayReport:
     changes: list[str] = field(default_factory=list)
     scored: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
     def render(self) -> str:
         if not self.races and not self.errors:
@@ -56,6 +57,7 @@ class RacedayReport:
                  f"re-read ({', '.join(f'R{r}' for r in self.races)}), {self.runners} runners"]
         lines += [f"  changed    {c}" for c in self.changes] or ["  changed    nothing"]
         lines += [f"  model      {s}" for s in self.scored]
+        lines += [f"  WARNING    {w}" for w in self.warnings]
         lines += [f"  ERROR      {e}" for e in self.errors]
         return "\n".join(lines)
 
@@ -87,12 +89,37 @@ def _changes(before: dict, after: dict, races: list[int]) -> list[str]:
     return out
 
 
-def run(db: Path | None = None, *, date: str | None = None, session=None) -> RacedayReport:
-    report = RacedayReport(date=date or dt.date.today().isoformat())
+_HK = dt.timezone(dt.timedelta(hours=8))
+
+
+def _due(db: Path | None, date: str, now: dt.datetime) -> list[int]:
+    """The races still to run whose scheduled off is still ahead. A race past
+    it is not read again even before its pool is recorded shut: on 2026-10-14
+    race 5's start was held five minutes for a withdrawal at the gates, and
+    the card read in that minute marked the whole field withdrawn. A race
+    with no off time on record is read."""
     conn = get_conn(db)
     try:
         init_db(conn)
-        races = store.unrun_races(conn, report.date)
+        races = store.unrun_races(conn, date)
+    finally:
+        conn.close()
+    out = []
+    for r in races:
+        t = str(r["off_time"] or "")
+        if len(t) == 5 and t[2] == ":" and f"{date}T{t}" <= now.strftime("%Y-%m-%dT%H:%M"):
+            continue
+        out.append(r["race_no"])
+    return out
+
+
+def run(db: Path | None = None, *, date: str | None = None, now: dt.datetime | None = None,
+        session=None) -> RacedayReport:
+    now = now or dt.datetime.now(_HK)
+    report = RacedayReport(date=date or now.date().isoformat())
+    races = _due(db, report.date, now)
+    conn = get_conn(db)
+    try:
         report.venue = tips_store.meeting_venue(conn, report.date) or ""
     finally:
         conn.close()
@@ -107,7 +134,7 @@ def run(db: Path | None = None, *, date: str | None = None, session=None) -> Rac
         except (FetchError, racecard.RacecardError) as exc:
             report.errors.append(f"R{no}: {exc}")
     report.races = [r["race"]["race_no"] for r in card["races"]]
-    report.runners = scrape_meeting.store_card(db, card)
+    report.runners = scrape_meeting.store_card(db, card, report.warnings)
     report.changes = _changes(before, _field(db, report.date), report.races)
     scored = score_gbm.score(report.date, db)
     report.scored = scored.scored + [f"{d}: unchanged" for d in scored.unchanged] + scored.notes
@@ -121,22 +148,18 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--date", help="YYYY-MM-DD (default: today)")
     ap.add_argument("--db", type=Path, default=None)
     a = ap.parse_args(argv)
-    conn = get_conn(a.db)
-    try:
-        init_db(conn)
-        due = bool(store.unrun_races(conn, a.date or dt.date.today().isoformat()))
-    finally:
-        conn.close()
-    if not due:
+    now = dt.datetime.now(_HK)
+    date = a.date or now.date().isoformat()
+    if not _due(a.db, date, now):
         # Most runs, and not an error: the job log is for runs that did something.
-        print(RacedayReport(date=a.date or dt.date.today().isoformat()).render())
+        print(RacedayReport(date=date).render())
         return 0
     with job_log.running("raceday_card", a.db) as outcome:
         report = run(a.db, date=a.date)
         outcome["ok"] = not report.errors
         outcome["detail"] = "; ".join(
             [f"{report.date} {report.venue}: {len(report.races)} races re-read"]
-            + report.changes + report.scored + report.errors)
+            + report.changes + report.scored + report.warnings + report.errors)
     print(report.render())
     return 1 if report.errors else 0
 

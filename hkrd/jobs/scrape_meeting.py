@@ -106,7 +106,7 @@ def scrape_meeting(date: str, venue: str, *, post_race: bool = False,
     try:
         card = racecard_ingest.fetch_meeting(date, venue, max_races=max_races,
                                              session=session)
-        report.declared = store_card(db, card)
+        report.declared = store_card(db, card, report.warnings)
         report.warnings.extend(f"racecard: {e}" for e in card["errors"])
         # Kept to check the results against. See `_is_same_meeting`.
         for race in card["races"]:
@@ -434,7 +434,14 @@ def _open(db: Path | None):
     return conn
 
 
-def store_card(db: Path | None, card: dict) -> int:
+# No race in the archive lost more than three runners on the day: one did, of
+# 5,904 (2020-11-08 R4). A card read that withdraws more is a misread -- on
+# 2026-10-14 race 5, read in the minute its delayed start went off, marked all
+# eleven runners left -- so none of that race's marks is stored.
+MOST_WITHDRAWN = 3
+
+
+def store_card(db: Path | None, card: dict, warnings: list[str]) -> int:
     """The declared field. Written through the same upsert the results use, so
     a race scraped twice is one set of rows rather than two.
 
@@ -443,13 +450,20 @@ def store_card(db: Path | None, card: dict) -> int:
     page spreads its chance over the rest). It was parsed and dropped here
     until 2026-10-08, so a horse withdrawn on race day stayed in the model's
     field until the results came in. The result's own code replaces WX, and a
-    placing clears it (`upsert_runners`)."""
+    placing clears it (`upsert_runners`). A race marking more than
+    MOST_WITHDRAWN is not believed, and says so in `warnings`."""
     written = 0
     conn = _open(db)
     try:
         with transaction(conn):
             for race in card["races"]:
                 head = race["race"]
+                gone = sum(1 for r in race["runners"] if r.get("scratched"))
+                believed = gone <= MOST_WITHDRAWN
+                if not believed:
+                    warnings.append(
+                        f"racecard {head['race_date']} R{head['race_no']}: marks {gone} of "
+                        f"{len(race['runners'])} runners withdrawn -- not believed, none stored")
                 upsert.upsert_races(conn, [head])
                 written += upsert.upsert_runners(conn, [{
                     "race_date": head["race_date"],
@@ -461,7 +475,7 @@ def store_card(db: Path | None, card: dict) -> int:
                     "actual_weight": r.get("actual_weight"),
                     "declared_weight": r.get("declared_weight"),
                     "rating": r.get("rating"), "gear": r.get("gear"),
-                    "place": "WX" if r.get("scratched") else None,
+                    "place": "WX" if r.get("scratched") and believed else None,
                 } for r in race["runners"]])
     finally:
         conn.close()

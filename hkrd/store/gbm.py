@@ -191,10 +191,11 @@ def card_facts(conn: Connection, date: str) -> list[dict[str, Any]]:
     return [dict(x) for x in rows]
 
 
-def unrun_races(conn: Connection, date: str) -> list[int]:
-    """One meeting's races still to run: pool not shut, no result stored."""
-    return [r[0] for r in conn.execute(
-        f"SELECT r.race_no FROM races r WHERE r.race_date = ? AND {_UNRUN} "
+def unrun_races(conn: Connection, date: str) -> list[dict[str, Any]]:
+    """One meeting's races still to run -- pool not shut, no result stored --
+    with the off time the card gave each (HH:MM, or None)."""
+    return [dict(r) for r in conn.execute(
+        f"SELECT r.race_no, r.off_time FROM races r WHERE r.race_date = ? AND {_UNRUN} "
         "ORDER BY r.race_no", (date,))]
 
 
