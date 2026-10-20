@@ -71,6 +71,20 @@ def test_each_declared_runner_with_its_trials_read_as_at_the_card(tmp_path):
     assert raced["since_last"] == 1
 
 
+def test_each_trial_carries_its_time_as_the_site_writes_one(tmp_path):
+    """Asked for on 2026-10-20: the time a declared runner ran in its trial,
+    in the m:ss.xx every race and trial time on the site is written in."""
+    conn = _db(tmp_path)
+    with transaction(conn):
+        _race(conn, CARD, 1, [(1, "TIMED", None, None)])
+        conn.execute("INSERT INTO trials (trial_date, trial_no, horse_name, place, "
+                     "venue, finish_time) VALUES ('2026-10-01', 1, 'TIMED', 1, "
+                     "'ST', 69.53)")
+    (trial,) = trial_card.meeting(CARD, conn=conn)["races"][0]["runners"][0]["trials"]
+    assert trial["finish_time"] == 69.53
+    assert trial["finish_time_display"] == "1:09.53"
+
+
 def test_a_horse_that_has_never_started_has_every_trial_since_its_last_run(tmp_path):
     conn = _db(tmp_path)
     _setup(conn)

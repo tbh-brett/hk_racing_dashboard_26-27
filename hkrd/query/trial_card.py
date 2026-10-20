@@ -37,7 +37,8 @@ RECENT = 4
 # that on expansion, this view links to it, and carrying it for ~80 trials made
 # the answer 513 KB.
 _TRIAL_KEYS = ("trial_date", "trial_no", "venue", "surface", "going", "place",
-               "field_size", "margin", "finish_time", "gear", "jockey", "trainer",
+               "field_size", "margin", "finish_time", "finish_time_display",
+               "gear", "jockey", "trainer",
                "draw", "comment", "running_positions", "quality_band",
                "quality_mark", "quality_reasons", "note", "archived")
 

@@ -433,6 +433,14 @@ function trialBand(runner) {
     row.append(el('span', 'v', `${t.venue} ${t.surface}`));
     row.append(el('span', 'p',
       t.place === null ? DASH : `${t.place}/${t.field_size}`));
+    // Where it was at each call, start to finish — the shape of the trial a
+    // finishing place cannot give: led all the way, or came from the back.
+    // Written as the run rows below write a race's, by the same function.
+    const rp = el('span', 'rp', positionsText(t.running_positions));
+    if ((t.running_positions ?? []).length) {
+      rp.title = `at each call: ${t.running_positions.join(' → ')}`;
+    }
+    row.append(rp);
     // m:ss.xx, from the server's own formatter — the same one every race time
     // on the site goes through. A bare 69.53 beside a race written 1:09.53 is
     // the same measurement in two notations on one screen.

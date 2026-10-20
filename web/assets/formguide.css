@@ -239,6 +239,10 @@
 .trial-band .trial-line .d { color: var(--text-2); }
 .trial-band .trial-line .v, .trial-band .trial-line .p,
 .trial-band .trial-line .m { color: var(--text-dim); }
+/* Position at each call. Tabular, so the calls line up trial over trial. */
+.trial-band .trial-line .rp {
+  color: var(--text-muted); font-variant-numeric: tabular-nums;
+}
 /* m:ss.xx, tabular so a column of trial times reads as a column. */
 .trial-band .trial-line .t {
   font-family: var(--font-mono); color: var(--text-dim);

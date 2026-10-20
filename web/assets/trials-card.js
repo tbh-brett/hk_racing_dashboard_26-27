@@ -122,6 +122,9 @@ function trialLine(x, t, redraw) {
     t.place === null ? DASH : `${t.place}/${t.field_size}`));
   row.append(el('span', 'mgn', t.place === 1 ? 'WON'
     : t.margin === null || t.margin === undefined ? DASH : `${num(t.margin, 1)}L`));
+  // The time it ran, m:ss.xx from the server's formatter — the notation every
+  // race and trial time on the site is written in.
+  row.append(el('span', 'tm', t.finish_time_display ?? DASH));
   row.append(el('span', 'gear', t.gear || ''));
   row.append(el('span', 'jk', t.jockey || DASH));
   const cm = el('span', 'cm', t.comment || DASH);

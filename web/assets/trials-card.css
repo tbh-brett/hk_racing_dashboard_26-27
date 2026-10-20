@@ -42,7 +42,7 @@
 
 .tc-trial {
   display: grid; align-items: center;
-  grid-template-columns: 58px 62px 16px 18px 40px 40px 52px 92px minmax(200px, 1fr) 62px;
+  grid-template-columns: 58px 62px 16px 18px 40px 40px 54px 52px 92px minmax(200px, 1fr) 62px;
   gap: 10px; min-height: 22px; padding: 0 14px 0 50px;
   font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
   white-space: nowrap;
@@ -58,6 +58,7 @@
 .tc-trial .fin { text-align: right; color: var(--text-2); }
 .tc-trial .fin.won { color: var(--win); font-weight: 600; }
 .tc-trial .mgn { text-align: right; }
+.tc-trial .tm { text-align: right; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .tc-trial .gear { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; }
 .tc-trial .jk { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; }
 .tc-trial .cm { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; }
