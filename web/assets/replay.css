@@ -1,6 +1,7 @@
 /* replay.css — HKJC's player, wherever it is shown (replay.js).
    Results embeds it in the page above the finishing order; every other page
-   docks it to the corner of the window. One header, one frame, both places. */
+   floats it over the page, where it can be dragged. One header, one frame,
+   both places. */
 
 .replay-hd {
   display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
@@ -39,23 +40,29 @@
 /* ── the dock ──────────────────────────────────────────────────────────── */
 
 /* Fixed to the window, not placed in the row that opened it: a player inside
-   a row pushes every row below it down the page. Under the popovers (20) and
-   the palette (40), so a note can still be written over it while it plays. */
+   a row pushes every row below it down the page. In the middle of the window
+   until it is dragged, then at the `left`/`top` replay.js gives it (`placed`).
+   Under the popovers (20) and the palette (40), so a note can still be written
+   over it while it plays. */
 .replay-dock {
-  position: fixed; right: 16px; bottom: 16px; z-index: 18;
-  width: min(480px, calc(100vw - 32px));
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 18; width: min(480px, calc(100vw - 32px));
   padding: 8px 10px 10px; background: var(--surface);
   border: 1px solid var(--line-3); box-shadow: var(--shadow-panel);
 }
+.replay-dock.placed { transform: none; }
+.replay-dock.dragging iframe { pointer-events: none; }
 /* Large is also held to the window's height — the frame's height follows its
    width, so on a short laptop screen an uncapped 960px would run off the top. */
 .replay-dock.large {
   width: min(960px, calc(100vw - 32px), calc((100vh - 100px) * 16 / 9));
 }
 .replay-dock[hidden] { display: none; }
-.replay-dock .replay-hd { margin-bottom: 6px; }
+.replay-dock .replay-hd {
+  margin-bottom: 6px; cursor: move; user-select: none; touch-action: none;
+}
 
+/* Too narrow for large to be any larger. */
 @media (max-width: 600px) {
-  .replay-dock, .replay-dock.large { left: 8px; right: 8px; bottom: 8px; width: auto; }
   .replay-dock .replay-size { display: none; }
 }
