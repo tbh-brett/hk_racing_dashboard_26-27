@@ -47,24 +47,11 @@ export function playerFrame(url, title) {
 
 /* ── the dock ────────────────────────────────────────────────────────────── */
 
-// Small or large, and where it was dragged to, remembered per browser:
-// whoever wants it large and out of the way wants that on the next replay too.
-const SIZE_KEY = 'hkrd:replay-dock';
+// Where it was dragged to, remembered per browser: whoever wants it out of
+// the way wants that on the next replay too. The size is not remembered —
+// owner, 22 Oct: it opens large, every time. Made smaller, it stays smaller
+// only until it is closed.
 const PLACE_KEY = 'hkrd:replay-dock-at';
-
-function loadLarge() {
-  try {
-    return localStorage.getItem(SIZE_KEY) === 'large';
-  } catch {
-    return false;       // site data blocked: the dock simply starts small
-  }
-}
-
-function saveLarge(large) {
-  try {
-    localStorage.setItem(SIZE_KEY, large ? 'large' : 'small');
-  } catch { /* nothing to remember on is not a failure */ }
-}
 
 /** Where the reader left it, or null for the middle of the window. */
 function loadPlace() {
@@ -158,7 +145,8 @@ export function playReplay(url, label) {
   }
   const frame = dock.querySelector('iframe');
   if (!dock.hidden && frame && frame.dataset.src === url) return;
-  dock.classList.toggle('large', loadLarge());
+  // Opened, it is large; re-pointed while open, it keeps the size it was left at.
+  if (dock.hidden || !frame) dock.classList.add('large');
 
   const head = el('div', 'replay-hd');
   head.title = 'drag to move · double-click to put it back in the middle';
@@ -175,7 +163,7 @@ export function playReplay(url, label) {
     size.setAttribute('aria-label', size.title);
   };
   size.addEventListener('click', () => {
-    saveLarge(dock.classList.toggle('large'));
+    dock.classList.toggle('large');
     drawSize();
     placeDock(loadPlace());
   });
