@@ -24,6 +24,7 @@ import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 import { isSystem } from './book-origin.js';
 import { loadTags, renderReview } from './review.js';
+import { playerFrame } from './replay.js';
 
 
 /* The owner's order, September 2026. Two changes worth naming.
@@ -128,17 +129,8 @@ function renderReplay() {
   close.addEventListener('click', toggleReplay);
   head.append(close);
 
-  const box = el('div', 'replay-frame');
-  const iframe = document.createElement('iframe');
-  iframe.src = url;
-  iframe.dataset.src = url;
-  iframe.title = `Race replay, ${r.race.race_date} race ${r.race.race_no}`;
-  iframe.allow = 'autoplay; fullscreen';
-  iframe.allowFullscreen = true;
-  iframe.loading = 'lazy';
-  box.append(iframe);
-
-  host.replaceChildren(head, box);
+  host.replaceChildren(head, playerFrame(url,
+    `Race replay, ${r.race.race_date} race ${r.race.race_no}`));
 }
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
@@ -769,7 +761,7 @@ async function boot() {
   installPalette();
   await loadTags();
   context.onChange(onContext);
-  await context.init();
+  await context.init({ resulted: true });
   await loadMeeting();
   await loadRace();
 }

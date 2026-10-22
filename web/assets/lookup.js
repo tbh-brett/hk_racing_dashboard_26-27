@@ -24,6 +24,7 @@ import { el, $, DASH, MINUS, renderNav, styleBadge, compactDate,
          positionsText, paceCell, replayUrl, hkjcResultUrl,
          externalLink, PACE_SHORT, tripTagChips, drawText } from './vocab.js';
 import { flyout } from './overlay.js';
+import { replayLink } from './replay.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 
@@ -581,8 +582,8 @@ function runRow(r) {
   const rep = el('div', 'c');
   const rurl = trial ? null : replayUrl(r.race_date, r.race_no);
   if (rurl) {
-    const a = externalLink(rurl, '\u25b6', 'lk-link');
-    a.title = `replay — ${r.race_date} race ${r.race_no}`;
+    const a = replayLink(rurl, '\u25b6', 'lk-link',
+      `replay — ${r.race_date} race ${r.race_no}`);
     rep.append(a);
   } else { rep.append(document.createTextNode(DASH)); }
   row.append(rep);

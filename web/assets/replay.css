@@ -1,0 +1,61 @@
+/* replay.css — HKJC's player, wherever it is shown (replay.js).
+   Results embeds it in the page above the finishing order; every other page
+   docks it to the corner of the window. One header, one frame, both places. */
+
+.replay-hd {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  max-width: 960px; margin-bottom: 8px; font-family: var(--font-mono);
+}
+.replay-hd .t { font-size: var(--fs-xs); letter-spacing: .1em; color: var(--text); }
+.replay-hd .n { font-size: var(--fs-xs); color: var(--text-faint); }
+.replay-hd .replay-out {
+  margin-left: auto; font-size: var(--fs-xs); letter-spacing: .08em;
+  color: var(--page-accent); text-decoration: none;
+}
+.replay-hd .replay-out:hover { text-decoration: underline; }
+.replay-hd .replay-close, .replay-hd .replay-size {
+  background: none; border: 1px solid var(--line-3); cursor: pointer;
+  padding: 1px 7px; font-family: var(--font-mono); font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+.replay-hd .replay-close:hover, .replay-hd .replay-size:hover {
+  color: var(--text); background: var(--page-hover);
+}
+
+/* Sized to HKJC's player exactly, not to a guess. Measured: a 30px tab bar
+   (Multi Angle / Passthrough) above a 1920×1080 video that fills whatever is
+   left — so a frame of width × 9/16 + 30px is the picture with no letterbox
+   and no controls cut off. `cqw` is the frame's own width, which is what the
+   ratio has to follow on a phone as much as on a wide screen. Capped at 960px:
+   past that the finishing order the video is for drops below the fold. */
+.replay-frame {
+  max-width: 960px; container-type: inline-size; background: var(--bg-deep);
+}
+.replay-frame iframe {
+  display: block; width: 100%; border: 0;
+  height: calc(100cqw * 9 / 16 + 30px);
+}
+
+/* ── the dock ──────────────────────────────────────────────────────────── */
+
+/* Fixed to the window, not placed in the row that opened it: a player inside
+   a row pushes every row below it down the page. Under the popovers (20) and
+   the palette (40), so a note can still be written over it while it plays. */
+.replay-dock {
+  position: fixed; right: 16px; bottom: 16px; z-index: 18;
+  width: min(480px, calc(100vw - 32px));
+  padding: 8px 10px 10px; background: var(--surface);
+  border: 1px solid var(--line-3); box-shadow: var(--shadow-panel);
+}
+/* Large is also held to the window's height — the frame's height follows its
+   width, so on a short laptop screen an uncapped 960px would run off the top. */
+.replay-dock.large {
+  width: min(960px, calc(100vw - 32px), calc((100vh - 100px) * 16 / 9));
+}
+.replay-dock[hidden] { display: none; }
+.replay-dock .replay-hd { margin-bottom: 6px; }
+
+@media (max-width: 600px) {
+  .replay-dock, .replay-dock.large { left: 8px; right: 8px; bottom: 8px; width: auto; }
+  .replay-dock .replay-size { display: none; }
+}

@@ -137,7 +137,15 @@ def model_status(*, conn: Connection | None = None) -> dict:
     conn = conn or get_conn()
     try:
         latest_race = conn.execute("SELECT max(race_date) FROM races").fetchone()[0]
-        out = {"latest_meeting": latest_race, "tables": {}}
+        # The newest meeting with a finishing position on record, which is not
+        # the newest card: a card goes up days before the races are run, and
+        # the Results page opening on it opened on a page of "not run".
+        latest_result = conn.execute(
+            "SELECT race_date FROM runners WHERE place IS NOT NULL "
+            "ORDER BY race_date DESC LIMIT 1").fetchone()
+        out = {"latest_meeting": latest_race,
+               "latest_result": latest_result[0] if latest_result else None,
+               "tables": {}}
         for table in ("runner_et", "runner_pace", "runner_sarr", "runner_tags"):
             covered = conn.execute(
                 f"SELECT max(race_date) FROM {table}").fetchone()[0]

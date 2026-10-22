@@ -387,8 +387,13 @@ class MeetingContext {
   }
 
   /** Called once per page. Resolves the meeting from the URL, then the latest.
-   *  Pages get a fully populated context before their first render. */
-  async init() {
+   *  Pages get a fully populated context before their first render.
+   *
+   *  `resulted` is for a page about what happened: with no date in the URL it
+   *  opens on the newest meeting that has a result, not the newest card —
+   *  which, between a card going up and its races being run, is a meeting
+   *  with nothing on it to read. */
+  async init({ resulted = false } = {}) {
     const url = MeetingContext._readUrl();
     // The card for a date the URL names is asked for BESIDE the meeting list,
     // not after it: every page's first data waits on it, and one more round
@@ -416,7 +421,8 @@ class MeetingContext {
     // the date was real, and if it has none it was a typo or a meeting we do
     // not hold, and falling back to the latest is still the right answer. That
     // costs one extra request, and only in the case that was already wrong.
-    const fallback = status?.latest_meeting ?? meetings[0]?.race_date ?? null;
+    const fallback = (resulted ? status?.latest_result : null)
+      ?? status?.latest_meeting ?? meetings[0]?.race_date ?? null;
     this.date = url.date ?? fallback;
 
     if (this.date) {

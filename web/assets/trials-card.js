@@ -14,11 +14,12 @@
  * every surface reads.
  */
 import { api, num } from './api.js';
-import { el, DASH, compactDate, ordinal, trialReplayUrl, externalLink,
+import { el, DASH, compactDate, ordinal, trialReplayUrl,
          classCell } from './vocab.js';
 import { renderReview, trialSubject } from './review.js';
 import { isSystem } from './book-origin.js';
 import { tierChip, tapsText } from './book-tier.js';
+import { replayLink } from './replay.js';
 
 /** The view's own state. `scope` is 'since' (trials since the last run, the
  *  default: what the last run cannot have told anyone) or 'recent' (the last
@@ -109,9 +110,8 @@ function trialLine(x, t, redraw) {
   row.append(el('span', 'where', `${t.venue} T${t.trial_no}`));
   const url = trialReplayUrl(t.trial_date, t.trial_no, t.venue, { archived: t.archived });
   if (url) {
-    const play = externalLink(url, '▶', 'tc-play');
-    play.title = `trial replay — ${t.trial_date} batch ${t.trial_no} at ${t.venue}`;
-    row.append(play);
+    row.append(replayLink(url, '▶', 'tc-play',
+      `trial replay — ${t.trial_date} batch ${t.trial_no} at ${t.venue}`));
   } else {
     row.append(el('span'));
   }

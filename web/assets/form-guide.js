@@ -12,7 +12,7 @@
 import { api, num, signed } from './api.js';
 import { el, $, DASH, MINUS, renderNav, styleClass, styleOrdinal,
          habitualStyleBadge,
-         replayUrl, trialReplayUrl, externalLink, compactDate,
+         replayUrl, trialReplayUrl, compactDate,
          tripTags, tripTagChips, ordinal, classCell, classLabel, eszCell,
          paceCell, positionsText, conditionLabel, drawText,
          tagLabel, isLiveBooking, bookingStatus, closedNote } from './vocab.js';
@@ -20,6 +20,7 @@ import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 import { loadTags, renderReview, trialSubject } from './review.js';
 import { isSystem } from './book-origin.js';
+import { replayLink } from './replay.js';
 
 
 /* The trend tint's threshold, measured rather than chosen. Over 12,540 six-run
@@ -508,8 +509,8 @@ function trialBand(runner) {
     const turl = trialReplayUrl(t.trial_date, t.trial_no, t.venue,
                                 { archived: t.archived });
     if (turl) {
-      const play = externalLink(turl, '▶', 'icon play');
-      play.title = `trial replay — ${t.trial_date} batch ${t.trial_no}`;
+      const play = replayLink(turl, '▶', 'icon play',
+        `trial replay — ${t.trial_date} batch ${t.trial_no}`);
       play.addEventListener('click', (e) => e.stopPropagation());
       marks.append(play);
     }
@@ -803,8 +804,8 @@ function runRow(runner, run, index) {
   // because that is the moment you want to see what actually happened.
   const url = replayUrl(run.race_date, run.race_no);
   if (url) {
-    const play = externalLink(url, '▶', 'icon play');
-    play.title = `replay — ${run.race_date} race ${run.race_no}`;
+    const play = replayLink(url, '▶', 'icon play',
+      `replay — ${run.race_date} race ${run.race_no}`);
     play.addEventListener('click', (e) => e.stopPropagation());
     marks.append(play);
   }

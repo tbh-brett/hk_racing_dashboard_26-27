@@ -25,7 +25,7 @@
  */
 import { api, num } from './api.js';
 import { el, $, DASH, MINUS, renderNav, tripTagChips,
-         replayUrl, trialReplayUrl, externalLink, compactDate,
+         replayUrl, trialReplayUrl, compactDate,
          ordinal, classLabel, drawText } from './vocab.js';
 import { context } from './context.js';
 import { renderReview, trialSubject, loadTags } from './review.js';
@@ -33,6 +33,7 @@ import { install as installPalette } from './palette.js';
 import { isSystem } from './book-origin.js';
 import { attachHorseSearch } from './horse-search.js';
 import { card, cardStats, loadCard, renderCard } from './trials-card.js';
+import { replayLink } from './replay.js';
 
 
 // DECLARED is the meeting in the header read by race: every declared runner's
@@ -136,8 +137,8 @@ function nextStart(nxt) {
   // replay that scrolls out of the cell is a replay nobody watches.
   const url = replayUrl(nxt.race_date, nxt.race_no);
   if (url) {
-    const play = externalLink(url, '▶', 'ns-play');
-    play.title = `replay — ${nxt.race_date} race ${nxt.race_no}`;
+    const play = replayLink(url, '▶', 'ns-play',
+      `replay — ${nxt.race_date} race ${nxt.race_no}`);
     play.addEventListener('click', (e) => e.stopPropagation());
     box.append(play);
   }
@@ -403,8 +404,8 @@ function formTable(runs) {
     // Watch it, from the row that made you ask.
     const url = replayUrl(f.race_date, f.race_no);
     if (url) {
-      const play = externalLink(url, '▶', 'd-play');
-      play.title = `replay — ${f.race_date} race ${f.race_no}`;
+      const play = replayLink(url, '▶', 'd-play',
+        `replay — ${f.race_date} race ${f.race_no}`);
       play.addEventListener('click', (e) => e.stopPropagation());
       line.append(play);
     }
@@ -562,8 +563,8 @@ function renderHorse() {
       const turl = trialReplayUrl(r.trial_date, r.trial_no, r.venue,
                                   { archived: r.archived });
       if (turl) {
-        const play = externalLink(turl, '▶ REPLAY', 'batch-replay');
-        play.title = `trial replay — ${r.trial_date} batch ${r.trial_no}`;
+        const play = replayLink(turl, '▶ REPLAY', 'batch-replay',
+          `trial replay — ${r.trial_date} batch ${r.trial_no}`);
         head.append(play);
       }
       box.append(head);
@@ -663,8 +664,8 @@ function renderBatches() {
     const turl = trialReplayUrl(b.trial_date, b.trial_no, b.venue,
                                 { archived: b.archived });
     if (turl) {
-      const play = externalLink(turl, '▶ REPLAY', 'batch-replay');
-      play.title = `trial replay — ${b.trial_date} batch ${b.trial_no}`;
+      const play = replayLink(turl, '▶ REPLAY', 'batch-replay',
+        `trial replay — ${b.trial_date} batch ${b.trial_no}`);
       head.append(play);
     }
     box.append(head);
