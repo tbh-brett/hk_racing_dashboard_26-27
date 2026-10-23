@@ -113,6 +113,10 @@ export const api = {
   raceCard: (date, no) => get(`/raceday/${date}/${no}`),
   raceCardLive: (date, no) => getLive(`/raceday/${date}/${no}`),
   speedMap: (date) => get(`/speedmap/${date}`),
+  // the race simulation (jobs/sim_card); reads only -- no request ever simulates
+  shapeSim: (date, no) => get(`/shape/sim/${date}/${no}`),
+  shapeCard: (date) => get(`/shape/sim/${date}`),
+  shapeRecord: () => get('/shape/record'),
   raceDayMeeting: (date) => get(`/raceday/${date}`),
   money: (date) => get(`/money/${date}`),
   tipsSummary: (date) => get(`/tips/summary/${date}`),

@@ -38,3 +38,9 @@ this file is that second artboard. It loads four sample answers from
 `./briefing-samples/` when opened outside the bundle; those are real tipster
 and bookmaker text, so they are kept off this public repo, on the owner's PC
 in `Claude outputs/briefing-design/`.
+
+`Speed Map.dc.html` (23 Oct 2026) is the other way round: generated FROM the built page, not
+designed. The Speed Map had no artboard, and the race simulation's panel was built in the dashboard's
+own style (docs/racesim.md), so this is the page as it stood -- the gate ladder and the RACE SHAPE
+panel for 25 Oct race 2, its rows bound to that race as sample data -- for the next design pass to
+start from. Redesign it in Claude Design and send it back like any other.

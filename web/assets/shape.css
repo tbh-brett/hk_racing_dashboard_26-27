@@ -1,0 +1,155 @@
+/* Race shape — the simulation panel on the Speed Map (racesim-SPEC section 9.2).
+ *
+ * The Speed Map's square 1px-border vocabulary (speedmap.css). Every colour is
+ * a token: the horses are their saddle cloths (--sc-1..14), the course is
+ * --turf / --rail / --post, and the pace bands are the dashboard's --pace-*.
+ *
+ * NOTHING HERE COLOURS A DIFFERENCE between the simulation and v2. SIM WIN
+ * equals v2 WIN by construction; the two columns are set in the same ink.
+ */
+
+.shape-section .shape-body { padding: 0 0 8px; }
+
+.shape-section .shape-line {
+  margin: 0;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--line);
+  font: 400 10px/1.5 var(--font-mono);
+  letter-spacing: .04em;
+  color: var(--text-muted);
+}
+.shape-section .shape-line b { color: var(--text-2); font-weight: 500; }
+.shape-section .shape-line .warn { color: var(--edge); }
+.shape-section .shape-empty { padding: 14px 12px; font: 400 11px/1.5 var(--font-mono); color: var(--text-muted); }
+
+/* ── the pace mix ──────────────────────────────────────────────────────── */
+.shape-section .shape-pace {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
+  padding: 8px 12px; border-bottom: 1px solid var(--line);
+}
+.shape-section .shape-pace .label { font: 500 9px/1 var(--font-mono); letter-spacing: .1em; color: var(--text-faint); }
+.shape-section .shape-pace .pp {
+  font: 500 10px/1 var(--font-mono); color: var(--text-2);
+  border: 1px solid var(--line-2); padding: 4px 6px;
+  border-left: 3px solid var(--c, var(--line-3));
+}
+.shape-section .shape-pace .pp.day { border-color: var(--text-muted); border-left-color: var(--c, var(--line-3)); }
+.shape-section .shape-pace .small { font: 400 10px/1.4 var(--font-mono); color: var(--text-dim); }
+
+/* ── the field over 20,000 races ───────────────────────────────────────── */
+.shape-section .shape-scroll { overflow-x: auto; }
+.shape-section .shape-grid { border-collapse: collapse; width: 100%; min-width: 980px; font: 400 11px/1.3 var(--font-mono); }
+.shape-section .shape-grid th {
+  font: 500 9px/1.2 var(--font-mono); letter-spacing: .08em; color: var(--text-faint);
+  text-align: right; padding: 7px 8px; border-bottom: 1px solid var(--line-2); white-space: nowrap;
+}
+.shape-section .shape-grid th.l, .shape-section .shape-grid td.l { text-align: left; }
+.shape-section .shape-grid td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: right; color: var(--text-2); white-space: nowrap; }
+.shape-section .shape-grid tr:hover td { background: var(--run-hover); }
+.shape-section .shape-grid tr[aria-selected="true"] td { background: var(--surface-2); }
+.shape-section .shape-grid tbody tr { cursor: pointer; }
+.shape-section .shape-grid .nm { font: 500 12px/1.2 var(--font); color: var(--text); }
+.shape-section .shape-grid .sub { font: 400 10px/1.2 var(--font-mono); color: var(--text-dim); }
+.shape-section .shape-grid .dim { color: var(--text-dim); }
+.shape-section .shape-grid .now { color: var(--text-muted); font-size: 10px; }
+.shape-section .shape-grid .v2 { border-left: 1px solid var(--line-2); }
+.shape-section .shape-grid .sim { border-right: 1px solid var(--line-2); }
+
+.shape-section .sc {
+  display: inline-block; min-width: 20px; padding: 2px 4px; text-align: center;
+  font: 600 10px/1.2 var(--font-mono); background: var(--c, var(--dot)); color: var(--dot-text);
+}
+
+/* first-call position: front, middle and back third, one hue in three steps */
+.shape-section .fmb { display: flex; width: 120px; height: 9px; background: var(--meter); margin-left: auto; }
+.shape-section .fmb span { display: block; height: 100%; }
+.shape-section .fmb .f { background: var(--bar); }
+.shape-section .fmb .m { background: var(--bar-2); }
+.shape-section .fmb .b { background: var(--bar-3); }
+
+/* ── trust: what the simulation is and is not good at ──────────────────── */
+.shape-section .shape-trust { padding: 8px 12px 4px; border-bottom: 1px solid var(--line); }
+.shape-section .shape-trust ul { margin: 0; padding: 0; list-style: none; }
+.shape-section .shape-trust li { font: 400 11px/1.5 var(--font); color: var(--text-muted); padding: 3px 0; }
+.shape-section .shape-trust li b { color: var(--text-2); font-weight: 500; }
+.shape-section .shape-trust .tag {
+  display: inline-block; font: 500 9px/1 var(--font-mono); letter-spacing: .08em;
+  padding: 3px 5px; margin-right: 6px; border: 1px solid var(--line-3); color: var(--text-muted);
+}
+.shape-section .shape-trust .tag.no { color: var(--hit); border-color: var(--hit); }
+
+/* ── watch a run ───────────────────────────────────────────────────────── */
+.shape-section .shape-watch { padding: 10px 12px; }
+.shape-section .shape-btn, .shape-section .shape-seg button {
+  font: 500 10px/1 var(--font-mono); letter-spacing: .06em; color: var(--text-2);
+  background: var(--surface-2); border: 1px solid var(--line-3); padding: 6px 9px; cursor: pointer;
+}
+.shape-section .shape-btn:hover, .shape-section .shape-seg button:hover { border-color: var(--text-dim); }
+.shape-section .shape-seg { display: inline-flex; }
+.shape-section .shape-seg button + button { border-left: 0; }
+.shape-section .shape-seg button[aria-pressed="true"] { color: var(--text); background: var(--surface); border-color: var(--text-dim); }
+.shape-section .shape-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+.shape-section .shape-tools .spacer { flex: 1; }
+.shape-section .shape-stage { position: relative; border: 1px solid var(--line-2); background: var(--infield); }
+.shape-section .shape-stage canvas { display: block; width: 100%; height: 380px; outline: none; }
+.shape-section .shape-hud {
+  position: absolute; left: 8px; top: 8px; font: 500 10px/1.4 var(--font-mono);
+  color: var(--text-2); background: var(--surface); border: 1px solid var(--line-2); padding: 3px 6px;
+}
+.shape-section .shape-scrub { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.shape-section .shape-scrub input { flex: 1; accent-color: var(--edge); }
+.shape-section .shape-run { font: 400 10px/1.5 var(--font-mono); color: var(--text-dim); margin: 6px 0 0; }
+.shape-section .shape-run b { color: var(--text-2); font-weight: 500; }
+.shape-section .shape-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 12px; }
+.shape-section .shape-cols .label, .shape-section .pace .label { font: 500 9px/1 var(--font-mono); letter-spacing: .1em; color: var(--text-faint); }
+.shape-section .shape-cols .small, .shape-section .pace .small { font: 400 10px/1.5 var(--font-mono); color: var(--text-muted); margin: 4px 0; }
+.shape-section .shape-cols .dim, .shape-section .pace .dim { color: var(--text-dim); }
+
+.shape-section table.tripcost { border-collapse: collapse; width: 100%; font: 400 11px/1.3 var(--font-mono); }
+.shape-section table.tripcost th { font: 500 9px/1.2 var(--font-mono); letter-spacing: .06em; color: var(--text-faint); text-align: right; padding: 5px 6px; border-bottom: 1px solid var(--line-2); }
+.shape-section table.tripcost td { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: right; color: var(--text-2); }
+.shape-section table.tripcost th:nth-child(-n+3), .shape-section table.tripcost td:nth-child(-n+3) { text-align: left; }
+.shape-section table.tripcost td.nm { font-family: var(--font); }
+.shape-section table.tripcost td.down { color: var(--hit); }
+.shape-section table.tripcost td.up { color: var(--win); }
+.shape-section table.tripcost tr[aria-selected="true"] td { background: var(--surface-2); }
+
+/* the vendored sectionals' markup (web/assets/shape/sectionals.js) */
+.shape-section .pace { display: grid; gap: 6px; border: 1px solid var(--line-2); padding: 10px 12px; min-width: 0; }
+.shape-section .pace-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.shape-section .pace .small b { color: var(--text-2); font-weight: 500; }
+.shape-section .band { font: 500 10px/1 var(--font-mono); padding: 3px 6px; border: 1px solid var(--line-3); color: var(--text-2); }
+.shape-section .band.vf { border-color: var(--pace-5); color: var(--pace-5); }
+.shape-section .band.f { border-color: var(--pace-4); color: var(--pace-4); }
+.shape-section .band.n { border-color: var(--pace-3); color: var(--pace-3); }
+.shape-section .band.s { border-color: var(--pace-2); color: var(--pace-2); }
+.shape-section .band.vs { border-color: var(--pace-1); color: var(--pace-1); }
+.shape-section .band.ghost { border-style: dashed; }
+.shape-section .bandscale { position: relative; height: 30px; max-width: 520px; }
+.shape-section .bandscale .bs { position: absolute; top: 7px; height: 8px; }
+.shape-section .bs.vf { background: var(--pace-5); }
+.shape-section .bs.f { background: var(--pace-4); }
+.shape-section .bs.n { background: var(--pace-3); }
+.shape-section .bs.s { background: var(--pace-2); }
+.shape-section .bs.vs { background: var(--pace-1); }
+.shape-section .bandscale .pin { position: absolute; top: 1px; width: 3px; height: 20px; margin-left: -1.5px; background: var(--text); box-shadow: 0 0 0 2px var(--surface); }
+.shape-section .bandscale .pin.ghost { background: var(--text-muted); width: 2px; margin-left: -1px; height: 14px; top: 4px; }
+.shape-section .bandscale .bl { position: absolute; top: 19px; font: 10px/1 var(--font-mono); color: var(--text-dim); }
+.shape-section .sect-scroll { overflow-x: auto; min-width: 0; }
+.shape-section table.sect { border-collapse: collapse; font: 11px/1.35 var(--font-mono); }
+.shape-section table.sect th, .shape-section table.sect td { padding: 3px 7px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.shape-section table.sect thead th { color: var(--text-dim); font: 500 10px/1.25 var(--font-mono); }
+.shape-section table.sect thead th span { display: block; color: var(--text-faint); font-size: 9px; }
+.shape-section table.sect tbody th { text-align: left; color: var(--text-dim); font-weight: 500; }
+.shape-section table.sect td.q { color: var(--pace-4); } table.sect td.sl { color: var(--pace-2); }
+.shape-section table.sect.all thead th:nth-child(-n+3) { text-align: left; }
+.shape-section table.sect.all td.nm { text-align: left; color: var(--text-2); font-family: var(--font); }
+.shape-section table.sect.all td.fin { text-align: left; }
+.shape-section table.sect.all td .p { color: var(--text-dim); }
+.shape-section table.sect.all .best { font-weight: 600; color: var(--text); }
+.shape-section table.sect.all tr[aria-selected="true"] td { background: var(--surface-2); }
+
+@media (max-width: 760px) {
+  .shape-section .shape-stage canvas { height: 260px; }
+  .shape-section .shape-cols { grid-template-columns: minmax(0, 1fr); }
+}

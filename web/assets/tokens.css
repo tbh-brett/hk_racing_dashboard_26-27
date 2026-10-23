@@ -228,6 +228,38 @@
   --away-steady:    #9aa7b8;
   --away-slow:      #e0637f;
 
+  /* ── race shape: the simulated field on its course ─────────────────────
+   * racesim-SPEC section 9. The canvas reads these with getComputedStyle,
+   * so a horse is drawn in its saddle cloth's colour and the course in the
+   * track's, and no colour is typed into the drawing code.
+   *
+   * One colour per saddle-cloth number, 1 to 14, the same in every race:
+   * the dot on the course and the number in the table are the same horse
+   * at a glance. Picked for separation from each other on the dark turf,
+   * not for meaning -- a number has none.
+   */
+  --sc-1:  #e15957;  --sc-2:  #03b4e9;  --sc-3:  #e9d25b;  --sc-4:  #3fb519;
+  --sc-5:  #e249c6;  --sc-6:  #f2f3f5;  --sc-7:  #f6a060;  --sc-8:  #35dcdc;
+  --sc-9:  #986bf6;  --sc-10: #b0ee3e;  --sc-11: #f6bfd7;  --sc-12: #5486d4;
+  --sc-13: #3fa594;  --sc-14: #ac9c83;
+  --turf:        #0f1915;   /* the turf track                                */
+  --turf-bend:   #13211b;   /* a bend, a step lighter                        */
+  --turf-line:   #1d2d26;   /* lane lines on the turf                        */
+  --awt:         #19150f;   /* the all-weather track                         */
+  --awt-bend:    #211c14;
+  --awt-line:    #2c261c;
+  --infield:     #090d0b;   /* inside the rail                               */
+  --rail:        #e6e8ec;   /* the inside rail                               */
+  --rail-outer:  #3d4a44;   /* the outside rail                              */
+  --post:        #f0a824;   /* the winning post (the --edge amber)           */
+  --dot:         #e6e8ec;   /* a horse with no saddle-cloth colour           */
+  --dot-text:    #0b0e13;   /* the number on a horse                         */
+  --nocover:     #f0a824;   /* no horse directly in front to sit behind      */
+  --hit:         #e0637f;   /* held up, a contact (the --loss rose)          */
+  --bar:         #5b8fd6;   /* the first-call bar: front third               */
+  --bar-2:       #3f6aa6;   /*                     middle third              */
+  --bar-3:       #2b4a77;   /*                     back third                */
+
   /* ── type ──────────────────────────────────────────────────────────── */
   --font: 'IBM Plex Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;

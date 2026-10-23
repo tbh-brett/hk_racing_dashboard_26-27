@@ -29,6 +29,7 @@ import { api } from './api.js';
 import { el, $, DASH, renderNav, styleBadge, drawText } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
+import { createShapePanel } from './shape-sim.js';
 
 const BAND_TITLE = {
   LEAD: 'projected to lead or sit outside the leader',
@@ -39,6 +40,11 @@ const BAND_TITLE = {
 
 const state = { date: null, race: 1, races: [], map: null, mae: null,
                 error: null };
+
+// The race simulation, under the ladder: how the race may be run, from
+// jobs/sim_card's record (shape-sim.js). Re-read only when the race changes.
+let shape = null;
+let shapeShown = null;
 
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
@@ -197,6 +203,11 @@ function render() {
   renderUnprojected(race);
   $('strip-note').textContent = state.map?.derive_version
     ? state.map.derive_version.toUpperCase() : '';
+  const key = `${state.date}/${state.race}`;
+  if (shape && key !== shapeShown) {
+    shapeShown = key;
+    shape.show(state.date, state.race);
+  }
 }
 
 async function onContext(ctx, what) {
@@ -219,6 +230,7 @@ function onKey(e) {
 async function init() {
   renderNav($('nav'), 'speed-map.html');
   installPalette();
+  shape = createShapePanel($('shape-body'));
   document.addEventListener('keydown', onKey);
   context.onChange(onContext);
   await context.init();

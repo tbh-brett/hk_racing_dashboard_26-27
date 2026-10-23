@@ -11,11 +11,13 @@
 <link rel="stylesheet" href="../assets/tokens.css">
 <link rel="stylesheet" href="../assets/pages.css">
 <link rel="stylesheet" href="../assets/speedmap.css">
+<link rel="stylesheet" href="../assets/shape.css">
 <!-- every module this page imports, asked for at once (tests/test_web_preload.py keeps the list true) -->
 <link rel="modulepreload" href="../assets/api.js">
 <link rel="modulepreload" href="../assets/context.js">
 <link rel="modulepreload" href="../assets/overlay.js">
 <link rel="modulepreload" href="../assets/palette.js">
+<link rel="modulepreload" href="../assets/shape-sim.js">
 <link rel="modulepreload" href="../assets/speed-map.js">
 <link rel="modulepreload" href="../assets/vocab.js">
 </head>
@@ -63,6 +65,21 @@
          the card; a zero bar would read as "breaks at field average", which is
          a claim about a horse we know nothing about. -->
     <div class="unprojected" id="unprojected" hidden></div>
+  </section>
+
+  <!-- The race simulated 20,000 times before it is run once (racesim-SPEC
+       section 9.2). Anchored to v2, so it says how the race may be run and
+       never who wins: SIM WIN is v2's chance by construction. -->
+  <section class="map-section shape-section" id="shape">
+    <div class="section-head">
+      <span class="title">RACE SHAPE</span>
+      <span class="sub">THE RACE SIMULATED 20,000 TIMES BEFORE IT IS RUN ONCE ·
+        ANCHORED SO EVERY HORSE WINS AS OFTEN AS v2 SAYS</span>
+    </div>
+    <p class="note">THE SIMULATION IS TIED TO v2'S CHANCES; IT SHOWS HOW THE RACE MAY
+      BE RUN, NOT WHO WINS. ITS EARLY POSITIONS COME FROM THE SHAPE MODELS, NOT
+      THE LADDER ABOVE: TWO READINGS OF THE SAME QUESTION, SHOWN SIDE BY SIDE.</p>
+    <div class="shape-body" id="shape-body"></div>
   </section>
 
 </main>

@@ -47,6 +47,9 @@ PAGES = {
     "Results": "results.js",
     "Trials": "trials.js",
     "Model Analysis": "model-analysis.js",
+    # generated from the build (23 Oct 2026) rather than designed: the gate ladder and the
+    # race simulation's panel, so the next design pass starts from the page as it is
+    "Speed Map": "speed-map.js",
 }
 
 # The page each module drives. A column header may live in the static markup
@@ -61,6 +64,7 @@ PAGE_HTML = {
     "results.js": "results.html",
     "trials.js": "trials.html",
     "model-analysis.js": "model-analysis.html",
+    "speed-map.js": "speed-map.html",
 }
 
 # Labels a page renders VERBATIM from the server. The Trials page prints the
@@ -83,6 +87,7 @@ EXTRA_SOURCES = {
     "form-guide.js": ["review.js"],
     "results.js": ["review.js"],
     "blackbook.js": ["review.js"],
+    "speed-map.js": ["shape-sim.js"],
 }
 
 # ─── deliberate divergences ───────────────────────────────────────────────────

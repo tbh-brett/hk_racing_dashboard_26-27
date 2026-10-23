@@ -16,16 +16,17 @@ import { context } from './context.js';
 import { Live } from './live.js';
 import { install as installPalette } from './palette.js';
 import { renderGbm } from './model-gbm.js';
+import { renderSim } from './model-sim.js';
 
 const VIEWS = [['gbm', 'MODEL'], ['sarr', 'SARR'], ['blend', 'BLEND'],
                ['backtest', 'DOES IT BEAT THE PRICE'], ['et', 'ET'],
-               ['all', 'ALL']];
+               ['sim', 'SIM'], ['all', 'ALL']];
 const WEIGHTS = [0, 0.1, 0.32, 1];
 
 
 const state = {
   date: null, race: 1, races: [], view: 'gbm', weight: null,
-  sarr: null, blend: null, et: null, backtest: null, gbm: undefined,
+  sarr: null, blend: null, et: null, backtest: null, gbm: undefined, sim: undefined,
   sortS: { key: 'rank', dir: 1 }, sortB: { key: 'blended', dir: -1 },
 };
 
@@ -637,7 +638,9 @@ function render() {
   show('sec-blend', state.view === 'blend' || state.view === 'all');
   show('sec-backtest', state.view === 'backtest' || state.view === 'all');
   show('sec-et', state.view === 'et' || state.view === 'all');
+  show('sec-sim', state.view === 'sim' || state.view === 'all');
   if (state.gbm !== undefined) renderGbm($('gbm-body'), $('gbm-foot'), state.gbm);
+  if (state.sim !== undefined) renderSim($('sim-body'), $('sim-foot'), state.sim);
   renderSarr();
   renderBlend();
   renderBacktest();
@@ -693,6 +696,14 @@ async function loadGbm() {
   renderGbm($('gbm-body'), $('gbm-foot'), state.gbm);
 }
 
+/** The simulation's record: one for the season, read once, like the model's. */
+async function loadSim() {
+  state.sim = await settle(api.shapeRecord(), (e) => {
+    $('sim-foot').replaceChildren(el('span', 'warn', `simulation: ${e.message}`));
+  });
+  renderSim($('sim-body'), $('sim-foot'), state.sim);
+}
+
 async function loadBacktest() {
   state.backtest = await settle(api.modelBacktest(), (e) => {
     $('bt-sub').textContent = `backtest: ${e.message}`;
@@ -707,12 +718,13 @@ async function loadBacktest() {
  * and on one Python process they held the model's own request up behind them.
  * ALL still shows, and so reads, everything. */
 const shows = (v) => state.view === v || state.view === 'all';
-const asked = { backtest: false, etSummary: false, sarr: null, et: null, blend: null };
+const asked = { backtest: false, etSummary: false, sim: false, sarr: null, et: null, blend: null };
 
 async function ensure() {
   const race = state.date && state.race ? `${state.date}/${state.race}` : null;
   const jobs = [];
   if (shows('backtest') && !asked.backtest) { asked.backtest = true; jobs.push(loadBacktest()); }
+  if (shows('sim') && !asked.sim) { asked.sim = true; jobs.push(loadSim()); }
   if (shows('et') && !asked.etSummary) {
     asked.etSummary = true;
     jobs.push(settle(renderEtSummary(), () => {}));
