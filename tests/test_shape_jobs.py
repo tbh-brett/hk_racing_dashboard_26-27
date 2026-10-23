@@ -2,8 +2,8 @@
 
 jobs/sim_card with node stubbed out: the fingerprint ignores a v2 move under 0.01 and catches a
 scratching or a new rider; `--next` never touches a race that has gone off, and a simulation that
-finishes after the off is not kept; a throttled tick does nothing and says so; tables a simulation
-names are never rewritten. query/shape_record: the record row is the last one before the off.
+finishes after the off is not kept; a tick while Fly throttles the machine (CPU steal) does nothing
+and says so; tables a simulation names are never rewritten. query/shape_record: the record row is the last one before the off.
 jobs/import_sim_record: running it twice changes nothing. The card assembly (query/shape_sim)
 round-trips the lab's 25 Oct card.
 """
@@ -97,7 +97,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         calls.append(doc["race_no"])
         return _fake_result(next(r for r in doc["card"]["races"] if r["no"] == doc["race_no"])), 1.0
     monkeypatch.setattr(sim_card, "run_node", fake)
-    monkeypatch.setattr(sim_card, "CPU_STAT", tmp_path / "no-cpu.stat")
+    monkeypatch.setattr(sim_card, "PROC_STAT", tmp_path / "no-proc-stat")
     return SimpleNamespace(db=path, calls=calls)
 
 
@@ -170,22 +170,47 @@ def test_a_simulation_that_finishes_after_the_off_is_not_kept(env: SimpleNamespa
     conn.close()
 
 
-def test_a_throttled_tick_does_nothing_and_says_so(env: SimpleNamespace, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    stat = tmp_path / "cpu.stat"
-    monkeypatch.setattr(sim_card, "CPU_STAT", stat)
-    stat.write_text("usage_usec 1\nnr_periods 9\nnr_throttled 3\nthrottled_usec 7\n")
-    first = sim_card.next_tick(env.db, today=DATE)
-    conn = get_conn(env.db)                    # the last tick, fifteen minutes ago, as job_runs keeps it
+def _proc_stat(path: Path, steal_jiffies: int, boot: int = 1761200000) -> None:
+    """/proc/stat as Fly's machine writes it: steal is the 8th number on the `cpu` line."""
+    path.write_text("\n".join([f"cpu  1140 17283 610 18305 1252 0 62 {steal_jiffies} 0 0",
+                               f"cpu0 570 8641 305 9152 626 0 31 {steal_jiffies // 2} 0 0",
+                               f"btime {boot}", "processes 900", ""]))
+
+
+def _tick_after(env: SimpleNamespace, stat: Path, first: tuple, second: tuple) -> sim_card.SimReport:
+    """Two ticks fifteen minutes apart; the second as cron runs it, inside its own open job_runs row."""
+    _proc_stat(stat, *first)
+    reading = sim_card.next_tick(env.db, today=DATE).throttle
+    conn = get_conn(env.db)
     with transaction(conn):
-        job_log.record(conn, "sim_card", started_at="2026-10-23T06:52:00+00:00", ok=True, detail=first.throttle)
+        job_log.record(conn, "sim_card", started_at="2026-10-23T06:52:00+00:00", ok=True, detail=reading)
     conn.close()
-    stat.write_text("usage_usec 1\nnr_periods 12\nnr_throttled 5\nthrottled_usec 9\n")
-    # as cron runs it: inside its own job_runs row, which is open while the tick reads the last one
+    _proc_stat(stat, *second)
     with job_log.running("sim_card", env.db) as o:
         out = sim_card.next_tick(env.db, today=DATE)
         o["ok"], o["detail"] = True, out.throttle
-    assert "throttled since" in out.did and "nr_throttled=5 (was 3" in out.throttle
-    assert env.calls == [1]                                          
+    return out
+
+
+def test_a_throttled_tick_does_nothing_and_says_so(env: SimpleNamespace, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    stat = tmp_path / "stat"
+    monkeypatch.setattr(sim_card, "PROC_STAT", stat)
+    # 90 s of CPU withheld since the last tick: Fly is throttling
+    out = _tick_after(env, stat, (3000,), (12000,))
+    assert "Fly is throttling" in out.did and "90 s of CPU withheld" in out.throttle
+    assert env.calls == [1]
+
+
+def test_a_quiet_quarter_hour_or_a_restart_is_not_throttling(env: SimpleNamespace, tmp_path: Path,
+                                                              monkeypatch: pytest.MonkeyPatch) -> None:
+    stat = tmp_path / "stat"
+    monkeypatch.setattr(sim_card, "PROC_STAT", stat)
+    out = _tick_after(env, stat, (3000,), (3400,))                   # 4 s withheld: host noise
+    assert "simulated 2026-10-25 R2" in out.did and "4.0 s withheld" in out.throttle
+    # a deploy or a resize restarts the machine and sets the counter back: a new boot time, no comparison
+    out = _tick_after(env, stat, (12000,), (500, 1761300000))
+    assert "nothing to simulate" in out.did and "no earlier reading since the machine started" in out.throttle
+                                         
 
 
 def test_tables_a_simulation_names_are_never_rewritten(env: SimpleNamespace) -> None:

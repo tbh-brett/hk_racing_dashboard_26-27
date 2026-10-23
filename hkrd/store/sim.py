@@ -9,12 +9,13 @@ from __future__ import annotations
 
 import gzip
 import json
+import re
 from typing import Any
 
 from .connect import Connection
 from .gbm import _UNRUN
 
-__all__ = ["standards", "tempo_races", "season_contacts", "tables_row", "has_tables", "last_throttle_reading",
+__all__ = ["standards", "tempo_races", "season_contacts", "tables_row", "has_tables", "last_steal_reading",
            "tables_named", "save_tables",
            "card", "gone", "unrun_races", "sim_keys", "write_sim", "latest_sim", "sim_rows", "SIM_RUNNER_COLUMNS"]
 
@@ -65,15 +66,16 @@ def has_tables(conn: Connection, as_of: str, version: str) -> bool:
     return conn.execute("SELECT 1 FROM sim_tables WHERE as_of = ? AND version = ?", (as_of, version)).fetchone() is not None
 
 
-def last_throttle_reading(conn: Connection) -> int | None:
-    """`nr_throttled` as the last FINISHED sim_card run read it (a run's own row is open while it runs)."""
+_STEAL = re.compile(r"steal_s=([0-9.]+) boot=([0-9]+)")
+
+
+def last_steal_reading(conn: Connection) -> tuple[float, int] | None:
+    """(CPU seconds stolen since boot, the boot time) as the last FINISHED sim_card run read them --
+    a run's own row is open while it runs."""
     r = conn.execute("SELECT detail FROM job_runs WHERE job = 'sim_card' AND finished_at IS NOT NULL "
-                     "AND detail LIKE '%nr_throttled=%' ORDER BY started_at DESC LIMIT 1").fetchone()
-    if r is None:
-        return None
-    tail = r[0].split("nr_throttled=", 1)[1]
-    digits = tail[:len(tail) - len(tail.lstrip("0123456789"))]
-    return int(digits) if digits else None
+                     "AND detail LIKE '%steal_s=%' ORDER BY started_at DESC LIMIT 1").fetchone()
+    m = _STEAL.search(r[0]) if r else None
+    return (float(m.group(1)), int(m.group(2))) if m else None
 
 
 def tables_named(conn: Connection, as_of: str, version: str) -> bool:

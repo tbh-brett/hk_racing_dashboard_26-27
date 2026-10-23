@@ -14,8 +14,9 @@ WHICH RACE. Never one that has gone off (its pool shut or a result stored): its 
 record it is scored on, so a race is never simulated again after its off, and a simulation that
 finishes after the off is not kept. Never one whose v2 or shape scores are incomplete. Of the rest,
 the earliest whose fingerprint (query/shape_sim) has no row: a new card, a changed field or rider,
-v2 or the shape models moved by 0.01, new tables, a new engine. And not at all when the machine has
-been throttled since the last run (`nr_throttled` in the cgroup's cpu.stat): that tick says so.
+v2 or the shape models moved by 0.01, new tables, a new engine. And not at all when Fly has been
+throttling the machine: more than a minute of CPU withheld since the last run (`steal` in
+/proc/stat, kept in job_runs). That tick says so and runs nothing.
 
 THE ONE SUBPROCESS IN THE CODEBASE (§5.5; Brett, 23 Oct). node runs the vendored engine -- the same
 files the pages run -- on one JSON document on stdin and writes one on stdout. A non-zero exit, a
@@ -50,7 +51,14 @@ ENGINE_DIR = Path(__file__).resolve().parents[2] / "web" / "assets" / "shape"
 RUNNER = Path(__file__).resolve().with_name("sim_node") / "run_race.cjs"
 ENGINE_FILES = ("engine.js", "sim-core.js", "sectionals.js", "track-view.js")
 NODE = shutil.which("node") or "/usr/local/bin/node"
-CPU_STAT = Path("/sys/fs/cgroup/cpu.stat")
+# Throttling, as Fly's machines show it. They have no cgroup throttle counter (/sys/fs/cgroup/cpu.stat
+# is absent; checked 23 Oct); what they show is `steal` -- CPU time a vCPU was ready to use and the
+# hypervisor withheld. Idle, the machine steals nothing (0.0% on 24 Oct); out of burst credit on 23
+# Oct it lost 95% of every second. A minute withheld in a quarter hour is about one race's worth, so
+# past it the machine is out of credit and a race now would only deepen it. Seconds, not a share:
+# a share of all four vCPUs' time hides one throttled thread among three idle ones.
+PROC_STAT = Path("/proc/stat")
+STEAL_MAX_S = 60.0
 
 
 class SimError(RuntimeError):
@@ -163,19 +171,34 @@ def simulate(conn: Connection, date: str, race_no: int, report: SimReport, *, do
     return True
 
 
-def _throttled(conn: Connection) -> tuple[bool, str]:
-    """Has the machine been throttled since the last run? (nr_throttled, kept in job_runs.)"""
+def _steal() -> tuple[float, int] | None:
+    """(CPU seconds stolen since boot, the boot time) from /proc/stat; None off Linux. The boot time
+    says when a restart -- every deploy, every resize -- has set the counter back to zero."""
     try:
-        stat = dict(line.split() for line in CPU_STAT.read_text().splitlines() if line.strip())
+        lines = {ln.split(None, 1)[0]: ln.split() for ln in PROC_STAT.read_text().splitlines() if ln.strip()}
     except OSError:
-        return False, "no cgroup cpu.stat on this machine: not checked"
-    now = stat.get("nr_throttled")
+        return None
+    cpu, btime = lines.get("cpu"), lines.get("btime")
+    if cpu is None or btime is None or len(cpu) < 9:
+        return None
+    hz = os.sysconf("SC_CLK_TCK") if hasattr(os, "sysconf") else 100
+    return int(cpu[8]) / hz, int(btime[1])
+
+
+def _throttled(conn: Connection) -> tuple[bool, str]:
+    """Has Fly been throttling the machine since the last run? The reading goes into job_runs."""
+    now = _steal()
     if now is None:
-        return False, "cpu.stat has no nr_throttled here: not checked"
-    last = store.last_throttle_reading(conn)
-    if last is not None and int(now) > last:
-        return True, f"nr_throttled={now} (was {last} at the last run): throttled since, nothing run this tick"
-    return False, f"nr_throttled={now}"
+        return False, "no /proc/stat on this machine: not checked"
+    stolen, boot = now
+    reading = f"steal_s={stolen:.1f} boot={boot}"
+    last = store.last_steal_reading(conn)
+    if last is None or last[1] != boot:
+        return False, reading + " (no earlier reading since the machine started)"
+    gap = stolen - last[0]
+    if gap > STEAL_MAX_S:
+        return True, f"{reading}: {gap:.0f} s of CPU withheld since the last run -- throttled, nothing run this tick"
+    return False, f"{reading}: {gap:.1f} s withheld since the last run"
 
 
 def next_tick(db: Path | None = None, *, today: str | None = None) -> SimReport:
@@ -187,7 +210,7 @@ def next_tick(db: Path | None = None, *, today: str | None = None) -> SimReport:
         init_db(conn)
         throttled, report.throttle = _throttled(conn)
         if throttled:
-            report.did = "throttled since the last run: nothing simulated this tick"
+            report.did = "Fly is throttling the machine: nothing simulated this tick"
             return report
         docs: dict[str, dict] = {}
         for r in store.unrun_races(conn, today=today):

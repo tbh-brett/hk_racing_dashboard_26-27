@@ -36,8 +36,9 @@ twice changes nothing. From then on the crontab does the rest.
 
 Check it with `python -m hkrd.jobs.sim_card --verify <date> <race>` (re-runs a stored race and fails
 unless the bytes are identical), the `job_runs` rows for `sim_card` and `fit_shape`, and the Speed
-Map's RACE SHAPE panel. The tick reads `nr_throttled` from `/sys/fs/cgroup/cpu.stat`; if the machine
-has no such counter the tick says "not checked" and carries on — worth looking at once after deploy.
+Map's RACE SHAPE panel. Each tick records how much CPU Fly has withheld from the machine (`steal` in
+`/proc/stat`; Fly's machines have no cgroup throttle counter) and runs nothing when more than a minute
+was withheld since the last tick. Its reading is in each `sim_card` row of `job_runs`.
 
 ## What it reproduces (checked 23 Oct on the 23 Oct pull)
 
