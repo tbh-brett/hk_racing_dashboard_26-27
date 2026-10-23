@@ -67,7 +67,21 @@ primary_region = "sin"          # Singapore, and only because Hong Kong is no
     path = "/api/health"
 
 [[vm]]
-  size = "shared-cpu-2x"        # gbm-SPEC §13.1, approved by Brett 29 Sep 2026.
+  size = "shared-cpu-4x"        # Brett, 24 Oct 2026 (was shared-cpu-2x, gbm-SPEC §13.1).
+                                # A shared vCPU is guaranteed 6.25% of a core
+                                # and may burst above it only while its credit
+                                # lasts (500 s at most; a restarted machine
+                                # starts with 5 s), so 2x was 12.5% of one core.
+                                # The race simulation (jobs/sim_card) takes ~58
+                                # s of CPU a race, one race per 15 min, for ~3 h
+                                # after each card lands or the models refit:
+                                # ~7% of a core, most of 2x's baseline, and on
+                                # 23 Oct the first fit after a deploy left the
+                                # machine 95% throttled (steal) and every page
+                                # slow. 4x is 25% of a core for ~$2 a month
+                                # more, the price being mostly the memory.
+                                # Scaled with `fly scale vm shared-cpu-4x
+                                # --vm-memory 4096` before the next deploy.
   memory = "4gb"                # The fundamental model's nightly fit peaks at
                                 # ~365 MB (inputs for the whole archive, then
                                 # LightGBM) and scoring a card at ~290 MB, on
