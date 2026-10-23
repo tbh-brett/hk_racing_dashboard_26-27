@@ -103,6 +103,10 @@ def run(db: Path | None = None, *, today: str | None = None) -> FitReport:
             report.skipped = "no settled meeting to fit on"
             return report
         last = dates[-1]
+        gap = store.trip_gap(conn, before=_day_after(last))
+        if gap:
+            report.skipped = gap
+            return report
         season = int(shape_frame.season_of(pd.Series(pd.to_datetime([last])))[0])
         hist = history(conn, before=_day_after(last))
         if not ({season - 1, season - 2} <= set(hist.season.unique())):

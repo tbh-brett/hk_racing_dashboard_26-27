@@ -193,11 +193,13 @@ def next_tick(db: Path | None = None, *, today: str | None = None) -> SimReport:
         for r in store.unrun_races(conn, today=today):
             date = r["race_date"]
             if date not in docs:
-                if not store.has_tables(conn, date, sim_tables.VERSION):
-                    out = fit_sim_tables.fit(date, conn=conn)
-                    report.did = out.render() + " -- simulating from the next tick"
-                    return report
                 docs[date] = shape_sim.card_inputs(conn, date)
+                # tables only for a card the shape models have scored: they are what the tick fits
+                # first on a fresh deploy, and they must not be fitted before the trip table is built
+                if docs[date]["races"] and not store.has_tables(conn, date, sim_tables.VERSION):
+                    out = fit_sim_tables.fit(date, conn=conn)
+                    report.did = out.render() + (" -- simulating from the next tick" if out.written else "")
+                    return report
             if simulate(conn, date, r["race_no"], report, doc=docs[date]):
                 return report
         report.did = "nothing to simulate: every race still to run is simulated at its current inputs"

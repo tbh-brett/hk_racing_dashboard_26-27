@@ -18,7 +18,7 @@ import pandas as pd
 from .connect import Connection, transaction
 
 __all__ = ["TRIP_COLUMNS", "trip_races", "trip_runners", "trip_comments", "write_trip", "load_runs",
-           "card_runs", "speed_map", "save_shape_models", "latest_shape_version", "shape_models",
+           "TRIP_COVERAGE_MIN", "trip_coverage", "trip_gap", "card_runs", "speed_map", "save_shape_models", "latest_shape_version", "shape_models",
            "write_shape_scores", "shape_keys"]
 
 TRIP_COLUMNS = ("has_comment", "lane_settle", "lane_mid", "lane_turn", "lane_straight",
@@ -102,6 +102,29 @@ def load_runs(conn: Connection, *, before: str) -> pd.DataFrame:
     every declared horse's last start."""
     trip = ", ".join(f"p.{c}" for c in TRIP_COLUMNS if c not in ("phases_json", "derive_version"))
     return pd.read_sql(_RUNS_SQL.format(trip=trip), conn, params=(before,))
+
+
+# Below this share of settled runs with a trip row, the trip table is still being built (a fresh
+# deploy, before the full rebuild_trip): nothing may be fitted on it.
+TRIP_COVERAGE_MIN = 0.95
+
+
+def trip_coverage(conn: Connection, *, before: str) -> tuple[int, int]:
+    """(settled runs before a date with a runner_trip row, settled runs before it)."""
+    r = conn.execute("""
+        SELECT count(t.horse_no), count(*) FROM runners u
+          LEFT JOIN runner_trip t USING (race_date, race_no, horse_no)
+         WHERE u.race_date < ? AND u.place IS NOT NULL""", (before,)).fetchone()
+    return int(r[0]), int(r[1])
+
+
+def trip_gap(conn: Connection, *, before: str) -> str | None:
+    """Why nothing may be fitted on the trip table yet, or None when it covers the archive."""
+    have, runs = trip_coverage(conn, before=before)
+    if runs and have / runs >= TRIP_COVERAGE_MIN:
+        return None
+    return (f"the trip table covers {have:,} of {runs:,} settled runs -- "
+            "run python -m hkrd.jobs.rebuild_trip first")
 
 
 def card_runs(conn: Connection, date: str) -> pd.DataFrame:

@@ -234,3 +234,25 @@ def test_importing_the_19_oct_record_twice_changes_nothing(tmp_path: Path) -> No
     n = conn.execute("SELECT count(*) FROM runner_sim WHERE race_date = '2026-10-19'").fetchone()[0]
     conn.close()
     assert n == 145
+
+
+# ── a fresh deploy: nothing is fitted on a trip table still being built ──────────────────────
+def test_nothing_is_fitted_before_the_trip_table_covers_the_archive(tmp_path: Path) -> None:
+    from hkrd.jobs import fit_shape, fit_sim_tables
+    db = tmp_path / "f.db"
+    conn = get_conn(db)
+    init_db(conn)
+    with transaction(conn):
+        upsert.upsert_races(conn, [dict(race_date="2026-10-21", race_no=1, venue="HV", surface="Turf",
+                                        distance=1200, race_class="4", course="A")])
+        upsert.upsert_runners(conn, [dict(race_date="2026-10-21", race_no=1, horse_no=n, horse_name=f"H{n}",
+                                          place=n, win_odds=4.0, running_positions=f"{n} {n} {n}") for n in (1, 2, 3)])
+    conn.close()
+    tables = fit_sim_tables.fit(DATE, db)
+    assert not tables.written and "rebuild_trip" in tables.note
+    shape = fit_shape.run(db, today="2026-10-23")
+    assert not shape.version and "rebuild_trip" in shape.skipped
+    conn = get_conn(db)
+    assert store.tables_row(conn, DATE, sim_tables.VERSION) is None
+    assert shape_store.latest_shape_version(conn) is None
+    conn.close()

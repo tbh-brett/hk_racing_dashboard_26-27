@@ -25,7 +25,7 @@ from hkrd.model import shape_frame, sim_tables
 from hkrd.store import gbm as gbm_store
 from hkrd.store import sim as store
 from hkrd.store.connect import Connection, get_conn, init_db, transaction
-from hkrd.store.shape import load_runs
+from hkrd.store.shape import load_runs, trip_gap
 
 __all__ = ["fit", "pending_dates", "main", "TablesReport"]
 
@@ -72,6 +72,10 @@ def fit(date: str, db: Path | None = None, *, conn: Connection | None = None) ->
         init_db(conn)
         if store.tables_named(conn, date, sim_tables.VERSION):
             report.note = "a stored simulation names these tables; they are kept as they are"
+            return report
+        gap = trip_gap(conn, before=date)
+        if gap:
+            report.note = f"not fitted: {gap}"
             return report
         t = shape_frame.build(load_runs(conn, before=date))
         season = int(shape_frame.season_of(pd.Series(pd.to_datetime([date])))[0])
