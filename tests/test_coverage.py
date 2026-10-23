@@ -51,13 +51,14 @@ def _db(tmp_path, sarr_versions):
 def test_the_wanted_version_comes_from_the_module_that_stamps_it():
     """Copied into this file it would be a second declaration, and the day the
     model moved it would report every fresh row as stale."""
-    from hkrd.derive import et, pace, settle
+    from hkrd.derive import et, pace, settle, trip
     from hkrd.model import sarr
     assert coverage.current_versions() == {
         "runner_pace": pace.DERIVE_VERSION,
         "runner_et": et.DERIVE_VERSION,
         "runner_sarr": sarr.DERIVE_VERSION,
         "runner_projection": settle.DERIVE_VERSION,
+        "runner_trip": trip.DERIVE_VERSION,
     }
 
 

@@ -51,6 +51,7 @@ DERIVED = [
     ("runner_et",         "hkrd.derive.et",     "hkrd.jobs.rebuild_et"),
     ("runner_sarr",       "hkrd.model.sarr",    "hkrd.jobs.rebuild_sarr"),
     ("runner_projection", "hkrd.derive.settle", "hkrd.jobs.project_card --pending"),
+    ("runner_trip",       "hkrd.derive.trip",   "hkrd.jobs.rebuild_trip"),
 ]
 
 

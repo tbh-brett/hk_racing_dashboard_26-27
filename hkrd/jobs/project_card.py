@@ -242,7 +242,7 @@ def main(argv: list[str] | None = None) -> int:
     # Imported here, not at the top: `scrape_meeting` imports this module to
     # project a card inside the Card button's request, and LightGBM must never
     # load in the web process (gbm-SPEC §6).
-    from hkrd.jobs import score_gbm
+    from hkrd.jobs import score_gbm, score_shape
     failed = False
     for date in dates:
         report = project(date, a.db, min_prior=a.min_prior)
@@ -250,7 +250,10 @@ def main(argv: list[str] | None = None) -> int:
         # the fundamental model's chances for the same card (skipped if unchanged)
         scored = score_gbm.score(date, a.db)
         print(scored.render())
-        failed = failed or bool(report.errors) or bool(scored.errors)
+        # and the race-shape models', which the simulation reads (skipped if unchanged)
+        shaped = score_shape.score(date, a.db)
+        print(shaped.render())
+        failed = failed or bool(report.errors) or bool(scored.errors) or bool(shaped.errors)
     return 1 if failed else 0
 
 

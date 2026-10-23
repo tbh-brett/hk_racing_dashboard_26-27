@@ -946,3 +946,97 @@ CREATE TABLE IF NOT EXISTS runner_gbm (
   scored_at      TEXT    NOT NULL,
   PRIMARY KEY (race_date, race_no, horse_no, stage)
 );
+
+
+-- ---- Race shape (racesim-SPEC section 3). ----------------------------------
+-- The 2D trip of each run, from the Comments on Running (derive/trip, written by
+-- jobs/rebuild_trip). Derived and droppable: rebuilt from runner_comments and
+-- runners. A lane is NULL when the comment does not state it -- never the rail --
+-- and HKJC's placeholder comment is no comment (has_comment 0). `phases_json` is
+-- the replay's fuller reading, the comment and the stewards' report merged.
+CREATE TABLE IF NOT EXISTS runner_trip (
+  race_date TEXT NOT NULL, race_no INTEGER NOT NULL, horse_no INTEGER NOT NULL,
+  has_comment      INTEGER NOT NULL,
+  lane_settle REAL, lane_mid REAL, lane_turn REAL, lane_straight REAL,
+  nocover_settle INTEGER, nocover_mid INTEGER, nocover_turn INTEGER, nocover_straight INTEGER,
+  stated INTEGER, wide3_pre INTEGER, nocover_pre INTEGER, rail_pre INTEGER, lane_max_pre REAL,
+  wide_straight INTEGER,
+  slow_bad INTEGER, slow_mild INTEGER, traffic_pre INTEGER, traffic_straight INTEGER,
+  run_way          TEXT,               -- 'round' | 'through' | NULL
+  run_from         INTEGER,            -- metres to go the run started, when the comment says
+  phases_json      TEXT NOT NULL,
+  derive_version   TEXT NOT NULL,
+  PRIMARY KEY (race_date, race_no, horse_no)
+);
+-- The stewards' contacts, placed on the course (derive/contacts). Derived.
+CREATE TABLE IF NOT EXISTS race_trip (
+  race_date TEXT NOT NULL, race_no INTEGER NOT NULL,
+  events_json    TEXT NOT NULL,
+  derive_version TEXT NOT NULL,
+  PRIMARY KEY (race_date, race_no)
+);
+
+-- The four shape models (jobs/fit_shape): early position, P(lead), settling lane,
+-- P(no cover). Kept by version like gbm_models; never dropped with the derived
+-- tables, because a fit is only reproducible with the same library build. Two
+-- kinds of version: 'shape-1.0+2026-10-21' (trained through that meeting: what
+-- cards are scored with) and 'shape-1.0+check-2025' (one a season: each seed's
+-- rounds, and models that stop at the season before, which the season so far is
+-- checked against). Only the newest fit of each keeps its boosters.
+CREATE TABLE IF NOT EXISTS shape_models (
+  version         TEXT NOT NULL,
+  kind            TEXT NOT NULL CHECK (kind IN ('early','lead','lane','nocover')),
+  trained_through TEXT NOT NULL,
+  params_json     TEXT NOT NULL,       -- params, seeds, rounds per seed, lightgbm version
+  model_gz        BLOB NOT NULL,       -- gzip of a JSON list: one LightGBM dump per seed
+  record_json     TEXT NOT NULL,       -- the season-so-far checks, recomputed at each fit
+  created_at      TEXT NOT NULL,
+  PRIMARY KEY (version, kind)
+);
+-- What the shape models say about each declared runner still to run (jobs/score_shape).
+-- Derived: rebuildable from raw and shape_models. `inputs_key` fingerprints the
+-- card's declared facts and the model, so an unchanged card is never re-scored.
+CREATE TABLE IF NOT EXISTS runner_shape (
+  race_date TEXT NOT NULL, race_no INTEGER NOT NULL, horse_no INTEGER NOT NULL,
+  pred_early REAL, p_lead REAL, exp_lane REAL, p_nocover REAL,
+  slow_rate REAL, n_prior INTEGER,
+  model_version TEXT NOT NULL, inputs_key TEXT NOT NULL, scored_at TEXT NOT NULL,
+  PRIMARY KEY (race_date, race_no, horse_no)
+);
+-- The simulator's tables for a card date, from settled races strictly before it
+-- (jobs/fit_sim_tables). Never overwritten once a race_sim row names it: a stored
+-- simulation must always re-run exactly.
+CREATE TABLE IF NOT EXISTS sim_tables (
+  as_of           TEXT NOT NULL,
+  version         TEXT NOT NULL,       -- 'simtables-1.0'
+  trained_through TEXT NOT NULL,
+  tables_gz       BLOB NOT NULL,       -- gzip of the tables JSON (the lab's keys)
+  created_at      TEXT NOT NULL,
+  PRIMARY KEY (as_of, version)
+);
+-- The simulations (jobs/sim_card): a RECORD, not derived, like screen_pick.
+-- Append-only; a race that has gone off is never simulated again, so its last
+-- row is the record it is scored on.
+CREATE TABLE IF NOT EXISTS race_sim (
+  race_date      TEXT    NOT NULL,
+  race_no        INTEGER NOT NULL,
+  fingerprint    TEXT    NOT NULL,     -- sha256 of the inputs node read, tables by name
+  simulated_at   TEXT    NOT NULL,
+  engine_version TEXT    NOT NULL,     -- sha256 of the four vendored files
+  tables_as_of   TEXT    NOT NULL, tables_version TEXT NOT NULL,
+  v2_version     TEXT    NOT NULL, shape_version  TEXT NOT NULL,
+  settings_json  TEXT    NOT NULL,
+  inputs_gz      BLOB    NOT NULL,     -- the card as node read it, minus the tables
+  result_gz      BLOB    NOT NULL,     -- exactly what node wrote
+  cpu_seconds    REAL    NOT NULL,
+  PRIMARY KEY (race_date, race_no, fingerprint)
+);
+-- The per-runner columns pages read, flattened from race_sim.result_gz.
+CREATE TABLE IF NOT EXISTS runner_sim (
+  race_date TEXT NOT NULL, race_no INTEGER NOT NULL, fingerprint TEXT NOT NULL, horse_no INTEGER NOT NULL,
+  v2_win REAL, v2_place REAL, sim_win REAL, sim_top3 REAL, p_lead REAL, first_call_pos REAL,
+  p_front_third REAL, p_back_third REAL, p_nocover REAL, p_wide3 REAL, p_held REAL,
+  trip_cost REAL, p_win_if_led REAL, engine_held REAL, engine_nocover_most REAL, engine_ground REAL,
+  run_share REAL, round_share REAL, through_share REAL, coupled_win REAL, coupled_top3 REAL,
+  PRIMARY KEY (race_date, race_no, fingerprint, horse_no)
+);

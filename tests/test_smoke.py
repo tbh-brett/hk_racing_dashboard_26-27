@@ -171,14 +171,24 @@ def test_web_is_static() -> None:
     assert not stray, f"web/ must contain no Python: {stray}"
 
 
+# The one named exception (racesim-SPEC section 5.5, Brett 23 Oct 2026): node running the
+# vendored race-shape engine -- JavaScript the pages also run, not our own Python -- from one
+# job, one race per cron tick. Anywhere else, or anything but node, is still an offence.
+NODE_CALLER = "jobs/sim_card.py"
+
+
 def test_no_subprocess_call_to_our_own_python() -> None:
     """subprocess is reserved for Playwright. 29 sites in the old repo cost 0.61s each."""
-    offenders = []
+    offenders, node_calls = [], 0
     for f in py_files():
         src = f.read_text(encoding="utf-8")
         for m in re.finditer(r"subprocess\.(run|Popen|call|check_output)\s*\(([^)]{0,200})", src):
+            if rel(f) == NODE_CALLER and m.group(2).startswith("[NODE,"):
+                node_calls += 1
+                continue
             if "playwright" not in m.group(2).lower():
                 offenders.append(f"{rel(f)}:{src[: m.start()].count(chr(10)) + 1}: subprocess not for Playwright")
+    assert node_calls <= 1, f"{NODE_CALLER} calls node {node_calls} times; the exception is for one call"
     assert not offenders, "\n".join(offenders)
 
 

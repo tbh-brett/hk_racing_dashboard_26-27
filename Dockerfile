@@ -13,6 +13,15 @@
 #   supercronic runs the scrape and derive schedule
 #   uvicorn     serves the dashboard
 
+# node runs the race simulator's engine in jobs/sim_card (racesim-SPEC section 10):
+# the same vendored JavaScript the pages run (web/assets/shape), on one race at a
+# time, from cron. One binary, copied out of the official image and pinned by the
+# image's multi-arch index digest the way the two binaries below are pinned by
+# SHA. node 22 LTS is what the lab ran (v22.22.0). No npm and no packages: the
+# runner uses only node's own fs. The binary needs glibc and libstdc++6, which
+# the Python image already carries (apt depends on libstdc++6).
+FROM node:22.22.0-bookworm-slim@sha256:dd9d21971ec4395903fa6143c2b9267d048ae01ca6d3ea96f16cb30df6187d94 AS node
+
 FROM python:3.11-slim
 
 # ── binaries ─────────────────────────────────────────────────────────────────
@@ -70,6 +79,9 @@ RUN set -eux; \
     apt-get autoremove -y; \
     rm -rf /var/lib/apt/lists/* /tmp/*
 
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+RUN node --version
+
 # Race times, meeting dates and "did tonight's scrape run" are all Hong Kong
 # facts. The container thinks in HKT so a crontab line means what it reads as.
 ENV TZ=Asia/Hong_Kong
@@ -88,6 +100,8 @@ RUN pip install --no-cache-dir . \
 
 COPY hkrd/ hkrd/
 COPY web/ web/
+# The simulator's engine loads under node exactly as jobs/sim_card will load it.
+RUN node -e "require('/app/web/assets/shape/engine.js'); require('/app/web/assets/shape/sim-core.js')"
 COPY ops/ ops/
 
 # --force-reinstall, and NOT editable. The first install left a one-file `hkrd`

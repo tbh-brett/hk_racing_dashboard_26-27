@@ -35,7 +35,8 @@ pytestmark = pytest.mark.skipif(NODE is None, reason="node is not installed")
 
 
 def scripts() -> list[Path]:
-    return sorted(p for p in ASSETS.glob("*.js"))
+    # rglob: the vendored race-shape engine lives in web/assets/shape/.
+    return sorted(p for p in ASSETS.rglob("*.js"))
 
 
 def test_there_are_scripts_to_check() -> None:
@@ -43,7 +44,7 @@ def test_there_are_scripts_to_check() -> None:
     assert len(scripts()) >= 10
 
 
-@pytest.mark.parametrize("script", scripts(), ids=lambda p: p.name)
+@pytest.mark.parametrize("script", scripts(), ids=lambda p: p.relative_to(ASSETS).as_posix())
 def test_a_shipped_script_parses(script: Path, tmp_path: Path) -> None:
     copy = tmp_path / f"{script.stem}.mjs"
     copy.write_text(script.read_text(encoding="utf-8"), encoding="utf-8")

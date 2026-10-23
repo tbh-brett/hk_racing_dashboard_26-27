@@ -1,0 +1,414 @@
+{
+ "races": [
+  "2026-09-06_09",
+  "2026-09-13_05",
+  "2026-09-16_02",
+  "2026-09-16_08",
+  "2026-10-01_08",
+  "2026-10-04_11",
+  "2026-10-19_01",
+  "2026-10-19_02",
+  "2026-10-19_03",
+  "2026-10-19_04"
+ ],
+ "lanes": {
+  "guess_mid": {
+   "n": 38,
+   "exact": 0.684,
+   "within_one": 0.947,
+   "mean_signed": 0.16,
+   "mean_abs": 0.37
+  },
+  "guess_settle": {
+   "n": 40,
+   "exact": 0.45,
+   "within_one": 0.925,
+   "mean_signed": -0.17,
+   "mean_abs": 0.63
+  },
+  "guess_straight": {
+   "n": 38,
+   "exact": 0.342,
+   "within_one": 0.605,
+   "mean_signed": -0.03,
+   "mean_abs": 1.45
+  },
+  "guess_turn": {
+   "n": 38,
+   "exact": 0.237,
+   "within_one": 0.789,
+   "mean_signed": -0.76,
+   "mean_abs": 1.03
+  },
+  "with_marks_mid": {
+   "n": 38,
+   "exact": 1,
+   "within_one": 1,
+   "mean_signed": 0,
+   "mean_abs": 0
+  },
+  "with_marks_settle": {
+   "n": 40,
+   "exact": 0.9,
+   "within_one": 0.95,
+   "mean_signed": 0.15,
+   "mean_abs": 0.15
+  },
+  "with_marks_straight": {
+   "n": 38,
+   "exact": 0.921,
+   "within_one": 1,
+   "mean_signed": -0.03,
+   "mean_abs": 0.08
+  },
+  "with_marks_turn": {
+   "n": 38,
+   "exact": 0.947,
+   "within_one": 1,
+   "mean_signed": 0,
+   "mean_abs": 0.05
+  }
+ },
+ "cover": {
+  "guess_mid_cover": {
+   "n": 30,
+   "agree": 0.8
+  },
+  "guess_mid_none": {
+   "n": 2,
+   "agree": 0
+  },
+  "guess_settle_cover": {
+   "n": 27,
+   "agree": 0.852
+  },
+  "guess_settle_none": {
+   "n": 9,
+   "agree": 0.556
+  },
+  "guess_turn_cover": {
+   "n": 23,
+   "agree": 0.913
+  },
+  "guess_turn_none": {
+   "n": 9,
+   "agree": 0.444
+  },
+  "with_marks_mid_cover": {
+   "n": 30,
+   "agree": 0.967
+  },
+  "with_marks_mid_none": {
+   "n": 2,
+   "agree": 1
+  },
+  "with_marks_settle_cover": {
+   "n": 27,
+   "agree": 0.852
+  },
+  "with_marks_settle_none": {
+   "n": 9,
+   "agree": 0.778
+  },
+  "with_marks_turn_cover": {
+   "n": 23,
+   "agree": 0.826
+  },
+  "with_marks_turn_none": {
+   "n": 9,
+   "agree": 0.778
+  }
+ },
+ "runs": {
+  "marked": 32,
+  "engine_same_way": 13,
+  "engine_no_run": 11,
+  "engine_other_way": 8,
+  "rows": [
+   {
+    "race": "2026-10-19_01",
+    "no": 1,
+    "marked": "through",
+    "engine": "round",
+    "src": "cor",
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_01",
+    "no": 2,
+    "marked": "round",
+    "engine": "no run",
+    "src": null,
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_01",
+    "no": 7,
+    "marked": "round",
+    "engine": "through",
+    "src": "model",
+    "p_round": 0.3
+   },
+   {
+    "race": "2026-10-19_01",
+    "no": 8,
+    "marked": "round",
+    "engine": "round",
+    "src": "cor",
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_01",
+    "no": 9,
+    "marked": "round",
+    "engine": "no run",
+    "src": null,
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_01",
+    "no": 10,
+    "marked": "through",
+    "engine": "round",
+    "src": "cor",
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_01",
+    "no": 13,
+    "marked": "through",
+    "engine": "through",
+    "src": "cor",
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_02",
+    "no": 1,
+    "marked": "round",
+    "engine": "no run",
+    "src": null,
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_02",
+    "no": 2,
+    "marked": "round",
+    "engine": "no run",
+    "src": null,
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_02",
+    "no": 3,
+    "marked": "round",
+    "engine": "no run",
+    "src": null,
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_02",
+    "no": 5,
+    "marked": "through",
+    "engine": "round",
+    "src": "cor",
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_02",
+    "no": 6,
+    "marked": "round",
+    "engine": "round",
+    "src": "model",
+    "p_round": 0.78
+   },
+   {
+    "race": "2026-10-19_02",
+    "no": 7,
+    "marked": "through",
+    "engine": "through",
+    "src": "held",
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_02",
+    "no": 8,
+    "marked": "round",
+    "engine": "round",
+    "src": "cor",
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_02",
+    "no": 9,
+    "marked": "through",
+    "engine": "no run",
+    "src": "held",
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_02",
+    "no": 10,
+    "marked": "round",
+    "engine": "no run",
+    "src": null,
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_02",
+    "no": 12,
+    "marked": "through",
+    "engine": "through",
+    "src": "cor",
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_02",
+    "no": 13,
+    "marked": "round",
+    "engine": "round",
+    "src": "cor",
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_02",
+    "no": 14,
+    "marked": "round",
+    "engine": "through",
+    "src": "model",
+    "p_round": 0.24
+   },
+   {
+    "race": "2026-10-19_03",
+    "no": 1,
+    "marked": "through",
+    "engine": "no run",
+    "src": null,
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_03",
+    "no": 2,
+    "marked": "round",
+    "engine": "round",
+    "src": "model",
+    "p_round": 0.83
+   },
+   {
+    "race": "2026-10-19_03",
+    "no": 3,
+    "marked": "through",
+    "engine": "no run",
+    "src": null,
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_03",
+    "no": 6,
+    "marked": "through",
+    "engine": "through",
+    "src": "held",
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_03",
+    "no": 9,
+    "marked": "round",
+    "engine": "round",
+    "src": "cor",
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_03",
+    "no": 11,
+    "marked": "round",
+    "engine": "no run",
+    "src": null,
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_03",
+    "no": 12,
+    "marked": "round",
+    "engine": "through",
+    "src": "model",
+    "p_round": 0.84
+   },
+   {
+    "race": "2026-10-19_04",
+    "no": 3,
+    "marked": "round",
+    "engine": "through",
+    "src": "model",
+    "p_round": 0.9
+   },
+   {
+    "race": "2026-10-19_04",
+    "no": 4,
+    "marked": "round",
+    "engine": "through",
+    "src": "model",
+    "p_round": 0.19
+   },
+   {
+    "race": "2026-10-19_04",
+    "no": 6,
+    "marked": "round",
+    "engine": "no run",
+    "src": null,
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_04",
+    "no": 7,
+    "marked": "through",
+    "engine": "through",
+    "src": "held",
+    "p_round": null
+   },
+   {
+    "race": "2026-10-19_04",
+    "no": 8,
+    "marked": "through",
+    "engine": "through",
+    "src": "model",
+    "p_round": 0.25
+   },
+   {
+    "race": "2026-10-19_04",
+    "no": 11,
+    "marked": "round",
+    "engine": "round",
+    "src": "model",
+    "p_round": 0.9
+   }
+  ]
+ },
+ "traffic": {
+  "held": {
+   "n": 6,
+   "engine_held": 3
+  },
+  "clear": {
+   "n": 5,
+   "engine_held": 2
+  }
+ },
+ "not_honoured": [
+  {
+   "race": "2026-10-19_02",
+   "no": 5,
+   "name": "LEAN GENERAL",
+   "phase": "settle",
+   "marked": 1,
+   "shown": 2.5
+  },
+  {
+   "race": "2026-10-19_02",
+   "no": 12,
+   "name": "TRENDY RUSH",
+   "phase": "settle",
+   "marked": 2,
+   "shown": 3.5
+  }
+ ]
+}

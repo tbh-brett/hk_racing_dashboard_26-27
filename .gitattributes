@@ -38,3 +38,8 @@ Dockerfile      text eol=lf
 
 # Fixtures are compared byte for byte by the parser tests. Never touched.
 tests/fixtures/*.html   -text
+
+# The race-shape engine, vendored byte for byte from the lab (racesim-SPEC section 2). Its sha256 is
+# the engine version every stored simulation names (jobs/sim_card), and tests/test_shape_engine checks
+# it -- so no checkout, on any platform, may rewrite its line ends.
+web/assets/shape/*.js   text eol=lf

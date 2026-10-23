@@ -67,6 +67,30 @@
 # query and an exit; a race that has gone off is never fetched again.
 */20 10-22 * * *   nice -n 19 python -m hkrd.jobs.raceday_card --db /data/hkrd.db
 
+# The race-shape simulation (racesim-SPEC section 5): ONE race per run, every
+# fifteen minutes, never a card in one burst. The note at the top says one
+# vCPU; there are two since 29 Sep, but what matters for anything heavy is Fly's
+# baseline for a shared-cpu-2x machine: 10 ms of CPU per 80 ms (12.5% of one
+# core) once its burst balance -- at most 500 s -- is spent, after which
+# EVERYTHING on the machine slows, the odds capture included. A 14-runner race
+# is ~64 s of CPU, so one per fifteen minutes is ~7% of one core and the
+# balance never runs down. The whole 25 Oct card in one go was 707 s.
+#
+# `--next` picks the one race most in need -- a new card, a changed field, v2
+# moved, a new engine -- and a race that has gone off is never simulated again
+# (its last row is the record). A tick with nothing to do says so and exits; a
+# tick that finds the machine has been throttled since the last one does
+# nothing and says that. Offset to :07/:22/:37/:52, clear of every other line.
+7-59/15 * * * *   nice -n 19 python -m hkrd.jobs.sim_card --next --db /data/hkrd.db
+
+# The four race-shape models the simulation reads (jobs/fit_shape): refitted
+# once a meeting has settled, then every stored card rescored. Before dawn, when
+# nothing else on this list runs, because it is two to three minutes of
+# LightGBM on two threads -- once a season twice that, when the season's rounds
+# and check models are fitted. `--pending` is one query on a day with nothing
+# new. 04:10 sits between the simulation's 04:07 and 04:22 ticks.
+10 4 * * *   nice -n 19 python -m hkrd.jobs.fit_shape --pending --db /data/hkrd.db
+
 # Barrier trials. A separate line because they are a different source on a
 # different schedule, and folding them into `nightly` would mean a failed
 # race-day scrape takes the trials down with it.

@@ -27,8 +27,9 @@ def test_a_landed_night_derives_only_what_it_can_move(tmp_path, monkeypatch) -> 
                         calls.append((date, tuple(only))) or derive_all.DeriveReport())
     derive_all.run_landed(db, dates=["2026-09-16"])
 
-    assert ("2026-09-16", ("pace", "tempo")) in calls
-    assert ("2026-09-13", ("pace", "tempo")) not in calls
+    # Per landed meeting: pace, tempo and the 2D trip (racesim-SPEC section 4.4).
+    assert ("2026-09-16", ("pace", "tempo", "trip")) in calls
+    assert ("2026-09-13", ("pace", "tempo", "trip")) not in calls
     # SARR from the landed date on -- the 16th and the 23rd, never the 13th.
     assert [d for d, only in calls if only == ("sarr",)] == ["2026-09-16", "2026-09-23"]
     assert calls[-1] == (None, ("et", "tags"))

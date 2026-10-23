@@ -30,7 +30,7 @@ from pathlib import Path
 
 from hkrd.ingest import racecard
 from hkrd.ingest._client import FetchError
-from hkrd.jobs import score_gbm, scrape_meeting
+from hkrd.jobs import score_gbm, score_shape, scrape_meeting
 from hkrd.store import gbm as store
 from hkrd.store import job_log
 from hkrd.store import tips as tips_store
@@ -139,6 +139,11 @@ def run(db: Path | None = None, *, date: str | None = None, now: dt.datetime | N
     scored = score_gbm.score(report.date, db)
     report.scored = scored.scored + [f"{d}: unchanged" for d in scored.unchanged] + scored.notes
     report.errors += scored.errors
+    # the race-shape models' too: a new rider or a withdrawal moves the simulation's inputs
+    shaped = score_shape.score(report.date, db)
+    report.scored += [f"shape {s}" for s in shaped.scored + [f"{d}: unchanged" for d in shaped.unchanged]
+                      + shaped.notes]
+    report.errors += shaped.errors
     return report
 
 

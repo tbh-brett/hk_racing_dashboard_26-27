@@ -1,0 +1,156 @@
+{
+ "races": 107,
+ "section_marks_hit": "4638/4638",
+ "backwards_steps": 0,
+ "steps_over_20_5_ms": 44,
+ "displayed_track": {
+  "section_marks_within_half_a_metre": "99.1%",
+  "within_1m": "100.0%",
+  "mean_deviation_m": "0.02",
+  "max_deviation_m": "0.90",
+  "backwards_steps": 0,
+  "steps_over_20_5_ms": 403,
+  "steps_more_than_2m_behind_curve": "8.5%"
+ },
+ "recorded_order_vs_sectional_order_within_1": "98.9%",
+ "sideways": {
+  "jumps_over_1_5_lanes_in_1s": "3 of 1031160 horse-steps (0.0%); without a stewards' contact 3",
+  "max_lanes_per_s": "2.00",
+  "steps_over_1_5_lanes_per_s": "0.1%",
+  "bodies_overlapping": "75 of 593028 alongside pairs (0.0%)",
+  "runs_pushed_over_1_5_lanes_off_a_stated_lane": "37 of 1316 (2.8%)",
+  "runs_round_from_the_turn_wider_than_a_stated_lane_by_1_5": "66 of 291 (on purpose)"
+ },
+ "stated_lane_honoured": {
+  "n": 1596,
+  "exact": "84.5%",
+  "within_one_lane": "96.2%"
+ },
+ "stewards_contacts": {
+  "sentences_placed": 584,
+  "that_move_a_horse": 413
+ },
+ "rail_horses_stay_on_rail_until_a_run_round": {
+  "n": 199,
+  "max_lane_le_1_5": "74.9%",
+  "max_lane_le_2": "86.4%"
+ },
+ "runs_from_the_turn": {
+  "no run": {
+   "runs": 534,
+   "held_2s_plus": "12.2%",
+   "comments_say_held": "10.7%",
+   "both": 28,
+   "mean_held_s": "0.7"
+  },
+  "round (the comment)": {
+   "runs": 126,
+   "held_2s_plus": "29.4%",
+   "comments_say_held": "8.7%",
+   "both": 6,
+   "mean_held_s": "1.5"
+  },
+  "round (the model)": {
+   "runs": 123,
+   "held_2s_plus": "12.2%",
+   "comments_say_held": "0.0%",
+   "both": 0,
+   "mean_held_s": "0.6"
+  },
+  "through (the comment)": {
+   "runs": 66,
+   "held_2s_plus": "33.3%",
+   "comments_say_held": "24.2%",
+   "both": 12,
+   "mean_held_s": "1.8"
+  },
+  "through (the model)": {
+   "runs": 146,
+   "held_2s_plus": "51.4%",
+   "comments_say_held": "34.2%",
+   "both": 30,
+   "mean_held_s": "2.8"
+  }
+ },
+ "derived_cover_vs_stewards": {
+  "said_no_cover": {
+   "n": 198,
+   "replay_no_cover": "67.2%"
+  },
+  "said_cover": {
+   "n": 192,
+   "replay_cover": "67.2%"
+  },
+  "all_horses": {
+   "n": 2255,
+   "share_none": "0.263",
+   "share_cover": "0.737"
+  }
+ },
+ "brett_corrections": {
+  "races": 10,
+  "lanes": {
+   "with_corrections_mid": {
+    "n": 65,
+    "exact": "96.9%",
+    "within_one_lane": "98.5%",
+    "mean_signed": "0.02"
+   },
+   "with_corrections_settle": {
+    "n": 62,
+    "exact": "87.1%",
+    "within_one_lane": "98.4%",
+    "mean_signed": "0.16"
+   },
+   "with_corrections_straight": {
+    "n": 61,
+    "exact": "93.4%",
+    "within_one_lane": "100.0%",
+    "mean_signed": "-0.07"
+   },
+   "with_corrections_turn": {
+    "n": 58,
+    "exact": "98.3%",
+    "within_one_lane": "100.0%",
+    "mean_signed": "-0.02"
+   },
+   "without_corrections_before_straight_guessed": {
+    "n": 101,
+    "exact": "52.5%",
+    "within_one_lane": "88.1%",
+    "mean_signed": "-0.26"
+   },
+   "without_corrections_before_straight_stated": {
+    "n": 84,
+    "exact": "83.3%",
+    "within_one_lane": "100.0%",
+    "mean_signed": "-0.05"
+   },
+   "without_corrections_straight": {
+    "n": 61,
+    "exact": "32.8%",
+    "within_one_lane": "82.0%",
+    "mean_signed": "-0.11"
+   }
+  },
+  "cover": {
+   "with_corrections_said_cover": {
+    "n": 130,
+    "agree": "86.2%"
+   },
+   "with_corrections_said_none": {
+    "n": 50,
+    "agree": "82.0%"
+   },
+   "without_corrections_said_cover": {
+    "n": 130,
+    "agree": "87.7%"
+   },
+   "without_corrections_said_none": {
+    "n": 50,
+    "agree": "82.0%"
+   }
+  },
+  "rail_horses_pushed_off_rail": "0 of 12"
+ }
+}

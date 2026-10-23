@@ -27,7 +27,7 @@ from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
 __all__ = ["rebuild_pace", "run", "run_landed"]
 
-STEPS = ("pace", "tempo", "et", "sarr", "tags")
+STEPS = ("pace", "tempo", "et", "sarr", "tags", "trip")
 
 
 @dataclass
@@ -149,6 +149,13 @@ def run(db: Path | None = None, *, date: str | None = None,
         from hkrd.jobs import rebuild_tags
         out = rebuild_tags.rebuild(target)
         report.written["runner_tags"] = out.tags_written
+    if "trip" in only:
+        # The 2D trip of each run from its Comments on Running (derive/trip), which the
+        # race-shape models and the simulator's tables read. Per date, like pace.
+        from hkrd.jobs import rebuild_trip
+        out = rebuild_trip.rebuild(target, date=date)
+        report.written["runner_trip"] = out.rows_written
+        report.written["race_trip"] = out.races_written
     return report
 
 
@@ -160,7 +167,7 @@ def run_landed(db: Path | None = None, *, dates: list[str]) -> DeriveReport:
     day, on a single shared CPU the dashboard is also serving from. Most of it
     rewrote numbers that could not have changed:
 
-      pace, tempo  per race: only the meetings that landed
+      pace, tempo, trip  per race: only the meetings that landed
       SARR         walk-forward, so a result can move only the races AFTER it.
                    Every settled meeting from the earliest landed date on --
                    usually just the one -- which also covers a late meeting
@@ -182,7 +189,7 @@ def run_landed(db: Path | None = None, *, dates: list[str]) -> DeriveReport:
         report.errors.extend(sub.errors)
 
     for date in sorted(set(dates)):
-        merge(run(target, date=date, only=("pace", "tempo")))
+        merge(run(target, date=date, only=("pace", "tempo", "trip")))
     conn = get_conn(target)
     try:
         settled = [r[0] for r in conn.execute(
