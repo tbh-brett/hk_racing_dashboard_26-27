@@ -117,6 +117,11 @@ export const api = {
   shapeSim: (date, no) => get(`/shape/sim/${date}/${no}`),
   shapeCard: (date) => get(`/shape/sim/${date}`),
   shapeRecord: () => get('/shape/record'),
+  // a race day as it is run: its finished races, Brett's straight-lane reads, the fetch of results so far
+  shapeDay: (date) => get(`/shape/day/${date}`),
+  saveDayLane: (body) => post('/shape/day/lane', body),
+  clearDayLanes: (body) => post('/shape/day/clear', body),
+  fetchDayResults: (date) => post(`/shape/day/${date}/fetch`),
   raceDayMeeting: (date) => get(`/raceday/${date}`),
   money: (date) => get(`/money/${date}`),
   tipsSummary: (date) => get(`/tips/summary/${date}`),

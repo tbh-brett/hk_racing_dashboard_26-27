@@ -20,6 +20,7 @@
  * sim_app.js); the look is the Speed Map's.
  */
 import { api } from './api.js';
+import { createScenario } from './shape-scenario.js';
 import { el, DASH } from './vocab.js';
 
 const PACE = ['Very Fast', 'Fast', 'Neutral', 'Slow', 'Very Slow'];
@@ -58,7 +59,17 @@ export function createShapePanel(host) {
   let sel = null;             // the horse picked in the table or on the course
   let token = 0;              // the newest show() call; an older answer is dropped
   const viewer = { open: false, run: null, R: null, sr: null, ctx: null, t: 0, playing: false, speed: 2,
-                   seed: 1, wide: false, lastTs: null, cam: null, frame: null, raf: null };
+                   seed: 1, wide: false, lastTs: null, cam: null, frame: null, raf: null, base: null, scenarioCtx: null };
+  // the SCENARIO box (shape-scenario.js): one for the panel, so its levers carry from race to race;
+  // a scenario that has been run hands its context to "Watch a run"
+  const scenarioWrap = el('div');
+  const scenario = createScenario(scenarioWrap, {
+    loadEngine,
+    onChange: (ctx) => {
+      viewer.scenarioCtx = ctx;
+      if (viewer.open && viewer.R) newRun(viewer.seed);
+    },
+  });
 
   async function show(date, raceNo) {
     const mine = ++token;
@@ -82,12 +93,16 @@ export function createShapePanel(host) {
     }
     const top = [...data.runners].sort((a, b) => b.v2_win - a.v2_win)[0];
     sel = top ? top.no : null;
+    viewer.scenarioCtx = null;
+    scenario.show(data);
     render();
   }
 
   /* ── the panel ──────────────────────────────────────────────────────── */
   function render() {
-    host.replaceChildren(metaLine(), ...onDay(), paceMix(), table(), trust(), watch());
+    // no scenario without the borrowed clocks (the lab's imported 19 Oct record does not carry them)
+    host.replaceChildren(metaLine(), ...onDay(), paceMix(), table(), trust(),
+                         ...(data.templates.length ? [scenarioWrap] : []), watch());
   }
 
   function metaLine() {
@@ -308,7 +323,8 @@ export function createShapePanel(host) {
   function newRun(seed) {
     const S = window.SimCore, C = window.ReplayCore;
     viewer.seed = seed;
-    viewer.ctx ??= S.context(data.race, data.tables, 0, data.settle_sd, data.templates);
+    viewer.base ??= S.context(data.race, data.tables, 0, data.settle_sd, data.templates);
+    viewer.ctx = viewer.scenarioCtx || viewer.base;
     viewer.run = S.coupled(viewer.ctx, data.anchor.a, seed, C, data.coupling);
     viewer.sr = viewer.run.sr;
     viewer.R = viewer.run.R;
@@ -489,8 +505,18 @@ export function createShapePanel(host) {
 
   function stop() {
     if (viewer.raf) cancelAnimationFrame(viewer.raf);
-    Object.assign(viewer, { raf: null, open: false, run: null, R: null, sr: null, ctx: null, playing: false, lastTs: null });
+    Object.assign(viewer, { raf: null, open: false, run: null, R: null, sr: null, ctx: null, base: null, playing: false,
+                            lastTs: null });
   }
 
-  return { show };
+  // the day's read put on the sliders (TODAY'S RACES); nothing runs until re-simulated. False when
+  // the race on screen has no scenario to set
+  function setScenario(v) {
+    if (!data?.templates?.length) return false;
+    scenario.set(v);
+    scenarioWrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return true;
+  }
+
+  return { show, setScenario };
 }

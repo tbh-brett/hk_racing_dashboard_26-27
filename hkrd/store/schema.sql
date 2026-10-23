@@ -1040,3 +1040,24 @@ CREATE TABLE IF NOT EXISTS runner_sim (
   run_share REAL, round_share REAL, through_share REAL, coupled_win REAL, coupled_top3 REAL,
   PRIMARY KEY (race_date, race_no, fingerprint, horse_no)
 );
+
+-- ---- A meeting's own bias (model/day_bias, query/shape_day). -------------
+-- Brett's read of where a placed horse came in the straight, entered on race
+-- day (jobs/save_day_lanes): HKJC's Comments on Running, which say it, are
+-- published days later. RAW -- his, not derived; a race can be cleared.
+CREATE TABLE IF NOT EXISTS day_lanes (
+  race_date  TEXT    NOT NULL,
+  race_no    INTEGER NOT NULL,
+  horse_no   INTEGER NOT NULL,
+  lane       TEXT    NOT NULL CHECK (lane IN ('rail','middle','outside')),
+  entered_at TEXT    NOT NULL,
+  PRIMARY KEY (race_date, race_no, horse_no)
+);
+-- Whether a meeting's bias has ever carried from its early races to its later
+-- ones beyond the price (jobs/fit_day_bias): the record the day's read is
+-- shown beside. One row per fit.
+CREATE TABLE IF NOT EXISTS day_bias_record (
+  fitted_at   TEXT PRIMARY KEY,
+  through     TEXT NOT NULL,
+  record_json TEXT NOT NULL
+);

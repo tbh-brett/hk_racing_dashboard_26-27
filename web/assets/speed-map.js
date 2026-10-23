@@ -29,6 +29,7 @@ import { api } from './api.js';
 import { el, $, DASH, renderNav, styleBadge, drawText } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
+import { createDayPanel } from './shape-day.js';
 import { createShapePanel } from './shape-sim.js';
 
 const BAND_TITLE = {
@@ -45,6 +46,9 @@ const state = { date: null, race: 1, races: [], map: null, mae: null,
 // jobs/sim_card's record (shape-sim.js). Re-read only when the race changes.
 let shape = null;
 let shapeShown = null;
+// TODAY'S RACES (shape-day.js): the meeting's finished races, read once per meeting
+let dayPanel = null;
+let dayShown = null;
 
 
 /* ── chrome ──────────────────────────────────────────────────────────────── */
@@ -208,6 +212,10 @@ function render() {
     shapeShown = key;
     shape.show(state.date, state.race);
   }
+  if (dayPanel && state.date && state.date !== dayShown) {
+    dayShown = state.date;
+    dayPanel.show(state.date);
+  }
 }
 
 async function onContext(ctx, what) {
@@ -231,6 +239,7 @@ async function init() {
   renderNav($('nav'), 'speed-map.html');
   installPalette();
   shape = createShapePanel($('shape-body'));
+  dayPanel = createDayPanel($('shape-day'), { onApply: (v) => shape.setScenario(v) });
   document.addEventListener('keydown', onKey);
   context.onChange(onContext);
   await context.init();

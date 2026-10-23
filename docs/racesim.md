@@ -54,6 +54,31 @@ was withheld since the last tick. Its reading is in each `sim_card` row of `job_
   the field; win and top 3 tie v2. No skill yet on 3+ wide, no cover or held up (none clear of the
   season-before rate by twice its standard error).
 
+## On the day: the scenario and today's races (built 24 Oct)
+
+Under the race's table, SCENARIO runs the race again in the browser on the stored anchor, twice on
+the same random numbers (neutral, then under the assumption), about 0.4 s for 2 x 20,000 races. Its
+three levers are parameters the engine already has, so the vendored files are untouched: the early
+pace (which borrowed clocks it may draw: fast, neutral or slow early), LEADERS (`early` in the cost
+table: lengths for leading against racing last) and THE RAIL (`turn` 2, 3 and 4+: lengths for being
+off the rail turning in). A scenario that has been run is what "Watch a run" plays. Only the 25 Oct
+card on can use it; the 19 Oct record imported from the lab carries no borrowed clocks.
+
+Above the panel, TODAY'S RACES lists each finished race's first three with their draw and first-call
+position, and three buttons for where each came in the straight (`day_lanes`; a second click takes
+one back, CLEAR removes a race). FETCH asks HKJC for races that have gone off (`market_close`) and
+have no result; a page from another meeting, which HKJC serves for an unpublished race, is refused.
+The day's read is a conditional logit on the winner with the price as the offset, shrunk towards no
+bias, in lengths with its error; SET THE SCENARIO TO TODAY'S READ puts it on the sliders and runs
+nothing.
+
+The record it sits beside (`python -m hkrd.jobs.fit_day_bias`, ~40 s, stored in `day_bias_record`):
+over 614 meetings since 2019 a meeting's first half has not predicted its second beyond the price
+(leaders r -0.04, inside gates -0.04, the rail +0.05), where the same test finds days that differ by
+about 1.8 lengths between leading and racing last; carrying the read into the next race made the
+winner's log loss 0.0043 a race worse than the price alone (better in one season of eight). So the
+sliders start at neutral and the read is shown as what happened.
+
 ## Not built (separate tickets, or on hold)
 
 The 2D replay of run races and Brett's marking grid (`run_marks`, `race_reads`) — on hold. The
