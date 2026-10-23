@@ -40,6 +40,22 @@
 
 <main class="speedmap-page">
 
+  <!-- The race simulated 20,000 times before it is run once (racesim-SPEC
+       section 9.2). Anchored to v2, so it says how the race may be run and
+       never who wins: SIM WIN is v2's chance by construction. First on the page
+       (Brett, 23 Oct); the gate ladder follows it. -->
+  <section class="map-section shape-section" id="shape">
+    <div class="section-head">
+      <span class="title">RACE SHAPE</span>
+      <span class="sub">THE RACE SIMULATED 20,000 TIMES BEFORE IT IS RUN ONCE ·
+        ANCHORED SO EVERY HORSE WINS AS OFTEN AS v2 SAYS</span>
+    </div>
+    <p class="note">THE SIMULATION IS TIED TO v2'S CHANCES; IT SHOWS HOW THE RACE MAY
+      BE RUN, NOT WHO WINS. ITS EARLY POSITIONS COME FROM THE SHAPE MODELS, NOT
+      THE LADDER BELOW: TWO READINGS OF THE SAME QUESTION, SHOWN ONE ABOVE THE OTHER.</p>
+    <div class="shape-body" id="shape-body"></div>
+  </section>
+
   <section class="map-section">
     <div class="section-head">
       <span class="title">SPEED MAP</span>
@@ -65,21 +81,6 @@
          the card; a zero bar would read as "breaks at field average", which is
          a claim about a horse we know nothing about. -->
     <div class="unprojected" id="unprojected" hidden></div>
-  </section>
-
-  <!-- The race simulated 20,000 times before it is run once (racesim-SPEC
-       section 9.2). Anchored to v2, so it says how the race may be run and
-       never who wins: SIM WIN is v2's chance by construction. -->
-  <section class="map-section shape-section" id="shape">
-    <div class="section-head">
-      <span class="title">RACE SHAPE</span>
-      <span class="sub">THE RACE SIMULATED 20,000 TIMES BEFORE IT IS RUN ONCE ·
-        ANCHORED SO EVERY HORSE WINS AS OFTEN AS v2 SAYS</span>
-    </div>
-    <p class="note">THE SIMULATION IS TIED TO v2'S CHANCES; IT SHOWS HOW THE RACE MAY
-      BE RUN, NOT WHO WINS. ITS EARLY POSITIONS COME FROM THE SHAPE MODELS, NOT
-      THE LADDER ABOVE: TWO READINGS OF THE SAME QUESTION, SHOWN SIDE BY SIDE.</p>
-    <div class="shape-body" id="shape-body"></div>
   </section>
 
 </main>

@@ -442,8 +442,10 @@ export function createShapePanel(host) {
     const i = R.H.findIndex((x) => x.h.no === sel);
     window.TrackView.draw(cv, {
       // the camera snaps whenever the run is paused (a jump, the scrub) and follows smoothly while it plays,
-      // as the lab's page does
-      R, F, t, sel, col: COL, font: COL.font, awt: sr.surface === 'AWT', snap: viewer.snap || !viewer.playing,
+      // as the lab's page does -- but the vendored camera eases by a share PER FRAME, so where frames come
+      // slowly (a phone, a tab in the background) it would trail the field: there it snaps every frame
+      R, F, t, sel, col: COL, font: COL.font, awt: sr.surface === 'AWT',
+      snap: viewer.snap || !viewer.playing || viewer.slowFrame,
       cam: viewer.cam,
       wide: viewer.wide, clothOf: (no) => COL.cloth[(no - 1) % 14] || COL.dot,
       held: (f) => sr.runners[f.i].sim.held && f.held && sr.distance - f.x < R.geo.Lh + 50,
@@ -475,6 +477,7 @@ export function createShapePanel(host) {
   function loop(ts) {
     viewer.raf = null;
     if (!viewer.open || !host.isConnected) return;
+    viewer.slowFrame = viewer.lastTs != null && ts - viewer.lastTs > 100;
     if (viewer.playing && viewer.lastTs != null) {
       viewer.t += ((ts - viewer.lastTs) / 1000) * viewer.speed;
       if (viewer.t >= end()) { viewer.t = end(); setPlaying(false); }
