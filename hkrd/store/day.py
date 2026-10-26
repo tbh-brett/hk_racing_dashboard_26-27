@@ -11,7 +11,8 @@ from typing import Any
 from .connect import Connection
 from .gbm import _UNRUN
 
-__all__ = ["LANES", "save_lane", "clear_race", "lanes", "meeting", "race_sims", "save_record", "latest_record"]
+__all__ = ["LANES", "save_lane", "clear_race", "lanes", "meeting", "race_sims", "save_record", "latest_record",
+           "last_settled"]
 
 LANES = ("rail", "middle", "outside")
 
@@ -71,6 +72,12 @@ def save_record(conn: Connection, *, fitted_at: str, through: str, record: dict)
     conn.execute("INSERT INTO day_bias_record (fitted_at, through, record_json) VALUES (?,?,?) "
                  "ON CONFLICT (fitted_at) DO UPDATE SET through = excluded.through, record_json = excluded.record_json",
                  (fitted_at, through, json.dumps(record)))
+
+
+def last_settled(conn: Connection, *, before: str) -> str | None:
+    """The newest meeting before `before` with a result stored."""
+    r = conn.execute("SELECT max(race_date) FROM runners WHERE place IS NOT NULL AND race_date < ?", (before,)).fetchone()
+    return r[0]
 
 
 def latest_record(conn: Connection) -> dict | None:

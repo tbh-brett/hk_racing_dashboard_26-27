@@ -4,8 +4,10 @@
 
 On every settled meeting from 2019 (model/day_bias): each meeting's first half against its second,
 on all going and on rain-affected going, and the day's read carried into the next race's chances
-against the price alone. About forty seconds; run when the record should take in a new stretch of
-the season. The Speed Map's TODAY'S RACES box shows the newest row beside the day's own read.
+against the price alone; the AWT's full nights on their own; and each trip's facts. About forty
+seconds, before dawn from cron, and a run with no new settled meeting since the newest row (at this
+version) says so and writes nothing. The Speed Map's TODAY'S RACES box shows the newest row beside
+the day's own read, and an AWT race's Race Shape panel its trip's facts.
 """
 from __future__ import annotations
 
@@ -45,6 +47,10 @@ def run(db: Path | None = None, *, today: str | None = None) -> str:
     conn = get_conn(db)
     try:
         init_db(conn)
+        last, settled = store.latest_record(conn), store.last_settled(conn, before=today)
+        if last and last.get("version") == day_bias.VERSION and last["through"] == settled:
+            return (f"fit_day_bias: nothing new -- the record fitted {last['fitted_at']} already takes in every "
+                    f"settled meeting to {settled}; 0 rows written")
         d = frame(conn, before=today)
         rec = day_bias.record(d)
         now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
@@ -55,7 +61,8 @@ def run(db: Path | None = None, *, today: str | None = None) -> str:
     p, q = rec["persistence"], rec["prediction"]
     return (f"fit_day_bias: {p['meetings']} meetings; first half vs second r = "
             + ", ".join(f"{c} {p[c]['r']:+.3f}" for c in day_bias.COLS)
-            + f"; the day's read on the next race {q['gain_per_race']:+.4f} log loss a race (+/- {q['se']})")
+            + f"; the day's read on the next race {q['gain_per_race']:+.4f} log loss a race (+/- {q['se']})"
+            + f"; {len(rec['trips']) - 1} trips' facts; 1 row written")
 
 
 def main(argv: list[str] | None = None) -> int:

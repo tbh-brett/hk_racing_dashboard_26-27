@@ -20,6 +20,7 @@
  * sim_app.js); the look is the Speed Map's.
  */
 import { api } from './api.js';
+import { tripFacts } from './shape-facts.js';
 import { createScenario } from './shape-scenario.js';
 import { el, DASH } from './vocab.js';
 
@@ -101,7 +102,7 @@ export function createShapePanel(host) {
   /* ── the panel ──────────────────────────────────────────────────────── */
   function render() {
     // no scenario without the borrowed clocks (the lab's imported 19 Oct record does not carry them)
-    host.replaceChildren(metaLine(), ...onDay(), paceMix(), table(), trust(),
+    host.replaceChildren(metaLine(), ...onDay(), ...[tripFacts(data)].filter(Boolean), paceMix(), table(), trust(),
                          ...(data.templates.length ? [scenarioWrap] : []), watch());
   }
 
@@ -509,13 +510,15 @@ export function createShapePanel(host) {
                             lastTs: null });
   }
 
-  // the day's read put on the sliders (TODAY'S RACES); nothing runs until re-simulated. False when
-  // the race on screen has no scenario to set
+  // the day's read put on the sliders (TODAY'S RACES); nothing runs until re-simulated. 'none' when
+  // the race on screen has no scenario, 'surface' when the read is another surface's, 'held' when a
+  // lever was held to its range
   function setScenario(v) {
-    if (!data?.templates?.length) return false;
-    scenario.set(v);
+    if (!data?.templates?.length) return 'none';
+    if (v.surface && v.surface !== data.race.surface) return 'surface';
+    const held = scenario.set({ front: v.front, lane: v.lane });
     scenarioWrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    return true;
+    return held ? 'held' : 'set';
   }
 
   return { show, setScenario };

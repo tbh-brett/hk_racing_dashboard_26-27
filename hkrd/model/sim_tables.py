@@ -15,7 +15,8 @@ the one-turn fits of turns/turns_check.py). The keys are the lab's, because the 
   traffic    P(held up in the straight) by position turning in and field size; its cost is a
              placeholder (below)
   slow       how often a horse starts slowly, and what it costs
-  noise      the spread of finishing lengths once the price is known
+  noise      the spread of finishing lengths once the price is known, pooled and by trip group
+             (`by_group`); the engine reads one number, `for_race` chooses it
   contacts   the stewards' contacts per runner by part of the race, this season, and their direction
 
 The study's two statsmodels fits are least squares on the same dummy columns here (numpy), with
@@ -35,10 +36,10 @@ from scipy import stats
 from hkrd.derive.pace import section_lengths
 from hkrd.model.shape_frame import LENGTH_M, floats
 
-__all__ = ["VERSION", "SLOW_PRIOR_RUNS", "cost_group", "fit", "slow_base", "trip_regressions", "trip_costs",
-           "templates", "calls", "contacts"]
+__all__ = ["VERSION", "SLOW_PRIOR_RUNS", "cost_group", "fit", "for_race", "group_noise", "slow_base",
+           "trip_regressions", "trip_costs", "templates", "calls", "contacts"]
 
-VERSION = "simtables-1.0"
+VERSION = "simtables-1.1"     # 1.1 (26 Oct): the finishing spread by trip group
 RECENT_FROM = 2022            # templates, calls and the traffic rates: 2022/23 on
 NOISE_FROM = 2019             # the costs' controls and the noise: 2019/20 on
 PER_COURSE = 400
@@ -50,6 +51,7 @@ SLOW_EXTRA = {"early_frac_extra": 0.115, "early_frac_extra_n": 8417}
 # placeholder until it can be measured.
 TRAFFIC_COST = [1.0, 0.5, 2.0]
 SLOW_PRIOR_RUNS = 8           # a horse's slow-start record is shrunk towards the population's by 8 runs
+NOISE_MIN_RUNS = 1000         # a trip group's own spread needs this many runs; fewer take the pooled one
 _Z = float(stats.norm.ppf(0.975))
 
 
@@ -62,6 +64,17 @@ def cost_group(venue: str, surface: str, distance: int) -> str:
         return {1000: "ST 1000 straight", 1200: "ST 1200", 1400: "ST 1400",
                 1600: "ST 1600-1800", 1800: "ST 1600-1800"}.get(distance, "ST 2000+")
     return {1000: "HV 1000", 1200: "HV 1200", 1650: "HV 1650"}.get(distance, "HV 1800+")
+
+
+def for_race(T: Mapping, group: str) -> dict:
+    """The tables as the engine reads them for one race: `noise.sd_lengths` is the race's trip
+    group's own spread where it has one, the pooled one otherwise. The engine takes one number for
+    every race, so the choice is made here and the vendored file is untouched."""
+    noise = dict(T.get("noise") or {})
+    own = (noise.get("by_group") or {}).get(group)
+    if own:
+        noise.update(sd_lengths=own["sd_lengths"], group=group, pooled_sd_lengths=T["noise"]["sd_lengths"])
+    return {**T, "noise": noise}
 
 
 def _study_group(venue: str, surface: str, distance: int) -> str:
@@ -285,6 +298,23 @@ def _settled(t: pd.DataFrame, last_season: int) -> pd.DataFrame:
     return f
 
 
+def group_noise(f: pd.DataFrame) -> dict[str, dict]:
+    """The pooled noise's fit on each trip group's runs alone (`_settled` rows): the spread of
+    finishing lengths once the price, the field and the class are known. Measured 26 Oct, the AWT
+    spreads a field more than any turf trip -- 4.9 to 5.7 lengths against 3.2 to 4.7, and its
+    winners win by two lengths or more in 22 to 28% of races against 12 to 17% -- so one spread
+    for every trip made the trip decide too much of an AWT result and drew its margins as turf's."""
+    groups = [cost_group(v, s, int(d)) for v, s, d in zip(f.venue, f.surface, f.distance)]
+    out = {}
+    for g, d in f.groupby(pd.Series(groups, index=f.index)):
+        if len(d) < NOISE_MIN_RUNS:
+            continue
+        terms = [("num", "logp"), ("num", "field")] + ([("cat", "cls", None)] if d.cls.nunique() > 1 else [])
+        _, _, scale, n = _ols(d, "lens_vs_med", terms)
+        out[g] = dict(sd_lengths=round(float(np.sqrt(scale)), 2), n=n)
+    return out
+
+
 def slow_base(t: pd.DataFrame, *, last_season: int) -> float:
     """How often a run with a comment starts slowly: the population a horse's own record is shrunk
     towards (`slow.base`)."""
@@ -326,7 +356,7 @@ def fit(t: pd.DataFrame, card: str, *, std_cum: Callable[[str], list[float] | No
                                              ("cat", "grp", None)])
     last = f[f.place == f.field]
     noise = dict(sd_lengths=round(float(np.sqrt(scale)), 2), n=n,
-                 last_horse_lengths_median=round(float(last.lengths_behind.median()), 2))
+                 last_horse_lengths_median=round(float(last.lengths_behind.median()), 2), by_group=group_noise(f))
     return dict(card=card, made_from=f"settled races before {card}", templates=tpl, calls=calls(recent),
                 costs=trip_costs(trip_regressions(t, last_season=last_season)), traffic=traffic, slow=slow, noise=noise,
                 contacts=contacts(contact_races), sizes={k: len(v) for k, v in tpl.items()})

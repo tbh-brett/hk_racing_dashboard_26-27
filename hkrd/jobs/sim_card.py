@@ -154,7 +154,8 @@ def simulate(conn: Connection, date: str, race_no: int, report: SimReport, *, do
         return False
     tables = store.tables_row(conn, date, sim_tables.VERSION)          # 1 MB of JSON: only when it runs
     card = shape_sim.race_inputs(doc)
-    text, cpu = run_node(dict(card=card, tables=tables["tables"], race_no=race_no, settings=settings))
+    text, cpu = run_node(dict(card=card, tables=_race_tables(tables["tables"], card, race_no), race_no=race_no,
+                              settings=settings))
     result = json.loads(text)
     if _gone(conn, date, race_no):
         report.did = f"{date} R{race_no}: went off while it was simulated; not kept (its record is the row before)"
@@ -236,6 +237,13 @@ def next_tick(db: Path | None = None, *, today: str | None = None) -> SimReport:
     return report
 
 
+def _race_tables(T: dict, card: dict, race_no: int) -> dict:
+    """The tables with the race's own finishing spread (sim_tables.for_race): the same choice for
+    a run and for its --verify, so a stored race still re-runs to identical bytes."""
+    group = next(r["cost_group"] for r in card["races"] if r["no"] == race_no)
+    return sim_tables.for_race(T, group)
+
+
 def verify(date: str, race_no: int, db: Path | None = None) -> tuple[bool, str]:
     """Re-run a race's newest stored inputs: identical bytes, or a failure."""
     conn = get_conn(db)
@@ -249,7 +257,7 @@ def verify(date: str, race_no: int, db: Path | None = None) -> tuple[bool, str]:
         tables = store.tables_row(conn, as_of, version)
         if tables is None:
             return False, f"the tables it names ({as_of}, {version}) are gone"
-        text, _ = run_node(dict(inputs, tables=tables["tables"]))
+        text, _ = run_node(dict(inputs, tables=_race_tables(tables["tables"], inputs["card"], race_no)))
     finally:
         conn.close()
     same = text == sim["result_text"]

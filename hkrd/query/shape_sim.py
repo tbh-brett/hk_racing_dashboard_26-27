@@ -22,11 +22,13 @@ from typing import Any
 
 from hkrd.derive.pace import section_lengths
 from hkrd.model.sim_tables import VERSION as TABLES_VERSION
+from hkrd.model import sim_tables
 from hkrd.model.sim_tables import cost_group
+from hkrd.store import day as day_store
 from hkrd.store import sim as store
 from hkrd.store.connect import Connection, db_file, get_conn
 
-__all__ = ["card_inputs", "fingerprint", "race_inputs", "race", "card", "TABLES_VERSION"]
+__all__ = ["card_inputs", "fingerprint", "race_inputs", "race", "card", "noise", "TABLES_VERSION"]
 
 _NEED = ("draw", "p_win", "pred_early", "p_lead", "exp_lane", "p_nocover", "slow_rate", "n_prior")
 
@@ -151,6 +153,14 @@ def _actual(conn: Connection, date: str, race_no: int, runners: list[dict]) -> d
                 missing=[dict(no=h["no"], name=h["name"]) for h in runners if names.get(h["no"]) != h["name"]])
 
 
+def _trip_facts(conn: Connection, rc: dict) -> dict | None:
+    """What the archive says of the race's course and trip (model/day_bias.trip_facts, stored by
+    jobs/fit_day_bias), with the turf trips' range beside it; None before the record has them."""
+    trips = (day_store.latest_record(conn) or {}).get("trips") or {}
+    own = trips.get(rc["template_key"])
+    return dict(own, key=rc["template_key"], turf=trips.get("_turf")) if own else None
+
+
 def race(date: str, race_no: int, *, conn: Connection | None = None) -> dict | None:
     """One race's newest simulation, or None when it has none."""
     conn = conn or get_conn()
@@ -181,9 +191,18 @@ def race(date: str, race_no: int, *, conn: Connection | None = None) -> dict | N
         race=rc, runners=runners, summary=res["summary"], engine=res["engine"], coupling=res["coupling"],
         coupled_check=res["coupled_check"], anchor=res["anchor"], settle_sd=res["settle_sd"],
         templates=[t for t in templates if t["id"] in used],
-        tables={k: T[k] for k in ("calls", "traffic", "slow", "noise", "contacts") if k in T}
+        # the race's own finishing spread, as its stored simulation ran (sim_tables.for_race)
+        tables={k: v for k, v in sim_tables.for_race(T, rc["cost_group"]).items()
+                if k in ("calls", "traffic", "slow", "noise", "contacts")}
         | {"costs": {rc["cost_group"]: T.get("costs", {}).get(rc["cost_group"])}},
-        actual=_actual(conn, date, race_no, runners))
+        actual=_actual(conn, date, race_no, runners), trip_facts=_trip_facts(conn, rc))
+
+
+def noise(conn: Connection, date: str) -> dict | None:
+    """A card's finishing spreads, pooled and by trip group (sim_tables), from its tables at this
+    version; None when the card has none."""
+    T = _tables(conn, date, sim_tables.VERSION)
+    return None if T is None else T.get("noise")
 
 
 def card(date: str, *, conn: Connection | None = None) -> dict:

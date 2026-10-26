@@ -91,6 +91,13 @@
 # new. 04:10 sits between the simulation's 04:07 and 04:22 ticks.
 10 4 * * *   nice -n 19 python -m hkrd.jobs.fit_shape --pending --db /data/hkrd.db
 
+# Whether a day's bias carries over, and what the archive says of each trip
+# (jobs/fit_day_bias): the record the Speed Map's TODAY'S RACES and an AWT race's
+# line are set against. About 45 s of pandas when a meeting has settled since
+# the newest row, one query when none has. 04:25, after fit_shape and between
+# the simulation's 04:22 and 04:37 ticks.
+25 4 * * *   nice -n 19 python -m hkrd.jobs.fit_day_bias --db /data/hkrd.db
+
 # Barrier trials. A separate line because they are a different source on a
 # different schedule, and folding them into `nightly` would mean a failed
 # race-day scrape takes the trials down with it.

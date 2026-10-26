@@ -168,6 +168,7 @@
 .shape-section .day-horse .nm { font: 500 12px/1.2 var(--font); color: var(--text); }
 .shape-section .day-horse .shape-seg button { padding: 4px 6px; font-size: 9px; }
 .shape-section .sc-grid { min-width: 760px; }
+.shape-section .day-surface { font: 500 9px/1 var(--font-mono); letter-spacing: .1em; color: var(--text-2); margin: 10px 0 2px; }
 
 @media (max-width: 760px) {
   .shape-section .day-race { grid-template-columns: minmax(0, 1fr); }

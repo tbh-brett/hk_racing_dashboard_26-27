@@ -79,6 +79,34 @@ about 1.8 lengths between leading and racing last; carrying the read into the ne
 winner's log loss 0.0043 a race worse than the price alone (better in one season of eight). So the
 sliders start at neutral and the read is shown as what happened.
 
+## The all-weather (26 Oct, `simtables-1.1`)
+
+Measured on the archive since 2019 (332 AWT races at 1200, 219 at 1650, 49 at 1800):
+
+- Margins are wider than turf's: the winner wins by 2 L or more in 22-28% of AWT races against
+  12-17% on turf, the last horse finishes a median 14.5-19 L behind against 9-14, and the spread of
+  finishes once the price is known is 4.9-5.7 L against 3.2-4.7. The tables kept one spread for
+  every trip (4.0 L), which drew AWT margins as turf's and let the trip decide too much of an AWT
+  result. `noise.by_group` is now the same fit on each trip group's runs, and
+  `sim_tables.for_race` puts the race's own spread where the engine reads its one number, for a
+  run, its `--verify` and the page alike, so the vendored engine is unchanged.
+- Leaders who led early beat their price on the AWT (1.38x at 1200, 1.64x at 1650) as they do on
+  turf (1.45x at Sha Tin 1200, 1.40x over 1400-1800); closers do worse than their price (0.57-0.71x)
+  as on turf sprints. Known before the race, by habitual early speed: about the price at 1200, 1.20x
+  at 1650. The AWT cost tables already carry this: at 1200 the early pace against position costs
+  4.7 L a unit against turf's 2.25, and at 1650 settling four or more wide costs 3.4 L.
+- The draw: inside gates win more (1650: gates 1-3 10.4%, 10-14 4.3%), but against the price the
+  inside is not distinguishable from zero. The engine plays it through where a horse settles.
+- A night's bias: on the 32 nights with six or more AWT races, the first AWT races did not predict
+  the later ones (leaders r +0.11) and carrying the read forward was no better than the price
+  (log loss +0.0013 +/- 0.011 a race, better in two seasons of seven); 32 nights reliably
+  show only a night effect of about 8 L, so this rules out little.
+
+TODAY'S RACES reads a card's AWT and turf races apart, each against its own record and in its own
+races' spread of lengths, and only sets an AWT read on an AWT race. An AWT race's Race Shape panel
+has one line of what the archive says of its trip (`trips` in the day-bias record). The scenario
+sliders reach further where results spread more (4 L at AWT 1650, 3.5 at AWT 1200, 3 on turf).
+
 ## Not built (separate tickets, or on hold)
 
 The 2D replay of run races and Brett's marking grid (`run_marks`, `race_reads`) — on hold. The

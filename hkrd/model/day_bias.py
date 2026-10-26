@@ -22,6 +22,14 @@ seasons of eight). On rain-affected going (30 meetings) the rail reads r +0.24, 
 too few days to be a finding. So the day's read is shown as what happened, beside this record,
 and never moves a simulation unless Brett sets it to.
 
+THE AWT (26 Oct) is a different surface on the same night, so its races are read apart from turf
+and against their own record: on the 32 meetings with six or more AWT races, a night's first AWT
+races have not predicted its later ones either (leaders r +0.11) and carrying the read forward
+made the next race's chances no better than the price's (log loss +0.0013 +/- 0.011 a race, better
+in two seasons of seven) -- but 32 nights reliably show only a night effect of
+about 8 lengths between leading and racing last, so this rules out very little. `trip_facts`
+keeps what the archive says of each course and trip, which the Speed Map shows on an AWT race.
+
 Pure: frames in, numbers out. jobs/fit_day_bias stores the record; query/shape_day reads the day.
 """
 from __future__ import annotations
@@ -31,14 +39,22 @@ from collections.abc import Sequence
 import numpy as np
 import pandas as pd
 
-__all__ = ["COLS", "covariates", "fit", "persistence", "prediction", "record", "logit_to_lengths"]
+from hkrd.derive.pace import classify_style
+
+__all__ = ["COLS", "covariates", "fit", "persistence", "prediction", "record", "trip_facts", "logit_to_lengths"]
 
 COLS = ("front", "inside", "rail")
+VERSION = "daybias-1.1"      # 1.1 (26 Oct): the AWT's own record, base rates by surface, each trip's facts
 
 # The smallest day effect the persistence test finds reliably at the archive's size: a day sd of
 # 0.6 on the winner's log odds, leading against racing last, in lengths on the simulator's noise
 # (measured 24 Oct on synthetic meetings, 614 of ten races; 0.4 gave z 2.5, 0.25 gave z 1.4).
 DETECTABLE_LENGTHS = 1.8
+# The same on the AWT's full nights (32 with six or more AWT races, nine a night, the AWT's noise of
+# about 5 lengths): a night sd of 2.0 found three times in four, 1.0 once in six (26 Oct).
+AWT_MIN_RACES = 6
+AWT_DETECTABLE_LENGTHS = 7.8
+WET = ("Y", "GY", "YS", "S", "H", "WS", "SL")
 
 
 def covariates(d: pd.DataFrame) -> pd.DataFrame:
@@ -154,16 +170,58 @@ def prediction(d: pd.DataFrame, *, first: int = 4, ridge: float = 2.0) -> dict:
                 seasons_better=int((per_season > 0).sum()), seasons=int(len(per_season)))
 
 
+def _ae(e: pd.DataFrame) -> float | None:
+    return round(float(e.won.sum() / e.p_mkt.sum()), 2) if len(e) else None
+
+
+def trip_facts(d: pd.DataFrame, *, min_races: int = 30) -> dict[str, dict]:
+    """What the archive says of each course and trip (`venue_surface_distance`, the simulator's
+    template key) with `min_races` or more: winners against the price (A/E, wins over the wins the
+    price expected) by where they raced early -- led (the first two at the first call) and closers,
+    `derive.pace.classify_style`'s one definition -- and by habitual early speed, which is known
+    before the race; the draw; and the margins. And '_turf', the range of the same over the turf
+    trips with 100 races or more, for the comparison."""
+    fc = (d.early_frac * (d.field - 1)).round().astype(int) + 1
+    style = pd.Series([classify_style([p], int(n)) for p, n in zip(fc, d.field)], index=d.index)
+    d = d.assign(style=style, key=d.venue + "_" + d.surface + "_" + d.distance.astype(int).astype(str))
+    out = {}
+    for k, g in d.groupby("key"):
+        nr = g.race_id.nunique()
+        if nr < min_races:
+            continue
+        second = g[g.place == 2].lengths_behind.dropna()
+        last = g[g.place == g.field].lengths_behind.dropna()
+        inside, wide = g[g.draw <= 3], g[g.draw >= 10]
+        out[k] = dict(races=int(nr), led_ae=_ae(g[g["style"] == "Leader"]), closer_ae=_ae(g[g["style"] == "Closer"]),
+                      habit_front_ae=_ae(g[g.early_rank <= 1 / 3]),
+                      inside_win=round(float(inside.won.mean()), 3) if len(inside) else None, inside_ae=_ae(inside),
+                      wide_win=round(float(wide.won.mean()), 3) if len(wide) else None, wide_ae=_ae(wide),
+                      won_by_2=round(float((second >= 2).mean()), 3) if len(second) else None,
+                      margin_median=float(second.median()) if len(second) else None,
+                      last_median=float(last.median()) if len(last) else None)
+    turf = [v for k, v in out.items() if "_Turf_" in k and v["races"] >= 100]
+    span = lambda f: [min(v[f] for v in turf), max(v[f] for v in turf)] if turf else None   # noqa: E731
+    out["_turf"] = dict(won_by_2=span("won_by_2"), led_ae=span("led_ae"), last_median=span("last_median"))
+    return out
+
+
 def record(d: pd.DataFrame) -> dict:
     """The whole record: persistence on all going and on rain-affected going, the prediction test,
-    and the base rates the day's read is set against (winners from the front third, placegetters
-    on the rail turning in), by venue."""
-    wet = d.going.fillna("G").str.upper().str.strip().isin(["Y", "GY", "YS", "S", "H", "WS", "SL"])
+    the AWT's own (`by_surface`, its full nights' AWT races alone), the base rates the day's read is
+    set against (winners from the front third, placegetters on the rail turning in) by venue and
+    surface, and each trip's facts."""
+    wet = d.going.fillna("G").str.upper().str.strip().isin(WET)
     win = d[d.won == 1]
     placed = d[d.place.between(1, 3) & d.rail_obs.notna()]
+    where = d.venue + " " + d.surface
     base = {v: dict(winner_front_third=round(float((g.early_frac < 1 / 3).mean()), 3),
-                    placed_on_rail=round(float(placed[placed.venue == v].rail_obs.mean()), 3))
-            for v, g in win.groupby("venue")}
-    return dict(seasons=[int(d.season.min()), int(d.season.max())], persistence=persistence(d),
+                    placed_on_rail=round(float(placed[where[placed.index] == v].rail_obs.mean()), 3))
+            for v, g in win.groupby(where[win.index])}
+    awt = d[d.surface == "AWT"]
+    per = awt.groupby("race_date").race_no.nunique()
+    full = awt[awt.race_date.isin(per[per >= AWT_MIN_RACES].index)]
+    by_surface = {"AWT": dict(persistence=persistence(full, min_races=AWT_MIN_RACES), prediction=prediction(full),
+                              detectable_lengths=AWT_DETECTABLE_LENGTHS, min_races=AWT_MIN_RACES)} if len(full) else {}
+    return dict(version=VERSION, seasons=[int(d.season.min()), int(d.season.max())], persistence=persistence(d),
                 persistence_wet=persistence(d[wet], min_races=6), prediction=prediction(d), base_rates=base,
-                detectable_lengths=DETECTABLE_LENGTHS)
+                detectable_lengths=DETECTABLE_LENGTHS, by_surface=by_surface, trips=trip_facts(d))

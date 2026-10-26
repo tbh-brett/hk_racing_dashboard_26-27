@@ -13,6 +13,10 @@
  *                horse's lane on the turn, not in the straight; a horse wide on the turn comes wide
  *                in the straight.
  *
+ * Both sliders reach 3 lengths either way on a trip with turf's spread of results, and further in
+ * proportion where results spread more (4 at AWT 1650, 3.5 at 1200, whose winners win by more): a length means
+ * less there against the luck of the race.
+ *
  * It uses the race's stored anchor and runs twice on the same random numbers -- once neutral, once
  * under the scenario -- so the difference is the scenario and not noise (0.3 s each). The win
  * chances that move are YOUR assumption's consequence, not information: the record says a day's
@@ -28,7 +32,14 @@ export const PACE_GROUPS = {
   slow: ['Slow', 'Very Slow'],
 };
 const N = 20000;
-export const RANGE = 3;          // lengths either way on both sliders
+export const RANGE = 3;          // lengths either way on both sliders, on turf's spread of results
+const SPREAD = 4.0;              // the pooled spread the 3 is set against (sim_tables noise, 25 Oct)
+
+/** The sliders' reach for a race: RANGE, widened where its trip's results spread more. */
+export function rangeFor(data) {
+  const sd = data?.tables?.noise?.sd_lengths;
+  return sd ? Math.max(RANGE, Math.round((2 * RANGE * sd) / SPREAD) / 2) : RANGE;
+}
 const pct = (v, d = 1) => (v == null ? DASH : `${(100 * v).toFixed(d)}%`);
 const title = (s) => String(s || '').split(/\s+/).map((w) => (w ? w[0] + w.slice(1).toLowerCase() : w)).join(' ');
 const lens = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(2)} L`;
@@ -61,14 +72,21 @@ export function createScenario(host, { loadEngine, onChange }) {
   function show(d) {
     data = d;
     out = null;
+    const r = rangeFor(d);          // the levers carry from race to race, within this race's reach
+    sc = { ...sc, front: Math.max(-r, Math.min(r, sc.front)), lane: Math.max(-r, Math.min(r, sc.lane)) };
     render();
   }
 
+  /** Put levers on the box; true when one had to be held to the race's range. */
   function set(next) {
-    sc = { ...sc, ...next };
+    const r = rangeFor(data);
+    const held = Object.fromEntries(Object.entries(next).map(([k, v]) => [k,
+      typeof v === 'number' && k !== 'pace' ? Math.max(-r, Math.min(r, v)) : v]));
+    sc = { ...sc, ...held };
     out = null;
     onChange(null);                 // the run viewer runs what the table shows: neutral until re-run
     render();
+    return Object.keys(next).some((k) => held[k] !== next[k]);
   }
 
   function slider(label, key, min, max, step, hint) {
@@ -101,8 +119,8 @@ export function createScenario(host, { loadEngine, onChange }) {
     }
     const controls = el('div', 'sc-controls');
     controls.append(pace,
-      slider('LEADERS', 'front', -RANGE, RANGE, 0.25, 'lengths for leading against racing last; + favours the pace'),
-      slider('THE RAIL', 'lane', -RANGE, RANGE, 0.25, 'lengths for being off the rail turning in; + favours the rail'));
+      slider('LEADERS', 'front', -rangeFor(data), rangeFor(data), 0.25, 'lengths for leading against racing last; + favours the pace'),
+      slider('THE RAIL', 'lane', -rangeFor(data), rangeFor(data), 0.25, 'lengths for being off the rail turning in; + favours the rail'));
     const run = el('button', 'shape-btn', isNeutral(sc) ? 'NEUTRAL — NOTHING TO RE-RUN' : 'RE-SIMULATE');
     run.type = 'button';
     run.disabled = isNeutral(sc);
