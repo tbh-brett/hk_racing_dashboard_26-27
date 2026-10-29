@@ -1,14 +1,18 @@
 """The vendored engine and simulator, and the node runner (racesim-SPEC §10, §11.1, §12).
 
-The four files in web/assets/shape are the lab's, byte for byte, and both the engine and the
-simulator are deterministic -- a rerun of 25 Oct race 7 matched the lab's batch to the last digit --
-so every check here is EXACT equality with a file the lab wrote:
+The four files in web/assets/shape were the lab's, byte for byte, until 29 Oct, when engine.js and
+track-view.js took Happy Valley's course from HKJC's map (the lab drew it as Sha Tin's shape made
+smaller). Both the engine and the simulator are deterministic -- a rerun of 25 Oct race 7 matched the
+lab's batch to the last digit -- so every check here is EXACT equality with a file written before:
 
   the runner on 25 Oct race 7 at small settings   race-sim/out/sim_small_2026-10-25_r7.json
   the runner on the whole 25 Oct card, lab settings  race-sim/out/sim_2026-10-25.json (slow: HKRD_SLOW=1)
-  the engine over the season's replays             race-shape-2d/out/test_core_out.json
+  the engine over the season's Sha Tin replays     the lab's engine on the 64 Sha Tin of them (29 Oct)
+  the engine over all the season's replays          this engine on all 107, 43 at Happy Valley (29 Oct)
   Brett's 19 Oct marks against the replay           race-shape-2d/out/marks_check_2026-10-19.json
-  the engine's traffic against the comments        race-sim/out/engine_traffic_check.json
+  the engine's traffic against the comments        the lab's on the Sha Tin replays; this engine's on all
+
+Sha Tin is the lab's to the byte: the Happy Valley course changes nothing on it.
 
 Skipped where node is not installed, like test_js_parses.
 """
@@ -33,12 +37,13 @@ NODE = shutil.which("node")
 
 pytestmark = pytest.mark.skipif(NODE is None, reason="node is not installed")
 
-# The lab's files, by the sha256 they had when they were vendored (23 Oct, engine v3).
+# The files by sha256: the lab's as vendored (23 Oct, engine v3), but for engine.js and track-view.js,
+# which since 29 Oct carry Happy Valley's course (the lab's were d4813257... and 0514a271...).
 VENDORED = {
-    "engine.js": "d4813257ad80650a98a331e761db39a391f290bf497c513a6f3b2e0adc203c12",
+    "engine.js": "5cd799aa4e78ee333f9c94b5bce998c13707ec2e29d577f3b7d29964d8e2bb71",
     "sectionals.js": "97a03a9dcc4676d24eef5f76688f32d9d414b2d1b23205e26407d415385e08dc",
     "sim-core.js": "f2e381c8bad646ad63e5b2af8595ae9040306c50795635fd584fcc06488c7d9b",
-    "track-view.js": "0514a271b1fdc1fc03cb75726e8e62bc419eb3b5c4e598850c8e866756800be3",
+    "track-view.js": "d469ecda28458ee0453044a4221d4e12c99ee4eb72471252779dfd4e7b9982ee",
 }
 SMALL = dict(N_SUM=2000, N_ANCHOR=2000, PASSES=40, N_ENGINE=20, N_COUPLED=20, SIGMA_MULT=1.045)
 LAB = dict(N_SUM=20000, N_ANCHOR=10000, PASSES=40, N_ENGINE=300, N_COUPLED=600, SIGMA_MULT=1.045)
@@ -119,10 +124,25 @@ def _helper(script: str, *args: Path, env: dict | None = None) -> None:
     assert done.returncode == 0, done.stderr.decode()
 
 
-def test_the_engine_over_the_seasons_replays_is_the_labs(tmp_path: Path) -> None:
+def _sha_tin_only(tmp_path: Path) -> Path:
+    races = json.loads(_unzip("races_2026-10-14.json.gz", tmp_path).read_text(encoding="utf-8"))
+    out = tmp_path / "races_st.json"
+    out.write_text(json.dumps(dict(races, races=[r for r in races["races"] if r["venue"] == "ST"])), encoding="utf-8")
+    return out
+
+
+def test_the_engine_over_the_seasons_sha_tin_replays_is_the_labs(tmp_path: Path) -> None:
+    marks = _unzip("marks_2026-10-23.json.gz", tmp_path)
+    _helper("test_core.cjs", _sha_tin_only(tmp_path), tmp_path / "out.json", env={"MARKS": str(marks)})
+    assert json.loads((tmp_path / "out.json").read_text(encoding="utf-8")) == _load("test_core_out_st.json")
+
+
+def test_the_engine_over_all_the_seasons_replays_is_as_recorded(tmp_path: Path) -> None:
     races, marks = _unzip("races_2026-10-14.json.gz", tmp_path), _unzip("marks_2026-10-23.json.gz", tmp_path)
     _helper("test_core.cjs", races, tmp_path / "out.json", env={"MARKS": str(marks)})
-    assert json.loads((tmp_path / "out.json").read_text(encoding="utf-8")) == _load("test_core_out.json")
+    got = json.loads((tmp_path / "out.json").read_text(encoding="utf-8"))
+    assert got["section_marks_hit"] == "4638/4638" and got["backwards_steps"] == 0
+    assert got == _load("test_core_out.json")
 
 
 def test_brett_s_19_oct_marks_against_the_replay_are_the_labs(tmp_path: Path) -> None:
@@ -131,7 +151,40 @@ def test_brett_s_19_oct_marks_against_the_replay_are_the_labs(tmp_path: Path) ->
     assert json.loads((tmp_path / "out.json").read_text(encoding="utf-8")) == _load("marks_check_2026-10-19.json")
 
 
-def test_the_engines_traffic_against_the_comments_is_the_labs(tmp_path: Path) -> None:
-    races = _unzip("races_2026-10-14.json.gz", tmp_path)
-    _helper("engine_traffic_check.cjs", races, tmp_path / "out.json")
-    assert json.loads((tmp_path / "out.json").read_text(encoding="utf-8")) == _load("engine_traffic_check.json")
+def test_the_engines_traffic_against_the_comments_is_the_labs_at_sha_tin_and_as_recorded_on_all(tmp_path: Path) -> None:
+    _helper("engine_traffic_check.cjs", _sha_tin_only(tmp_path), tmp_path / "st.json")
+    assert json.loads((tmp_path / "st.json").read_text(encoding="utf-8")) == _load("engine_traffic_check_st.json")
+    _helper("engine_traffic_check.cjs", _unzip("races_2026-10-14.json.gz", tmp_path), tmp_path / "all.json")
+    assert json.loads((tmp_path / "all.json").read_text(encoding="utf-8")) == _load("engine_traffic_check.json")
+
+
+_HV = """
+const E = require(process.env.ENGINE_DIR + "/engine.js"), T = require(process.env.ENGINE_DIR + "/track-view.js");
+const out = {};
+for (const D of [1000, 1200, 1650, 1800, 2200]) {
+  const g = E.geometry({ venue: "HV", surface: "Turf", distance: D }), bs = E.bends(g, D);
+  out[D] = { chute: g.chute, deg: bs.reduce((a, b) => a + (b.to - b.from) / b.R * 180 / Math.PI, 0),
+             first: bs.length ? bs[bs.length - 1].name : null, lap: g.parts.reduce((a, p) => a + p.len, 0),
+             turn: g.parts.reduce((a, p) => a + p.deg, 0) };
+}
+const g = E.geometry({ venue: "HV", surface: "Turf", distance: 1650 }), p0 = T.railPoint(g, 0, true), p1 = T.railPoint(g, 1450, true);
+out.closes = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+out.straight_normal = [T.railPoint(g, 150, true).nx, T.railPoint(g, 150, true).ny];
+const st = E.geometry({ venue: "ST", surface: "Turf", distance: 1200 });
+out.st = { label: st.label, R: E.bends(st, 1200).map(b => b.R) };
+process.stdout.write(JSON.stringify(out));
+"""
+
+
+def test_happy_valley_is_its_own_course_from_the_hkjc_map() -> None:
+    done = subprocess.run([NODE, "-e", _HV], capture_output=True, env={**os.environ, "ENGINE_DIR": str(ENGINE)},
+                          timeout=60)
+    assert done.returncode == 0, done.stderr.decode()
+    got = json.loads(done.stdout)
+    assert got["1650"]["lap"] == pytest.approx(1450) and got["1650"]["turn"] == pytest.approx(360)
+    assert got["1650"]["deg"] == pytest.approx(360, abs=0.5)            # one lap, every bend once
+    assert got["1000"]["chute"] == {"from": 937.5, "to": 1000} and got["1000"]["deg"] == pytest.approx(162, abs=0.5)
+    assert got["1200"]["chute"]["from"] == 1150 and got["1200"]["first"] == "left side"     # up the left side first
+    assert got["1800"]["chute"] is None and got["2200"]["deg"] > 500
+    assert got["closes"] < 0.01 and got["straight_normal"] == [0, 1]   # the rail meets itself; outward is down the page
+    assert got["st"] == {"label": "Sha Tin turf", "R": [pytest.approx(519.5 / 3.141592653589793)]}   # the home bend only

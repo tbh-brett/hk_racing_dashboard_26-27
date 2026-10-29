@@ -154,6 +154,15 @@ def test_the_finishing_spread_is_each_trips_own_where_it_has_enough_runs() -> No
     assert T["noise"]["sd_lengths"] == 4.0                             # the stored tables are not changed
 
 
+def test_a_race_takes_its_own_venues_hold_up_rates_where_it_has_them() -> None:
+    T = dict(noise=dict(sd_lengths=4.0), traffic=dict(rate={"2_1": 0.12}, base=0.10,
+                                                      by_venue={"HV Turf": dict(rate={"2_1": 0.06}, base=0.05, runs=3000)}))
+    assert sim_tables.for_race(T, "HV 1650")["traffic"]["rate"] == {"2_1": 0.06}
+    assert sim_tables.for_race(T, "HV 1650")["traffic"]["base"] == 0.05
+    assert sim_tables.for_race(T, "ST 1200")["traffic"]["rate"] == {"2_1": 0.12}       # no table of its own: pooled
+    assert sim_tables.venue_of("ST AWT 1650+") == "ST AWT" and T["traffic"]["base"] == 0.10
+
+
 def test_a_trips_facts_say_how_its_winners_raced_against_the_price() -> None:
     rows = []
     for r in range(40):

@@ -2,8 +2,8 @@
  "races": 107,
  "runs_with_comment": 995,
  "comments_say_held_in_straight": 0.1347,
- "engine_no_way_through_0_5s": 0.2462,
- "engine_no_way_through_5s": 0.0503,
+ "engine_no_way_through_0_5s": 0.2392,
+ "engine_no_way_through_5s": 0.0482,
  "auc": 0.564,
  "note": "Comments on Running and the stewards' report (the replay's parse); the engine run with no corrections and without the comments' held-ups (since 18 Oct the replay plays those)."
 }

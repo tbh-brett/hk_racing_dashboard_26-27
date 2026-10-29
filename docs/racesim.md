@@ -107,8 +107,40 @@ races' spread of lengths, and only sets an AWT read on an AWT race. An AWT race'
 has one line of what the archive says of its trip (`trips` in the day-bias record). The scenario
 sliders reach further where results spread more (4 L at AWT 1650, 3.5 at AWT 1200, 3 on turf).
 
+## Happy Valley's own course (29 Oct, `simtables-1.2`)
+
+Until 29 Oct the engine drew and ran Happy Valley as Sha Tin's shape made smaller: two 310 m straights
+and two equal 415 m bends of 132 m. The course is now HKJC's map, traced from the turf's inside rail,
+checked against HKJC's own start markers (the 1650 and 1800 on the home straight, the 1200 at the
+chute, the 2400 under its arrow), scaled to the A course's 1,450 m lap and fitted as straights and
+arcs (2.8 m from the traced rail on average). In metres to go on the last lap: the home straight
+0-310; the home turn 310-630, 162 degrees in three arcs (entry 149 m, middle 83 m, exit 116 m); the
+back straight 630-938; a sharp top-left corner 938-983 (61 m); the gentle left side 983-1193 (269
+m); the bend after the post 1193-1420 (117 m), which starts 30 m past the post. Brett confirmed the
+chutes: the 1000 (and the 2400) start straight onto the back straight, 62 m before it; the 1200 in
+the chute at the bottom left, 50 m, then up the left side. Ground lost is each bend's own radius;
+the replay draws the course from the same parts.
+
+From the archive (2019 on, Comments on Running):
+
+- A horse making three or more places into the turn comes round 0.7-0.8 of a lane wider than the
+  field at HV 1650+, against a twentieth of a lane at Sha Tin and 0.2 in the HV sprints. The engine
+  gave 0.2-0.35 everywhere, so a horse going round on the HV home bend at 1650 m and beyond is now
+  carried 1.5 lanes outside where it entered it (`DRIFT`); measured on the 1 Nov 1650 and 1800, those
+  movers turn in 0.36 of a lane wider than the field, from 0.21. Going wide there also costs little
+  against the price (4+ wide at HV 1650+ A/E 1.05, Sha Tin 0.49).
+- Rail runners in the front 60% turning in are held up in the straight 5-6% of the time at HV,
+  10-13% at Sha Tin; midfield rail runners 7% against 15-18%. `traffic.by_venue` gives each venue
+  its own rates (HV base 5.3%, Sha Tin turf 8.7%, the AWT 3.3%; pooled 6.9%).
+- The comments almost never say where a leader went in the straight, so when a gap opens on the HV
+  rail is for Brett's marked races, not the archive.
+
+Uphill out of the bend after the post and downhill into the home turn are in the borrowed clocks,
+which are HV races' own sectionals. Sha Tin and the AWT are the lab's to the byte: the engine's 64
+Sha Tin replays are identical to the lab engine's (tests/test_shape_engine.py).
+
 ## Not built (separate tickets, or on hold)
 
 The 2D replay of run races and Brett's marking grid (`run_marks`, `race_reads`) — on hold. The
 calibration items of the spec's §14, the Speed Map decision (§13.10: the settle model beats the
-ladder, but replacing it is its own change), a Happy Valley course drawn from the map.
+ladder, but replacing it is its own change).

@@ -83,6 +83,14 @@
     "HV 1650+": { round: [400, 550], through: [200, 400] }, "ST 1200": { round: [500, 550], through: [300, 450] },
     "ST 1400": { round: [500, 600], through: [300, 450] }, "ST 1600-1800": { round: [500, 600], through: [250, 450] },
     "ST 2000+": { round: [500, 700], through: [200, 450] } };           // ST 2000+ through: 15 named, the pooled quartiles
+  /* Carried wide round the home bend (29 Oct). Brett: at Happy Valley a horse making its run on the turn goes wider. The
+     comments agree beyond 1600 m: horses making 3+ places into the turn come round 0.7 to 0.8 of a lane wider than the
+     field there, against a twentieth of a lane at Sha Tin and 0.2 in the Happy Valley sprints, which the engine already
+     gave. So a horse going round on the HV home bend at those trips sits this many lanes outside where it entered it.
+     Measured on the 1 Nov 1650 and 1800 (300 runs): those movers turn into the straight 0.36 of a lane wider than the
+     field, from 0.21 with none -- half the comments' figure, because only a horse already going round is carried. More
+     would push the whole field out (3 lanes: the field 0.4 wider too); Brett's marked races are the next measure. */
+  const DRIFT = { "HV 1650+": 1.5 };
   function runTrip(race) {
     const v = race.venue, s = race.surface, D = race.distance;
     if (v === "ST" && s === "AWT") return "AWT";
@@ -103,8 +111,45 @@
      bend after the post, 220 m and 420 m of a bend that isn't there. */
   const CHUTE = { "ST Turf": [1400, 1600, 1800], "ST AWT": [1200] };
 
+  /* Happy Valley as it is (29 Oct): traced from HKJC's course map, scaled to the A course's 1,450 m lap and fitted as
+     straights and arcs, 2.8 m from the traced rail on average. Until 29 Oct it was Sha Tin's shape made smaller, two
+     equal 415 m bends of 132 m; HKJC's map has the home turn 162 degrees in 320 m and tightest in its middle (83 m), the
+     bend after the post 30 m past the post, a gentle left side, a sharp top-left corner (61 m) and a 307 m back
+     straight. Each part from the post going back: [name, metres, degrees turned]. Brett (29 Oct): the 1000 starts in a
+     chute straight onto the back straight (so does the 2400, 12 m into it), the 1200 in the chute at the bottom left,
+     straight, then up the left side; HV_CHUTE is where each joins the course, metres to go. */
+  const HV_COURSE = [["home straight", 310, 0], ["home bend", 171.5, 84.6], ["home bend", 65.3, 45.1], ["home bend", 83.5, 32.2],
+    ["back straight", 307.2, 0], ["top-left bend", 45.1, 42.0], ["left side", 210.6, 44.8], ["bend after the post", 226.9, 111.3],
+    ["after the post", 29.9, 0]];
+  const HV_CHUTE = { 1000: 937.5, 1200: 1150, 2400: 937.5 + 1450 };
+  const HV_PARTS = HV_COURSE.map(([name, len, deg]) => ({ name, len, deg, R: deg ? len / (deg * Math.PI / 180) : Infinity }));
+  // the drawing's rail, a point a metre from the post back: x, y (metres, y down, the post at 0,0, the home straight
+  // running right to left to it) and the unit direction away from the post, for track-view.js
+  const HV_PTS = (() => {
+    const out = new Float64Array(4 * 1451);
+    let x = 0, y = 0, h = 0, s = 0, j = 0;
+    const put = () => { out[4 * j] = x; out[4 * j + 1] = -y; out[4 * j + 2] = Math.cos(h); out[4 * j + 3] = -Math.sin(h); j++; };
+    put();
+    for (const p of HV_PARTS) {                // going back from the post the course turns left, y up; drawn y down
+      const n = Math.round(p.len * 20), dl = p.len / n, dh = (p.deg * Math.PI / 180) / n;
+      for (let q = 1; q <= n; q++) {
+        x += dl * Math.cos(h + dh / 2); y += dl * Math.sin(h + dh / 2); h += dh; s += dl;
+        while (j <= 1450 && s >= j - 1e-9) put();
+      }
+    }
+    // the fit closes within 3 m of the post; spread the gap round the lap so the drawn rail meets itself
+    const ex = out[4 * (j - 1)], ey = out[4 * (j - 1) + 1];
+    for (let q = 0; q < j; q++) { out[4 * q] -= ex * q / (j - 1); out[4 * q + 1] -= ey * q / (j - 1); }
+    return out.subarray(0, 4 * j);
+  })();
+
   function geometry(race) {
     const D = race.distance;
+    if (race.venue === "HV") {
+      const J = HV_CHUTE[D], chute = J != null && D > J ? { from: J, to: D } : null, B = 171.5 + 65.3 + 83.5;
+      return { straight: false, C: 1450, Lh: 310, B, Lb: 307.2, R: B / ((84.6 + 45.1 + 32.2) * Math.PI / 180), chute,
+        label: "Happy Valley" + (chute ? ", chute start" : ""), parts: HV_PARTS, pts: HV_PTS };
+    }
     if (race.venue === "ST" && race.surface === "Turf" && D === 1000) {
       return { straight: true, C: Infinity, Lh: D, B: 0, Lb: 0, R: Infinity, chute: null, label: "Sha Tin 1000 m straight" };
     }
@@ -117,14 +162,18 @@
     return { straight: false, C, Lh, B, Lb, R: B / Math.PI, chute, label };
   }
 
-  /** Bends as intervals of distance to go, nearest the post first. None in a chute. */
+  /** Bends as intervals of distance to go, nearest the post first, each with its radius. None in a chute. */
   function bends(geo, D) {
     if (geo.straight) return [];
     const out = [], lim = geo.chute ? geo.chute.from : D;
     for (let k = 0; k * geo.C < D; k++) {
-      const o = k * geo.C;
-      out.push({ from: o + geo.Lh, to: o + geo.Lh + geo.B, name: k === 0 ? "home bend" : "bend" });
-      out.push({ from: o + geo.Lh + geo.B + geo.Lb, to: o + geo.C, name: k === 0 ? "bend after the post" : "bend" });
+      let o = k * geo.C;
+      if (geo.parts) {                       // Happy Valley: each arc of the course
+        for (const p of geo.parts) { if (p.deg) out.push({ from: o, to: o + p.len, name: k === 0 ? p.name : "bend", R: p.R }); o += p.len; }
+        continue;
+      }
+      out.push({ from: o + geo.Lh, to: o + geo.Lh + geo.B, name: k === 0 ? "home bend" : "bend", R: geo.R });
+      out.push({ from: o + geo.Lh + geo.B + geo.Lb, to: o + geo.C, name: k === 0 ? "bend after the post" : "bend", R: geo.R });
     }
     return out.filter(b => b.from < lim).map(b => ({ ...b, to: Math.min(b.to, lim) }));
   }
@@ -385,7 +434,7 @@
     }
     const XD = H.map(() => new Float32Array(K)), Y = H.map(() => new Float32Array(K)), FL = H.map(() => new Uint8Array(K));
     const AH = H.map(() => new Int8Array(K).fill(-1));            // who it is held up behind, frame by frame (20 Oct: the simulator's trip cost)
-    const y = H.map(x => x.plan.gate), v = H.map(() => 0), yIn = H.map(() => null), o = H.map(() => 0);
+    const y = H.map(x => x.plan.gate), v = H.map(() => 0), yIn = H.map(() => null), o = H.map(() => 0), yBend = H.map(() => null);
     const push = H.map(() => null);            // active contact: {until, dir, victim}
     const contacts = [];
     y.forEach((yy, i) => { Y[i][0] = yy; });
@@ -496,6 +545,12 @@
                 if (dx < -0.5 * BODY || dx > LOOK_ROUND || y[j] < y[i] - 0.6) continue;
                 if (dx > BODY && closeF(j) <= 0.05) continue;              // ahead and no slower: not in the way
                 need = Math.max(need, y[j] + SIDE + ROUND_CLEAR);
+              }
+              // carried wider round a home bend where the trip says so (DRIFT), from the lane it entered the bend in
+              const hb = DRIFT[trip] ? onBend(bs, d) : null;
+              if (hb && hb.name === "home bend") {
+                if (yBend[i] === null) yBend[i] = y[i];
+                need = Math.max(need, yBend[i] + DRIFT[trip]);
               }
               target = Math.min(LANE_MAX, Math.max(target, need));
               vmax = Math.max(vmax, 0.8); T = Math.min(T, 1.2);
@@ -665,7 +720,7 @@
         const d = D - XD[i][k];
         if (d < -5) break;
         const b = onBend(bs, d);
-        if (b) ground += (Y[i][k] - 1) * LANE_M * (XD[i][k] - XD[i][k - 1]) / geo.R;
+        if (b) ground += (Y[i][k] - 1) * LANE_M * (XD[i][k] - XD[i][k - 1]) / b.R;      // the bend's own radius
         if (k % 5 || d < geo.Lh || XD[i][k] < 150) continue;
         cnt++;
         if (coverOf(XD.map(a => a[k]), Y.map(a => a[k]), i) === "none") nc++;

@@ -5,7 +5,9 @@
    straight along the bottom running right to left to the post at the bottom left, so the field goes round clockwise:
    up the left side after the post, left to right along the back straight at the top, down the right side round the
    home bend, then right to left up the straight. At Sha Tin the 1400, 1600 and 1800 start in a chute off the back
-   straight; the 1000 is the straight course.
+   straight; the 1000 is the straight course. Happy Valley (29 Oct) is its own shape, HKJC's course map as the engine
+   fitted it (geo.pts), in the same frame; its 1000 and 2400 start in the chute off the back straight, the 1200 in the
+   chute at the bottom left.
 
    Along the track every distance is to scale (metres). Across it everything is drawn 1.6 times as wide as it is, so that
    horses side by side read as side by side: the engine's one-metre lanes 1.6 m apart, and the course at its own width
@@ -31,6 +33,7 @@
    *  mini-map: the plan turned half round, so the home straight runs along the bottom, right to left. */
   function railPoint(geo, d, ovalOnly) {
     if (geo.straight) return { x: d, y: 0, nx: 0, ny: 1 };       // the straight course: run right to left to the post
+    if (geo.pts) return tracedPoint(geo, d, ovalOnly);
     const { Lh, B, Lb } = geo, r = B / Math.PI, xL = 0, xR = Lh, yC = 0;
     let p;
     if (!ovalOnly && geo.chute && d > geo.chute.from) p = { x: xL + (d - Lh - B), y: yC + r, nx: 0, ny: 1 };
@@ -43,6 +46,25 @@
     }
     // turned half round (as seen from the stands): x -> -x, y -> -y; the normal still points away from the infield
     return { x: -p.x, y: -p.y, nx: -p.nx, ny: -p.ny };
+  }
+
+  /** The same on a course drawn from its map (Happy Valley, 29 Oct): geo.pts holds the rail a metre at a time from the
+   *  post back (x, y, and the unit direction away from the post), already in this view's frame. A chute leaves the
+   *  course where it joins it, straight back along the course's direction there. */
+  function tracedPoint(geo, d, ovalOnly) {
+    const P = geo.pts, last = P.length / 4 - 1;
+    const at = (u) => {
+      const f = Math.max(0, Math.min(last, u)), i = Math.min(last - 1, Math.floor(f)), w = f - i, a = 4 * i, b = a + 4;
+      const bx = P[a + 2] + (P[b + 2] - P[a + 2]) * w, by = P[a + 3] + (P[b + 3] - P[a + 3]) * w, m = Math.hypot(bx, by) || 1;
+      // outward, away from the infield: the way back from the post turned a quarter clockwise on screen (y down)
+      return { x: P[a] + (P[b] - P[a]) * w, y: P[a + 1] + (P[b + 1] - P[a + 1]) * w, bx: bx / m, by: by / m, nx: -by / m, ny: bx / m };
+    };
+    if (!ovalOnly && geo.chute && d > geo.chute.from) {
+      const j = at(geo.chute.from), e = d - geo.chute.from;
+      return { x: j.x + j.bx * e, y: j.y + j.by * e, nx: j.nx, ny: j.ny };
+    }
+    const p = at(((d % geo.C) + geo.C) % geo.C);
+    return { x: p.x, y: p.y, nx: p.nx, ny: p.ny };
   }
 
   /** Where a horse is: d metres to go, in lane l (1 = on the rail). */

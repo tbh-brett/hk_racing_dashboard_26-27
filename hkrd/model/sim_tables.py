@@ -12,8 +12,8 @@ the one-turn fits of turns/turns_check.py). The keys are the lab's, because the 
   costs      lengths a trip costs at the finish: lane at the home turn and while settled, no cover,
              early position x pace, the price as a control, by venue and trip group (the one-turn
              Sha Tin chutes apart from the two-turn trips)
-  traffic    P(held up in the straight) by position turning in and field size; its cost is a
-             placeholder (below)
+  traffic    P(held up in the straight) by position turning in and field size, pooled and by venue
+             (`by_venue`); its cost is a placeholder (below)
   slow       how often a horse starts slowly, and what it costs
   noise      the spread of finishing lengths once the price is known, pooled and by trip group
              (`by_group`); the engine reads one number, `for_race` chooses it
@@ -36,10 +36,10 @@ from scipy import stats
 from hkrd.derive.pace import section_lengths
 from hkrd.model.shape_frame import LENGTH_M, floats
 
-__all__ = ["VERSION", "SLOW_PRIOR_RUNS", "cost_group", "fit", "for_race", "group_noise", "slow_base",
+__all__ = ["VERSION", "SLOW_PRIOR_RUNS", "cost_group", "fit", "for_race", "group_noise", "venue_of", "slow_base",
            "trip_regressions", "trip_costs", "templates", "calls", "contacts"]
 
-VERSION = "simtables-1.1"     # 1.1 (26 Oct): the finishing spread by trip group
+VERSION = "simtables-1.2"     # 1.1 (26 Oct): the finishing spread by trip group; 1.2 (29 Oct): hold-ups by venue
 RECENT_FROM = 2022            # templates, calls and the traffic rates: 2022/23 on
 NOISE_FROM = 2019             # the costs' controls and the noise: 2019/20 on
 PER_COURSE = 400
@@ -52,6 +52,7 @@ SLOW_EXTRA = {"early_frac_extra": 0.115, "early_frac_extra_n": 8417}
 TRAFFIC_COST = [1.0, 0.5, 2.0]
 SLOW_PRIOR_RUNS = 8           # a horse's slow-start record is shrunk towards the population's by 8 runs
 NOISE_MIN_RUNS = 1000         # a trip group's own spread needs this many runs; fewer take the pooled one
+TRAFFIC_MIN_RUNS = 2000       # a venue's own hold-up rates need this many stated runs
 _Z = float(stats.norm.ppf(0.975))
 
 
@@ -66,15 +67,25 @@ def cost_group(venue: str, surface: str, distance: int) -> str:
     return {1000: "HV 1000", 1200: "HV 1200", 1650: "HV 1650"}.get(distance, "HV 1800+")
 
 
+def venue_of(group: str) -> str:
+    """A trip group's venue and surface, as `traffic.by_venue` keys them."""
+    return "HV Turf" if group.startswith("HV") else "ST AWT" if group.startswith("ST AWT") else "ST Turf"
+
+
 def for_race(T: Mapping, group: str) -> dict:
     """The tables as the engine reads them for one race: `noise.sd_lengths` is the race's trip
-    group's own spread where it has one, the pooled one otherwise. The engine takes one number for
-    every race, so the choice is made here and the vendored file is untouched."""
+    group's own spread where it has one, the pooled one otherwise; `traffic.rate` and `.base` its
+    venue's hold-up rates where it has them. The engine takes one table for every race, so the
+    choice is made here and the vendored file is untouched."""
     noise = dict(T.get("noise") or {})
     own = (noise.get("by_group") or {}).get(group)
     if own:
         noise.update(sd_lengths=own["sd_lengths"], group=group, pooled_sd_lengths=T["noise"]["sd_lengths"])
-    return {**T, "noise": noise}
+    traffic = dict(T.get("traffic") or {})
+    mine = (traffic.get("by_venue") or {}).get(venue_of(group))
+    if mine:
+        traffic.update(rate=mine["rate"], base=mine["base"], venue=venue_of(group))
+    return {**T, "noise": noise, "traffic": traffic}
 
 
 def _study_group(venue: str, surface: str, distance: int) -> str:
@@ -315,6 +326,22 @@ def group_noise(f: pd.DataFrame) -> dict[str, dict]:
     return out
 
 
+def _traffic_by_venue(stated: pd.DataFrame) -> dict[str, dict]:
+    """The pooled hold-up rates fitted on each venue's runs alone. Measured 29 Oct: a Happy Valley
+    runner on the rail in the front 60% turning in is held up in the straight 5 to 6% of the time,
+    against 10 to 13% at Sha Tin, and midfield on the rail 7% against 15 to 18%: the shorter
+    straight and the smaller fields. Pooled, the simulation held HV runners up as often as Sha
+    Tin's."""
+    out = {}
+    for v, d in stated.groupby(stated.venue + " " + stated.surface):
+        if len(d) < TRAFFIC_MIN_RUNS:
+            continue
+        r = d.groupby(["tb", "fb"]).traffic_straight.agg(["mean", "size"]).reset_index()
+        out[v] = dict(rate={f"{int(x.tb)}_{int(x.fb)}": round(float(x["mean"]), 4) for _, x in r.iterrows() if x["size"] >= 50},
+                      base=round(float(d.traffic_straight.mean()), 4), runs=int(len(d)))
+    return out
+
+
 def slow_base(t: pd.DataFrame, *, last_season: int) -> float:
     """How often a run with a comment starts slowly: the population a horse's own record is shrunk
     towards (`slow.base`)."""
@@ -342,7 +369,8 @@ def fit(t: pd.DataFrame, card: str, *, std_cum: Callable[[str], list[float] | No
                          for _, r in rate.iterrows() if r["size"] >= 50},
                    base=round(float(recent_stated.traffic_straight.mean()), 4),
                    seasons=f"{RECENT_FROM}-{str(RECENT_FROM + 1)[2:]} to {last_season}-{str(last_season + 1)[2:]}",
-                   definition="the Comments on Running say held up, no clear run, checked or similar in the straight")
+                   definition="the Comments on Running say held up, no clear run, checked or similar in the straight",
+                   by_venue=_traffic_by_venue(recent_stated))
     s = stated.dropna(subset=["turn_frac"])
     mt, ci, _, _ = _ols(s, "lens_vs_med", [("num", c) for c in ("traffic_straight", "traffic_pre", "slow_bad",
                                                                 "early_frac", "turn_frac", "logp", "field")]
