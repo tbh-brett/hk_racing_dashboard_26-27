@@ -40,7 +40,7 @@ pytestmark = pytest.mark.skipif(NODE is None, reason="node is not installed")
 # The files by sha256: the lab's as vendored (23 Oct, engine v3), but for engine.js and track-view.js,
 # which since 29 Oct carry Happy Valley's course (the lab's were d4813257... and 0514a271...).
 VENDORED = {
-    "engine.js": "5cd799aa4e78ee333f9c94b5bce998c13707ec2e29d577f3b7d29964d8e2bb71",
+    "engine.js": "9b0c3f39997c5c1dc3bc5af99b83e16fdc391148cd6b65d3c2bc2696f3eea150",
     "sectionals.js": "97a03a9dcc4676d24eef5f76688f32d9d414b2d1b23205e26407d415385e08dc",
     "sim-core.js": "f2e381c8bad646ad63e5b2af8595ae9040306c50795635fd584fcc06488c7d9b",
     "track-view.js": "d469ecda28458ee0453044a4221d4e12c99ee4eb72471252779dfd4e7b9982ee",
@@ -156,6 +156,19 @@ def test_the_engines_traffic_against_the_comments_is_the_labs_at_sha_tin_and_as_
     assert json.loads((tmp_path / "st.json").read_text(encoding="utf-8")) == _load("engine_traffic_check_st.json")
     _helper("engine_traffic_check.cjs", _unzip("races_2026-10-14.json.gz", tmp_path), tmp_path / "all.json")
     assert json.loads((tmp_path / "all.json").read_text(encoding="utf-8")) == _load("engine_traffic_check.json")
+
+
+def test_brett_s_happy_valley_reads_against_the_replay(tmp_path: Path) -> None:
+    """Brett's reads of eleven HV videos (29 Oct): the lab's engine agreed with 10 of 27, the HV course
+    alone 11; the straight fan, the drift round the home bend and the later run start 13 or 14 (one race turns
+    on a front-runner's own fan). The misses
+    left are mostly settling lanes the comments don't give (the engine sends those to the rail)."""
+    _helper("hv_reads_check.cjs", _unzip("races_2026-10-14.json.gz", tmp_path), FIX / "hv_reads_2026-10-29.json",
+            tmp_path / "out.json")
+    got = json.loads((tmp_path / "out.json").read_text(encoding="utf-8"))
+    assert got["races"] == 11 and got["checks"] == 27 and got["agree"] >= 13
+    ok = {(r["race"], r["horse"], r["d"]) for r in got["rows"] if r["ok"]}
+    assert ("2026-10-07_04", "ABSOLUTE HONOUR", 100) in ok and ("2026-09-16_08", "LE ZONDA", 300) in ok
 
 
 _HV = """

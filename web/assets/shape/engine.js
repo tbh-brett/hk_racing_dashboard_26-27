@@ -80,17 +80,26 @@
     trip: { "AWT": 0.4629, "HV 1000-1200": -0.0534, "HV 1650+": 0.5882, "ST 1200": -0.1629, "ST 1400": 0, "ST 1600-1800": 0.2417, "ST 2000+": 0.8686 } };
   const RUN_START = {                                                     // metres to go, quartiles of the comments' start points
     "AWT": { round: [500, 600], through: [250, 400] }, "HV 1000-1200": { round: [350, 450], through: [150, 300] },
-    "HV 1650+": { round: [400, 550], through: [200, 400] }, "ST 1200": { round: [500, 550], through: [300, 450] },
+    // HV 1650+ round: Brett's video reads (29 Oct) have them shifting out at 600 to 750 m; the comments' 400-550 is where
+    // they say the horse improved, which is after it got out
+    "HV 1650+": { round: [500, 650], through: [200, 400] }, "ST 1200": { round: [500, 550], through: [300, 450] },
     "ST 1400": { round: [500, 600], through: [300, 450] }, "ST 1600-1800": { round: [500, 600], through: [250, 450] },
     "ST 2000+": { round: [500, 700], through: [200, 450] } };           // ST 2000+ through: 15 named, the pooled quartiles
   /* Carried wide round the home bend (29 Oct). Brett: at Happy Valley a horse making its run on the turn goes wider. The
-     comments agree beyond 1600 m: horses making 3+ places into the turn come round 0.7 to 0.8 of a lane wider than the
-     field there, against a twentieth of a lane at Sha Tin and 0.2 in the Happy Valley sprints, which the engine already
-     gave. So a horse going round on the HV home bend at those trips sits this many lanes outside where it entered it.
-     Measured on the 1 Nov 1650 and 1800 (300 runs): those movers turn into the straight 0.36 of a lane wider than the
-     field, from 0.21 with none -- half the comments' figure, because only a horse already going round is carried. More
-     would push the whole field out (3 lanes: the field 0.4 wider too); Brett's marked races are the next measure. */
-  const DRIFT = { "HV 1650+": 1.5 };
+     comments agree beyond 1600 m (horses making 3+ places into the turn come round 0.7 to 0.8 of a lane wider than the
+     field there, against a twentieth of a lane at Sha Tin and 0.2 in the HV sprints), and his video reads put it at
+     two to four lanes for the horse that goes round: Fortunate Son one out to lane 5/6 into the straight, Le Zonda 3
+     wide at 750 m, 4 at the turn, 6 into the straight, Happy Smile 2 to 3 to an open lane. So a horse going round on the
+     HV home bend at those trips is carried out as it goes, to this many lanes outside where it entered the bend by the
+     time it leaves it. */
+  const DRIFT = { "HV 1650+": 3.0 };
+  /* The HV straight (Brett's reads, 29 Oct): the front-runners come off the rail -- Absolute Honour led on it and went
+     to lane 4-5, Bright Day (the box seat) to 3-4, Turin Champion to 3, Golden Fortune out for a run -- and the horses
+     on the rail behind them come through inside (Target Audience, Quantum Cloud). The comments agree in their way: an
+     HV rail runner is held up half as often as a Sha Tin one. But not always: Brett, it depends on the pace, the rail
+     position and the rider, and sometimes the rail runners are shut in. So at HV each horse in the front quarter of
+     the field fans off its entry lane by its own amount between these two, against FAN[0] for the leader at Sha Tin. */
+  const HV_FAN_FRONT = [1.0, 4.0], HV_FRONT = 0.25;
   function runTrip(race) {
     const v = race.venue, s = race.surface, D = race.distance;
     if (v === "ST" && s === "AWT") return "AWT";
@@ -362,7 +371,9 @@
         // held up in the straight: Brett's mark, else the comment (or the simulation's draw); 'clear run' overrides
         held: corr && corr.straight && corr.straight.traffic ? corr.straight.traffic === "held" : !!(!(opts && opts.said === false) && h.p.traffic_straight) };
       // the straight: a horse making its run takes its own line (round or through); the rest spread a little
-      const fan = run.mover ? 0 : posT / N <= 0.15 ? FAN[0] : FAN[1];
+      const fan = run.mover ? 0 : geo.parts && posT / N <= HV_FRONT
+        ? HV_FAN_FRONT[0] + unit(`${race.id}|${h.no}|fan`) * (HV_FAN_FRONT[1] - HV_FAN_FRONT[0])
+        : posT / N <= 0.15 ? FAN[0] : FAN[1];
       const plan = planOf(race, h, A, corr, geo, fan);
       if (stPlan && stPlan[hi]) { plan.stLane = stPlan[hi].lane; plan.stLane2 = stPlan[hi].lane2; plan.stAt = stPlan[hi].at; plan.wait = stPlan[hi].wait; }
       return { h, tl: timeline(race, h), plan, corr, run };
@@ -435,6 +446,7 @@
     const XD = H.map(() => new Float32Array(K)), Y = H.map(() => new Float32Array(K)), FL = H.map(() => new Uint8Array(K));
     const AH = H.map(() => new Int8Array(K).fill(-1));            // who it is held up behind, frame by frame (20 Oct: the simulator's trip cost)
     const y = H.map(x => x.plan.gate), v = H.map(() => 0), yIn = H.map(() => null), o = H.map(() => 0), yBend = H.map(() => null);
+    const home = bs.filter(b => b.name === "home bend"), homeFrom = Math.min(...home.map(b => b.from)), homeTo = Math.max(...home.map(b => b.to));
     const push = H.map(() => null);            // active contact: {until, dir, victim}
     const contacts = [];
     y.forEach((yy, i) => { Y[i][0] = yy; });
@@ -550,7 +562,8 @@
               const hb = DRIFT[trip] ? onBend(bs, d) : null;
               if (hb && hb.name === "home bend") {
                 if (yBend[i] === null) yBend[i] = y[i];
-                need = Math.max(need, yBend[i] + DRIFT[trip]);
+                const through = Math.max(0, Math.min(1, (homeTo - d) / Math.max(1, homeTo - homeFrom)));   // of the bend
+                need = Math.max(need, yBend[i] + DRIFT[trip] * through);
               }
               target = Math.min(LANE_MAX, Math.max(target, need));
               vmax = Math.max(vmax, 0.8); T = Math.min(T, 1.2);
@@ -793,7 +806,9 @@
     };
     for (const i of order) {
       if (line[i]) continue;
-      const run = R0.runs[i], going = run.mover ? run.how : null, w = ST_WIN[going || "none"];
+      const run = R0.runs[i], going = run.mover ? run.how : null;
+      // HV: a front-runner's fan is wider than the window Sha Tin keeps a horse to
+      const w = geo.parts && !going ? Math.max(ST_WIN.none, (H[i].plan.fan || 0) + 0.5) : ST_WIN[going || "none"];
       if (run.held) {                                    // said to be held up: in behind the horse in front, then the first gap
         const j = blocker(i);
         if (j != null) {

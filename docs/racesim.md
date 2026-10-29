@@ -125,15 +125,29 @@ From the archive (2019 on, Comments on Running):
 
 - A horse making three or more places into the turn comes round 0.7-0.8 of a lane wider than the
   field at HV 1650+, against a twentieth of a lane at Sha Tin and 0.2 in the HV sprints. The engine
-  gave 0.2-0.35 everywhere, so a horse going round on the HV home bend at 1650 m and beyond is now
-  carried 1.5 lanes outside where it entered it (`DRIFT`); measured on the 1 Nov 1650 and 1800, those
-  movers turn in 0.36 of a lane wider than the field, from 0.21. Going wide there also costs little
-  against the price (4+ wide at HV 1650+ A/E 1.05, Sha Tin 0.49).
+  gave 0.2-0.35 everywhere. Going wide there also costs little against the price (4+ wide at HV
+  1650+ A/E 1.05, Sha Tin 0.49).
 - Rail runners in the front 60% turning in are held up in the straight 5-6% of the time at HV,
   10-13% at Sha Tin; midfield rail runners 7% against 15-18%. `traffic.by_venue` gives each venue
   its own rates (HV base 5.3%, Sha Tin turf 8.7%, the AWT 3.3%; pooled 6.9%).
 - The comments almost never say where a leader went in the straight, so when a gap opens on the HV
-  rail is for Brett's marked races, not the archive.
+  rail is for Brett's reads.
+
+Brett read eleven of this season's HV races from the video (29 Oct,
+tests/fixtures/shape/hv_reads_2026-10-29.json): the front-runners come off the rail in the straight
+(Absolute Honour from the lead to lane 4-5, Bright Day from the box seat to 3-4, Turin Champion to
+3) and the horses on the rail behind them come through inside; a horse going round shifts out at
+600-750 m and is carried two to four lanes wider into the straight (Fortunate Son one out to 5/6, Le
+Zonda 3 wide at 750 m, 4 at the turn, 6 into the straight). So at HV each horse in the front quarter
+of the field fans off its entry lane in the straight by its own one to four lanes (`HV_FAN_FRONT`:
+Brett, it depends on the pace, the rail and the rider); a horse going round on the
+home bend at 1650 m and beyond is carried out as it goes, to three lanes outside where it entered
+the bend (`DRIFT`); and those runs start at 500-650 m. The replay of those races, from their
+comments, agreed with 10 of his 27 checks on the lab's engine, 11 with the course alone and 13
+now; most of the misses left are settling lanes the comments don't give. In the 1 Nov
+simulations the horse leading at the turn call is in lane 4.0 at 100 m to go (2.2 before), the
+ones on the rail behind it 2.8 (2.3), and in the 1650 and 1800 horses making ground into the turn
+turn into the straight 0.61 of a lane wider than the field (the comments: 0.7-0.8).
 
 Uphill out of the bend after the post and downhill into the home turn are in the borrowed clocks,
 which are HV races' own sectionals. Sha Tin and the AWT are the lab's to the byte: the engine's 64

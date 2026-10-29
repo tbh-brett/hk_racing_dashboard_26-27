@@ -1,0 +1,32 @@
+{
+  "source": "Brett's reads of the race videos, 29 Oct 2026: Happy Valley this season. Lane 1 is the rail; 'one out' is 2. Each check is where the horse was as it passed d metres to go, or what it did.",
+  "checks": [
+    {"race": "2026-09-09_01", "horse": "TEAM HAPPY", "d": 800, "lane": [2.5, 3.6], "said": "3 wide throughout without cover"},
+    {"race": "2026-09-09_01", "horse": "TEAM HAPPY", "d": 450, "lane": [1.5, 2.6], "said": "settled outside the leader (one out) at the home bend"},
+    {"race": "2026-09-09_05", "horse": "FORTUNATE SON", "d": 900, "lane": [1.5, 2.6], "said": "settled one out with cover"},
+    {"race": "2026-09-09_05", "horse": "FORTUNATE SON", "d": 300, "lane": [4.5, 6.6], "said": "shifted out entering the home turn (600-500), into the straight on lane 5/6"},
+    {"race": "2026-09-16_03", "horse": "ROMANTIC FANTASY", "d": 900, "lane": [1.5, 2.6], "said": "settled one out behind cover"},
+    {"race": "2026-09-16_03", "horse": "ROMANTIC FANTASY", "d": 200, "lane": [8.5, 11.6], "said": "shifted out about 600m to go round, very wide in the straight (lane 10/11)"},
+    {"race": "2026-09-16_08", "horse": "LE ZONDA", "d": 750, "lane": [2.5, 3.6], "said": "shifted out at 750m, 3 wide no cover"},
+    {"race": "2026-09-16_08", "horse": "LE ZONDA", "d": 450, "lane": [3.5, 4.6], "said": "4 wide no cover at the home turn"},
+    {"race": "2026-09-16_08", "horse": "LE ZONDA", "d": 300, "lane": [5.0, 7.1], "said": "lane 6 or so into the straight"},
+    {"race": "2026-09-23_04", "horse": "BROWNNEEDSFURTHER", "d": 300, "lane": [1.0, 2.6], "said": "came through, behind one out one back"},
+    {"race": "2026-09-23_04", "horse": "JOKER ORBIT", "out": [550, 350], "by": 0.7, "said": "went outwards at the home turn (500-400)"},
+    {"race": "2026-09-23_05", "horse": "HAPPY SMILE", "d": 900, "lane": [1.5, 2.6], "said": "settled 2 wide behind cover"},
+    {"race": "2026-09-23_05", "horse": "HAPPY SMILE", "d": 550, "lane": [2.5, 3.6], "said": "three wide at 600m entering the home turn, still behind cover"},
+    {"race": "2026-09-23_05", "horse": "HAPPY SMILE", "d": 250, "lane": [4.0, 9.0], "said": "further out onto an open lane entering the straight (350-300)"},
+    {"race": "2026-10-07_01", "horse": "GOLDEN FORTUNE", "d": 500, "lane": [1.0, 1.6], "said": "box seat throughout, on the rail behind the leader"},
+    {"race": "2026-10-07_01", "horse": "GOLDEN FORTUNE", "d": 100, "lane": [2.0, 6.0], "said": "only shifted out for a run after entering the straight"},
+    {"race": "2026-10-07_04", "horse": "ABSOLUTE HONOUR", "d": 500, "lane": [1.0, 1.6], "said": "led on the rail throughout"},
+    {"race": "2026-10-07_04", "horse": "ABSOLUTE HONOUR", "d": 100, "lane": [3.5, 5.6], "said": "shifted out to lane 4-5 in the straight"},
+    {"race": "2026-10-07_04", "held_none": true, "said": "no horse was held up"},
+    {"race": "2026-10-07_07", "horse": "BRIGHT DAY", "d": 500, "lane": [1.0, 1.6], "said": "on the rail, improved to the box seat entering the home turn"},
+    {"race": "2026-10-07_07", "horse": "BRIGHT DAY", "d": 100, "lane": [2.5, 4.6], "said": "stayed inside in the straight, lane 3-4, and won"},
+    {"race": "2026-10-07_07", "horse": "QUANTUM CLOUD", "inside_of": "BRIGHT DAY", "d": 100, "said": "came through near the rail, a lane closer to it than Bright Day"},
+    {"race": "2026-10-07_07", "horse": "TARGET AUDIENCE", "inside_of": "BRIGHT DAY", "d": 100, "said": "settled on the rail behind Bright Day and came through near the rail"},
+    {"race": "2026-10-07_08", "horse": "AUDACIOUS PURSUIT", "run": "round", "said": "won from 8th, round"},
+    {"race": "2026-10-14_05", "horse": "CHARMING BABE", "d": 900, "lane": [2.5, 3.6], "said": "settled at the back 3 wide with cover"},
+    {"race": "2026-10-14_05", "horse": "CHARMING BABE", "d": 250, "lane": [4.0, 9.0], "said": "shifted further out at the home turn (400-300) for an open lane"},
+    {"race": "2026-10-14_05", "horse": "CORNERSTONE", "held": true, "said": "held up behind runners in lane 3"}
+  ]
+}
