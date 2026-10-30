@@ -16,6 +16,7 @@ import datetime as dt
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
 from hkrd.jobs.fit_shape import history
 from hkrd.model import day_bias
@@ -39,6 +40,8 @@ def frame(conn: Connection, *, before: str):
     d["won"] = (d.place == 1).astype(float)
     d = d[d.groupby("race_id").won.transform("sum") == 1]          # a dead heat has two winners
     d["race_no"] = d.race_no.astype(int)
+    bw = pd.DataFrame(store.body_weights(conn, before=before), columns=["race_date", "race_no", "horse_no", "declared_weight"])
+    d = d.merge(bw, on=["race_date", "race_no", "horse_no"], how="left")
     return day_bias.covariates(d)
 
 
@@ -62,7 +65,7 @@ def run(db: Path | None = None, *, today: str | None = None) -> str:
     return (f"fit_day_bias: {p['meetings']} meetings; first half vs second r = "
             + ", ".join(f"{c} {p[c]['r']:+.3f}" for c in day_bias.COLS)
             + f"; the day's read on the next race {q['gain_per_race']:+.4f} log loss a race (+/- {q['se']})"
-            + f"; {len(rec['trips']) - 1} trips' facts; 1 row written")
+            + f"; {len(rec['trips']) - 2} trips' facts; 1 row written")
 
 
 def main(argv: list[str] | None = None) -> int:

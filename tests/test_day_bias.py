@@ -170,10 +170,16 @@ def test_a_trips_facts_say_how_its_winners_raced_against_the_price() -> None:
             led = h == 1                                               # gate 1 leads and, at a fair price, wins
             rows.append(dict(venue="ST", surface="AWT", distance=1650, race_id=f"r{r}", field=12, draw=h,
                              early_frac=(h - 1) / 11, early_rank=h / 12, won=float(led), p_mkt=1 / 12,
-                             place=h, lengths_behind=None if led else 2.5 * (h - 1)))
-    got = day_bias.trip_facts(pd.DataFrame(rows))["ST_AWT_1650"]
-    assert got["races"] == 40 and got["led_ae"] > 1 and got["closer_ae"] == 0
+                             place=h, lengths_behind=None if led else 2.5 * (h - 1), season=2020 + 4 * (r % 2),
+                             declared_weight=1200 - 10 * h))                    # the winner is the heaviest
+    facts = day_bias.trip_facts(pd.DataFrame(rows))
+    got = facts["ST_AWT_1650"]
+    assert got["races"] == 40 and got["led"]["ae"] > 1 and got["closer"]["ae"] == 0
+    front, back = got["profile"]["front"], got["profile"]["back"]
+    assert front["ae"] > 1 and front["early"] > 1 and front["late"] > 1 and back["ae"] == 0   # it held in both halves
     assert got["won_by_2"] == 1.0 and got["margin_median"] == 2.5 and got["inside_win"] > got["wide_win"]
+    body = facts["_body"]["ST"]
+    assert body["heavy"]["ae"] > 1 and body["light"]["ae"] == 0 and body["cuts"][0] < body["cuts"][1]
 
 
 def test_the_fetch_asks_only_about_races_gone_off_and_refuses_another_meetings_page(tmp_path: Path,

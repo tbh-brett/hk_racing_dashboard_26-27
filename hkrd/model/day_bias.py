@@ -44,7 +44,8 @@ from hkrd.derive.pace import classify_style
 __all__ = ["COLS", "covariates", "fit", "persistence", "prediction", "record", "trip_facts", "logit_to_lengths"]
 
 COLS = ("front", "inside", "rail")
-VERSION = "daybias-1.1"      # 1.1 (26 Oct): the AWT's own record, base rates by surface, each trip's facts
+VERSION = "daybias-1.2"      # 1.1 (26 Oct): the AWT's own record, base rates by surface, each trip's facts;
+#                              1.2 (30 Oct): every trip's facts by running profile and its halves, body weight by venue
 
 # The smallest day effect the persistence test finds reliably at the archive's size: a day sd of
 # 0.6 on the winner's log odds, leading against racing last, in lengths on the simulator's noise
@@ -174,16 +175,36 @@ def _ae(e: pd.DataFrame) -> float | None:
     return round(float(e.won.sum() / e.p_mkt.sum()), 2) if len(e) else None
 
 
+HALF = 2022                  # a cell's two halves: seasons to 2022/23, and since
+
+
+def _cell(e: pd.DataFrame) -> dict | None:
+    """A/E over every season, and in each half: a figure that is the same side of 1.00 in both has
+    held; one that flips is the price's to have and the noise's to show."""
+    if not len(e):
+        return None
+    a, b = e[e.season <= HALF], e[e.season > HALF]
+    return dict(ae=_ae(e), early=_ae(a), late=_ae(b), wins=int(e.won.sum()))
+
+
 def trip_facts(d: pd.DataFrame, *, min_races: int = 30) -> dict[str, dict]:
     """What the archive says of each course and trip (`venue_surface_distance`, the simulator's
-    template key) with `min_races` or more: winners against the price (A/E, wins over the wins the
-    price expected) by where they raced early -- led (the first two at the first call) and closers,
-    `derive.pace.classify_style`'s one definition -- and by habitual early speed, which is known
-    before the race; the draw; and the margins. And '_turf', the range of the same over the turf
-    trips with 100 races or more, for the comparison."""
+    template key) with `min_races` or more, every figure against the price (A/E, wins over the wins
+    the price expected) with its two halves (`_cell`): by running profile -- the thirds of the field
+    by habitual early position, known before the race -- by where they raced early (led: the first
+    two at the first call; closers; `derive.pace.classify_style`), by the draw, and the margins.
+    '_body' is body weight by venue (thirds of the declared weight there, and where they start);
+    '_turf' the range of the margins over the turf trips with 100 races or more.
+
+    Measured 30 Oct: by profile, a few hold in both halves (AWT 1650+ front third 1.31 then 1.22,
+    back 0.87 then 0.78; Sha Tin 1600-1800 front 1.10 / 1.13, back 0.81 / 0.85; HV 1000 and 1200
+    back third under the price), the draw holds nowhere, and the heaviest Sha Tin horses 1.06 / 1.08.
+    Used as adjustments on later seasons they improved neither the price nor v2 (log loss within
+    0.0005 a race of both): context for reading a race, not a rating of it."""
     fc = (d.early_frac * (d.field - 1)).round().astype(int) + 1
     style = pd.Series([classify_style([p], int(n)) for p, n in zip(fc, d.field)], index=d.index)
-    d = d.assign(style=style, key=d.venue + "_" + d.surface + "_" + d.distance.astype(int).astype(str))
+    d = d.assign(style=style, key=d.venue + "_" + d.surface + "_" + d.distance.astype(int).astype(str),
+                 third=pd.cut(d.early_rank, [0, 1 / 3, 2 / 3, 1.01], labels=["front", "middle", "back"]))
     out = {}
     for k, g in d.groupby("key"):
         nr = g.race_id.nunique()
@@ -192,16 +213,23 @@ def trip_facts(d: pd.DataFrame, *, min_races: int = 30) -> dict[str, dict]:
         second = g[g.place == 2].lengths_behind.dropna()
         last = g[g.place == g.field].lengths_behind.dropna()
         inside, wide = g[g.draw <= 3], g[g.draw >= 10]
-        out[k] = dict(races=int(nr), led_ae=_ae(g[g["style"] == "Leader"]), closer_ae=_ae(g[g["style"] == "Closer"]),
-                      habit_front_ae=_ae(g[g.early_rank <= 1 / 3]),
-                      inside_win=round(float(inside.won.mean()), 3) if len(inside) else None, inside_ae=_ae(inside),
-                      wide_win=round(float(wide.won.mean()), 3) if len(wide) else None, wide_ae=_ae(wide),
+        out[k] = dict(races=int(nr), profile={t: _cell(g[g.third == t]) for t in ("front", "middle", "back")},
+                      led=_cell(g[g["style"] == "Leader"]), closer=_cell(g[g["style"] == "Closer"]),
+                      inside_win=round(float(inside.won.mean()), 3) if len(inside) else None, inside=_cell(inside),
+                      wide_win=round(float(wide.won.mean()), 3) if len(wide) else None, wide=_cell(wide),
                       won_by_2=round(float((second >= 2).mean()), 3) if len(second) else None,
                       margin_median=float(second.median()) if len(second) else None,
                       last_median=float(last.median()) if len(last) else None)
     turf = [v for k, v in out.items() if "_Turf_" in k and v["races"] >= 100]
     span = lambda f: [min(v[f] for v in turf), max(v[f] for v in turf)] if turf else None   # noqa: E731
-    out["_turf"] = dict(won_by_2=span("won_by_2"), led_ae=span("led_ae"), last_median=span("last_median"))
+    out["_turf"] = dict(won_by_2=span("won_by_2"), last_median=span("last_median"))
+    body = {}
+    if "declared_weight" in d:
+        for v, g in d[d.declared_weight.notna()].groupby("venue"):
+            cut = [float(x) for x in g.declared_weight.quantile([1 / 3, 2 / 3])]
+            third = pd.cut(g.declared_weight, [-np.inf, cut[0], cut[1], np.inf], labels=["light", "middle", "heavy"])
+            body[v] = dict(cuts=[round(c) for c in cut], **{t: _cell(g[third == t]) for t in ("light", "middle", "heavy")})
+    out["_body"] = body
     return out
 
 

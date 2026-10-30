@@ -12,7 +12,7 @@ from .connect import Connection
 from .gbm import _UNRUN
 
 __all__ = ["LANES", "save_lane", "clear_race", "lanes", "meeting", "race_sims", "save_record", "latest_record",
-           "last_settled"]
+           "last_settled", "body_weights"]
 
 LANES = ("rail", "middle", "outside")
 
@@ -72,6 +72,12 @@ def save_record(conn: Connection, *, fitted_at: str, through: str, record: dict)
     conn.execute("INSERT INTO day_bias_record (fitted_at, through, record_json) VALUES (?,?,?) "
                  "ON CONFLICT (fitted_at) DO UPDATE SET through = excluded.through, record_json = excluded.record_json",
                  (fitted_at, through, json.dumps(record)))
+
+
+def body_weights(conn: Connection, *, before: str) -> list[tuple]:
+    """Each run's declared body weight (lb) before a date: (race_date, race_no, horse_no, weight)."""
+    return conn.execute("SELECT race_date, race_no, horse_no, declared_weight FROM runners "
+                        "WHERE race_date < ? AND declared_weight > 0", (before,)).fetchall()
 
 
 def last_settled(conn: Connection, *, before: str) -> str | None:

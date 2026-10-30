@@ -103,8 +103,14 @@ Measured on the archive since 2019 (332 AWT races at 1200, 219 at 1650, 49 at 18
   show only a night effect of about 8 L, so this rules out little.
 
 TODAY'S RACES reads a card's AWT and turf races apart, each against its own record and in its own
-races' spread of lengths, and only sets an AWT read on an AWT race. An AWT race's Race Shape panel
-has one line of what the archive says of its trip (`trips` in the day-bias record). The scenario
+races' spread of lengths, and only sets an AWT read on an AWT race. Every race's Race Shape panel
+(the AWT's from 26 Oct, every course's from 30 Oct) has one line of what the archive says of its
+course and trip (`trips` in the day-bias record): winners against the price by running profile
+(the thirds by habitual early position, known before the race), by the draw and by body weight at
+the venue, each over every season and in its two halves, and the margins. A few hold in both
+halves (AWT 1650 front third 1.25 then 1.15; Sha Tin 1600 back third 0.89 / 0.85; the heaviest
+Sha Tin horses 1.06 / 1.08); none improved on the price or v2 when tried on later seasons, so the
+line is context, not a rating. The scenario
 sliders reach further where results spread more (4 L at AWT 1650, 3.5 at AWT 1200, 3 on turf).
 
 ## Happy Valley's own course (29 Oct, `simtables-1.2`)

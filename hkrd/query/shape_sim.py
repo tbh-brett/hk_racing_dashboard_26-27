@@ -158,7 +158,8 @@ def _trip_facts(conn: Connection, rc: dict) -> dict | None:
     jobs/fit_day_bias), with the turf trips' range beside it; None before the record has them."""
     trips = (day_store.latest_record(conn) or {}).get("trips") or {}
     own = trips.get(rc["template_key"])
-    return dict(own, key=rc["template_key"], turf=trips.get("_turf")) if own else None
+    return dict(own, key=rc["template_key"], turf=trips.get("_turf"),
+                body=(trips.get("_body") or {}).get(rc["venue"])) if own else None
 
 
 def race(date: str, race_no: int, *, conn: Connection | None = None) -> dict | None:
