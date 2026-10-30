@@ -162,6 +162,16 @@ purpose: it serves the whole betting ledger and the blackbook, and a deploy
 that has forgotten its secret must fail rather than publish them. Minimum
 twelve characters, also enforced.
 
+`HKRD_BETS_PASSWORD` is a second, separate password for the Bets page alone
+(the page, `/api/bets` and the statement import), for when the site password
+is shared with other readers. It is asked for after the site password, never
+instead of it. Twelve characters minimum, and it must differ from
+`HKRD_PASSWORD`. Unset, Bets sits behind the site password only.
+
+```bash
+fly secrets set HKRD_BETS_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(18))')"
+```
+
 ### 4. Ship it
 
 ```bash

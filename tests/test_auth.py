@@ -17,10 +17,10 @@ from hkrd.api import auth
 @pytest.fixture(autouse=True)
 def _restore():
     """Each test configures auth for itself and puts it back."""
-    saved = (auth._password, auth._open)
+    saved = (auth._password, auth._open, auth._bets_password)
     auth._attempts.clear()
     yield
-    auth._password, auth._open = saved
+    auth._password, auth._open, auth._bets_password = saved
 
 
 # ── configuration fails closed ───────────────────────────────────────────────
@@ -108,6 +108,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("HKRD_DB", str(tmp_path / "auth.db"))
     monkeypatch.setenv("HKRD_PASSWORD", "a-long-enough-secret")
     monkeypatch.delenv("HKRD_ALLOW_NO_AUTH", raising=False)
+    monkeypatch.delenv("HKRD_BETS_PASSWORD", raising=False)
     monkeypatch.setenv("HKRD_INSECURE_COOKIE", "1")
 
     import warnings
@@ -258,3 +259,126 @@ def test_a_real_page_is_still_shut(real_client):
     assert r.status_code == 303
     assert r.headers["location"].startswith("/login")
     assert real_client.get("/assets/bets.js").status_code == 303
+
+
+# ── the ledger's own password ────────────────────────────────────────────────
+#
+# The site password is shared with other readers, so the bets need one of
+# their own, checked behind the first.
+
+SITE, BETS = "a-long-enough-secret", "the-ledger-secret-1"
+_FORM = {"content-type": "application/x-www-form-urlencoded"}
+
+
+@pytest.fixture()
+def locked(tmp_path, monkeypatch):
+    monkeypatch.setenv("HKRD_DB", str(tmp_path / "locked.db"))
+    monkeypatch.setenv("HKRD_PASSWORD", SITE)
+    monkeypatch.setenv("HKRD_BETS_PASSWORD", BETS)
+    monkeypatch.delenv("HKRD_ALLOW_NO_AUTH", raising=False)
+    monkeypatch.setenv("HKRD_INSECURE_COOKIE", "1")
+
+    import warnings
+    warnings.filterwarnings("ignore")
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    app = FastAPI()
+
+    @app.get("/api/bets")
+    def bets():
+        return {"bets": ["private"]}
+
+    @app.get("/api/bets/summary")
+    def summary():
+        return {"staked": "private"}
+
+    @app.post("/api/jobs/import-statement")
+    def import_statement():
+        return {"written": True}
+
+    @app.get("/api/races")
+    def races():
+        return {"races": ["public"]}
+
+    @app.get("/pages/bets.html")
+    def page():
+        return {"page": True}
+
+    auth.configure()
+    auth.install(app)
+    c = TestClient(app, follow_redirects=False)
+    c.post("/api/login", data={"password": SITE}, headers=_FORM)   # jar keeps it
+    return c
+
+
+def test_a_bets_password_must_be_long_and_not_the_site_one():
+    with pytest.raises(auth.AuthError, match="shorter than 12"):
+        auth.configure(password=SITE, bets_password="short")
+    with pytest.raises(auth.AuthError, match="same as HKRD_PASSWORD"):
+        auth.configure(password=SITE, bets_password=SITE)
+    assert auth.configure(password=SITE, bets_password=BETS) is True
+    assert auth.bets_locked()
+
+
+def test_unset_leaves_the_bets_behind_the_site_password_alone(client):
+    assert not auth.bets_locked()
+    r = client.post("/api/login", data={"password": SITE}, headers=_FORM)
+    assert client.get("/api/bets", cookies={
+        auth.COOKIE: r.cookies.get(auth.COOKIE)}).status_code == 200
+
+
+def test_the_site_password_still_opens_everything_but_the_bets(locked):
+    assert locked.get("/api/races").status_code == 200
+    for path in ("/api/bets", "/api/bets/summary"):
+        r = locked.get(path)
+        assert r.status_code == 401 and "private" not in r.text
+    assert locked.post("/api/jobs/import-statement").status_code == 401
+
+
+@pytest.mark.parametrize("path", ["/pages/bets.html", "/pages//bets.html",
+                                  "/pages/./bets.html", "/pages/BETS.html"])
+def test_the_bets_page_sends_a_reader_to_the_bets_form(locked, path):
+    r = locked.get(path)
+    assert r.status_code == 303
+    assert r.headers["location"].startswith("/login?scope=bets&next=")
+
+
+def test_the_bets_password_opens_the_ledger(locked):
+    r = locked.post("/api/login/bets",
+                    data={"password": BETS, "next": "/pages/bets.html"},
+                    headers=_FORM)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/pages/bets.html"
+    assert locked.get("/api/bets").json()["bets"] == ["private"]
+    assert locked.get("/pages/bets.html").status_code == 200
+
+
+def test_the_site_password_does_not_open_the_bets_form(locked):
+    r = locked.post("/api/login/bets", data={"password": SITE}, headers=_FORM)
+    assert r.headers["location"] == "/login?scope=bets&bad=1"
+    assert not r.cookies.get(auth.BETS_COOKIE)
+
+
+def test_the_bets_password_alone_does_not_pass_the_front_door(locked):
+    """Behind the site password, not instead of it."""
+    r = locked.post("/api/login/bets", data={"password": BETS}, headers=_FORM)
+    bets_cookie = r.cookies.get(auth.BETS_COOKIE)
+    locked.cookies.clear()
+    locked.cookies.set(auth.BETS_COOKIE, bets_cookie)
+    assert locked.get("/api/bets").status_code == 401
+    assert locked.post("/api/login/bets", data={"password": BETS},
+                       headers=_FORM).status_code == 401
+
+
+def test_a_site_cookie_is_not_a_bets_cookie(locked):
+    """Signed with a different key, so copying one into the other's name
+    does not work."""
+    locked.cookies.set(auth.BETS_COOKIE, locked.cookies.get(auth.COOKIE))
+    assert locked.get("/api/bets").status_code == 401
+
+
+def test_logging_out_clears_both_cookies(locked):
+    r = locked.post("/api/logout")
+    cookies = "; ".join(r.headers.get_list("set-cookie"))
+    assert auth.COOKIE in cookies and auth.BETS_COOKIE in cookies

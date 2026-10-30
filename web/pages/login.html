@@ -33,6 +33,15 @@
 <script type="module">
   const params = new URLSearchParams(window.location.search);
   if (params.get('bad')) document.getElementById('err').hidden = false;
+  // The Bets page has a password of its own, asked for here once the site
+  // one has already been given. Same form, different door.
+  if (params.get('scope') === 'bets') {
+    document.title = 'Bets locked';
+    document.querySelector('form').action = '/api/login/bets';
+    document.querySelector('.brand').lastChild.textContent = 'BETS';
+    document.querySelector('.note').textContent =
+      'The betting ledger has its own password, separate from the dashboard.';
+  }
   // Come back to where the browser was headed, but only ever to a path on
   // this site — an absolute URL here would make the login form an open
   // redirect for anyone who could get the owner to click it.
