@@ -7,10 +7,13 @@ mode a writer blocks every reader for the length of its transaction.
 from __future__ import annotations
 
 import os
+import re
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+
+from . import upsert
 
 __all__ = ["get_conn", "transaction", "init_db", "db_path", "db_file", "Connection",
            "StoreError", "CACHE_KIB", "MMAP_BYTES"]
@@ -144,6 +147,56 @@ def _migrate(conn: sqlite3.Connection) -> None:
         _migrate_blackbook_origin(conn)
         _migrate_races_restricted(conn)
         _migrate_book_tiers(conn)
+        _migrate_vet_note_key(conn)
+
+
+def _migrate_vet_note_key(conn: sqlite3.Connection) -> None:
+    """`vet_records` is keyed by the note, and the copies fold into one row.
+
+    It was keyed by the card the note was read from as well, and HKJC's vet
+    page lists a declared runner's WHOLE history -- so every card a horse was
+    declared on stored every one of its notes again. On the 29 Oct 2026 copy of
+    production that was 2,365 rows holding 1,097 notes, 406 of 548 horses with
+    at least one note stored two to six times, and the Race Day panel listing
+    each copy: RUN RUN SMART's one January finding three times, under VET +2.
+
+    Nothing that is not a copy goes. Every old row is replayed, earliest card
+    first, through the same statement the writer now uses, so the table that
+    comes out is the one the fixed writer would have built from the same pages:
+    one row per (horse, date, text), the earliest card kept as where it was
+    first read, and a clearance on any copy kept. The copies agreed on every
+    column but the card on the production copy, so no value is chosen between.
+
+    SQLite cannot change a primary key in place, so the table is rebuilt.
+    Safe to re-run: once `race_date` is out of the key there is nothing to do.
+    """
+    key = {r["name"] for r in conn.execute("PRAGMA table_info(vet_records)")
+           if r["pk"]}
+    if "race_date" not in key:
+        return                      # no table yet, or already keyed by the note
+    conn.execute("ALTER TABLE vet_records RENAME TO vet_records_by_card")
+    # The old index went with the renamed table and is not rebuilt: the new
+    # key leads with (horse_name, record_date) and serves the same lookups.
+    conn.execute("DROP INDEX IF EXISTS ix_vet_horse")
+    conn.execute(_table_sql("vet_records"))
+    old = conn.execute(
+        f"SELECT {', '.join(upsert.VET_COLS)} FROM vet_records_by_card "
+        "ORDER BY race_date, race_no").fetchall()
+    conn.executemany(upsert.VET_UPSERT_SQL, [tuple(r) for r in old])
+    conn.execute("DROP TABLE vet_records_by_card")
+
+
+def _table_sql(table: str) -> str:
+    """One table's CREATE statement, read out of schema.sql.
+
+    A rebuild must produce exactly the table a fresh database gets, so it reads
+    the one definition rather than carrying a second copy that can drift.
+    """
+    m = re.search(rf"CREATE TABLE IF NOT EXISTS {table} \(.*?\n\);",
+                  _SCHEMA.read_text(encoding="utf-8"), re.S)
+    if m is None:
+        raise StoreError(f"schema.sql has no CREATE TABLE for {table}")
+    return m.group(0)
 
 
 def _migrate_book_tiers(conn: sqlite3.Connection) -> None:

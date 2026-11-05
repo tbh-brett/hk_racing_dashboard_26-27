@@ -204,10 +204,17 @@ CREATE TABLE IF NOT EXISTS trials (
 -- them worth reading. Nothing is filtered on the way in -- the old scraper
 -- scored each note and dropped the ones below a threshold, so a record that
 -- existed on the page and did not survive the filter was simply not there.
+--
+-- KEYED BY THE NOTE, not by the card it was read from. HKJC's vet page lists a
+-- declared runner's WHOLE history, so a horse declared three times hands over
+-- the same note three times. Keyed on the card as well, each became a row of
+-- its own: 2,365 rows held 1,097 notes on 29 Oct 2026, and the Race Day panel
+-- listed one January finding three times under a chip reading VET +2.
+-- `store/connect._migrate_vet_note_key` folds an older table into this shape.
 CREATE TABLE IF NOT EXISTS vet_records (
-  race_date    TEXT    NOT NULL,
-  race_no      INTEGER NOT NULL,
-  horse_no     INTEGER,
+  race_date    TEXT    NOT NULL,            -- the earliest card the note was
+  race_no      INTEGER NOT NULL,            -- read from; provenance, not part
+  horse_no     INTEGER,                     -- of what the note is
   horse_name   TEXT    NOT NULL,
   record_date  TEXT    NOT NULL,
   detail       TEXT    NOT NULL,
@@ -215,10 +222,8 @@ CREATE TABLE IF NOT EXISTS vet_records (
   category     TEXT,                        -- RESPIRATORY | CARDIAC | PHYSICAL
                                             -- | PERFORMANCE | PROCEDURAL
                                             -- | UNKNOWN
-  PRIMARY KEY (race_date, race_no, horse_name, record_date, detail)
+  PRIMARY KEY (horse_name, record_date, detail)
 );
-
-CREATE INDEX IF NOT EXISTS ix_vet_horse ON vet_records(horse_name, record_date);
 
 -- ── bets ─────────────────────────────────────────────────────────────────────
 --

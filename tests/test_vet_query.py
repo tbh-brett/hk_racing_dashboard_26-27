@@ -150,3 +150,83 @@ def test_the_race_card_carries_vet_records_per_runner(db):
     by_name = {r["horse_name"]: r for r in card["runners"]}
     assert by_name["RECENT BLEEDER"]["vet"]
     assert by_name["CLEAN HORSE"]["vet"] == []
+
+
+# ─── one row per note, however many cards it was read from ───────────────────
+#
+# HKJC's vet page lists a declared runner's WHOLE history, so every card the
+# horse is declared on hands over the same notes again. Keyed on the card as
+# well, each became a row: the Race Day panel listed RUN RUN SMART's one
+# January finding three times under a chip reading VET +2.
+
+FINDING = "Unacceptable performance and rider concerned horse's action during racing."
+
+
+def _page(race_date, race_no, horse_no, passed=None):
+    return {"race_date": race_date, "race_no": race_no, "horse_no": horse_no,
+            "horse_name": "RECENT BLEEDER", "record_date": "2026-01-07",
+            "detail": FINDING, "passed_date": passed, "category": "PERFORMANCE"}
+
+
+def test_the_same_note_read_from_three_cards_is_one_record(db):
+    conn = get_conn(db)
+    with transaction(conn):
+        # out of order on purpose: a backfill must not move the first card
+        for page in (_page("2026-07-01", 4, 2), _page("2026-06-10", 8, 5),
+                     _page(DATE, 1, 1)):
+            upsert.upsert_vet_records(conn, [page])
+        upsert.upsert_vet_records(conn, [_page(DATE, 1, 1)])     # a re-scrape
+    rows = conn.execute("SELECT race_date, race_no, horse_no FROM vet_records "
+                        "WHERE detail = ?", (FINDING,)).fetchall()
+    conn.close()
+    assert [tuple(r) for r in rows] == [("2026-06-10", 8, 5)]   # the earliest card
+    found = [v for v in vet_q.for_race(DATE, 1)["RECENT BLEEDER"]
+             if v["detail"] == FINDING]
+    assert len(found) == 1
+
+
+def test_a_clearance_on_a_later_page_is_kept_and_never_blanked(db):
+    conn = get_conn(db)
+    with transaction(conn):
+        upsert.upsert_vet_records(conn, [_page("2026-06-10", 8, 5)])
+        upsert.upsert_vet_records(conn, [_page("2026-07-01", 4, 2, passed="2026-01-20")])
+        upsert.upsert_vet_records(conn, [_page(DATE, 1, 1)])     # page without it
+    passed = conn.execute("SELECT passed_date FROM vet_records WHERE detail = ?",
+                          (FINDING,)).fetchall()
+    conn.close()
+    assert [r[0] for r in passed] == ["2026-01-20"]
+
+
+OLD_SHAPE = """
+CREATE TABLE vet_records (
+  race_date TEXT NOT NULL, race_no INTEGER NOT NULL, horse_no INTEGER,
+  horse_name TEXT NOT NULL, record_date TEXT NOT NULL, detail TEXT NOT NULL,
+  passed_date TEXT, category TEXT,
+  PRIMARY KEY (race_date, race_no, horse_name, record_date, detail));
+CREATE INDEX ix_vet_horse ON vet_records(horse_name, record_date);
+"""
+
+
+def test_a_table_keyed_by_the_card_folds_its_copies_and_keeps_every_note(tmp_path):
+    path = tmp_path / "old.db"
+    conn = get_conn(path)
+    conn.executescript(OLD_SHAPE)
+    rows = [("2026-10-07", 8, 5, "RUN RUN SMART", "2026-01-07", FINDING, "2026-01-20", "PERFORMANCE"),
+            ("2026-09-13", 10, 6, "RUN RUN SMART", "2026-01-07", FINDING, "2026-01-20", "PERFORMANCE"),
+            ("2026-11-08", 7, 8, "RUN RUN SMART", "2026-01-07", FINDING, "2026-01-20", "PERFORMANCE"),
+            ("2026-09-13", 10, 6, "RUN RUN SMART", "2025-06-25", "Castration.", None, "PROCEDURAL"),
+            # the same date and text on ANOTHER horse is another note
+            ("2026-09-13", 2, 3, "TAGLINE", "2026-01-07", FINDING, None, "PERFORMANCE")]
+    conn.executemany("INSERT INTO vet_records VALUES (?, ?, ?, ?, ?, ?, ?, ?)", rows)
+    conn.commit()
+
+    init_db(conn)
+    init_db(conn)                                      # safe to re-run
+    got = sorted(tuple(r) for r in conn.execute("SELECT * FROM vet_records"))
+    key = [r["name"] for r in conn.execute("PRAGMA table_info(vet_records)") if r["pk"]]
+    left = conn.execute("SELECT count(*) FROM sqlite_master "
+                        "WHERE name = 'vet_records_by_card'").fetchone()[0]
+    conn.close()
+    assert key == ["horse_name", "record_date", "detail"]
+    assert left == 0
+    assert got == sorted([rows[1], rows[3], rows[4]])  # earliest card, nothing else lost

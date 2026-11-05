@@ -17,7 +17,7 @@ import { el, $, DASH, MINUS, renderNav, habitualStyleBadge, styleOrdinal,
          isVetTag, isLiveBooking, bookingStatus, closedNote } from './vocab.js';
 import { context } from './context.js';
 import { Live } from './live.js';
-import { anchoredPanel } from './overlay.js';
+import { recordPanel } from './record-panel.js';
 import { install as installPalette } from './palette.js';
 import { isSystem } from './book-origin.js';
 import { tierChip, tierRank } from './book-tier.js';
@@ -233,7 +233,7 @@ function renderBlackbookBand() {
       if (isSystem(e)) item.classList.add('sys');
       if (!roomy) item.classList.add('tight');
       item.append(el('span', 'name', `${e.horse_no} ${e.horse_name}`));
-      const tc = tierChip(e.book_tier);
+      const tc = tierChip(e.book_tier, { who: `${e.horse_no} ${e.horse_name}`, on: state.date });
       if (tc) item.append(tc);
       item.append(el('span', 'od', num(e.win_odds)));
       const mv = bbMove(e);
@@ -262,7 +262,9 @@ function renderBlackbookBand() {
       if (!e.booked_before_race) chip.classList.add('bb-stale');
       chip.append(el('span', 'r', `R${e.race_no}`));
       chip.append(el('span', 'name', `${e.horse_no} ${e.horse_name}`));
-      if (e.book_tier?.tier === 'NOTE') chip.append(tierChip(e.book_tier));
+      if (e.book_tier?.tier === 'NOTE') {
+        chip.append(tierChip(e.book_tier, { who: `${e.horse_no} ${e.horse_name}`, on: state.date }));
+      }
       const mv = bbMove(e);
       chip.append(el('span', `pct ${mv.cls}`, mv.text));
       chip.addEventListener('click', () => selectRace(e.race_no));
@@ -551,30 +553,20 @@ function renderH2HBand() {
  * positioned in the row's own flow is what made the page vibrate on scroll.
  */
 function openVet(trigger, runner, records) {
-  // render() takes no arguments and RETURNS the element; anchoredPanel then
-  // adds its own class to it. Passing a space-separated className would throw
-  // in classList.add, so the panel's own class goes on the element here.
-  anchoredPanel(trigger, () => {
-    const host = el('div', 'vet-panel');
-    host.append(el('h6', null, `${runner.horse_no} ${runner.horse_name} · VET RECORD`));
-    records.forEach((v) => {
-      const row = el('div', `vet-rec vet-${v.grade}`);
-      const head = el('div', 'vr-head');
-      head.append(el('span', 'd', compactDate(v.record_date)));
-      head.append(el('span', 'c', v.category ?? 'UNKNOWN'));
-      if (v.age_days != null) {
-        head.append(el('span', 'age', `${v.age_days}d ago`));
-      }
-      row.append(head);
-      row.append(el('div', 'vr-detail', v.detail));
+  // The same panel the TRIAL NOTE opens (record-panel.js), so the two read
+  // alike. One row per note: the store keys a note by the note itself, so a
+  // horse declared three times no longer lists its history three times.
+  recordPanel(trigger, `${runner.horse_no} ${runner.horse_name} · VET RECORD`,
+    records.map((v) => ({
+      date: compactDate(v.record_date),
+      label: v.category ?? 'UNKNOWN',
+      tone: 'incident',
+      age: v.age_days,
+      body: v.detail,
       // Cleared to race is the difference between "was lame" and "is lame".
-      row.append(el('div', v.cleared ? 'vr-cleared' : 'vr-open',
-        v.cleared ? `cleared to race ${compactDate(v.passed_date)}`
-                  : 'no clearance recorded'));
-      host.append(row);
-    });
-    return host;
-  });
+      lines: [v.cleared ? [`cleared to race ${compactDate(v.passed_date)}`, 'win']
+                        : ['no clearance recorded', 'incident']],
+    })));
 }
 
 /* ── race context bar ────────────────────────────────────────────────────── */
@@ -988,7 +980,7 @@ function cardRow(r, index) {
   if (isLiveBooking(r.blackbook)) nm.classList.add('booked');
   if (isLiveBooking(r.blackbook) && isSystem(r.blackbook)) nm.classList.add('sys');
   box.append(nm);
-  const tier = tierChip(r.book_tier);
+  const tier = tierChip(r.book_tier, { who: `${r.horse_no} ${r.horse_name}`, on: state.date });
   if (tier) box.append(tier);
   // LINE 2: the facts, as plain coloured text, soundness first (owner, 6 Oct:
   // eight boxed chips in five styles on one line was unreadable). The book's
@@ -1042,7 +1034,7 @@ function cardRow(r, index) {
     // dated, coloured by category, with what cleared them. The browser's own
     // tooltip drew the same text again in a white box on top of it, so every
     // hover produced two answers to one question.
-    // Bound once, at construction. anchoredPanel attaches mouseenter/mouseleave
+    // Bound once, at construction. The panel attaches mouseenter/mouseleave
     // to the trigger, so calling it from a click handler would stack a fresh
     // pair of listeners on every click.
     openVet(chip, r, vet);

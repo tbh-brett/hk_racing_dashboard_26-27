@@ -285,7 +285,7 @@ function raceDetail(r, ctx) {
     const sc = el('span', 'sc');
     sc.append(bar(x.bar, x.top ? 'top' : ''), el('span', 'pl', x.place), el('span', 'wn', x.win));
     const bb = el('span', 'bb');
-    const chip = tierChip(x.bookTier);
+    const chip = tierChip(x.bookTier, { who: `${x.no} ${x.name}` });
     if (chip) bb.append(chip);
     else if (x.hasBB) {
       bb.append(el('span', `bf-bbtag${x.bbSys ? ' sys' : ''}`, x.bbSys ? 'SYS' : 'BB'),

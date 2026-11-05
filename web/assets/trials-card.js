@@ -164,7 +164,7 @@ function runnerBlock(x, list, redraw) {
   head.append(el('span', 'no', String(x.horse_no)));
   const sys = x.blackbook && isSystem(x.blackbook);
   head.append(el('span', `nm${x.blackbook ? ' booked' : ''}${sys ? ' sys' : ''}`, x.horse_name));
-  const tier = tierChip(x.book_tier);
+  const tier = tierChip(x.book_tier, { who: `${x.horse_no} ${x.horse_name}` });
   if (tier) head.append(tier);
   head.append(el('span', 'meta', `dr ${x.draw ?? DASH} · ${x.jockey ?? DASH} · ${x.trainer ?? DASH}`));
   head.append(lastRun(x));

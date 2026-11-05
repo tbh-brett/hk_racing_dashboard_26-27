@@ -228,12 +228,39 @@ def upsert_trials(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
                    ["trial_date", "trial_no", "horse_name"], prepared)
 
 
+VET_COLS = ("race_date", "race_no", "horse_no", "horse_name", "record_date",
+            "detail", "passed_date", "category")
+
+# Every SET reads the row as it was BEFORE this update, so the three card
+# columns are compared against the stored date, not against each other.
+VET_UPSERT_SQL = f"""
+    INSERT INTO vet_records ({', '.join(VET_COLS)})
+    VALUES ({', '.join('?' for _ in VET_COLS)})
+    ON CONFLICT (horse_name, record_date, detail) DO UPDATE SET
+      race_no     = CASE WHEN excluded.race_date < vet_records.race_date
+                         THEN excluded.race_no ELSE vet_records.race_no END,
+      horse_no    = CASE WHEN excluded.race_date < vet_records.race_date
+                         THEN excluded.horse_no ELSE vet_records.horse_no END,
+      race_date   = min(excluded.race_date, vet_records.race_date),
+      passed_date = coalesce(excluded.passed_date, vet_records.passed_date),
+      category    = coalesce(excluded.category, vet_records.category)
+"""
+
+
 def upsert_vet_records(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
     """One row per veterinary NOTE, not per horse.
 
     A horse can carry several and collapsing them to the most recent loses the
     pattern that makes them worth reading — three bleeding notes in a season
     say something one does not.
+
+    And one row per note, not per time it was READ. HKJC's vet page lists a
+    declared runner's whole history, so every card the horse is declared on
+    hands over the same notes again. The key is the note itself; the card is
+    kept as the EARLIEST one it was read from, whatever order the pages are
+    scraped in, so a re-scrape or a backfill changes nothing. A clearance
+    arriving on a later page fills `passed_date` and a page without one never
+    blanks it, the same rule `_upsert` applies to every table.
     """
     prepared = []
     for r in rows:
@@ -251,11 +278,11 @@ def upsert_vet_records(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:
             "passed_date": coerce.to_date(r.get("passed_date")),
             "category": r.get("category"),
         })
-    cols = ["race_date", "race_no", "horse_no", "horse_name", "record_date",
-            "detail", "passed_date", "category"]
-    return _upsert(conn, "vet_records", cols,
-                   ["race_date", "race_no", "horse_name", "record_date",
-                    "detail"], prepared)
+    if not prepared:
+        return 0
+    conn.executemany(VET_UPSERT_SQL,
+                     [tuple(r[c] for c in VET_COLS) for r in prepared])
+    return len(prepared)
 
 
 def upsert_market_close(conn: sqlite3.Connection, rows: Sequence[Row]) -> int:

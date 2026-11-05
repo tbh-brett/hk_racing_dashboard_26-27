@@ -6,7 +6,8 @@
  * is the only one that reads as an action; the quiet tiers are drawn quiet so
  * a race with five book horses reads as the one or two that matter.
  */
-import { el } from './vocab.js';
+import { el, compactDate } from './vocab.js';
+import { recordPanel, daysBetween, hkTime } from './record-panel.js';
 
 const SHORT = { NOTE: 'TRIAL NOTE', STANDOUT: 'STANDOUT', EXCUSE: 'EXCUSE',
                 QUIET: 'QUIET', STALE: 'STALE', RUN_NOTE: 'RUN NOTE' };
@@ -23,14 +24,54 @@ export function recordText(t) {
     + (r.ae !== null && r.ae !== undefined ? ` (A/E ${r.ae.toFixed(2)})` : '');
 }
 
-/** The chip on a runner's row. `null` when the runner has no tier. */
-export function tierChip(t) {
+/** "5 starts since booked", or null when the horse is not in the book. */
+function startsText(t) {
+  if (t.starts === null || t.starts === undefined || !t.in_book) return null;
+  return `${t.starts} start${t.starts === 1 ? '' : 's'} since booked`;
+}
+
+/** The chip on a runner's row. `null` when the runner has no tier.
+ *  `who` ("5 LIGHTNING ACE") heads the trial note's panel and `on` (the race
+ *  date) is what its age counts to; without them it is headed by the tier
+ *  alone and aged to today. */
+export function tierChip(t, { who = null, on = null } = {}) {
   if (!t) return null;
   const c = el('span', `bt bt-${t.tier.toLowerCase()}`, SHORT[t.tier] || t.tier);
+  if (t.tier === 'NOTE' && t.note) {
+    notePanel(c, t, who, on);
+    return c;
+  }
+  const starts = startsText(t);
   c.title = `${t.label}: ${DOES[t.tier] || ''}.\n${recordText(t)}`
-    + (t.starts !== null && t.starts !== undefined && t.in_book
-      ? `\n${t.starts} start${t.starts === 1 ? '' : 's'} since booked` : '');
+    + (starts ? `\n${starts}` : '');
   return c;
+}
+
+/** The owner's trial note, in the panel the VET RECORD uses: the trial it is
+ *  about, the note in the owner's own words, and when it was written. The
+ *  writing time is the proof the note came before the race (`written_at`;
+ *  book_tier only counts a note written before the off). No tote record here:
+ *  the note is the reason to back the horse, not the tier's A/E. */
+function notePanel(chip, t, who, on) {
+  const n = t.note;
+  const at = hkTime(n.written_at);
+  const lines = [[at ? `written ${compactDate(at.slice(0, 10))} · ${at.slice(11)}`
+                       + (on ? ', before the off' : '')
+                     : 'no writing time recorded', at ? 'win' : 'incident']];
+  const taps = tapsText(n);
+  if (taps) lines.push([taps, 'muted']);
+  const more = (t.notes ?? 1) - 1;
+  const tail = [DOES.NOTE, startsText(t),
+                more > 0 ? `${more} earlier note${more === 1 ? '' : 's'} since its last run` : null];
+  lines.push([tail.filter(Boolean).join(' · '), 'muted']);
+  recordPanel(chip, `${who ? `${who} · ` : ''}TRIAL NOTE`, [{
+    date: compactDate(n.trial_date),
+    label: n.trial_no != null ? `TRIAL · BATCH ${n.trial_no}` : 'TRIAL',
+    tone: 'win',
+    age: daysBetween(n.trial_date, on),
+    body: `“${n.note}”`,
+    lines,
+  }]);
 }
 
 /** "Rider asked · response strong", from the note's two taps, or ''. */

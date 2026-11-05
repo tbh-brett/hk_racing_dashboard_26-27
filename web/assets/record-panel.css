@@ -1,0 +1,20 @@
+/* record-panel.css — the dated-records panel (record-panel.js): the VET
+ * RECORD and the TRIAL NOTE, on every page that draws either. */
+.rec-panel { min-width: 300px; max-width: 420px; }
+.rec-panel h6 {
+  margin: 0 0 6px; font-size: var(--fs-xs); letter-spacing: .06em;
+  color: var(--text-muted); font-weight: 600;
+}
+.rec {
+  padding: 6px 0; border-top: 1px solid var(--line-2); font-size: 11px;
+}
+.rec:first-of-type { border-top: none; }
+.rec-head { display: flex; gap: 8px; align-items: baseline; }
+.rec-head .d { font-family: var(--font-mono); color: var(--text-2); }
+.rec-head .c { font-size: 9px; letter-spacing: .06em; }
+.rec-head .age { margin-left: auto; font-size: 10px; color: var(--text-faint); }
+.rec-body { color: var(--text-dim); line-height: 1.5; margin-top: 2px; }
+.rec-line { font-size: 10px; margin-top: 2px; }
+.rec-panel .incident { color: var(--incident); }
+.rec-panel .win { color: var(--win); }
+.rec-panel .muted { color: var(--text-muted); }

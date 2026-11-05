@@ -123,7 +123,7 @@ function opened(r, ctx) {
               el('span', `w44 px${x.mPriceMost ? ' most' : ''}`, x.mPrice));
     const l2 = el('div', 'l2');
     l2.append(styleEl(x), el('span', `tier${x.top ? ' top' : ''}`, x.tier));
-    const chip = tierChip(x.bookTier);
+    const chip = tierChip(x.bookTier, { who: `${x.no} ${x.name}` });
     if (chip) l2.append(chip);
     else if (x.hasBB) {
       l2.append(el('span', `bf-bbtag${x.bbSys ? ' sys' : ''}`,
