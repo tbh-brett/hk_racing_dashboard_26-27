@@ -82,7 +82,19 @@ primary_region = "sin"          # Singapore, and only because Hong Kong is no
                                 # more, the price being mostly the memory.
                                 # Scaled with `fly scale vm shared-cpu-4x
                                 # --vm-memory 4096` before the next deploy.
-  memory = "4gb"                # The fundamental model's nightly fit peaks at
+  memory = "3gb"                # 3 GB from 6 Nov 2026 (was 4): memory is two-thirds of
+                                # the Fly bill ($7.87 a GB a month; October's receipt
+                                # was $39.55). Measured 6 Nov: the site and Litestream
+                                # rest at ~480 MB; the nightly job peaks at 469 MB, the
+                                # v2 fit at 438, the shape fit at ~520 and one race
+                                # simulation at ~290; the worst overlap the cron
+                                # schedule can make (nightly + a simulation + a card
+                                # scored) is ~1.5 GB, so 3 GB leaves ~1.5 GB spare.
+                                # 2 GB would leave ~0.5 GB and no swap: don't go lower
+                                # without measuring on the machine itself.
+                                #
+                                # The reasoning below was written for 4 GB.
+                                # The fundamental model's nightly fit peaks at
                                 # ~365 MB (inputs for the whole archive, then
                                 # LightGBM) and scoring a card at ~290 MB, on
                                 # top of everything below. On 2 GB, with ~590
