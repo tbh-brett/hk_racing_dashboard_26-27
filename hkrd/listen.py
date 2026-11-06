@@ -118,7 +118,15 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s:  %(message)s")
     dash, fund, sock = build(a.host, a.port, None if a.no_fund else a.fund_port)
-    asyncio.run(serve(dash, fund, sock))
+    try:
+        asyncio.run(serve(dash, fund, sock))
+    except KeyboardInterrupt:
+        # Fly stops the machine with SIGINT. By the time this is raised both
+        # servers have shut down cleanly: uvicorn re-raises the signal once it
+        # has, and asyncio reports that as KeyboardInterrupt. `uvicorn.run`
+        # catches it the same way; uncaught, it printed a traceback on every
+        # deploy (6 Nov 2026, v75 to v76) that looked like a crash.
+        log.info("stopped by SIGINT after a clean shutdown")
     return 0
 
 

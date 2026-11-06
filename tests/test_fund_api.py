@@ -397,3 +397,14 @@ def test_no_token_no_fund_listener(db, monkeypatch):
     from hkrd import listen
     monkeypatch.delenv("FUND_API_TOKEN")
     assert listen.build("127.0.0.1", _free_port(), _free_port())[1] is None
+
+
+def test_the_stop_signal_ends_the_process_cleanly(db, monkeypatch):
+    """Fly stops the machine with SIGINT; that is a clean exit, not a traceback."""
+    from hkrd import listen
+
+    def interrupted(coro):
+        coro.close()
+        raise KeyboardInterrupt
+    monkeypatch.setattr(listen.asyncio, "run", interrupted)
+    assert listen.main(["--port", str(_free_port()), "--no-fund"]) == 0
