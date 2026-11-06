@@ -1,0 +1,666 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "hkrd fund API responses, version 1",
+ "description": "What hkrd's read-only fund API returns to the HKTB fund app, as hkrd serves it. Amended from the handoff's version 1 on 2026-11-06; docs/fund-api.md lists every change.",
+ "oneOf": [
+  {
+   "$ref": "#/$defs/meetingResponse"
+  },
+  {
+   "$ref": "#/$defs/meetingList"
+  },
+  {
+   "$ref": "#/$defs/horseRuns"
+  },
+  {
+   "$ref": "#/$defs/health"
+  }
+ ],
+ "$defs": {
+  "meeting": {
+   "type": "object",
+   "required": [
+    "date",
+    "venue"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "date": {
+     "type": "string",
+     "format": "date"
+    },
+    "venue": {
+     "enum": [
+      "ST",
+      "HV"
+     ]
+    },
+    "course": {
+     "type": "string",
+     "description": "Rail for the meeting: A, A+3, B, B+2, C, C+3"
+    },
+    "going": {
+     "type": "string"
+    }
+   }
+  },
+  "race": {
+   "type": "object",
+   "required": [
+    "race_no",
+    "post_time",
+    "distance",
+    "runners"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "race_no": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 12
+    },
+    "post_time": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "description": "null for the 2025/26 archive, which was stored from results alone"
+    },
+    "distance": {
+     "type": "integer"
+    },
+    "class": {
+     "type": "string"
+    },
+    "track": {
+     "enum": [
+      "turf",
+      "awt"
+     ]
+    },
+    "runners": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/runner"
+     }
+    }
+   }
+  },
+  "runner": {
+   "type": "object",
+   "required": [
+    "horse_no",
+    "name",
+    "brand_no"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "horse_no": {
+     "type": "integer"
+    },
+    "name": {
+     "type": "string"
+    },
+    "name_zh": {
+     "type": "string"
+    },
+    "brand_no": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "HKJC brand number, the key for blackbook matching; null where hkrd has not paired one (1.7% of 2026/27 runners, all 6 to 16 Sep)"
+    },
+    "draw": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "jockey": {
+     "type": "string"
+    },
+    "trainer": {
+     "type": "string"
+    },
+    "scratched": {
+     "type": "boolean"
+    }
+   }
+  },
+  "odds": {
+   "type": "object",
+   "required": [
+    "label",
+    "taken_at",
+    "races"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "label": {
+     "enum": [
+      "T-60",
+      "T-30",
+      "lock",
+      "close",
+      "snapshot"
+     ],
+     "description": "close once every race returned had stopped selling by `at`; snapshot otherwise. hkrd does not know the fund's lock, so never T-60, T-30 or lock"
+    },
+    "taken_at": {
+     "type": "string",
+     "format": "date-time",
+     "description": "The newest of the races' own taken_at"
+    },
+    "races": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "required": [
+       "race_no",
+       "taken_at",
+       "win"
+      ],
+      "additionalProperties": false,
+      "properties": {
+       "race_no": {
+        "type": "integer"
+       },
+       "win": {
+        "type": "object",
+        "description": "horse number (as a string key) to win odds",
+        "additionalProperties": {
+         "type": "number",
+         "minimum": 1
+        }
+       },
+       "taken_at": {
+        "type": "string",
+        "format": "date-time",
+        "description": "When this race's prices were captured: races are captured on their own ladders"
+       }
+      }
+     }
+    }
+   }
+  },
+  "pool": {
+   "type": "object",
+   "required": [
+    "type",
+    "legs"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "type": {
+     "enum": [
+      "six_up",
+      "six_up_early"
+     ]
+    },
+    "legs": {
+     "type": "array",
+     "items": {
+      "type": "integer"
+     },
+     "minItems": 6,
+     "maxItems": 6
+    },
+    "investment_hkd": {
+     "type": [
+      "number",
+      "null"
+     ],
+     "description": "The latest turnover capture; null while the pool is not open"
+    },
+    "jackpot_hkd": {
+     "type": [
+      "number",
+      "null"
+     ],
+     "description": "hkrd does not capture the jackpot: null until it does"
+    }
+   }
+  },
+  "result": {
+   "type": "object",
+   "required": [
+    "race_no",
+    "finish"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "race_no": {
+     "type": "integer"
+    },
+    "finish": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "required": [
+       "horse_no",
+       "pos"
+      ],
+      "additionalProperties": false,
+      "properties": {
+       "horse_no": {
+        "type": "integer"
+       },
+       "pos": {
+        "type": [
+         "integer",
+         "null"
+        ],
+        "description": "null if scratched or did not finish"
+       },
+       "margin": {
+        "type": "string",
+        "description": "Lengths behind the winner as HKJC prints them; the winner's is empty"
+       },
+       "win_odds_close": {
+        "type": "number"
+       },
+       "incidents": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        },
+        "description": "Stewards' incident tags, e.g. slow away, checked"
+       },
+       "scratched": {
+        "type": "boolean",
+        "description": "Sent (true) only for a withdrawn runner"
+       },
+       "place_odds_close": {
+        "type": "number",
+        "minimum": 1,
+        "description": "The tote's closing place odds: its last capture before HKJC shut the pool. With win_odds_close, what a leg that did not pay is measured against"
+       }
+      }
+     }
+    },
+    "win_dividends": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/dividend"
+     }
+    },
+    "place_dividends": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/dividend"
+     }
+    }
+   }
+  },
+  "dividend": {
+   "type": "object",
+   "required": [
+    "horse_no",
+    "per_10_hkd"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "horse_no": {
+     "type": "integer"
+    },
+    "per_10_hkd": {
+     "type": "number"
+    }
+   }
+  },
+  "poolDividend": {
+   "type": "object",
+   "required": [
+    "type"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "type": {
+     "enum": [
+      "six_up",
+      "six_up_early"
+     ]
+    },
+    "six_up_per_10_hkd": {
+     "type": [
+      "number",
+      "null"
+     ]
+    },
+    "six_win_bonus_per_10_hkd": {
+     "type": [
+      "number",
+      "null"
+     ]
+    },
+    "jackpot_carried_hkd": {
+     "type": [
+      "number",
+      "null"
+     ]
+    }
+   }
+  },
+  "meetingResponse": {
+   "type": "object",
+   "required": [
+    "v",
+    "kind",
+    "version",
+    "updated_at",
+    "meeting"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "v": {
+     "const": 1
+    },
+    "kind": {
+     "enum": [
+      "card",
+      "odds",
+      "pool",
+      "results"
+     ]
+    },
+    "version": {
+     "type": "string",
+     "description": "Hash of everything but updated_at; sent as a weak ETag"
+    },
+    "updated_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "description": "When hkrd last read this from HKJC. Not part of version: an unchanged card keeps its version"
+    },
+    "meeting": {
+     "$ref": "#/$defs/meeting"
+    },
+    "races": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/race"
+     }
+    },
+    "odds": {
+     "$ref": "#/$defs/odds"
+    },
+    "pools": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/pool"
+     }
+    },
+    "results": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/result"
+     }
+    },
+    "pool_dividends": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/poolDividend"
+     },
+     "description": "Not sent: hkrd does not capture Six Up dividends"
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "kind": {
+        "const": "card"
+       }
+      }
+     },
+     "then": {
+      "required": [
+       "races"
+      ]
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "kind": {
+        "const": "odds"
+       }
+      }
+     },
+     "then": {
+      "required": [
+       "odds"
+      ]
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "kind": {
+        "const": "pool"
+       }
+      }
+     },
+     "then": {
+      "required": [
+       "pools"
+      ]
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "kind": {
+        "const": "results"
+       }
+      }
+     },
+     "then": {
+      "required": [
+       "results"
+      ]
+     }
+    }
+   ]
+  },
+  "meetingList": {
+   "type": "object",
+   "required": [
+    "v",
+    "kind",
+    "version",
+    "updated_at",
+    "meetings"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "v": {
+     "const": 1
+    },
+    "kind": {
+     "const": "meetings"
+    },
+    "version": {
+     "type": "string",
+     "description": "Hash of everything but updated_at; sent as a weak ETag"
+    },
+    "updated_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "description": "When hkrd last read this from HKJC. Not part of version: an unchanged card keeps its version"
+    },
+    "meetings": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "required": [
+       "date",
+       "venue",
+       "races"
+      ],
+      "additionalProperties": false,
+      "properties": {
+       "date": {
+        "type": "string",
+        "format": "date"
+       },
+       "venue": {
+        "enum": [
+         "ST",
+         "HV"
+        ]
+       },
+       "course": {
+        "type": "string"
+       },
+       "races": {
+        "type": "integer"
+       },
+       "first_post": {
+        "type": "string",
+        "format": "date-time"
+       },
+       "last_post": {
+        "type": "string",
+        "format": "date-time"
+       }
+      }
+     }
+    }
+   }
+  },
+  "run": {
+   "type": "object",
+   "required": [
+    "date",
+    "venue",
+    "race_no",
+    "pos"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "date": {
+     "type": "string",
+     "format": "date"
+    },
+    "venue": {
+     "enum": [
+      "ST",
+      "HV"
+     ]
+    },
+    "race_no": {
+     "type": "integer"
+    },
+    "distance": {
+     "type": "integer"
+    },
+    "class": {
+     "type": "string"
+    },
+    "draw": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "pos": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "field_size": {
+     "type": "integer"
+    },
+    "margin": {
+     "type": "string"
+    },
+    "win_odds_close": {
+     "type": "number"
+    },
+    "incidents": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "place_odds_close": {
+     "type": "number",
+     "minimum": 1,
+     "description": "The tote's closing place odds: its last capture before HKJC shut the pool. With win_odds_close, what a leg that did not pay is measured against"
+    }
+   }
+  },
+  "horseRuns": {
+   "type": "object",
+   "required": [
+    "v",
+    "kind",
+    "version",
+    "updated_at",
+    "brand_no",
+    "runs"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "v": {
+     "const": 1
+    },
+    "kind": {
+     "const": "runs"
+    },
+    "version": {
+     "type": "string",
+     "description": "Hash of everything but updated_at; sent as a weak ETag"
+    },
+    "updated_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "description": "When hkrd last read this from HKJC. Not part of version: an unchanged card keeps its version"
+    },
+    "brand_no": {
+     "type": "string"
+    },
+    "runs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/run"
+     }
+    }
+   }
+  },
+  "health": {
+   "type": "object",
+   "required": [
+    "ok",
+    "db_updated_at"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "ok": {
+     "const": true
+    },
+    "db_updated_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "description": "The newest successful scrape of HKJC"
+    }
+   }
+  }
+ }
+}

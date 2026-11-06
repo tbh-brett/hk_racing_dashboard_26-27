@@ -1,0 +1,208 @@
+[
+ {
+  "v": 1,
+  "kind": "meetings",
+  "version": "a41c09d2e7b0",
+  "updated_at": "2026-11-10T09:05:00+08:00",
+  "meetings": [
+   {
+    "date": "2026-11-11",
+    "venue": "HV",
+    "course": "B",
+    "races": 9,
+    "first_post": "2026-11-11T18:45:00+08:00",
+    "last_post": "2026-11-11T23:00:00+08:00"
+   }
+  ]
+ },
+ {
+  "v": 1,
+  "kind": "card",
+  "version": "4d66702d709a",
+  "updated_at": "2026-11-10T09:05:00+08:00",
+  "meeting": {
+   "date": "2026-11-11",
+   "venue": "HV",
+   "course": "B"
+  },
+  "races": [
+   {
+    "race_no": 4,
+    "post_time": "2026-11-11T20:15:00+08:00",
+    "distance": 1200,
+    "class": "Class 4",
+    "track": "turf",
+    "runners": [
+     {
+      "horse_no": 3,
+      "name": "Golden Harbour",
+      "brand_no": "H001",
+      "draw": 2,
+      "jockey": "J Lam",
+      "trainer": "T Ho",
+      "scratched": false
+     },
+     {
+      "horse_no": 5,
+      "name": "Silver Tide",
+      "brand_no": "H002",
+      "draw": 1,
+      "jockey": "R Chan",
+      "trainer": "K Yu",
+      "scratched": false
+     },
+     {
+      "horse_no": 7,
+      "name": "Ocean Pearl",
+      "brand_no": "H003",
+      "draw": 5,
+      "jockey": "P Tse",
+      "trainer": "C Fung",
+      "scratched": false
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "v": 1,
+  "kind": "odds",
+  "version": "d49b202e92f6",
+  "updated_at": "2026-11-11T20:00:05+08:00",
+  "meeting": {
+   "date": "2026-11-11",
+   "venue": "HV"
+  },
+  "odds": {
+   "label": "snapshot",
+   "taken_at": "2026-11-11T20:00:00+08:00",
+   "races": [
+    {
+     "race_no": 4,
+     "win": {
+      "3": 1.9,
+      "5": 4.6,
+      "7": 14
+     },
+     "taken_at": "2026-11-11T20:00:00+08:00"
+    }
+   ]
+  }
+ },
+ {
+  "v": 1,
+  "kind": "pool",
+  "version": "97f549fff958",
+  "updated_at": "2026-11-11T20:00:06+08:00",
+  "meeting": {
+   "date": "2026-11-11",
+   "venue": "HV"
+  },
+  "pools": [
+   {
+    "type": "six_up",
+    "legs": [
+     4,
+     5,
+     6,
+     7,
+     8,
+     9
+    ],
+    "investment_hkd": 18500000,
+    "jackpot_hkd": null
+   }
+  ]
+ },
+ {
+  "v": 1,
+  "kind": "results",
+  "version": "9cc53560a8ff",
+  "updated_at": "2026-11-11T23:25:00+08:00",
+  "meeting": {
+   "date": "2026-11-11",
+   "venue": "HV"
+  },
+  "results": [
+   {
+    "race_no": 4,
+    "finish": [
+     {
+      "horse_no": 5,
+      "pos": 1,
+      "margin": "",
+      "win_odds_close": 4.4,
+      "place_odds_close": 1.6
+     },
+     {
+      "horse_no": 3,
+      "pos": 2,
+      "margin": "N",
+      "win_odds_close": 2.0,
+      "place_odds_close": 1.1
+     },
+     {
+      "horse_no": 7,
+      "pos": 6,
+      "margin": "3-1/4",
+      "win_odds_close": 15,
+      "incidents": [
+       "slow away"
+      ],
+      "place_odds_close": 3.4
+     },
+     {
+      "horse_no": 9,
+      "pos": null,
+      "scratched": true
+     }
+    ],
+    "win_dividends": [
+     {
+      "horse_no": 5,
+      "per_10_hkd": 44.0
+     }
+    ],
+    "place_dividends": [
+     {
+      "horse_no": 5,
+      "per_10_hkd": 15.5
+     },
+     {
+      "horse_no": 3,
+      "per_10_hkd": 11.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "v": 1,
+  "kind": "runs",
+  "version": "6e0f2b91c3aa",
+  "updated_at": "2026-11-11T23:25:00+08:00",
+  "brand_no": "H003",
+  "runs": [
+   {
+    "date": "2026-11-11",
+    "venue": "HV",
+    "race_no": 4,
+    "distance": 1200,
+    "class": "Class 4",
+    "draw": 5,
+    "pos": 6,
+    "field_size": 12,
+    "margin": "3-1/4",
+    "win_odds_close": 15,
+    "incidents": [
+     "slow away"
+    ],
+    "place_odds_close": 3.4
+   }
+  ]
+ },
+ {
+  "ok": true,
+  "db_updated_at": "2026-11-11T23:25:00+08:00"
+ }
+]

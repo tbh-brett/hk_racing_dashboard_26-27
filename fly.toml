@@ -39,6 +39,11 @@ primary_region = "sin"          # Singapore, and only because Hong Kong is no
   HKRD_HOST = "0.0.0.0"
   HKRD_PORT = "8080"
   TZ = "Asia/Hong_Kong"
+  # The HKTB fund app's read-only API (docs/fund-api.md), served by hkrd.listen
+  # on [::]:8081 when the FUND_API_TOKEN secret is set. Fly's private network
+  # reaches it as hkrd.internal:8081. NEVER add this port to [http_service] or
+  # a [[services]] block: that is what would put it on the internet.
+  FUND_API_PORT = "8081"
 
 [mounts]
   source = "hkrd_data"

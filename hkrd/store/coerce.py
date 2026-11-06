@@ -13,7 +13,7 @@ import re
 from datetime import date, datetime
 
 __all__ = [
-    "CoerceError", "parse_lbw", "parse_finish_time", "to_place",
+    "CoerceError", "parse_lbw", "format_lbw", "parse_finish_time", "to_place",
     "to_odds", "to_date", "to_int", "parse_section_times",
     "parse_running_positions", "parse_gear", "to_race_class", "RACE_CLASSES",
 ]
@@ -111,6 +111,39 @@ def parse_lbw(token: object) -> float | None:
         return float(s)
     except ValueError:
         raise CoerceError(f"lbw: unrecognised margin {token!r}") from None
+
+
+# The way back, for a reader outside this system that wants the margin as HKJC
+# prints it (the fund API). One table, both directions: a code added above is
+# a code written back here. Where two codes share a value (SH and SHD, N and NK
+# and SN) the first one listed is the one HKJC prints today.
+_CODE_FOR: dict[float, str] = {}
+for _code, _value in _MARGIN_CODES.items():
+    if _value > 0:
+        _CODE_FOR.setdefault(_value, _code)
+_QUARTERS = {1: "1/4", 2: "1/2", 3: "3/4"}
+
+
+def format_lbw(value: float | None) -> str | None:
+    """Lengths behind the winner as HKJC writes them: the inverse of parse_lbw.
+
+    None stays None (a winner, or a margin that was never measured).
+
+    >>> format_lbw(3.25), format_lbw(0.5), format_lbw(0.3), format_lbw(4.0)
+    ('3-1/4', '1/2', 'N', '4')
+    """
+    if value is None:
+        return None
+    for known, code in _CODE_FOR.items():
+        if abs(value - known) < 1e-9:
+            return code
+    quarters = round(value * 4)
+    if abs(quarters - value * 4) > 1e-9:
+        return f"{value:g}"            # not a quarter: say what is stored
+    whole, part = divmod(quarters, 4)
+    if not part:
+        return str(whole)
+    return f"{whole}-{_QUARTERS[part]}" if whole else _QUARTERS[part]
 
 
 # ── finish time ───────────────────────────────────────────────────────────────

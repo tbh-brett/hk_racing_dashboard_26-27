@@ -89,15 +89,23 @@ else
 fi
 
 # ── 3. the server ────────────────────────────────────────────────────────────
+# hkrd.listen is the dashboard as uvicorn served it, plus the fund API on
+# [::]:${FUND_API_PORT:-8081} when FUND_API_TOKEN is set (docs/fund-api.md).
+# One process; a fund listener that fails never stops the dashboard.
 say "serving" "http://${HOST}:${PORT}"
+if [[ -n "${FUND_API_TOKEN:-}" ]]; then
+  say "fund API" "[::]:${FUND_API_PORT:-8081}, private network only"
+else
+  say "fund API" "off: FUND_API_TOKEN is not set"
+fi
 
 if [[ -n "${LITESTREAM_REPLICA_URL:-}" ]]; then
   exec litestream replicate -config "$CONFIG" \
-    -exec "uvicorn hkrd.api.app:app --host ${HOST} --port ${PORT}"
+    -exec "python -m hkrd.listen --host ${HOST} --port ${PORT}"
 fi
 
 # No replica configured. Say so once, loudly, rather than looking identical to
 # a replicated deploy — this is the state where a lost volume is a lost ledger.
 echo "  NOT REPLICATED. LITESTREAM_REPLICA_URL is unset; the only copy of the" >&2
 echo "  betting ledger is this volume."                                        >&2
-exec uvicorn hkrd.api.app:app --host "${HOST}" --port "${PORT}"
+exec python -m hkrd.listen --host "${HOST}" --port "${PORT}"

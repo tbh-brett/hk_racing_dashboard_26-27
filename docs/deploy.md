@@ -408,6 +408,23 @@ cookie is signed with the password as the key, so a changed password makes
 every outstanding cookie fail its signature check. That is the logout-everywhere
 button.
 
+### The fund API
+
+The HKTB fund app reads a small private API from this machine
+(`docs/fund-api.md`). `hkrd.listen` serves it from the dashboard's own process
+on `[::]:8081`, which Fly's private network reaches as `hkrd.internal:8081` and
+the internet does not. It starts only when the token secret is set:
+
+```bash
+fly secrets set FUND_API_TOKEN="$(openssl rand -hex 32)" -a hkrd   # restarts
+fly logs -a hkrd | grep "fund API"         # "[::]:8081, private network only"
+```
+
+Give the fund app the same value as its `HKRD_API_TOKEN`. Never list 8081 in
+`[http_service]` or a `[[services]]` block. Don't deploy between two hours before
+the fund's first leg and the last result: the fund app carries on from its copy,
+but its odds and results stop moving.
+
 ### After a deploy that changes the model
 
 A deploy replaces the CODE. It does not touch the volume, so every derived row
