@@ -198,6 +198,9 @@ CREATE TABLE IF NOT EXISTS trials (
   comment_text      TEXT,
   PRIMARY KEY (trial_date, trial_no, horse_name)
 );
+-- A horse's trials: the Form Guide's lines, the card's "latest trial" in the
+-- model's scoring key. Seven seasons once backfilled, so not a scan per runner.
+CREATE INDEX IF NOT EXISTS ix_trials_horse ON trials(horse_name, trial_date);
 
 -- Veterinary records. One row per NOTE, not per horse: a horse can carry
 -- several, and collapsing them to the most recent loses the pattern that makes

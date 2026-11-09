@@ -208,10 +208,12 @@ def _reasons(race: dict, runners: list[dict], interviews: list[dict],
                 + (f", the Screen's {sc['rank']} of {len(runners)}" if sc["rank"]
                    else ", not scored by the model"),
                 r["horse_no"])
-        # The model reads no trials (gbm-SPEC §14.9), so a good one since the
-        # last run is said as the thing its number cannot see -- at any rank,
-        # because the rank cannot see it either -- with what such trials have
-        # been worth against the model, from its record (model/gbm_unseen).
+        # A live model fitted before gbm-1.1 reads no trials (gbm-SPEC §14.9),
+        # so a good one since the last run is said as the thing its number
+        # cannot see -- at any rank, because the rank cannot see it either --
+        # with what such trials have been worth against the model, from its
+        # record (model/gbm_unseen). From gbm-1.1 the trial is in the number,
+        # its group a FOR or AGAINST line like any other, and none is unseen.
         good = next((u for u in sc.get("unseen", []) if u["key"] in _GOOD_TRIAL), None)
         if good:
             worth = (f": trials like it won {good['model_ae']:.2f}x what the model gave "

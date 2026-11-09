@@ -23,6 +23,12 @@ walk-forward seasons, retraining before every meeting beats one fit a season by
 
 Every run reports its counts, and a fit that is not promoted says why: that is
 a normal night, and the page keeps the model it has.
+
+Since gbm-1.1 the model reads barrier trials, and a fit needs them for every
+season it trains on. HKJC lists only ~13 months of trial days, so an archive
+that has not been backfilled (`scrape_trials --backfill 2019-05-01`) holds one
+season: trained on that, the model would learn that a horse in 2021 never
+trialled. The fit refuses, as an error, and the page keeps the model it has.
 """
 from __future__ import annotations
 
@@ -42,7 +48,11 @@ from hkrd.store import gbm as store
 from hkrd.store import job_log
 from hkrd.store.connect import Connection, get_conn, init_db, transaction
 
-__all__ = ["run", "pending", "main", "FitReport"]
+__all__ = ["run", "pending", "main", "FitReport", "MIN_TRIAL_DAYS"]
+
+# A season holds ~150-163 trial days (2019-20 to 2025-26). Fewer than this
+# means the archive was never backfilled that far, not a quiet season.
+MIN_TRIAL_DAYS = 100
 
 
 @dataclass
@@ -154,12 +164,29 @@ def _carries(prior: dict | None, recipe: dict, seasons: list[int]) -> bool:
 
 def _mark_unseen(frame: pd.DataFrame, starts: pd.DataFrame, conn: Connection) -> None:
     """A column per fact the model cannot see, on every row of `frame`, so
-    the walk-forward carries them into the record."""
+    the walk-forward carries them into the record. This recipe reads trials,
+    so only the facts it cannot see are marked: a new stable."""
     key = ["race_date", "race_no", "horse_no"]
-    marks = gbm_unseen.mark(starts, trial_bands.bands(conn=conn)).set_index(key)
+    reads = features.reads_trials(features.DERIVE_VERSION)
+    marks = gbm_unseen.mark(starts, {} if reads else trial_bands.bands(conn=conn),
+                            reads_trials=reads).set_index(key)
     got = marks.reindex(pd.MultiIndex.from_frame(frame[key]))
-    for k in gbm_unseen.UNSEEN:
+    for k in gbm_unseen.facts_for(reads):
         frame[k] = got[k].eq(True).to_numpy()          # a row never marked is False
+
+
+def short_of_trials(conn: Connection, now: int) -> str:
+    """'' when the trial archive covers every season the fit trains on (and
+    the one before the first, whose trials its first starts read); otherwise
+    what is missing and what to run."""
+    days = store.trial_days_by_season(conn)
+    short = [s for s in range(gbm.FIRST_TRAIN - 1, now) if days.get(s, 0) < MIN_TRIAL_DAYS]
+    if not short:
+        return ""
+    held = ", ".join(f"{s}-{(s + 1) % 100:02d} {days.get(s, 0)} days" for s in short)
+    return (f"the trial archive is short of the seasons the model trains on ({held}; a "
+            f"season holds ~150): run `python -m hkrd.jobs.scrape_trials --backfill "
+            f"{gbm.FIRST_TRAIN - 1}-05-01` first. The live model stays.")
 
 
 def _seasons(dates: list[str]) -> set[int]:
@@ -195,12 +222,17 @@ def run(db: Path | None = None, *, through: str | None = None, rebuild_record: b
                               f"seasons before the latest ({len(dates)} meetings held)")
             return report
         last = dates[-1]
+        if features.reads_trials(features.DERIVE_VERSION):
+            missing = short_of_trials(conn, now)
+            if missing:
+                report.errors.append(missing)
+                return report
         runs = store.load_runs(conn, through=last)
         # Every start, for what the model cannot see (a trainer against the
         # last start's); a scratched runner never ran for anyone.
         starts = runs.loc[~runs["place_code"].fillna("").str.startswith("W"),
                           ["race_date", "race_no", "horse_no", "horse_name", "trainer"]]
-        frame = features.build(runs)
+        frame = features.build(runs, trials=store.load_trials(conn, through=last))
         del runs
         frame = frame[~frame["is_card"]].reset_index(drop=True)
         season = frame["season"].to_numpy()

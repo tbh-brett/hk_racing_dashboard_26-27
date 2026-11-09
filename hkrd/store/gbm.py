@@ -25,7 +25,8 @@ import pandas as pd
 from . import coerce
 from .connect import Connection
 
-__all__ = ["load_runs", "settled_dates", "save_model", "promote", "live_model",
+__all__ = ["load_runs", "load_trials", "trial_days_by_season", "settled_dates", "save_model",
+           "promote", "live_model",
            "model_row", "card_facts", "unrun_races", "unrun_dates", "scored_keys", "write_scores",
            "shown", "scored_dates", "TROUBLE_TAGS", "WIDE_TAGS", "VET_TAGS"]
 
@@ -92,6 +93,37 @@ def load_runs(conn: Connection, *, through: str = "9999-12-31") -> pd.DataFrame:
     for c in TAG_COLS:
         runs[c] = t[c].to_numpy(dtype=float)
     return runs
+
+
+_TRIALS_SQL = """
+SELECT trial_date, trial_no, horse_name, venue, course, distance, finish_time,
+       running_positions, comment_text
+  FROM trials
+ WHERE trial_date <= ?
+ ORDER BY trial_date, venue, trial_no, horse_name
+"""
+
+
+def load_trials(conn: Connection, *, through: str = "9999-12-31") -> pd.DataFrame:
+    """Every barrier trial run on or before `through`, for `derive/trial_inputs`.
+    Which of them a race may read (earlier days only, since its last start) is
+    the feature build's rule, not this query's."""
+    t = pd.read_sql(_TRIALS_SQL, conn, params=(through,))
+    t["finish_time"] = pd.to_numeric(t["finish_time"], errors="coerce").astype(float)
+    t["distance"] = pd.to_numeric(t["distance"], errors="coerce").astype(float)
+    return t
+
+
+def trial_days_by_season(conn: Connection) -> dict[int, int]:
+    """Trial days held per season (September to August; August trials belong
+    to the season they lead into, as in `derive/features.season_of`)."""
+    rows = conn.execute("""
+        SELECT CASE WHEN cast(substr(trial_date, 6, 2) AS INTEGER) >= 8
+                    THEN cast(substr(trial_date, 1, 4) AS INTEGER)
+                    ELSE cast(substr(trial_date, 1, 4) AS INTEGER) - 1 END AS season,
+               count(DISTINCT trial_date)
+          FROM trials GROUP BY season""").fetchall()
+    return {int(r[0]): int(r[1]) for r in rows}
 
 
 def settled_dates(conn: Connection, *, through: str = "9999-12-31",
@@ -180,11 +212,15 @@ _UNRUN = ("NOT EXISTS (SELECT 1 FROM runners x WHERE x.race_date = r.race_date "
 def card_facts(conn: Connection, date: str) -> list[dict[str, Any]]:
     """Every runner still declared on the day's unrun races, with the race
     facts a score depends on: what `score_gbm` fingerprints before it builds
-    anything. Scratched runners (W codes) are not in the field."""
+    anything. Scratched runners (W codes) are not in the field. The runner's
+    latest trial before the day is one of them: the model reads trials, and a
+    trial stored after the card was scored must score it again."""
     rows = conn.execute(f"""
         SELECT u.race_no, u.horse_no, u.horse_name, u.draw, u.jockey, u.trainer,
                u.actual_weight, u.declared_weight, u.rating,
-               r.venue, r.surface, r.course, r.distance, r.race_class, r.going
+               r.venue, r.surface, r.course, r.distance, r.race_class, r.going,
+               (SELECT max(t.trial_date) FROM trials t
+                 WHERE t.horse_name = u.horse_name AND t.trial_date < u.race_date) AS last_trial
           FROM runners u JOIN races r USING (race_date, race_no)
          WHERE u.race_date = ? AND coalesce(u.place_code, '') NOT LIKE 'W%' AND {_UNRUN}
          ORDER BY u.race_no, u.horse_no""", (date,)).fetchall()

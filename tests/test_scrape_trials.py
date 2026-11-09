@@ -239,3 +239,88 @@ def test_a_day_hkjc_does_not_publish_is_not_a_failure(tmp_path):
                                   session=Missing())
     assert report.ok and report.no_such_day and report.batches == 0
     assert "none published" in report.render()
+
+
+# ── the archive before HKJC's list ───────────────────────────────────────────
+#
+# HKJC lists about thirteen months of trial days but serves any older day asked
+# for by date. A date with no trials answers 200 with its "No information."
+# panel: that is the answer a backfill gets most of the time, not a fault.
+
+NO_DAY_HTML = (Path(__file__).parent / "fixtures" / "trials_no_day.html").read_text(
+    encoding="utf-8")
+
+
+def test_hkjcs_no_information_panel_is_no_trial_day_not_a_layout_change():
+    from hkrd.ingest import trials as tr
+    from hkrd.ingest._client import NotFound
+
+    with pytest.raises(NotFound, match="no trial results"):
+        tr.parse_trial_day(NO_DAY_HTML, source="2024-10-13")
+
+
+def test_a_date_with_no_trials_is_answered_none_published(tmp_path):
+    report = scrape_trials.scrape("2024-10-13", db=tmp_path / "t.db",
+                                  session=_Page(NO_DAY_HTML))
+    assert report.ok and report.no_such_day and report.runners == 0
+
+
+class _ByDate:
+    """HKJC by date: trials on the dates given, the "No information." panel
+    on every other, and a record of what was asked, in order."""
+
+    def __init__(self, trial_dates, broken=()):
+        self.trial_dates, self.broken, self.asked = set(trial_dates), set(broken), []
+
+    def get(self, url, params=None, timeout=None):
+        date = params["Date"].replace("/", "-")
+        self.asked.append(date)
+        if date in self.broken:
+            return _Resp(200, "<html><body><p>a page nobody has seen</p></body></html>")
+        return _Resp(200, TRIALS_HTML if date in self.trial_dates else NO_DAY_HTML)
+
+
+def test_backfill_asks_every_date_it_lacks_newest_first_and_skips_what_it_holds(tmp_path):
+    db = tmp_path / "t.db"
+    scrape_trials.scrape("2019-06-05", db=db, session=_Page(TRIALS_HTML))
+    hkjc = _ByDate({"2019-06-03"})
+    report = scrape_trials.backfill("2019-06-01", "2019-06-06", db=db, session=hkjc)
+    assert hkjc.asked == ["2019-06-06", "2019-06-04", "2019-06-03", "2019-06-02",
+                          "2019-06-01"]
+    assert (report.asked, report.held, report.trial_days, report.no_trials) == (5, 1, 1, 4)
+    assert report.runners == 4 and report.ok
+    conn = get_conn(db)
+    days = [r[0] for r in conn.execute(
+        "SELECT trial_date, count(*) FROM trials GROUP BY trial_date ORDER BY trial_date")]
+    conn.close()
+    assert days == ["2019-06-03", "2019-06-05"]
+
+
+def test_a_second_backfill_does_not_ask_for_a_day_it_stored(tmp_path):
+    db = tmp_path / "t.db"
+    scrape_trials.backfill("2019-06-01", "2019-06-03", db=db, session=_ByDate({"2019-06-02"}))
+    again = _ByDate({"2019-06-02"})
+    report = scrape_trials.backfill("2019-06-01", "2019-06-03", db=db, session=again)
+    assert "2019-06-02" not in again.asked and report.held == 1 and report.runners == 0
+    conn = get_conn(db)
+    n = conn.execute("SELECT count(*) FROM trials").fetchone()[0]
+    conn.close()
+    assert n == 4
+
+
+def test_backfill_stops_when_hkjc_keeps_failing_rather_than_asking_on(tmp_path):
+    dates = [f"2019-06-{d:02d}" for d in range(1, 21)]
+    hkjc = _ByDate((), broken=dates)
+    report = scrape_trials.backfill("2019-06-01", "2019-06-20", db=tmp_path / "t.db",
+                                    session=hkjc)
+    assert len(hkjc.asked) == scrape_trials.STOP_AFTER_ERRORS
+    assert not report.ok and "--to 2019-06-11" in report.stopped
+    assert "STOPPED" in report.render()
+
+
+def test_one_bad_day_is_reported_and_the_walk_goes_on(tmp_path):
+    hkjc = _ByDate({"2019-06-01"}, broken={"2019-06-02"})
+    report = scrape_trials.backfill("2019-06-01", "2019-06-03", db=tmp_path / "t.db",
+                                    session=hkjc)
+    assert report.asked == 3 and report.trial_days == 1 and len(report.errors) == 1
+    assert not report.ok and not report.stopped

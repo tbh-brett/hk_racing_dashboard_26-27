@@ -91,7 +91,9 @@ def _score(conn: Connection, date: str, report: ScoreReport) -> None:
         return
     declared = {(f["race_no"], f["horse_no"]): f["declared_weight"] is not None for f in facts}
     going = {f["race_no"]: f["going"] is not None for f in facts}
-    frame = features.build(store.load_runs(conn, through=date), card_dates=(date,))
+    # trials on days before the meeting only: the build's rule, and the as-of cut's
+    frame = features.build(store.load_runs(conn, through=date), card_dates=(date,),
+                           trials=store.load_trials(conn, through=date))
     # a body weight as declared or carried from the last run, before the median fills the rest
     had_weight = frame["declared_weight"].notna().to_numpy()
     gbm.assume_body_weight(frame)

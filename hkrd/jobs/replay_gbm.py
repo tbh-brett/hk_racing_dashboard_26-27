@@ -12,7 +12,9 @@ both reads against what happened.
 Run it on a COPY (`ops/pull-db.ps1`); it writes nothing to the database it is
 given. The six 26/27 meetings the lab replayed must give R² 0.145 (morning) and
 0.143 (night before), 16 top picks and 29 winners in the top three, within
-0.005 R².
+0.005 R² -- for the lab's recipe, gbm-1.0. gbm-1.1 reads trials as well, and on
+the 29 Oct copy with the trial archive backfilled gives 0.149 and 0.149, 16
+and 32 (docs/gbm.md), with no input differing from the full archive's.
 """
 from __future__ import annotations
 
@@ -38,8 +40,10 @@ REPLAY_DATES = ["2026-09-06", "2026-09-09", "2026-09-13", "2026-09-16", "2026-09
 def _inputs(db: Path, date: str | None = None) -> pd.DataFrame:
     conn = get_conn(db)
     try:
-        return features.build(store.load_runs(conn, through=date or "9999-12-31"),
-                              card_dates=(date,) if date else ())
+        through = date or "9999-12-31"
+        return features.build(store.load_runs(conn, through=through),
+                              card_dates=(date,) if date else (),
+                              trials=store.load_trials(conn, through=through))
     finally:
         conn.close()
 

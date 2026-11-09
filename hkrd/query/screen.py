@@ -42,6 +42,7 @@ import math
 import time
 from typing import Any
 
+from hkrd.derive.features import reads_trials as _reads_trials
 from hkrd.model import gbm_unseen
 from hkrd.model import screen as model
 from hkrd.query import blackbook_band, book_tier
@@ -188,13 +189,16 @@ def _last_start(prev: dict[str, Any] | None) -> dict[str, Any] | None:
             "incident_comment": prev["incident_comment"]}
 
 
-def _unseen(r: dict, date: str, records: dict[str, dict]) -> list[dict[str, Any]]:
+def _unseen(r: dict, date: str, records: dict[str, dict],
+            reads_trials: bool = False) -> list[dict[str, Any]]:
     """What the model cannot see about this runner, each with its record
-    against the model and the price (None where the record predates it)."""
+    against the model and the price (None where the record predates it).
+    A live model that reads trials leaves only the new stable."""
     prev = r["prev"] or {}
     out = []
     for key, trial in gbm_unseen.facts(date, prev.get("race_date"), r["trainer"],
-                                       prev.get("trainer"), r["trials"]):
+                                       prev.get("trainer"), r["trials"],
+                                       reads_trials=reads_trials):
         rec = records.get(key) or {}
         mod, price = rec.get("model") or {}, rec.get("price") or {}
         out.append({"key": key, **gbm_unseen.UNSEEN[key],
@@ -210,7 +214,7 @@ def _unseen(r: dict, date: str, records: dict[str, dict]) -> list[dict[str, Any]
 
 def _runner(r: dict, sc: dict | None, book: dict | None, notes: list,
             reversals: list, date: str, records: dict[str, dict],
-            tier: dict | None = None) -> dict[str, Any]:
+            tier: dict | None = None, reads_trials: bool = False) -> dict[str, Any]:
     groups = (sc or {}).get("groups", {})
     prev_tags = set((r["prev"] or {}).get("tags") or ())
     lines = [_group_line(k, x) for k, x in groups.items()
@@ -231,7 +235,7 @@ def _runner(r: dict, sc: dict | None, book: dict | None, notes: list,
         "case_x": round(math.exp(sum(math.log(groups[k]) for k in _SITUATION
                                      if k in groups)), 2),
         "flags": (sc or {}).get("flags", []), "assumed": (sc or {}).get("assumed", []),
-        "unseen": _unseen(r, date, records),
+        "unseen": _unseen(r, date, records, reads_trials),
         # A real veterinary finding on the last start: the Briefing's VET chip.
         # The model reads it (its `trouble & vet` group); the chip is for the eye.
         "vet": bool(prev_tags & model.VET_BAD),
@@ -263,14 +267,14 @@ def _book(b: dict[str, Any]) -> dict[str, Any]:
 
 
 def _race(block: dict, books: dict, notes: dict, scores: dict,
-          records: dict[str, dict], tiers: dict) -> dict[str, Any]:
+          records: dict[str, dict], tiers: dict, reads_trials: bool = False) -> dict[str, Any]:
     race, runners = block["race"], block["runners"]
     rev = _reversals(runners, race)
     lines = [_runner(r, scores.get((race["race_no"], r["horse_no"])),
                      books.get((race["race_no"], r["horse_no"])),
                      notes.get(r["horse_name"], []), rev.get(r["horse_no"], []),
                      race["race_date"], records,
-                     tiers.get((race["race_no"], r["horse_no"])))
+                     tiers.get((race["race_no"], r["horse_no"])), reads_trials)
              for r in runners]
     # Read in order of the chance to place; a runner the model has not scored
     # (a late replacement) goes to the foot, named but not ranked.
@@ -376,15 +380,19 @@ def _meeting(conn: Connection, date: str) -> dict[str, Any]:
     names = [r["horse_name"] for b in blocks for r in b["runners"]]
     notes = notes_for_horses(names, conn=conn)
     scores = gbm_q.scores(date, conn=conn)
-    records = gbm_q.unseen_records(gbm_q.live(conn))
+    live = gbm_q.live(conn)
+    records = gbm_q.unseen_records(live)
+    # the live model's own inputs decide what it cannot see: a trial is unseen
+    # only beside a model fitted before gbm-1.1
+    reads = _reads_trials((live or {}).get("features_version"))
     tiers = book_tier.for_meeting(date, conn=conn)
-    races = [_race(b, books, notes, scores, records, tiers) for b in blocks]
+    races = [_race(b, books, notes, scores, records, tiers, reads) for b in blocks]
     version = next((x["model_version"] for x in scores.values()), None)
     fit = gbm_q.version_fit(conn, version)
     return {
         "race_date": date, "version": version,
         "fit": {**fit, "shortlist": SHORTLIST},
         "factors": [{"key": k, "group": k, "label": k.capitalize(), "x": None,
-                     "runs": None, "caveat": None} for k in gbm_q.GROUPS],
+                     "runs": None, "caveat": None} for k in gbm_q.groups_of(live)],
         "races": races,
     }

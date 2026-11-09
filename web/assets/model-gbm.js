@@ -120,6 +120,10 @@ export function renderGbm(host, foot, d) {
   foot.replaceChildren(
     el('span', null, `TIME ENTERS THROUGH ${(d.time_inputs ?? []).length} INPUTS, EACH A RUN `
       + `AGAINST THE MEDIAN OF ITS OWN RACE: ${(d.time_inputs ?? []).join(' · ')}`),
-    el('span', null, `TWELVE GROUPS: ${(d.groups ?? []).join(' · ').toUpperCase()}`),
-    el('span', null, 'IT NEVER SEES TODAY’S PRICE, TRIALS, TRACKWORK OR GEAR'));
+    el('span', null, `${(d.groups ?? []).length} GROUPS: `
+      + `${(d.groups ?? []).join(' · ').toUpperCase()}`),
+    // the live model's own groups: a model fitted before gbm-1.1 has no trials group
+    el('span', null, (d.groups ?? []).includes('trials')
+      ? 'IT NEVER SEES TODAY’S PRICE, TRACKWORK OR GEAR'
+      : 'IT NEVER SEES TODAY’S PRICE, TRIALS, TRACKWORK OR GEAR'));
 }

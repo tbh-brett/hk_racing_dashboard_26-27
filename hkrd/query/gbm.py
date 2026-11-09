@@ -28,7 +28,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from hkrd.derive.features import GROUPS, TIME
+from hkrd.derive.features import GROUPS, TIME, reads_trials
 from hkrd.derive.probability import place_from_win
 from hkrd.model.gbm_flags import FLAGS, flags
 from hkrd.model.gbm_unseen import UNSEEN
@@ -36,7 +36,7 @@ from hkrd.query import pools
 from hkrd.store.connect import Connection, db_file, get_conn
 
 __all__ = ["live", "scores", "race", "race_notes", "record", "version_fit", "unseen_records",
-           "GROUPS", "MAX_FLAGS"]
+           "groups_of", "GROUPS", "MAX_FLAGS"]
 
 MAX_FLAGS = 2
 _FACTS = ["prep_run", "n_prior", "l1_place", "vs", "l1_vs", "l2_vs", "l3_vs", "hab_early",
@@ -128,7 +128,7 @@ def _runner_flags(facts: list[dict[str, Any]], records: dict[str, dict]) -> list
 def scores(date: str, race_no: int | None = None, *,
            conn: Connection) -> dict[tuple[int, int], dict[str, Any]]:
     """Each runner still in its race: the model's win and place chance (as
-    percentages), the first read when the card landed, the twelve groups as
+    percentages), the first read when the card landed, the model's groups as
     "x vs this field", its flags and what was assumed. Empty when unscored."""
     rows = [dict(r) for r in conn.execute(
         _SCORES.format(race="AND g.race_no = ?" if race_no else ""),
@@ -242,6 +242,15 @@ def _gap_note(wf: dict[str, Any]) -> str | None:
             f"knows, not a bet.")
 
 
+def groups_of(model: dict[str, Any] | None) -> list[str]:
+    """The factor groups a fitted model speaks in: every group, less trials for
+    a model fitted before gbm-1.1 read them. No model yet: today's recipe's."""
+    if model is None:
+        return list(GROUPS)
+    reads = reads_trials(model.get("features_version"))
+    return [g for g in GROUPS if reads or g != "trials"]
+
+
 def record(*, conn: Connection | None = None) -> dict[str, Any] | None:
     """GET /api/model/gbm/record: what the live model has earned, which fit is
     live, and what the gate said about the newest fit. None before the first."""
@@ -260,7 +269,7 @@ def record(*, conn: Connection | None = None) -> dict[str, Any] | None:
                              "promoted": bool(newest["promoted"]),
                              "gate": json.loads(newest["record_json"]).get("gate")},
                 "walk_forward": wf, "meetings": model["record"].get("meetings", []),
-                "gap_note": _gap_note(wf), "groups": list(GROUPS), "time_inputs": TIME,
+                "gap_note": _gap_note(wf), "groups": groups_of(model), "time_inputs": TIME,
                 "flags": FLAGS}
     finally:
         if own:

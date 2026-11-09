@@ -2,7 +2,8 @@
  *
  * Two kinds of line, both from the API and neither typed here:
  *  - a fact the model does not read (query/screen `unseen`, model/gbm_unseen:
- *    a trial since the last run, a new stable), and
+ *    a new stable, and a trial since the last run while the live model is one
+ *    fitted before gbm-1.1 read trials), and
  *  - a flag, where five seasons say the model's number is weakest (`flags`).
  * Each says what it has been worth against the model's chance and against the
  * price's, and over how many runs; a line whose record has not been built yet

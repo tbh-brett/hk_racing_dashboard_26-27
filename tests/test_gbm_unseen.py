@@ -14,7 +14,7 @@ import pandas as pd
 from hkrd.derive import features as F
 from hkrd.jobs import fit_gbm
 from hkrd.model import gbm, gbm_record
-from hkrd.model.gbm_unseen import UNSEEN, facts, mark, new_stable, trial_since
+from hkrd.model.gbm_unseen import UNSEEN, facts, facts_for, mark, new_stable, trial_since
 
 RACE = "2026-10-01"
 
@@ -117,3 +117,15 @@ def test_a_record_without_the_table_is_never_carried() -> None:
     assert fit_gbm._carries(prior, recipe, seasons)
     assert not fit_gbm._carries(prior, recipe, seasons + [2026])
     assert not fit_gbm._carries(None, recipe, seasons)
+
+
+def test_a_model_that_reads_trials_leaves_only_the_new_stable_unseen() -> None:
+    assert facts_for(False) == list(UNSEEN) and facts_for(True) == ["new_stable"]
+    got = facts(RACE, "2026-09-01", "NEW", "OLD", [_t("2026-09-20", "POSITIVE")],
+                reads_trials=True)
+    assert [k for k, _ in got] == ["new_stable"]
+    starts = pd.DataFrame({"race_date": ["2026-09-06", "2026-10-01"], "race_no": [1, 3],
+                           "horse_no": [5, 5], "horse_name": ["A", "A"], "trainer": ["T1", "T2"]})
+    marks = mark(starts, {"A": [_t("2026-09-25")]}, reads_trials=True)
+    assert [c for c in marks.columns if c in UNSEEN] == ["new_stable"]
+    assert marks["new_stable"].tolist() == [False, True]

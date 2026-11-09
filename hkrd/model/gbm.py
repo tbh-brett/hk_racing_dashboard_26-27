@@ -37,7 +37,8 @@ __all__ = ["KIND", "RECIPE", "INPUTS", "PARAMS", "FIRST_TRAIN", "Races", "prep",
            "recipe", "from_text"]
 
 KIND = "fundamental"
-RECIPE = "gbm-1.0"             # bump when anything below changes what a fit produces
+RECIPE = "gbm-1.1"             # bump when anything below changes what a fit produces
+#                                1.1: the trial inputs (derive/trial_inputs), Nov 2026
 INPUTS = FEATURES + CATEGORICAL
 # The lab's settings, fixed: tuning them against recent meetings is fitting the
 # test (§10). num_threads is part of the recipe -- LightGBM sums histograms per
@@ -81,12 +82,19 @@ def _metric(races: Races, y: np.ndarray):
     return feval
 
 
-def prep(frame: pd.DataFrame, rows: np.ndarray | pd.Series | None = None) -> pd.DataFrame:
+def prep(frame: pd.DataFrame, rows: np.ndarray | pd.Series | None = None,
+         inputs: list[str] | None = None) -> pd.DataFrame:
     """The model's input matrix: one copy of the input columns (of `rows`), with
-    the categories typed as the lab typed them -- from the rows at hand."""
-    X = frame.loc[rows, INPUTS] if rows is not None else frame[INPUTS].copy()
+    the categories typed as the lab typed them -- from the rows at hand.
+
+    `inputs` is a fitted model's own list (`booster.feature_name()`), which can
+    be an older recipe's: the model live on the page until a new recipe passes
+    the gate is scored on the inputs it was trained on, not today's."""
+    cols = list(inputs) if inputs is not None else INPUTS
+    X = frame.loc[rows, cols] if rows is not None else frame[cols].copy()
     for c in CATEGORICAL:
-        X[c] = X[c].astype("category")
+        if c in X:
+            X[c] = X[c].astype("category")
     return X
 
 
@@ -123,7 +131,7 @@ def choose_rounds(frame: pd.DataFrame, train_rows, valid_rows) -> int:
 def predict(booster: lgb.Booster, frame: pd.DataFrame, rows=None) -> np.ndarray:
     """Win chances, each race's summing to 1 over the rows given."""
     ids = (frame.loc[rows, "race_id"] if rows is not None else frame["race_id"]).to_numpy()
-    s = booster.predict(prep(frame, rows), raw_score=True)
+    s = booster.predict(prep(frame, rows, booster.feature_name()), raw_score=True)
     return Races(ids).softmax(s)
 
 
@@ -131,9 +139,12 @@ def contributions(booster: lgb.Booster, frame: pd.DataFrame) -> pd.DataFrame:
     """Per runner and factor group: its log-contribution against this field's
     mean, so exp(value) reads as "x vs this field" (§5). SHAP accounting: the
     groups add back to the score exactly; they are not causes."""
-    raw = booster.predict(prep(frame), pred_contrib=True)[:, :-1]
-    C = pd.DataFrame(raw, columns=booster.feature_name(), index=frame.index)
-    G = pd.DataFrame({k: C[v].sum(axis=1) for k, v in GROUPS.items()})
+    names = booster.feature_name()
+    raw = booster.predict(prep(frame, inputs=names), pred_contrib=True)[:, :-1]
+    C = pd.DataFrame(raw, columns=names, index=frame.index)
+    # an older recipe has no column for a newer group: it is not shown, not 0
+    G = pd.DataFrame({k: C[[c for c in v if c in C]].sum(axis=1)
+                      for k, v in GROUPS.items() if any(c in C for c in v)})
     return G - G.groupby(frame["race_id"].to_numpy()).transform("mean")
 
 

@@ -5,8 +5,10 @@ the model's own chance -- read from the live model's walk-forward record
 (`model/gbm_record`, the `unseen` table), never a typed number:
 
 - a barrier trial since the last run, rated STANDOUT, POSITIVE or NEGATIVE by
-  `derive/trial_quality`. The model reads no trials (gbm-SPEC §14.9): the
-  archive holds them from 2025-26 only, one season in five.
+  `derive/trial_quality` -- only while the live model is one that reads no
+  trials (feature version feat-1.0, gbm-SPEC §14.9). From gbm-1.1 the model
+  reads them itself (`derive/trial_inputs`), and a trial named "unseen" beside
+  a number that already holds it would be counted twice by the eye.
 - a new stable: a different trainer from the last start. The model reads each
   stable's last year, not the move between two of them.
 
@@ -34,7 +36,8 @@ from typing import Any
 
 import pandas as pd
 
-__all__ = ["UNSEEN", "TRIAL_WINDOW_DAYS", "trial_since", "new_stable", "facts", "mark"]
+__all__ = ["UNSEEN", "TRIAL_WINDOW_DAYS", "trial_since", "new_stable", "facts", "mark",
+           "facts_for"]
 
 # A trial counts when it came after the last run AND within this many days of
 # the race -- the old Screen's window, kept so its measurements carry over.
@@ -54,6 +57,12 @@ UNSEEN: dict[str, dict[str, str]] = {
 }
 _BY_BAND = {"STANDOUT": "trial_standout", "POSITIVE": "trial_positive",
             "NEGATIVE": "trial_negative"}
+
+
+def facts_for(reads_trials: bool) -> list[str]:
+    """The facts a model cannot see: all of them for one that reads no trials,
+    only the new stable for one that does."""
+    return [k for k in UNSEEN if not (reads_trials and k in _BY_BAND.values())]
 
 
 def _day(value: Any) -> str:
@@ -81,13 +90,13 @@ def new_stable(trainer: str | None, last_trainer: str | None) -> bool:
 
 
 def facts(race_date: str, last_run: str | None, trainer: str | None,
-          last_trainer: str | None, trials: Sequence[Mapping[str, Any]]
-          ) -> list[tuple[str, Mapping[str, Any] | None]]:
+          last_trainer: str | None, trials: Sequence[Mapping[str, Any]], *,
+          reads_trials: bool = False) -> list[tuple[str, Mapping[str, Any] | None]]:
     """The facts that hold for one runner, in `UNSEEN` order, each with the
     trial it rests on (None for a new stable). `trials` newest first, rated
-    (`band`)."""
+    (`band`). `reads_trials`: the live model reads trials, so none is unseen."""
     out: list[tuple[str, Mapping[str, Any] | None]] = []
-    t = trial_since(race_date, last_run, trials)
+    t = None if reads_trials else trial_since(race_date, last_run, trials)
     key = _BY_BAND.get((t or {}).get("band"))
     if key:
         out.append((key, t))
@@ -96,8 +105,8 @@ def facts(race_date: str, last_run: str | None, trainer: str | None,
     return out
 
 
-def mark(starts: pd.DataFrame, trials: Mapping[str, Sequence[Mapping[str, Any]]]
-         ) -> pd.DataFrame:
+def mark(starts: pd.DataFrame, trials: Mapping[str, Sequence[Mapping[str, Any]]], *,
+         reads_trials: bool = False) -> pd.DataFrame:
     """One boolean column per fact, for every starter in `starts` (race_date,
     race_no, horse_no, horse_name, trainer; scratched runners already out),
     keyed on (race_date, race_no, horse_no). The same `facts` the page calls,
@@ -105,12 +114,14 @@ def mark(starts: pd.DataFrame, trials: Mapping[str, Sequence[Mapping[str, Any]]]
     s = starts.sort_values(["horse_name", "race_date", "race_no"], kind="stable")
     g = s.groupby("horse_name", sort=False)
     last_date, last_trainer = g["race_date"].shift(), g["trainer"].shift()
-    on = {k: [] for k in UNSEEN}
+    keys = facts_for(reads_trials)
+    on: dict[str, list[bool]] = {k: [] for k in keys}
     for date, name, trainer, ld, lt in zip(s["race_date"], s["horse_name"], s["trainer"],
                                             last_date, last_trainer):
         held = {k for k, _ in facts(date, None if pd.isna(ld) else ld, trainer,
-                                    None if pd.isna(lt) else lt, trials.get(name, ()))}
-        for k in UNSEEN:
+                                    None if pd.isna(lt) else lt, trials.get(name, ()),
+                                    reads_trials=reads_trials)}
+        for k in keys:
             on[k].append(k in held)
     out = s[["race_date", "race_no", "horse_no"]].copy()
     for k, v in on.items():

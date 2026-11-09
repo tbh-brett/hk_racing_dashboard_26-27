@@ -398,7 +398,9 @@ def test_the_route_404s_without_a_card(tmp_path, monkeypatch, db) -> None:
     assert client.get("/api/screen/2026-01-01").status_code == 404
     body = client.get(f"/api/screen/{TODAY}").json()
     assert body["races"][0]["race_no"] == 1
-    assert [f["key"] for f in body["factors"]] == list(screen_q.gbm_q.GROUPS)
+    # the live model here was fitted before gbm-1.1 (feat-1.0): no trials group
+    assert [f["key"] for f in body["factors"]] == [g for g in screen_q.gbm_q.GROUPS
+                                                   if g != "trials"]
 
 
 # ── what the model cannot see, and a Screen kept until its inputs change ──
@@ -412,6 +414,17 @@ def test_a_trial_since_the_last_run_is_named_beside_the_model(db) -> None:
     assert line["model_ae"] is None and line["runs"] is None
     plain = _one(out["races"], "PLAIN SAILING")
     assert plain["unseen"] == [] and plain["vet"] is False
+
+
+def test_beside_a_model_that_reads_trials_no_trial_is_unseen(db) -> None:
+    """From gbm-1.1 the trial is in the model's number; naming it again as
+    something the number cannot see would count it twice."""
+    with transaction(db):
+        db.execute("UPDATE gbm_models SET features_version = 'feat-1.1', "
+                   "record_json = record_json || ' '")
+    star = _one(screen_q.meeting(TODAY, conn=db)["races"], "TRIAL STAR")
+    assert not any(u["key"].startswith("trial_") for u in star["unseen"])
+    assert star["trial"]["trial_date"] == "2026-09-10"       # the trial line itself stays
 
 
 def test_the_records_figure_travels_with_the_line(db) -> None:

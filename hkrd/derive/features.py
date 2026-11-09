@@ -33,10 +33,17 @@ from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 
-__all__ = ["DERIVE_VERSION", "FEATURES", "CATEGORICAL", "GROUPS", "TIME", "FACTS",
-           "build", "season_of", "class_num"]
+from hkrd.derive import trial_inputs
 
-DERIVE_VERSION = "feat-1.0"
+__all__ = ["DERIVE_VERSION", "FEATURES", "CATEGORICAL", "GROUPS", "TIME", "FACTS",
+           "LAB_FEATURES", "build", "season_of", "class_num", "reads_trials"]
+
+# feat-1.1 (Nov 2026): the trial inputs (`derive/trial_inputs`), after the lab's.
+DERIVE_VERSION = "feat-1.1"
+# Feature versions built before the model read trials. A model fitted on one
+# is still scored on its own inputs (`model/gbm.predict` reads them off the
+# booster), and the Briefing still names its trials as unseen.
+TRIALLESS = ("feat-1.0",)
 
 # The lab's order, kept: feature_fraction samples columns by position, so a
 # reordering is a different model.
@@ -61,10 +68,15 @@ FEATURES = [
     "rel_ew_fmrp", "rel_ew_pos_frac", "rel_ew_logp_run", "rel_jockey_ae",
     "rel_career_top3_rate",
 ]
+# The lab's 83 numbers end there; the trial inputs follow them, so the lab's
+# columns keep their positions.
+LAB_FEATURES = list(FEATURES)
+FEATURES += trial_inputs.INPUTS
 CATEGORICAL = ["vs", "going_g"]
 
-# The twelve factor groups the page speaks in (gbm-SPEC §14.1), from the lab's
-# groups.py. Every model input is in exactly one (tests/test_gbm.py).
+# The factor groups the page speaks in: the lab's twelve (gbm-SPEC §14.1, its
+# groups.py) and, since feat-1.1, trials. Every model input is in exactly one
+# (tests/test_gbm.py).
 GROUPS = {
     "form": ["l1_pos_frac", "l1_lbw", "l1_fmrp", "l2_pos_frac", "l2_lbw", "l2_fmrp", "l3_pos_frac",
              "l3_lbw", "l3_fmrp", "ew_pos_frac", "ew_fmrp", "ew_lbw", "ew_top3", "ew_won",
@@ -84,6 +96,7 @@ GROUPS = {
                           "ew_early_frac", "ew_late_dev", "ew_early_dev", "hab_early",
                           "n_leaders", "early_rank"],
     "trouble & vet": ["l1_n_trouble", "l1_n_wide", "l1_n_vet", "l1_eased", "l1_weakened", "l1_keen"],
+    "trials": list(trial_inputs.INPUTS),
     "race": ["field", "race_no"],
 }
 # The inputs made from a race time (the MODEL view's "where time enters").
@@ -171,10 +184,20 @@ def _connections(r: pd.DataFrame, who: str) -> pd.DataFrame:
     return r[[who, "date"]].merge(st, on=[who, "date"], how="left")
 
 
-def build(runs: pd.DataFrame, card_dates: Iterable[str] = ()) -> pd.DataFrame:
+def reads_trials(features_version: str | None) -> bool:
+    """Was a model with this feature version fitted on trial inputs?"""
+    return (features_version or TRIALLESS[0]) not in TRIALLESS
+
+
+def build(runs: pd.DataFrame, card_dates: Iterable[str] = (), *,
+          trials: pd.DataFrame) -> pd.DataFrame:
     """One row per starter (and per declared runner on `card_dates`), in key
     order, with `FEATURES`, `CATEGORICAL`, `FACTS`, the outcome and the closing
-    market's chance (`p_mkt`, the benchmark -- never an input)."""
+    market's chance (`p_mkt`, the benchmark -- never an input).
+
+    `trials` is the barrier trial table (`store/gbm.load_trials`). Required,
+    not defaulted: a caller that forgot it would score every horse as one that
+    had not trialled, and nothing on the page would look wrong."""
     cards = set(card_dates)
     card = runs["race_date"].isin(cards)
     scratched = runs["place_code"].fillna("").str.startswith("W")
@@ -235,6 +258,9 @@ def build(runs: pd.DataFrame, card_dates: Iterable[str] = ()) -> pd.DataFrame:
     r["prep_run"] = r.groupby([horse, prep_id]).cumcount() + 1
     r["debut"] = (r["n_prior"] == 0).astype(float)
     hist: dict[str, object] = {}
+    # the latest barrier trial since the previous start, earlier days only
+    tri = trial_inputs.attach(horse, r["date"], prev_date, trial_inputs.reads(trials))
+    hist.update({c: tri[c].to_numpy() for c in trial_inputs.INPUTS})
     for k, cols in _LAGS.items():
         sh = g[cols].shift(k)
         hist.update({f"l{k}_{c}": sh[c].to_numpy() for c in cols})

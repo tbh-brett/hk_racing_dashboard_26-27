@@ -17,11 +17,15 @@ import pytest
 from hkrd.derive import features as F
 from hkrd.store import asof
 from hkrd.store.connect import get_conn, init_db, transaction
-from hkrd.store.gbm import load_runs
+from hkrd.store.gbm import load_runs, load_trials
 
 ROOT = Path(__file__).resolve().parent.parent
 REAL_DB = Path(os.environ.get("HKRD_TEST_DB", ROOT / "hkrd.db"))
 INPUTS = F.FEATURES + F.CATEGORICAL
+# The trial table with nothing in it: these archives have no trials, and the
+# build insists on being told so rather than assuming it.
+NO_TRIALS = pd.DataFrame(columns=["trial_date", "trial_no", "horse_name", "venue", "course",
+                                  "distance", "finish_time", "running_positions", "comment_text"])
 
 HORSES = [f"HORSE {i:02d}" for i in range(24)]
 JOCKEYS = ["J ONE", "J TWO", "J THREE", "J FOUR", "J FIVE"]
@@ -81,13 +85,17 @@ def _rows(df: pd.DataFrame, date: str, race_no: int | None = None) -> pd.DataFra
 # ─── the definition ──────────────────────────────────────────────────────────
 
 def test_the_groups_cover_every_input_once() -> None:
-    # 83 numbers and two categories: the "85 of 85 inputs" of the replay audit
-    assert len(INPUTS) == 85 and len(set(INPUTS)) == 85
+    # the lab's 83 numbers and two categories -- the "85 of 85 inputs" of the
+    # replay audit -- and since feat-1.1 the 11 trial inputs after them
+    assert len(F.LAB_FEATURES) + len(F.CATEGORICAL) == 85
+    assert F.FEATURES[:len(F.LAB_FEATURES)] == F.LAB_FEATURES, "the lab's columns keep their places"
+    assert F.FEATURES[len(F.LAB_FEATURES):] == F.GROUPS["trials"]
+    assert len(INPUTS) == 96 and len(set(INPUTS)) == 96
     grouped = [f for fs in F.GROUPS.values() for f in fs]
     assert sorted(grouped) == sorted(INPUTS), "every input in exactly one group"
     assert list(F.GROUPS) == ["form", "market history", "rider", "stable", "draw", "weight",
                               "rating & class", "campaign", "trip & track",
-                              "pace & sectionals", "trouble & vet", "race"]
+                              "pace & sectionals", "trouble & vet", "trials", "race"]
     assert set(F.TIME) <= set(F.FEATURES)
 
 
@@ -102,8 +110,8 @@ def test_the_price_is_never_an_input() -> None:
 def test_a_later_run_changes_nothing_before_it() -> None:
     arc = _archive()
     last = arc["race_date"].max()
-    before = F.build(arc[arc["race_date"] < last])
-    after = F.build(arc)
+    before = F.build(arc[arc["race_date"] < last], trials=NO_TRIALS)
+    after = F.build(arc, trials=NO_TRIALS)
     earlier = after[after["race_date"] < last].reset_index(drop=True)
     pd.testing.assert_frame_equal(before, earlier, check_exact=True)
 
@@ -115,7 +123,7 @@ def test_a_later_result_rewritten_changes_nothing_before_it() -> None:
     later = edited["race_date"] == last
     edited.loc[later, "place"] = edited.loc[later, "place"].to_numpy()[::-1]
     edited.loc[later, "win_odds"] = 99.0
-    a, b = F.build(arc), F.build(edited)
+    a, b = F.build(arc, trials=NO_TRIALS), F.build(edited, trials=NO_TRIALS)
     keep = a["race_date"] < last
     pd.testing.assert_frame_equal(a[keep], b[keep], check_exact=True)
 
@@ -128,7 +136,8 @@ def test_the_same_days_earlier_race_does_not_move_a_later_one() -> None:
     flipped = arc.copy()
     flipped.loc[r1, "place"] = flipped.loc[r1, "place"].to_numpy()[::-1]
     flipped.loc[r1, "win_odds"] = flipped.loc[r1, "win_odds"].to_numpy()[::-1]
-    a, b = _rows(F.build(arc), date, 2), _rows(F.build(flipped), date, 2)
+    a = _rows(F.build(arc, trials=NO_TRIALS), date, 2)
+    b = _rows(F.build(flipped, trials=NO_TRIALS), date, 2)
     riders = set(arc.loc[r1, "jockey"]) & set(arc.loc[(arc["race_date"] == date)
                                                       & (arc["race_no"] == 2), "jockey"])
     assert riders, "the fixture must share a rider across the day's two races"
@@ -154,8 +163,8 @@ def test_a_cards_price_and_result_never_reach_it() -> None:
     for c in ("place", "finish_time", "lengths_behind", "win_odds", "running_positions",
               "early_dev", "late_dev"):
         blank.loc[on, c] = np.nan
-    a = F.build(arc, card_dates=(date,))
-    b = F.build(blank, card_dates=(date,))
+    a = F.build(arc, card_dates=(date,), trials=NO_TRIALS)
+    b = F.build(blank, card_dates=(date,), trials=NO_TRIALS)
     pd.testing.assert_frame_equal(_rows(a, date), _rows(b, date), check_exact=True)
     card = a[a["race_date"] == date]
     assert card["is_card"].all()
@@ -166,8 +175,8 @@ def test_a_meeting_scored_as_a_card_has_the_inputs_it_has_once_run() -> None:
     """§14.2 without a database: nothing a run produces is read for that run."""
     arc = _archive()
     last = arc["race_date"].max()
-    as_card = _rows(F.build(arc, card_dates=(last,)), last)
-    as_run = _rows(F.build(arc), last)
+    as_card = _rows(F.build(arc, card_dates=(last,), trials=NO_TRIALS), last)
+    as_run = _rows(F.build(arc, trials=NO_TRIALS), last)
     pd.testing.assert_frame_equal(as_card, as_run, check_exact=True, check_dtype=False)
 
 
@@ -180,8 +189,8 @@ def test_a_cards_apprentice_is_read_as_the_results_name_him() -> None:
     on = (claimed["race_date"] == date) & (claimed["horse_no"] <= 4)
     claimed.loc[on, "jockey"] = claimed.loc[on, "jockey"] + " (-7)"
     claimed.loc[on, "actual_weight"] = claimed.loc[on, "actual_weight"] + 7
-    a = _rows(F.build(plain, card_dates=(date,)), date)
-    b = _rows(F.build(claimed, card_dates=(date,)), date)
+    a = _rows(F.build(plain, card_dates=(date,), trials=NO_TRIALS), date)
+    b = _rows(F.build(claimed, card_dates=(date,), trials=NO_TRIALS), date)
     pd.testing.assert_frame_equal(a, b, check_exact=True)
 
 
@@ -189,7 +198,7 @@ def test_a_scratched_runner_is_not_in_the_field() -> None:
     arc, date = _with_card(_archive())
     out = arc["race_date"].eq(date) & arc["horse_no"].eq(3)
     arc.loc[out, "place_code"] = "WV"
-    card = F.build(arc, card_dates=(date,))
+    card = F.build(arc, card_dates=(date,), trials=NO_TRIALS)
     card = card[card["race_date"] == date]
     assert 3 not in set(card["horse_no"])
     assert (card["field"] == 11).all()
@@ -198,7 +207,7 @@ def test_a_scratched_runner_is_not_in_the_field() -> None:
 def test_a_card_without_body_weight_carries_the_last_runs() -> None:
     arc, date = _with_card(_archive())
     arc.loc[arc["race_date"] == date, "declared_weight"] = np.nan
-    out = F.build(arc, card_dates=(date,))
+    out = F.build(arc, card_dates=(date,), trials=NO_TRIALS)
     hist = out[~out["is_card"]].groupby("horse_name").tail(1).set_index("horse_name")
     card = out[out["race_date"] == date].set_index("horse_name")
     raced = card[card["n_prior"] > 0]
@@ -255,10 +264,10 @@ def test_a_meeting_cut_from_the_database_has_the_same_inputs(tmp_path) -> None:
     report = asof.cut_copy(REAL_DB, cut, AS_OF)
     assert report["result_cells_on_card"] == 0 and report["runners_after"] == 0
     conn = get_conn(cut)
-    card = F.build(load_runs(conn), card_dates=(AS_OF,))
+    card = F.build(load_runs(conn), card_dates=(AS_OF,), trials=load_trials(conn))
     conn.close()
     conn = get_conn(REAL_DB)
-    full = F.build(load_runs(conn))
+    full = F.build(load_runs(conn), trials=load_trials(conn))
     conn.close()
     a, b = _rows(card, AS_OF), _rows(full, AS_OF)
     assert len(a) == report["card_runners"] > 0
@@ -278,7 +287,11 @@ def _frame(races: int = 480, field: int = 10, seed: int = 11, signal: float = 1.
     softmax on the draw (inside is better), everything else noise."""
     rng = np.random.default_rng(seed)
     n = races * field
-    f = pd.DataFrame(rng.normal(size=(n, len(F.FEATURES))), columns=F.FEATURES)
+    f = pd.DataFrame(rng.normal(size=(n, len(F.LAB_FEATURES))), columns=F.LAB_FEATURES)
+    # no trials in this world: drawn after the lab's columns would shift every
+    # later random draw, and the gate tests read this exact frame
+    for c in F.FEATURES[len(F.LAB_FEATURES):]:
+        f[c] = np.nan
     f["draw"] = np.tile(np.arange(1, field + 1), races).astype(float)
     f["vs"] = rng.choice(["ST_Turf", "HV_Turf", "ST_AWT"], n)
     f["going_g"] = "G"
@@ -437,7 +450,7 @@ def _scoring_db(path: Path) -> tuple[Path, str]:
         conn.executemany(f"INSERT INTO runners ({', '.join(_RUNNER_COLS)}) VALUES "
                          f"({', '.join('?' * len(_RUNNER_COLS))})",
                          run.where(run.notna(), None).values.tolist())
-    frame = F.build(load_runs(conn))
+    frame = F.build(load_runs(conn), trials=load_trials(conn))
     hist = frame[~frame["is_card"]].reset_index(drop=True)
     booster = gbm.fit(hist, rounds=20)
     with transaction(conn):
@@ -547,7 +560,17 @@ def test_the_routes_answer_from_tables_or_say_what_is_missing(tmp_path, monkeypa
     assert all(r["market_pct"] is None and r["gap"] is None for r in body["runners"])
     assert client.get(f"/api/model/gbm/{date}/9").status_code == 404
     rec = client.get("/api/model/gbm/record").json()
-    assert rec["live"]["version"] == "test+1" and len(rec["groups"]) == 12
+    assert rec["live"]["version"] == "test+1" and len(rec["groups"]) == 13
+    # a model fitted before it read trials speaks in the lab's twelve groups
+    conn = get_conn(db)
+    with transaction(conn):
+        # (record_json grows a byte so the live model is read again, not served
+        # from the cache a real model row never needs to leave)
+        conn.execute("UPDATE gbm_models SET features_version = 'feat-1.0', "
+                     "record_json = record_json || ' '")
+    conn.close()
+    rec = client.get("/api/model/gbm/record").json()
+    assert len(rec["groups"]) == 12 and "trials" not in rec["groups"]
     conn = get_conn(db)
     with transaction(conn):
         conn.execute("UPDATE gbm_models SET promoted = 0")

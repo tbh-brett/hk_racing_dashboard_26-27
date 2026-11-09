@@ -157,3 +157,20 @@ scrape that silently captured nothing must never look like one that worked.
 ```
 
 Every one of them prints row counts. None of them prints "done".
+
+**Trials before HKJC's list.** The trial page lists about thirteen months of days (back to
+6 Oct 2025 on 9 Nov 2026), but it still serves any older day asked for by its date, and a date
+with no trials answers with HKJC's "No information." panel (`ingest/trials` reads that as no
+trial day, not as a broken page). So the archive goes back by asking for every date:
+
+```bash
+python -m hkrd.jobs.scrape_trials --backfill 2019-05-01            # from yesterday back
+python -m hkrd.jobs.scrape_trials --backfill 2019-05-01 --to 2022-06-30   # resume a stopped run
+```
+
+It skips every date already held, stores each day exactly as the daily scrape does, prints a
+line per trial day found and a count every fifty dates, and stops after ten failures in a row
+with the `--to` to resume from. Measured 9 Nov 2026: May 2019 to Aug 2025 is ~2,300 dates and
+~1,000 trial days (38,190 runs); HKJC serves old days slowly (2-4 s each), so allow two to
+three hours at the scrapers' one request per 1.2 s. The model's fit refuses to train without
+it (docs/gbm.md, "The model reads trials").

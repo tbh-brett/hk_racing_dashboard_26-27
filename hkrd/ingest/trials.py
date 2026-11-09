@@ -31,7 +31,7 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
-from hkrd.ingest._client import fetch_html, urls
+from hkrd.ingest._client import NotFound, fetch_html, urls
 
 __all__ = ["TrialsError", "parse_trial_day", "parse_batch", "fetch_day",
            "parse_day_list", "list_days"]
@@ -248,6 +248,14 @@ def parse_trial_day(html: str, *, source: str = "") -> list[dict[str, Any]]:
         pending_meta = ""
 
     if not batches:
+        # Asked for a date with no trials, HKJC answers 200 with its error
+        # panel -- `<div id="errorContainer">No information.</div>` and no date
+        # selector -- instead of a trial page. That is "no trial day", the
+        # answer a backfill walking every date gets most of the time; any
+        # other page with no batch is still a layout change.
+        panel = soup.find(id="errorContainer")
+        if panel is not None and "no information" in _clean(panel.get_text()).lower():
+            raise NotFound(f"{source or 'trials'}: HKJC has no trial results for this date")
         raise TrialsError(
             f"{source or 'trials'}: no trial batch found on the page")
     return batches

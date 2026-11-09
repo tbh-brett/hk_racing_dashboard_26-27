@@ -161,7 +161,7 @@ its range and the price's -- or "not measured yet" until a record holds the tabl
 built before `unseen` existed is rebuilt at the next fit, not carried. The model's flags join
 the same block (the Briefing never drew them before), and a good trial is a Briefing reason
 at any rank, because the rank cannot see it. Trials go into the model itself only when the
-archive holds two seasons of them.
+archive holds two seasons of them -- done in gbm-1.1, below.
 
 The VET and NEW TR chips had stopped appearing when the model replaced the Screen: they were
 keyed on the old factor names. They read the Screen's own `vet` and `unseen` fields now.
@@ -187,3 +187,65 @@ Brett's PC a round trip to Singapore is ~45 ms, and the Briefing waited on seven
 
 On this PC, same data: the Screen 121 ms to 2 ms when nothing has changed (~100 ms when it has),
 the Briefing 125 ms to 6 ms; the Briefing's load went from seven waves of requests to three.
+
+## The model reads trials: gbm-1.1 (Nov 2026)
+
+Brett asked on 9 Nov 2026 what trials say about the next race. HKJC's trial page lists only
+about thirteen months of days, but serves any older day by its date, so the archive was
+fetched back to May 2019 (48,120 trial runs, 25,381 starts with a trial since their last run)
+and every trial fact measured against the price, the model and all four pools, holding only
+what held in both 2019-22 and 2023-26:
+
+- The closing price already knows what a trial says about who went well: trial winners win
+  at 1.00x it, fast times 1.02x, the dashboard's STANDOUT band 0.93x on 2019-22 trials it was
+  never fitted to. All the trial facts together do not beat it out of sample.
+- The model, which read none, missed by a lot: trial winners won 1.34x what it gave, slow
+  trialists 0.86x, debutants most of all. So trials belong in the model, where they make
+  the number truer; they are not a bet on their own.
+
+**What it reads** (`derive/trial_inputs`, the `trials` group): the latest trial since the
+previous start and within 120 days, run on an earlier day than the race -- days since it, how
+many trials, first-call and finishing share of the batch, places made late, seconds behind the
+batch's fastest, seconds against that morning's median runner over the same course and trip,
+whether HKJC's comment says it was asked (0 / 1 / 2 hard ridden) and how it finished (0 weak /
+1 fair / 2 strong), and whether it trialled at Conghua or Happy Valley. Eleven inputs after
+the lab's 85, so the lab's columns keep their places (`features.LAB_FEATURES`); feature
+version feat-1.1, recipe gbm-1.1.
+
+**Measured with this code** on a scratch copy of production (29 Oct, results to 28 Oct) with
+the backfilled trials loaded, by `jobs/fit_gbm` itself:
+
+| walk-forward | 2021-22 | 2022-23 | 2023-24 | 2024-25 | 2025-26 | pooled |
+|---|---|---|---|---|---|---|
+| gbm-1.0 R2 | 0.110 | 0.139 | 0.118 | 0.128 | 0.135 | 0.126 |
+| gbm-1.1 R2 | 0.114 | 0.144 | 0.126 | 0.135 | 0.145 | 0.133 |
+| closing price R2 | 0.179 | 0.206 | 0.179 | 0.201 | 0.191 | 0.192 |
+
++0.017 a race pooled (4,148 races); top pick 25.8% to 26.2%, winner in the top four 64.0% to
+64.5%. The gate, against what the page showed for the eight meetings 4-28 Oct: -0.043 a race
+(t -2.18), promoted. The research version of the same eleven inputs scored +0.0167.
+
+The leak test (`jobs/replay_gbm`, the six 26/27 meetings, each rebuilt from a copy cut at
+that morning, trials included): 0 inputs differ from the full archive's at every meeting. R2
+0.149 on race morning and 0.149 the night before, 16 top picks won and 32 winners in the top
+three -- against gbm-1.0's last recorded replay (29 Sep pull) of 0.142, 0.140, 14 and 29.
+
+**The switch-over.** Nothing the page shows changes until a gbm-1.1 fit passes the gate:
+- `model/gbm.predict` and `contributions` read the inputs off the booster, so the live
+  gbm-1.0 model goes on scoring cards on its own 85 under the new code, with no trials group.
+- The Briefing names a STANDOUT / POSITIVE / NEGATIVE trial as something the model cannot see
+  only while the live model's feature version is feat-1.0 (`features.reads_trials`). From
+  gbm-1.1 the trial is in the number and shows as its own FOR or AGAINST line ("Trials x1.2"),
+  and the record's `unseen` table keeps only the new stable.
+- The MODEL view lists the live model's groups (`query/gbm.groups_of`): twelve for gbm-1.0,
+  thirteen for gbm-1.1.
+- A card is rescored when one of its runners gets a new trial: the latest trial date is in
+  the scoring key (`store/gbm.card_facts`).
+
+**The guard.** A fit needs trials for every season it trains on (2019-20 on, for 2020-21's
+first starts), or it would learn that every horse before Aug 2025 never trialled.
+`jobs/fit_gbm` refuses, as an error naming the short seasons and the command, while any of
+them holds fewer than 100 trial days (a season holds ~150-163); the live model stays. So on
+production the order is: deploy, `scrape_trials --backfill 2019-05-01` (two to three hours),
+then the fit -- the next nightly after a meeting settles, or `fit_gbm` by hand. Its record is
+rebuilt because the feature version changed.

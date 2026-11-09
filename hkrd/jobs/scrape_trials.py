@@ -2,6 +2,7 @@
 
     python -m hkrd.jobs.scrape_trials --date 2026-08-21   # one day
     python -m hkrd.jobs.scrape_trials                     # whatever is new
+    python -m hkrd.jobs.scrape_trials --backfill 2019-05-01   # every older day, once
 
 With no date it asks HKJC which trial days exist and fetches the recent ones
 the database does not have. That question has an answer at source — the page
@@ -24,7 +25,8 @@ than in the source.
 from __future__ import annotations
 
 import argparse
-from collections.abc import Sequence
+import datetime as dt
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -33,7 +35,7 @@ from hkrd.ingest._client import FetchError, NotFound
 from hkrd.store import job_log, upsert
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
-__all__ = ["scrape", "catch_up", "TrialScrapeReport"]
+__all__ = ["scrape", "catch_up", "backfill", "TrialScrapeReport", "BackfillReport"]
 
 
 @dataclass
@@ -221,6 +223,105 @@ def catch_up(*, db: Path | None = None, limit: int = 6,
             for d in outstanding(days, db=db, limit=limit)]
 
 
+# ── the archive before HKJC's list ───────────────────────────────────────────
+#
+# HKJC's day list reaches back about thirteen months (6 Oct 2025 on 9 Nov
+# 2026), and the archive started 21 Aug 2025 -- one season of trials, which is
+# why the model could not read them. But the page still serves any older day
+# asked for by its date: 2019 days parse in full (positions, times, comments,
+# going, distance), and a date with no trials answers with HKJC's "No
+# information." panel. So the only way back is to ask for every date.
+
+# Ten failures in a row is HKJC refusing or the page changing, not ten bad
+# days: stop rather than ask it two thousand more times.
+STOP_AFTER_ERRORS = 10
+
+
+@dataclass
+class BackfillReport:
+    """A walk over every date in a range: what was asked, what was there."""
+
+    start: str = ""
+    end: str = ""
+    asked: int = 0              # dates fetched from HKJC
+    held: int = 0               # dates skipped: the database already had trials on them
+    trial_days: int = 0
+    no_trials: int = 0          # dates HKJC answered "No information."
+    runners: int = 0
+    unfinished: int = 0         # batches stored without positions or comments
+    stopped: str = ""
+    errors: list[str] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        return not self.errors and not self.stopped
+
+    def render(self) -> str:
+        lines = [f"  trial backfill     {self.end} back to {self.start}",
+                 f"  dates asked        {self.asked:>6}",
+                 f"  already held       {self.held:>6}",
+                 f"  trial days found   {self.trial_days:>6}",
+                 f"  no trials that day {self.no_trials:>6}",
+                 f"  runners stored     {self.runners:>6}"]
+        if self.unfinished:
+            lines.append(f"  NOT YET PUBLISHED  {self.unfinished:>6} batches")
+        if self.errors:
+            lines.append(f"  ERRORS             {len(self.errors):>6}")
+            lines += [f"    {e}" for e in self.errors[:10]]
+        if self.stopped:
+            lines.append(f"  STOPPED            {self.stopped}")
+        return "\n".join(lines)
+
+
+def backfill(start: str, end: str | None = None, *, db: Path | None = None,
+             session=None, echo: Callable[[str], None] | None = None) -> BackfillReport:
+    """Every date from `end` (default yesterday) back to `start`, newest first,
+    on which the database holds no trial: asked one by one, stored the way the
+    daily scrape stores a day. Idempotent, and a rerun skips what an earlier
+    one stored -- the dates with no trials are asked again, which is the cost
+    of not keeping a table of them."""
+    end = end or (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    report = BackfillReport(start=start, end=end)
+    say = echo or (lambda _line: None)
+    conn = get_conn(db if db is not None else db_path())
+    try:
+        init_db(conn)
+        have = {r[0] for r in conn.execute("SELECT DISTINCT trial_date FROM trials")}
+    finally:
+        conn.close()
+    day, first = dt.date.fromisoformat(end), dt.date.fromisoformat(start)
+    in_a_row = 0
+    while day >= first:
+        date = day.isoformat()
+        day -= dt.timedelta(days=1)
+        if date in have:
+            report.held += 1
+            continue
+        one = scrape(date, db=db, session=session)
+        report.asked += 1
+        if one.errors:
+            report.errors += one.errors
+            in_a_row += 1
+            say(f"  {date}  ERROR {one.errors[0]}")
+            if in_a_row >= STOP_AFTER_ERRORS:
+                report.stopped = (f"{in_a_row} dates in a row failed, the last {date}; "
+                                  f"rerun with --to {date} once HKJC answers again")
+                break
+            continue
+        in_a_row = 0
+        if one.no_such_day:
+            report.no_trials += 1
+        else:
+            report.trial_days += 1
+            report.runners += one.runners
+            report.unfinished += one.unfinished
+            say(f"  {date}  {one.batches:>2} batches {one.runners:>4} runners")
+        if report.asked % 50 == 0:
+            say(f"  ... {date}: {report.asked} asked, {report.trial_days} trial days, "
+                f"{report.runners} runners")
+    return report
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--date", default=None,
@@ -228,7 +329,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--db", type=Path, default=None)
     ap.add_argument("--limit", type=int, default=6,
                     help="most trial days to fetch in one catch-up run")
+    ap.add_argument("--backfill", metavar="FROM", default=None,
+                    help="YYYY-MM-DD: ask for every date from --to back to FROM that the "
+                         "database holds no trial for (HKJC lists only ~13 months)")
+    ap.add_argument("--to", default=None,
+                    help="YYYY-MM-DD: where --backfill starts (default yesterday)")
     a = ap.parse_args(argv)
+
+    if a.backfill:
+        filled = backfill(a.backfill, a.to, db=a.db, echo=lambda line: print(line, flush=True))
+        print(filled.render())
+        return 0 if filled.ok else 1
 
     if a.date:
         report = scrape(a.date, db=a.db)
