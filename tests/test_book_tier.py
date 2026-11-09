@@ -169,6 +169,40 @@ def test_the_run_an_entry_was_booked_from_is_not_one_of_its_starts(tmp_path):
     assert bt.for_meeting(CARD, conn=conn, with_record=False)[(7, 2)]["starts"] == 2
 
 
+def test_the_tier_carries_the_entrys_own_reason_and_the_run_it_was_booked_off(tmp_path):
+    # Owner, 9 Nov: the EXCUSE chip showed the tier's A/E and never why the
+    # horse was booked. The reason, the tags and the run ride with the tier,
+    # so the chip on every page can say it.
+    path, conn = _db(tmp_path)
+    with transaction(conn):
+        _card(conn)
+        _race(conn, "2026-09-06", 9, [(1, "BOOKED", 6, 12.0), (2, "PLAIN", 4, 8.0)])
+        _entry(conn, "bb_0001", "BOOKED", "2026-09-07", origin="system",
+               tags=["traffic", "final_sectional"], source_date="2026-09-06",
+               source_race_no=9)
+        _entry(conn, "bb_0002", "PLAIN", "2026-05-04", tags=["improvement"])
+        conn.execute("UPDATE blackbook SET reasoning = ? WHERE id = 'bb_0001'",
+                     ('6th of 12, beaten 2L. Stewards: "held up".',))
+        # A legacy entry kept only the typed source race.
+        conn.execute("UPDATE blackbook SET source_race = '2026-05-03 R4', "
+                     "reasoning = '  ' WHERE id = 'bb_0002'")
+    tiers = bt.for_meeting(CARD, conn=conn, with_record=False)
+    sys_ = tiers[(7, 2)]
+    assert sys_["tier"] == "EXCUSE" and sys_["excuse"] == ["traffic"]
+    assert sys_["booking"] == {
+        "origin": "system", "adopted_date": None, "added_date": "2026-09-07",
+        "source_date": "2026-09-06", "source_race_no": 9,
+        "reasoning": '6th of 12, beaten 2L. Stewards: "held up".',
+        "tags": ["final_sectional", "traffic"]}
+    mine = tiers[(7, 3)]
+    assert mine["tier"] == "QUIET"
+    assert mine["booking"]["origin"] == "owner"
+    assert (mine["booking"]["source_date"], mine["booking"]["source_race_no"]) == ("2026-05-03", 4)
+    assert mine["booking"]["reasoning"] is None
+    assert bt.classify(entry=None, starts=0, notes=[], standout=None,
+                       run_note={"note": "y"})["booking"] is None
+
+
 def test_renew_refuses_a_closed_entry_and_an_unadopted_system_one(tmp_path):
     path, conn = _db(tmp_path)
     with transaction(conn):

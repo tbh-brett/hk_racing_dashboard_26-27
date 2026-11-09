@@ -121,7 +121,28 @@ def classify(*, entry: dict | None, starts: int, notes: list[dict],
             "standout": standout, "run_note": run_note if tier == "RUN_NOTE" else None,
             "entry_id": entry["id"] if entry else None,
             "in_book": entry is not None, "starts": starts if entry else None,
-            "excuse": sorted(EXCUSE_TAGS & set(entry["tags"])) if entry else []}
+            "excuse": sorted(EXCUSE_TAGS & set(entry["tags"])) if entry else [],
+            "booking": _booking(entry) if entry else None}
+
+
+def _booking(entry: dict) -> dict[str, Any]:
+    """Why this horse is in the book, for the chip's panel: who booked it, off
+    which run, and the reason as written. The chip's figure is the TIER's
+    record (every runner in it since RECORD_FROM); this is the horse's own
+    case, which the owner asked to see on the chip (9 Nov: "I only see the
+    A/E thing")."""
+    date, race_no = entry.get("source_date"), entry.get("source_race_no")
+    if not date and entry.get("source_race"):
+        # A legacy entry kept only the typed 'YYYY-MM-DD Rn'.
+        head, _, tail = entry["source_race"].strip().partition(" R")
+        if len(head) == 10 and head[4] == "-":
+            date, race_no = head, int(tail) if tail.isdigit() else race_no
+    return {"origin": entry.get("origin") or "owner",
+            "adopted_date": entry.get("adopted_date"),
+            "added_date": entry.get("added_date"),
+            "source_date": date, "source_race_no": race_no,
+            "reasoning": (entry.get("reasoning") or "").strip() or None,
+            "tags": sorted(entry.get("tags") or [])}
 
 
 # --- reading the database ---------------------------------------------------
@@ -166,7 +187,7 @@ def _entries(conn: Connection, names: list[str]) -> dict[str, list[dict]]:
     for r in conn.execute(f"""
             SELECT b.id, b.horse_name, b.added_date, b.renewed_date, b.status,
                    b.closed_date, b.source_date, b.source_race_no, b.origin,
-                   b.adopted_date,
+                   b.adopted_date, b.reasoning, b.source_race,
                    (SELECT group_concat(t.tag) FROM blackbook_tags t
                      WHERE t.id = b.id) tag_csv
             FROM blackbook b WHERE b.horse_name IN ({_marks(len(names))})""", names):

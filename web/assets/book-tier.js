@@ -6,7 +6,7 @@
  * is the only one that reads as an action; the quiet tiers are drawn quiet so
  * a race with five book horses reads as the one or two that matter.
  */
-import { el, compactDate } from './vocab.js';
+import { el, compactDate, tagLabel } from './vocab.js';
 import { recordPanel, daysBetween, hkTime } from './record-panel.js';
 
 const SHORT = { NOTE: 'TRIAL NOTE', STANDOUT: 'STANDOUT', EXCUSE: 'EXCUSE',
@@ -31,9 +31,11 @@ function startsText(t) {
 }
 
 /** The chip on a runner's row. `null` when the runner has no tier.
- *  `who` ("5 LIGHTNING ACE") heads the trial note's panel and `on` (the race
- *  date) is what its age counts to; without them it is headed by the tier
- *  alone and aged to today. */
+ *  `who` ("5 LIGHTNING ACE") heads the chip's panel and `on` (the race date)
+ *  is what its ages count to; without them it is headed by the tier alone and
+ *  aged to today. Every chip opens on the horse's own case — the trial note,
+ *  the booking and its reason, the standout trial, the run note — and the
+ *  tier's record comes last, labelled as the tier's, not the horse's. */
 export function tierChip(t, { who = null, on = null } = {}) {
   if (!t) return null;
   const c = el('span', `bt bt-${t.tier.toLowerCase()}`, SHORT[t.tier] || t.tier);
@@ -41,10 +43,74 @@ export function tierChip(t, { who = null, on = null } = {}) {
     notePanel(c, t, who, on);
     return c;
   }
-  const starts = startsText(t);
-  c.title = `${t.label}: ${DOES[t.tier] || ''}.\n${recordText(t)}`
-    + (starts ? `\n${starts}` : '');
+  const rows = [t.booking ? bookingRow(t, on) : null,
+                t.tier === 'STANDOUT' && t.standout ? standoutRow(t.standout, on) : null,
+                t.tier === 'RUN_NOTE' && t.run_note ? runNoteRow(t.run_note, on) : null]
+    .filter(Boolean);
+  if (!rows.length) {
+    const starts = startsText(t);
+    c.title = `${t.label}: ${DOES[t.tier] || ''}.\n${recordText(t)}`
+      + (starts ? `\n${starts}` : '');
+    return c;
+  }
+  rows[rows.length - 1].lines.push(...tailLines(t));
+  recordPanel(c, `${who ? `${who} · ` : ''}${SHORT[t.tier] || t.tier}`, rows);
   return c;
+}
+
+/** What the tier asks, the starts since booking, and the TIER's record — every
+ *  runner in it since it began, so the A/E reads as the rule's, not the horse's. */
+function tailLines(t) {
+  const tier = t.record?.runs ? `every ${t.label.toLowerCase()} runner ${recordText(t)}`
+    : recordText(t);
+  return [[[DOES[t.tier], startsText(t)].filter(Boolean).join(' · '), 'muted'],
+          [tier, 'muted']];
+}
+
+/** The book entry behind the tier: who booked it, off which run, and why. */
+function bookingRow(t, on) {
+  const b = t.booking;
+  const sys = b.origin === 'system';
+  const from = b.source_date || b.added_date;
+  const who = sys ? (b.adopted_date ? 'SYSTEM BOOK · ADOPTED' : 'SYSTEM BOOK') : 'YOUR BOOK';
+  const lines = [];
+  const excuse = t.excuse ?? [];
+  if (excuse.length) lines.push([`excuse: ${excuse.map(tagLabel).join(', ')}`, 'incident']);
+  const other = (b.tags ?? []).filter((x) => !excuse.includes(x));
+  if (other.length) lines.push([`${excuse.length ? 'also ' : ''}tagged ${other.map(tagLabel).join(', ')}`, 'muted']);
+  if (b.added_date && b.added_date !== from) lines.push([`booked ${compactDate(b.added_date)}`, 'muted']);
+  return {
+    date: compactDate(from),
+    label: b.source_date && b.source_race_no != null ? `${who} · OFF R${b.source_race_no}` : who,
+    tone: t.tier === 'EXCUSE' ? 'incident' : 'muted',
+    age: daysBetween(from, on),
+    body: b.reasoning || 'no reason written on the entry',
+    lines,
+  };
+}
+
+/** The STANDOUT trial since its last run, in HKJC's words. */
+function standoutRow(s, on) {
+  return {
+    date: compactDate(s.trial_date),
+    label: `STANDOUT TRIAL${s.trial_no != null ? ` · BATCH ${s.trial_no}` : ''}`,
+    tone: 'win',
+    age: daysBetween(s.trial_date, on),
+    body: s.comment || null,
+    lines: [],
+  };
+}
+
+/** The owner's note on the horse's last start. */
+function runNoteRow(n, on) {
+  return {
+    date: compactDate(n.race_date),
+    label: `YOUR RUN NOTE${n.race_no != null ? ` · R${n.race_no}` : ''}`,
+    tone: 'muted',
+    age: daysBetween(n.race_date, on),
+    body: `“${n.note}”`,
+    lines: [],
+  };
 }
 
 /** The owner's trial note, in the panel the VET RECORD uses: the trial it is
