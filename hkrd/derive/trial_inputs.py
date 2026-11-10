@@ -33,6 +33,11 @@ What is read, and why:
     tr_at_hv       trialled at Happy Valley.
 Missing is NaN, as everywhere in the model: no trial since the last start, a
 comment that says nothing about effort, a run with no time.
+
+The Speed Map's shape models (model/shape, shape-1.1) read the same trial, for
+where a horse will sit: `tr_early`, `tr_days`, `tr_n` and one more read, the
+comment's word for the break, `tr_break` (1 good, 0 average, -1 slow, -2
+awkward) -- not a model input here, so the fundamental model is unchanged.
 """
 from __future__ import annotations
 
@@ -41,12 +46,14 @@ import re
 import numpy as np
 import pandas as pd
 
-__all__ = ["INPUTS", "WINDOW_DAYS", "reads", "attach", "effort", "finish_words", "venue_of"]
+__all__ = ["INPUTS", "WINDOW_DAYS", "READS", "reads", "attach", "effort", "finish_words",
+           "break_word", "venue_of"]
 
 WINDOW_DAYS = 120
 INPUTS = ["tr_days", "tr_n", "tr_early", "tr_fin", "tr_late_gain", "tr_behind",
           "tr_vs_morning", "tr_effort", "tr_finish", "tr_at_ch", "tr_at_hv"]
-_PER_TRIAL = INPUTS[2:]          # the rest are about the gap to the race
+# What is read off each trial run; the first two inputs are about the gap to the race.
+READS = [*INPUTS[2:], "tr_break"]
 
 
 # ── HKJC's comment: was it asked, and what did it find ────────────────────────
@@ -99,6 +106,32 @@ _FAIR = _rx(("kept on", "stayed on fairly", "ran on fairly", "ran on ok", "ran o
              "came from behind", "hit the front", "kept up"))
 
 
+_BREAK = {
+    -2.0: _rx(("jumped awkwardly", "stumbled", "jumped clumsily", "bounded on jumping", "blundered",
+               "reared", "awkward at start", "awkward start", "began awkwardly", "jumped out",
+               "jumped in", "hit the gate", "bumped at start", "jumped inwards", "jumped outwards",
+               "dived", "propped")),
+    -1.0: _rx(("slightly slow to begin", "slow to begin", "tardy start", "last to begin",
+               "slowly away", "missed the start", "missed the kick", "dwelt", "began slowly",
+               "slow away", "slow start", "slow to jump", "jumped slowly", "slow into stride",
+               "lost ground at start", "lost ground at the start", "tardy")),
+    1.0: _rx(("jumped well", "good early speed", "first to begin", "began well", "began fast",
+              "quickly away", "smartly away", "jumped smartly", "broke well", "jumped fast",
+              "fast to begin", "quick to begin", "quickly into stride", "began quickly",
+              "jumped quickly", "began smartly", "good start", "jumped sharply", "began sharply")),
+    0.0: _rx(("average to begin", "began fairly", "jumped fairly", "began ok", "fair start")),
+}
+
+
+def break_word(comment: object) -> float:
+    """1 a good break, 0 average, -1 slow, -2 awkward, NaN when unstated; an
+    awkward or slow start outranks a good word elsewhere in the comment."""
+    if not isinstance(comment, str):
+        return np.nan
+    low = comment.lower()
+    return next((v for v, rx in _BREAK.items() if rx.search(low)), np.nan)
+
+
 def effort(comment: object) -> float:
     """2 hard ridden, 1 asked, 0 not asked, NaN when the comment says nothing."""
     if not isinstance(comment, str):
@@ -144,7 +177,7 @@ def reads(trials: pd.DataFrame) -> pd.DataFrame:
     (trial_date, trial_no, horse_name, venue, course, distance, finish_time,
     running_positions, comment_text)."""
     if trials.empty:
-        return pd.DataFrame(columns=["horse_name", "trial_date", *_PER_TRIAL])
+        return pd.DataFrame(columns=["horse_name", "trial_date", *READS])
     t = trials.reset_index(drop=True)
     venue = venue_of(t["course"], t["venue"])
     batch = [t["trial_date"], venue, t["trial_no"]]
@@ -170,6 +203,7 @@ def reads(trials: pd.DataFrame) -> pd.DataFrame:
         "tr_finish": t["comment_text"].map(finish_words).astype(float),
         "tr_at_ch": (venue == "CH").astype(float),
         "tr_at_hv": (venue == "HV").astype(float),
+        "tr_break": t["comment_text"].map(break_word).astype(float),
     })
 
 
@@ -180,13 +214,13 @@ def attach(horse: pd.Series, date: pd.Series, prev_date: pd.Series,
     """For each run (or declared runner): the latest trial strictly before
     `date`, after `prev_date` (the horse's previous start, NaT for a debut) and
     within `WINDOW_DAYS`; and how many such trials it had. One row per input
-    row, in its order, with `INPUTS` -- NaN where there was no trial."""
+    row, in its order, with `INPUTS` and `tr_break` -- NaN where there was no trial."""
     ns = "datetime64[ns]"            # one resolution on both sides of every as-of join
     rows = pd.DataFrame({"horse_name": horse.to_numpy(),
                          "date": pd.to_datetime(date).astype(ns).to_numpy(),
                          "prev": pd.to_datetime(prev_date).astype(ns).to_numpy(),
                          "row": np.arange(len(horse))})
-    out = pd.DataFrame(np.nan, index=np.arange(len(horse)), columns=INPUTS)
+    out = pd.DataFrame(np.nan, index=np.arange(len(horse)), columns=["tr_days", "tr_n", *READS])
     if trial_reads.empty or rows.empty:
         return out
     t = trial_reads.assign(trial_date=pd.to_datetime(trial_reads["trial_date"]).astype(ns))
@@ -208,7 +242,7 @@ def attach(horse: pd.Series, date: pd.Series, prev_date: pd.Series,
     latest = latest.set_index("row").sort_index()
     below = floor.set_index("row")["k"].reindex(latest.index).fillna(-1)
     ok = latest["trial_date"].notna() & (latest["trial_date"] > latest["floor"])
-    out.loc[ok.to_numpy(), _PER_TRIAL] = latest.loc[ok, _PER_TRIAL].to_numpy(dtype=float)
+    out.loc[ok.to_numpy(), READS] = latest.loc[ok, READS].to_numpy(dtype=float)
     out.loc[ok.to_numpy(), "tr_days"] = (latest.loc[ok, "date"]
                                          - latest.loc[ok, "trial_date"]).dt.days.to_numpy()
     out.loc[ok.to_numpy(), "tr_n"] = (latest.loc[ok, "k"] - below[ok]).to_numpy(dtype=float)

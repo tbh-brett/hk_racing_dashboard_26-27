@@ -7,9 +7,14 @@ TWO FITS, SO A MEETING COSTS A THIRD OF THE LAB'S. The lab fitted every model th
 five seeds early-stopped on the last settled season to find their rounds, then refitted to date for
 the card, and again to the season before for the check (3 min of two threads on the 25 Oct card).
 Within a season the first and the last never change, so they are fitted once a season and kept as
-'shape-1.0+check-<season before>': each seed's rounds, and boosters that stop at the season before.
+'<version>+check-<season before>': each seed's rounds, and boosters that stop at the season before.
 After each settled meeting only the card models are refitted (to date, with those rounds), and the
 season so far is scored with the kept check boosters -- §6's record, on every fit's rows.
+
+TRIALS. Since shape-1.1 every runner reads its latest barrier trial (model/shape), so like the
+fundamental model's fit this one stands down while the trial archive is short of a season it trains
+on (`fit_gbm.short_of_trials`): fitted on one season of trials, the models would learn that no horse
+before Aug 2025 trialled. A new version also means a new check fit, once.
 
 WHEN. Its own crontab line before dawn, at nice 19, so a fit never shares the CPU with a race
 night's scrape and derive (Fly's baseline is 12.5% of one core; ops/crontab). `--pending` is one
@@ -27,6 +32,7 @@ import lightgbm as lgb
 import pandas as pd
 
 from hkrd.jobs import score_shape
+from hkrd.jobs.fit_gbm import short_of_trials
 from hkrd.model import shape, shape_frame
 from hkrd.store import gbm as gbm_store
 from hkrd.store import job_log
@@ -66,7 +72,7 @@ def history(conn: Connection, *, before: str) -> pd.DataFrame:
     pre-race features."""
     t = shape_frame.build(store.load_runs(conn, before=before))
     t["is_card"] = 0
-    return shape.features(t)
+    return shape.features(t, trials=gbm_store.load_trials(conn, through=before))
 
 
 def pending(db: Path | None = None, *, today: str | None = None) -> bool:
@@ -108,6 +114,10 @@ def run(db: Path | None = None, *, today: str | None = None) -> FitReport:
             report.skipped = gap
             return report
         season = int(shape_frame.season_of(pd.Series(pd.to_datetime([last])))[0])
+        missing = short_of_trials(conn, season)
+        if missing:
+            report.skipped = missing
+            return report
         hist = history(conn, before=_day_after(last))
         if not ({season - 1, season - 2} <= set(hist.season.unique())):
             report.skipped = f"not enough history to fit: it needs settled runs in {season - 2} and {season - 1}"

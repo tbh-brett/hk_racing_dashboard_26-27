@@ -159,6 +159,42 @@ Uphill out of the bend after the post and downhill into the home turn are in the
 which are HV races' own sectionals. Sha Tin and the AWT are the lab's to the byte: the engine's 64
 Sha Tin replays are identical to the lab engine's (tests/test_shape_engine.py).
 
+## Trials (10 Nov, `shape-1.1`)
+
+The early model learned only from horses with a race habit (`hab_early`), so a debutant's first-call
+position was extrapolated from its draw and its field. Since the trial archive was backfilled to May
+2019 (docs/gbm.md, "The model reads trials") every runner also reads its latest barrier trial since
+its last start, on an earlier day than the race: where it sat at the trial's first call (`tr_early`),
+HKJC's word for its break (`tr_break`), days since it, how many trials, and how many of today's rivals
+led their own (`tr_rivals_led`). The early model now learns from debutants with a trial too. The
+lab's inputs stay as `shape.LAB_RUNNER`: the live shape-1.0 boosters go on scoring under this code
+(`predict` reads each booster's own inputs) until a shape-1.1 fit replaces them, and the lab parity
+check fits on them.
+
+Measured walk-forward on a scratch copy of the 29 Oct production database with the trials loaded,
+both versions fitted exactly as `fit_shape` fits its check models (rounds by early stopping on the
+season before, trained to it), first-call position error in places:
+
+| | 2024-25 shape-1.0 | 2024-25 shape-1.1 | 2025-26 shape-1.0 | 2025-26 shape-1.1 |
+|---|---|---|---|---|
+| debut, with a trial (546 / 499 runners) | 5.01 | 2.52 | 4.41 | 2.66 |
+| first-up, with a trial (1,130 / 1,219) | 2.20 | 2.11 | 2.33 | 2.24 |
+| between runs, with a trial (2,355 / 2,349) | 2.27 | 2.17 | 2.31 | 2.23 |
+| no trial since the last start (6,305 / 6,725) | 2.18 | 2.18 | 2.22 | 2.22 |
+| every runner | 2.36 | 2.19 | 2.35 | 2.24 |
+
+Who leads: the top pick led 39.0% to 39.3% (2024-25) and 40.9% to 41.0% (2025-26); the leader's log
+loss 1.811 to 1.767 and 1.778 to 1.745.
+
+And `fit_shape` itself on the same copy (207 s, check models included), its record on 26/27 to 28 Oct
+(1,689 runners, 147 races): first call off 2.129 places against shape-1.0's 2.174 and the Speed Map
+ladder's 2.301 (z 6.92, was 5.56); its top pick led 42.9% of races against 39.5% and the ladder's
+27.9%.
+
+After the deploy the 04:10 `fit_shape --pending` fits shape-1.1 once a meeting has settled (its check
+models as well, once: about twice a normal fit), or run it by hand at nice 19. Like the fundamental
+model's fit it stands down while the trial archive is short of a season it trains on.
+
 ## Not built (separate tickets, or on hold)
 
 The 2D replay of run races and Brett's marking grid (`run_marks`, `race_reads`) — on hold. The

@@ -19,6 +19,7 @@ import os
 import sys
 from pathlib import Path
 
+import lightgbm as lgb
 import numpy as np
 import pandas as pd
 import pytest
@@ -26,6 +27,9 @@ import pytest
 from hkrd.model import shape, sim_tables
 
 ROOT = Path(__file__).resolve().parent.parent
+# The trial table with nothing in it: the lab's inputs, and these small frames, have no trials.
+NO_TRIALS = pd.DataFrame(columns=["trial_date", "trial_no", "horse_name", "venue", "course",
+                                  "distance", "finish_time", "running_positions", "comment_text"])
 FIX = Path(__file__).parent / "fixtures" / "shape"
 LAB = ROOT / "claude" / "tools"
 PULL = ROOT / "hkrd-fly.db"
@@ -92,8 +96,8 @@ def _frame(n_meetings: int = 4) -> pd.DataFrame:
 def test_a_run_appended_after_a_race_leaves_its_features_byte_identical() -> None:
     d = _frame()
     early = d[d.race_date < "2026-09-28"]
-    a = shape.features(early)
-    b = shape.features(d)
+    a = shape.features(early, trials=NO_TRIALS)
+    b = shape.features(d, trials=NO_TRIALS)
     b = b[b.race_date < "2026-09-28"].reset_index(drop=True)
     pd.testing.assert_frame_equal(a[shape.RUNNER].reset_index(drop=True), b[shape.RUNNER], check_exact=True)
 
@@ -101,14 +105,66 @@ def test_a_run_appended_after_a_race_leaves_its_features_byte_identical() -> Non
 def test_a_riders_same_day_rides_never_move_his_forwardness() -> None:
     d = _frame()
     last = d.race_date.max()
-    a = shape.features(d)
+    a = shape.features(d, trials=NO_TRIALS)
     moved = d.copy()
     moved.loc[(moved.race_date == last) & (moved.race_no == 1), "early_frac"] = 0.0
-    b = shape.features(moved)
+    b = shape.features(moved, trials=NO_TRIALS)
     key = ["race_id", "horse_no"]
     fa = a[a.race_date == last].set_index(key).rider_fwd
     fb = b[b.race_date == last].set_index(key).rider_fwd
     pd.testing.assert_series_equal(fa, fb)
+
+
+# ── trials (shape-1.1): the latest one since the last start, earlier days only ────────────────
+def _trial(date: str, horse: str, pos: str, comment: str = "Ran on well.") -> dict:
+    return dict(trial_date=date, trial_no=1, horse_name=horse, venue="ST", course="SHA TIN TURF",
+                distance=1000, finish_time=58.0, running_positions=pos, comment_text=comment)
+
+
+def test_a_trial_reaches_the_next_race_only_and_rivals_that_led_theirs_are_counted() -> None:
+    d = _frame()
+    first, second = sorted(d.race_date.unique())[:2]
+    horses = d[(d.race_date == second) & (d.race_no == 1)].horse_name.tolist()
+    trials = pd.DataFrame([_trial("2026-09-10", horses[0], "1 1 2", "Jumped well; led."),
+                           _trial("2026-09-10", horses[1], "1 2 2"),
+                           _trial(second, horses[2], "1 1 1")])            # on the race day: unseen
+    f = shape.features(d, trials=trials).set_index(["race_date", "race_no", "horse_name"])
+    row = f.loc[(second, 1, horses[0])]
+    assert row.tr_early == 0 and row.tr_break == 1 and row.tr_days == 4 and row.tr_n == 1
+    assert row.tr_rivals_led == 1                       # horses[1] led its trial too
+    assert np.isnan(f.loc[(second, 1, horses[2]), "tr_early"])
+    assert f.loc[(second, 1, horses[3]), "tr_rivals_led"] == 2
+    # nothing before the trial, and the earlier meetings' rows do not move
+    before = f.loc[f.index.get_level_values(0) == first, shape.TRIAL_RUNNER[:4]]
+    assert before.isna().all().all()
+    plain = shape.features(d[d.race_date == first], trials=trials)
+    pd.testing.assert_frame_equal(plain[shape.RUNNER].reset_index(drop=True),
+                                  shape.features(d, trials=trials).query("race_date == @first")[shape.RUNNER]
+                                  .reset_index(drop=True), check_exact=True)
+
+
+def test_the_early_model_learns_from_a_debutant_with_a_trial_and_the_labs_did_not() -> None:
+    d = shape.features(_frame(), trials=pd.DataFrame([_trial("2026-09-01", "H3", "4 4 4")]))
+    deb = d[d.hab_early.isna() & d.early_frac.notna() & d.tr_early.notna()]
+    assert len(deb)
+    assert set(deb.index) <= set(shape._rows(d, "early").index)
+    assert not set(deb.index) & set(shape._rows(d, "early", shape.LAB_RUNNER).index)
+
+
+def test_a_fit_on_the_labs_inputs_still_scores_under_the_new_inputs() -> None:
+    """The switch: the live shape-1.0 boosters score cards until a shape-1.1 fit replaces them."""
+    rng = np.random.default_rng(1)
+    n, field = 400, 8
+    X = pd.DataFrame(rng.random((n, len(shape.RUNNER))), columns=shape.RUNNER)
+    X["vsd"], X["course"] = "ST_Turf_1200", "A"
+    X["race_id"] = np.repeat([f"r{i:03d}" for i in range(n // field)], field)
+    X["race_date"], X["race_no"] = "2026-09-07", 1
+    X["horse_no"] = np.tile(np.arange(1, field + 1), n // field)
+    old = lgb.train(dict(objective="regression", verbose=-1, num_threads=1),
+                    lgb.Dataset(shape._prep(X, shape.LAB_RUNNER), label=rng.random(n)), 5)
+    got = shape.predict({k: [old] for k in shape.KINDS}, X)
+    assert len(got) == n and got.pred_early.between(0, 1).all()
+    assert old.feature_name() == shape.LAB_RUNNER
 
 
 # ── §11.2: against the lab, on its own inputs ─────────────────────────────────────────────────
@@ -171,9 +227,12 @@ def test_the_shape_models_are_the_labs_on_its_inputs(lab_trip: pd.DataFrame) -> 
     c.close()
     t = lab_trip.copy()
     t["is_card"] = 0
-    ex = shape.features(pd.concat([t, shape.card_rows(card)], ignore_index=True, sort=False))
+    ex = shape.features(pd.concat([t, shape.card_rows(card)], ignore_index=True, sort=False),
+                        trials=NO_TRIALS)
     hist, C = ex[ex.is_card == 0], ex[ex.is_card == 1]
-    boosters = {k: shape.fit_final(hist, k, shape.fit_rounds(hist, k, season=2026), train_to=2026) for k in shape.KINDS}
+    lab = shape.LAB_RUNNER                                      # the lab's inputs, shape-1.0
+    boosters = {k: shape.fit_final(hist, k, shape.fit_rounds(hist, k, season=2026, inputs=lab),
+                                   train_to=2026, inputs=lab) for k in shape.KINDS}
     P = shape.predict(boosters, C)
     lab = pd.read_csv(LAB / "race-shape-2d" / "out" / "card_2026-10-25_lanes.csv")
     m = P.merge(lab, on=["race_no", "horse_no"], suffixes=("", "_lab"))

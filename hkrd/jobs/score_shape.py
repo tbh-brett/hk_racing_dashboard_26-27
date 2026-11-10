@@ -30,8 +30,10 @@ from hkrd.store.connect import Connection, get_conn, init_db
 
 __all__ = ["score", "score_pending", "main", "ScoreReport"]
 
+# the latest trial before the day is a fact the models read (shape-1.1): a trial stored after the
+# card was scored scores it again
 _FACTS = ("race_no", "horse_no", "horse_name", "draw", "jockey", "gear", "venue", "surface",
-          "course", "distance", "race_class")
+          "course", "distance", "race_class", "last_trial")
 
 
 @dataclass
@@ -71,7 +73,8 @@ def _score(conn: Connection, date: str, report: ScoreReport) -> None:
         return
     t = shape_frame.build(store.load_runs(conn, before=date))
     t["is_card"] = 0
-    ex = shape.features(pd.concat([t, shape.card_rows(card)], ignore_index=True, sort=False))
+    ex = shape.features(pd.concat([t, shape.card_rows(card)], ignore_index=True, sort=False),
+                        trials=gbm_store.load_trials(conn, through=date))
     C = ex[ex.is_card == 1]
     models = store.shape_models(conn, version)               # twenty boosters: only when scoring
     boosters = {k: [lgb.Booster(model_str=s) for s in models[k]["model_text"]] for k in shape.KINDS}

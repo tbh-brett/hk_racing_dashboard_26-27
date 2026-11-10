@@ -16,6 +16,16 @@ The settle model beats the Speed Map on 26/27 (first-call position off by 2.17 p
 model's to make (§13.10). The lane and cover models learn from the Comments on Running, so they inherit
 its selection: a lane is written down when it was notable.
 
+TRIALS (shape-1.1, Nov 2026). The early model learned only from horses with a race habit, so a
+debutant's first-call position was a guess from its draw and its field. Every runner now also reads
+its latest barrier trial since its last start (`derive/trial_inputs`): where it sat at the trial's
+first call, the comment's word for its break, how many days ago and how many trials, and how many
+of today's rivals led their own. The early model learns from a debutant with a trial as well. In
+the 9 Nov study a trial cut debutants' first-call error by ~0.27 places of 2.8 and first-up
+runners' by ~0.1, in both directions of an era split; docs/racesim.md has this code's measurement.
+The lab's inputs stay as `LAB_RUNNER`: a model fitted on them is still scored on them (`predict`
+reads each booster's own inputs), and the parity check fits on them.
+
 Pure: frames in, boosters and predictions out. LightGBM is imported here and by the jobs that fit and
 score; never in a request.
 """
@@ -28,10 +38,12 @@ import lightgbm as lgb
 import numpy as np
 import pandas as pd
 
-__all__ = ["VERSION", "KINDS", "SEEDS", "RUNNER", "features", "card_rows", "fit_rounds", "fit_final",
-           "predict", "checks", "first_time_gear"]
+from hkrd.derive import trial_inputs
 
-VERSION = "shape-1.0"
+__all__ = ["VERSION", "KINDS", "SEEDS", "RUNNER", "LAB_RUNNER", "TRIAL_RUNNER", "features",
+           "card_rows", "fit_rounds", "fit_final", "predict", "checks", "first_time_gear"]
+
+VERSION = "shape-1.1"           # 1.1: the latest trial (TRIAL_RUNNER), Nov 2026
 KINDS = ("early", "lead", "lane", "nocover")
 SEEDS = (7, 11, 23, 42, 99)
 FIRST_SEASON = 2020
@@ -43,11 +55,15 @@ LEAD = dict(learning_rate=0.03, num_leaves=15, min_data_in_leaf=200, feature_fra
 REG = dict(learning_rate=0.03, num_leaves=31, min_data_in_leaf=200, feature_fraction=0.8,
            bagging_fraction=0.8, bagging_freq=1, lambda_l2=10.0, verbose=-1, num_threads=2)
 
-RUNNER = ["hab_early", "hab_mid", "l1_early_frac", "l1_mid_frac", "hab_wide3_pre", "hab_nocover_pre",
-          "hab_rail_pre", "hab_stated", "hab_lane", "hab_slow", "n_prior", "days_since", "dist_change",
-          "gear_first", "gear_bv_first", "gear_removed", "rider_fwd", "j_n", "ndraw", "draw", "field",
-          "early_rank", "n_leaders", "n_onpace", "best_rival_early", "quicker_inside", "race_hab_mean",
-          "race_top2_early", "cls_num", "vsd", "course"]
+LAB_RUNNER = ["hab_early", "hab_mid", "l1_early_frac", "l1_mid_frac", "hab_wide3_pre",
+              "hab_nocover_pre", "hab_rail_pre", "hab_stated", "hab_lane", "hab_slow", "n_prior",
+              "days_since", "dist_change", "gear_first", "gear_bv_first", "gear_removed", "rider_fwd",
+              "j_n", "ndraw", "draw", "field", "early_rank", "n_leaders", "n_onpace",
+              "best_rival_early", "quicker_inside", "race_hab_mean", "race_top2_early", "cls_num",
+              "vsd", "course"]
+# The latest trial since the last start, after the lab's inputs so theirs keep their positions.
+TRIAL_RUNNER = ["tr_early", "tr_break", "tr_days", "tr_n", "tr_rivals_led"]
+RUNNER = LAB_RUNNER + TRIAL_RUNNER
 
 
 # ── features: previous meetings only ──────────────────────────────────────────────────────────
@@ -78,11 +94,17 @@ def card_rows(card: pd.DataFrame) -> pd.DataFrame:
     return c
 
 
-def features(trip: pd.DataFrame) -> pd.DataFrame:
+def features(trip: pd.DataFrame, *, trials: pd.DataFrame) -> pd.DataFrame:
     """Every row's pre-race inputs. `trip`: the trip frame (model/shape_frame), with any card rows
-    appended (`is_card` 1, no result)."""
+    appended (`is_card` 1, no result). `trials`: the barrier trial table (`store/gbm.load_trials`;
+    an empty frame for none) -- required, so no caller can forget it and read every horse as one
+    that never trialled."""
     d = trip.sort_values(["horse_name", "date", "race_no"]).copy()
     g = d.groupby("horse_name", sort=False)
+    # the latest trial since the previous start, on an earlier day than the race
+    tri = trial_inputs.attach(d.horse_name, d.date, g.date.shift(1), trial_inputs.reads(trials))
+    for c in ("tr_early", "tr_break", "tr_days", "tr_n"):
+        d[c] = tri[c].to_numpy()
     d["n_prior"] = g.cumcount()
     d["days_since"] = (d.date - g.date.shift(1)).dt.days
     d["dist_change"] = d.dist - g.dist.shift(1)
@@ -137,6 +159,8 @@ def features(trip: pd.DataFrame) -> pd.DataFrame:
     d["quicker_inside"] = d.groupby(key, group_keys=False)[["hab_early", "draw"]].apply(inside)
     d["race_hab_mean"] = d.groupby(key).hab_early.transform("mean")
     d["race_top2_early"] = d.groupby(key).hab_early.transform(lambda s: s.nsmallest(2).mean())
+    trial_led = (d.tr_early == 0).astype(float)
+    d["tr_rivals_led"] = trial_led.groupby([d.race_date, d.race_no]).transform("sum") - trial_led
     d["course"] = d.course.fillna("?").astype(str)
     d["vsd"] = (d.vs.astype(str) + "_" + d.distance.astype(int).astype(str)).astype(str)
     d["cls_num"] = d.race_class.map(lambda c: float(c) if str(c) in {"1", "2", "3", "4", "5"} else 0.0)
@@ -167,8 +191,8 @@ class _Groups:
         return -np.add.reduceat(y * np.log(np.clip(p, 1e-12, 1)), self.starts)
 
 
-def _prep(df: pd.DataFrame) -> pd.DataFrame:
-    X = df[RUNNER].copy()
+def _prep(df: pd.DataFrame, inputs: Sequence[str] | None = None) -> pd.DataFrame:
+    X = df[list(inputs or RUNNER)].copy()
     for c in CATEGORICAL:
         if c in X:
             X[c] = X[c].astype("category")
@@ -196,54 +220,69 @@ _SPEC = {  # kind: (target, objective, which runs it learns from)
 }
 
 
-def _rows(hist: pd.DataFrame, kind: str) -> pd.DataFrame:
-    return hist[_SPEC[kind][2](hist)]
+def _rows(hist: pd.DataFrame, kind: str, inputs: Sequence[str] | None = None) -> pd.DataFrame:
+    keep = _SPEC[kind][2](hist)
+    if kind == "early" and "tr_early" in (inputs or RUNNER):
+        # a debutant has no habit, but its trial says where it sits: it is learnt from too
+        keep = keep | (hist.early_frac.notna() & hist.tr_early.notna())
+    return hist[keep]
 
 
-def _train(kind: str, seed: int, tr: pd.DataFrame, rounds: int, va: pd.DataFrame | None = None) -> lgb.Booster:
+def _train(kind: str, seed: int, tr: pd.DataFrame, rounds: int, va: pd.DataFrame | None = None,
+           inputs: Sequence[str] | None = None) -> lgb.Booster:
     target, objective, _ = _SPEC[kind]
-    dtr = lgb.Dataset(_prep(tr), label=tr[target].values, free_raw_data=False)
+    dtr = lgb.Dataset(_prep(tr, inputs), label=tr[target].values, free_raw_data=False)
     kw: dict = {}
     if kind == "lead":
         params = {**LEAD, "seed": seed, "objective": _softmax_objective(_Groups(tr.race_id.values), tr[target].values)}
         if va is not None:
-            kw = dict(valid_sets=[lgb.Dataset(_prep(va), label=va[target].values, reference=dtr)],
+            kw = dict(valid_sets=[lgb.Dataset(_prep(va, inputs), label=va[target].values, reference=dtr)],
                       feval=_race_nll(_Groups(va.race_id.values), va[target].values),
                       callbacks=[lgb.early_stopping(150, verbose=False)])
     else:
         params = {**REG, "objective": objective, "seed": seed}
         if va is not None:
-            kw = dict(valid_sets=[lgb.Dataset(_prep(va), label=va[target].values)],
+            kw = dict(valid_sets=[lgb.Dataset(_prep(va, inputs), label=va[target].values)],
                       callbacks=[lgb.early_stopping(150, verbose=False)])
     return lgb.train(params, dtr, rounds, **kw)
 
 
-def fit_rounds(hist: pd.DataFrame, kind: str, *, season: int) -> list[int]:
-    """Each seed's rounds: early stopping on season - 1, trained on 2020/21 to season - 2, x1.1."""
-    d = _rows(hist, kind)
+def fit_rounds(hist: pd.DataFrame, kind: str, *, season: int,
+               inputs: Sequence[str] | None = None) -> list[int]:
+    """Each seed's rounds: early stopping on season - 1, trained on 2020/21 to season - 2, x1.1.
+    `inputs` defaults to `RUNNER`; `LAB_RUNNER` is the lab's (shape-1.0)."""
+    d = _rows(hist, kind, inputs)
     itr = d[(d.season >= FIRST_SEASON) & (d.season <= season - 2)]
     iva = d[d.season == season - 1]
-    return [max(50, int(_train(kind, sd, itr, 3000, iva).best_iteration * 1.1)) for sd in SEEDS]
+    return [max(50, int(_train(kind, sd, itr, 3000, iva, inputs).best_iteration * 1.1)) for sd in SEEDS]
 
 
-def fit_final(hist: pd.DataFrame, kind: str, rounds: Sequence[int], *, train_to: int) -> list[lgb.Booster]:
+def fit_final(hist: pd.DataFrame, kind: str, rounds: Sequence[int], *, train_to: int,
+              inputs: Sequence[str] | None = None) -> list[lgb.Booster]:
     """One booster per seed on every season from 2020/21 to `train_to`."""
-    d = _rows(hist, kind)
+    d = _rows(hist, kind, inputs)
     tr = d[(d.season >= FIRST_SEASON) & (d.season <= train_to)]
-    return [_train(kind, sd, tr, n) for sd, n in zip(SEEDS, rounds)]
+    return [_train(kind, sd, tr, n, inputs=inputs) for sd, n in zip(SEEDS, rounds)]
 
 
 def predict(boosters: dict[str, list[lgb.Booster]], rows: pd.DataFrame) -> pd.DataFrame:
-    """pred_early, p_lead, exp_lane, p_nocover for `rows` (sorted by race, then horse)."""
+    """pred_early, p_lead, exp_lane, p_nocover for `rows` (sorted by race, then horse). Each booster
+    reads the inputs it was trained on, so a shape-1.0 fit still scores under shape-1.1's code."""
     D = rows.sort_values(["race_id", "horse_no"])
-    X = _prep(D)
+    mats: dict[tuple[str, ...], pd.DataFrame] = {}
+
+    def x(m: lgb.Booster) -> pd.DataFrame:
+        names = tuple(m.feature_name())
+        if names not in mats:
+            mats[names] = _prep(D, names)
+        return mats[names]
     out = D[["race_date", "race_no", "horse_no", "race_id"]].copy()
-    out["pred_early"] = np.mean([m.predict(X) for m in boosters["early"]], axis=0).clip(0, 1)
+    out["pred_early"] = np.mean([m.predict(x(m)) for m in boosters["early"]], axis=0).clip(0, 1)
     g = _Groups(D.race_id.values)
-    out["p_lead"] = np.mean([g.softmax(m.predict(X, raw_score=True)) for m in boosters["lead"]], axis=0)
+    out["p_lead"] = np.mean([g.softmax(m.predict(x(m), raw_score=True)) for m in boosters["lead"]], axis=0)
     out["p_lead"] = out.p_lead / out.groupby("race_id").p_lead.transform("sum")
-    out["exp_lane"] = np.mean([m.predict(X) for m in boosters["lane"]], axis=0).clip(1, 4)
-    out["p_nocover"] = np.mean([m.predict(X) for m in boosters["nocover"]], axis=0)
+    out["exp_lane"] = np.mean([m.predict(x(m)) for m in boosters["lane"]], axis=0).clip(1, 4)
+    out["p_nocover"] = np.mean([m.predict(x(m)) for m in boosters["nocover"]], axis=0)
     return out
 
 

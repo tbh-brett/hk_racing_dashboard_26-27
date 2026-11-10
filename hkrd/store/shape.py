@@ -128,11 +128,14 @@ def trip_gap(conn: Connection, *, before: str) -> str | None:
 
 
 def card_runs(conn: Connection, date: str) -> pd.DataFrame:
-    """A stored card's declared runners as the shape models read them (a scratching is not in it)."""
+    """A stored card's declared runners as the shape models read them (a scratching is not in it),
+    each with the date of its latest trial before the day: part of what a score is keyed on."""
     return pd.read_sql("""
         SELECT u.race_date, u.race_no, u.horse_no, u.horse_name, u.draw, u.jockey, u.trainer,
                u.gear, u.actual_weight, u.rating, a.venue, a.course, a.surface, a.going, a.distance,
-               a.race_class, a.race_name, a.off_time
+               a.race_class, a.race_name, a.off_time,
+               (SELECT max(t.trial_date) FROM trials t
+                 WHERE t.horse_name = u.horse_name AND t.trial_date < u.race_date) AS last_trial
           FROM runners u JOIN races a USING (race_date, race_no)
          WHERE u.race_date = ? AND coalesce(u.place_code, '') NOT LIKE 'W%'
          ORDER BY u.race_no, u.horse_no""", conn, params=(date,))
