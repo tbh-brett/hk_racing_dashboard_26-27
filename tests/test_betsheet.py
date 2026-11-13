@@ -1,9 +1,9 @@
 """The bet sheet — importing the spreadsheet the betting is planned in.
 
-The HKJC statement is the bookie's record: it exists only after the meeting,
-covers one account, and settles. This is the other half. It is kept alongside
-the betting, it covers both accounts, and it is the only place an all-up exists
-before the ticket is struck.
+The HKJC statement is the bookie's record of Brett's account: it exists only
+after the meeting, and settles. This is the other half: Kelvin's book, kept in a
+spreadsheet, and the only record of his tickets there is — so it settles them
+too, from its own Return and P/L.
 
 The fixture is the owner's own sheet for 2026-09-06, unedited. Its four
 tickets are the whole of the check, because each one states a total that this
@@ -148,11 +148,23 @@ def test_horses_become_numbers_and_the_banker_stays_the_banker(db):
 
 def test_a_name_the_card_never_heard_of_is_reported_not_guessed(db):
     """A fuzzy match is how a bet ends up recorded against the wrong horse,
-    and nothing downstream would ever show it."""
+    and nothing downstream would ever show it. The horse is left out; the
+    ticket is not, because its stake is money that moved."""
     text = _text().replace("SUPER STRONG KID", "SUPER STRONK KID")
     report = import_betsheet.run_text(text, name="sheet.csv", db=db)
     assert any("SUPER STRONK KID" in u for u in report.unmatched)
-    assert report.tickets == 2, "the two tickets naming it are not written"
+    assert report.tickets == 4, "a typo must not take a ticket out of the ledger"
+    assert report.disagreements == [], "a short ticket is not a second fault"
+    conn = get_conn(db)
+    try:
+        horses = {r["horse_no"] for r in conn.execute(
+            "SELECT horse_no FROM bet_selections WHERE race_no = 10")}
+        stake = conn.execute("SELECT stake FROM bets WHERE race_no = 10"
+                             ).fetchone()["stake"]
+    finally:
+        conn.close()
+    assert 8 not in horses                            # nothing guessed for it
+    assert stake == 1600.0
 
 
 def test_a_stake_that_disagrees_with_the_structure_is_named(db):
@@ -191,3 +203,143 @@ def test_a_meeting_with_no_card_is_an_error_not_a_silent_drop(db):
     report = import_betsheet.run_text(text, name="sheet.csv", db=db)
     assert report.tickets == 0
     assert any("no card stored" in e for e in report.errors)
+
+
+# ─── whose book, and what it returned ────────────────────────────────────────
+
+def _rows(db, sql: str, args: tuple = ()) -> list[dict]:
+    conn = get_conn(db)
+    try:
+        return [dict(r) for r in conn.execute(sql, args)]
+    finally:
+        conn.close()
+
+
+def test_a_sheet_is_kelvins_book_when_nobody_says(db):
+    """The file decides the ledger. 13 Nov 2026: eleven of Kelvin's tickets
+    sat in Brett's because the page's filter chose for it."""
+    report = import_betsheet.run_text(_text(), name="sheet.csv", db=db)
+    assert report.account == "kelvin"
+    assert {r["account"] for r in _rows(db, "SELECT account FROM bets")} \
+        == {"kelvin"}
+
+
+def test_re_importing_moves_a_ticket_filed_under_the_wrong_book(db):
+    import_betsheet.run(FIXTURE, db=db, account="brett")
+    again = import_betsheet.run(FIXTURE, db=db)
+    assert again.new_tickets == 0
+    assert {r["account"] for r in _rows(db, "SELECT account FROM bets")} \
+        == {"kelvin"}
+
+
+_SETTLED = _text().replace(
+    "Stakes per bet,Total stakes", "Stakes per bet,Total stakes,Return,P/L"
+).replace(",200,4000", ",200,4000,9150,5150"
+).replace(",300,2400\n3,", ",300,2400,,-2400\n3,")
+
+
+def test_the_sheets_return_settles_the_ticket(db):
+    """No statement covers Kelvin's account; the sheet's own columns do."""
+    report = import_betsheet.run_text(_SETTLED, name="sheet.csv", db=db)
+    assert report.settled == 2 and report.disagreements == []
+    rows = {r["bet_type"] + str(r["race_no"]): r for r in _rows(
+        db, "SELECT bet_type, race_no, returned, pnl, status, hit, "
+            "settle_method FROM bets")}
+    chain = rows["ALLUP_3x4None"]
+    assert (chain["returned"], chain["pnl"], chain["status"], chain["hit"]) \
+        == (9150.0, 5150.0, "settled", 1)
+    assert chain["settle_method"] == "bet_sheet"
+    lost = rows["QQP_BANKER5"]                      # P/L only: a loss
+    assert (lost["returned"], lost["pnl"], lost["hit"]) == (0.0, -2400.0, 0)
+    assert rows["QQP_BANKER8"]["status"] == "open"  # neither column written
+
+
+def test_a_result_some_other_source_settled_is_not_overwritten(db):
+    import_betsheet.run_text(_text(), name="sheet.csv", db=db)
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.execute("UPDATE bets SET status = 'settled', returned = 77, "
+                     "pnl = -3923, hit = 1, settle_method = 'manual' "
+                     "WHERE bet_type = 'ALLUP_3x4'")
+    conn.close()
+    import_betsheet.run_text(_SETTLED, name="sheet.csv", db=db)
+    row = _rows(db, "SELECT returned FROM bets WHERE bet_type = 'ALLUP_3x4'")
+    assert row[0]["returned"] == 77.0
+
+
+def _six_up_card(db, date: str) -> None:
+    conn = get_conn(db)
+    with transaction(conn):
+        upsert.upsert_races(conn, [
+            {"race_date": date, "race_no": r, "venue": "HV", "course": "A",
+             "surface": "Turf", "going": "G", "distance": 1200}
+            for r in range(3, 9)])
+        upsert.upsert_runners(conn, [
+            {"race_date": date, "race_no": r, "horse_no": n,
+             "horse_name": f"HORSE {r}{n}"}
+            for r in range(3, 9) for n in range(1, 4)])
+    conn.close()
+
+
+def test_a_six_up_is_its_own_pool_and_costs_the_product_of_its_legs(db):
+    _six_up_card(db, "2026-09-16")
+    rows = ["Bet no,Date,Race,Bet Type,Banker,Leg 1,Leg 2,Leg 3,"
+            "Stakes per bet,Total stakes,Return,P/L"]
+    for r in range(3, 9):
+        picks = [f"HORSE {r}{n}" for n in range(1, 4 if r < 5 else 2)]
+        money = ",2,18,955.5,937.5" if r == 8 else ",,,,"
+        rows.append(f"7,9/16/2026,{r},SIX UP,," + ",".join(
+            picks + [""] * (3 - len(picks))) + money)
+    report = import_betsheet.run_text("\n".join(rows), name="s.csv", db=db)
+    assert report.disagreements == [] and report.skipped == []
+    bet = _rows(db, "SELECT bet_type, race_no, stake, returned FROM bets")[0]
+    # 3 x 3 x 1 x 1 x 1 x 1 = 9 lines at $2: the $18 the sheet says
+    assert (bet["bet_type"], bet["race_no"], bet["stake"], bet["returned"]) \
+        == ("SIXUP", None, 18.0, 955.5)
+    legs = _rows(db, "SELECT DISTINCT leg_no FROM bet_selections")
+    assert sorted(l["leg_no"] for l in legs) == [1, 2, 3, 4, 5, 6]
+
+
+def test_a_ticket_with_no_race_numbers_keeps_its_money(db):
+    """8 Nov 2026 was written with the Race column empty on every row."""
+    text = _SETTLED.replace("1,9/6/2026,5,", "1,9/6/2026,,") \
+                   .replace("1,9/6/2026,8,", "1,9/6/2026,,") \
+                   .replace("1,9/6/2026,10,", "1,9/6/2026,,")
+    report = import_betsheet.run_text(text, name="sheet.csv", db=db)
+    assert sum("no race number" in s for s in report.skipped) == 3
+    chain = _rows(db, "SELECT stake, returned FROM bets "
+                      "WHERE bet_type = 'ALLUP_3x4'")
+    assert chain == [{"stake": 4000.0, "returned": 9150.0}]
+
+
+def test_a_leg_whose_pool_is_not_named_keeps_the_ticket(db):
+    text = _text().replace("All-Up,3x4,WP", "All-Up,3x4,")
+    report = import_betsheet.run_text(text, name="sheet.csv", db=db)
+    assert any("not a pool this ledger knows" in s for s in report.skipped)
+    assert report.tickets == 4
+
+
+def test_the_upload_route_files_by_kind_and_ignores_the_pages_filter(
+        db, monkeypatch):
+    """The filter said BRETT; the file is Kelvin's sheet, so it is Kelvin's."""
+    import json
+
+    from hkrd.api.routes.jobs import import_bets_job
+
+    monkeypatch.setenv("HKRD_DB", str(db))
+    out = import_bets_job({"text": _text(), "name": "Bets with Kelvin.csv",
+                           "account": "brett"})
+    body = json.loads(out.body)
+    assert (body["kind"], body["account"]) == ("bet sheet", "kelvin")
+    assert {r["account"] for r in _rows(db, "SELECT account FROM bets")} \
+        == {"kelvin"}
+
+
+def test_q_on_the_sheet_is_the_quinella(db):
+    """21 Oct 2026, bet 17: `Q` banker with four at $300 is $1,200."""
+    text = _text().replace("4,9/6/2026,10,QQP,", "4,9/6/2026,10,Q,") \
+                  .replace(",200,1600", ",300,1200")
+    report = import_betsheet.run_text(text, name="sheet.csv", db=db)
+    assert report.skipped == [] and report.disagreements == []
+    assert _rows(db, "SELECT stake FROM bets WHERE bet_type = 'QIN_BANKER'") \
+        == [{"stake": 1200.0}]

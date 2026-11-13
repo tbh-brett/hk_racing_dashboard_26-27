@@ -2,12 +2,12 @@
 
 The HKJC statement in `ingest/statement.py` is the record of what was actually
 struck, and it is authoritative about money. It is also only available AFTER the
-meeting, and it is one account's. The sheet is the other half: it is kept
-alongside the betting, it covers both accounts, and it is where a chain is
-worked out before the ticket is placed.
+meeting, and it is Brett's account's. The sheet is the other half: it is the
+book kept with Kelvin, for the tickets struck in Kelvin's account, which no
+statement here ever covers — so it is also where those tickets are settled.
 
     Bet no,Date,Race,Bet Type,All-Up Structure,All-Up bet type,Banker,
-    Leg 1,...,Leg 5,Stakes per bet,Total stakes
+    Leg 1,...,Leg 8,Stakes per bet,Total stakes,Return,P/L,Note
 
 ONE BET IS SEVERAL ROWS. An all-up carries one row per race, sharing a bet
 number, and the stake sits on the last of them — so rows are grouped by
@@ -21,9 +21,13 @@ columns hold that leg's own selections. Nothing here guesses which: the row's
 
 WHAT IS NOT PARSED HERE. Horse numbers, because the sheet has names and the
 numbers are a fact about the card — resolving them needs the database and
-belongs in the job. And settlement, because the sheet has no return column: a
-bet imported from it is open until a statement or a dividend settles it, which
-is the same state a bet typed into the dashboard starts in.
+belongs in the job. `Return` and `P/L` are read as they are written, on
+whichever row of the ticket carries them; deciding what they settle is the
+job's.
+
+A ROW WITH NO RACE NUMBER is reported and contributes no leg, but its money is
+still read: a ticket whose every row lacks a race is still a stake and a
+result, and dropping it would leave the ledger a ticket short.
 
 The sheet's own `Total stakes` is kept and CHECKED rather than trusted. The
 combination arithmetic in `query/tickets` reproduces it exactly on every row of
@@ -54,6 +58,7 @@ COLUMNS = {
     "bet type": "bet_type", "all-up structure": "structure",
     "all-up bet type": "leg_type", "banker": "banker",
     "stakes per bet": "unit_stake", "total stakes": "total_stake",
+    "return": "returned", "p/l": "pnl",
 }
 
 _LEG = re.compile(r"^leg\s*(\d+)$", re.I)
@@ -146,14 +151,15 @@ def parse_text(text: str, *, source: str = "sheet") -> SheetParse:
                 "source": source, "bet_no": bet_no, "race_date": date,
                 "bet_type": (cell.get("bet_type") or "").strip().upper(),
                 "structure": (cell.get("structure") or "").strip() or None,
-                "unit_stake": None, "total_stake": None, "legs": [],
+                "unit_stake": None, "total_stake": None,
+                "returned": None, "pnl": None, "legs": [],
             }
             order.append(key)
 
-        # The stake sits on whichever row of the group carries it — the last
+        # The money sits on whichever row of the group carries it — the last
         # one, in the file this was written against. Taken from any row, so a
         # sheet that puts it on the first is read the same way.
-        for money_key in ("unit_stake", "total_stake"):
+        for money_key in ("unit_stake", "total_stake", "returned", "pnl"):
             found = _money(cell.get(money_key))
             if found is not None:
                 ticket[money_key] = found
@@ -178,5 +184,6 @@ def parse_text(text: str, *, source: str = "sheet") -> SheetParse:
             "banker": banker, "selections": picks, "line": n,
         })
 
-    out.tickets = [grouped[k] for k in order if grouped[k]["legs"]]
+    out.tickets = [grouped[k] for k in order
+                   if grouped[k]["legs"] or grouped[k]["total_stake"]]
     return out

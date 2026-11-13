@@ -173,13 +173,17 @@ def rebuild_et_job(window_months: int = 24) -> JSONResponse:
 
 # ── importing what was bet ──────────────────────────────────────────────────
 # Two files say what was staked and they are not interchangeable. The HKJC
-# statement is the bookie's record: it exists only after the meeting, covers
-# one account, and settles. The bet sheet is the spreadsheet the betting is
-# planned in: it exists before the meeting, covers both accounts, and is where
-# an all-up is worked out. One button takes either, because from the user's
-# side there is one question — "put this file in the ledger" — and being made
-# to say which kind of file it is would be the interface asking a question it
-# can answer itself.
+# statement is the bookie's record of Brett's account: it exists only after the
+# meeting and settles. The bet sheet is Kelvin's book, kept in a spreadsheet,
+# settled by its own Return column. One button takes either, because from the
+# user's side there is one question — "put this file in the ledger" — and being
+# made to say which kind of file it is would be the interface asking a question
+# it can answer itself.
+#
+# WHOSE LEDGER follows from the same answer, and from nothing else. It used to
+# follow the page's account filter, so a sheet uploaded with the filter on both
+# accounts landed in Brett's: on 13 Nov 2026 eleven of Kelvin's tickets were in
+# Brett's ledger and Kelvin's read empty.
 
 def _looks_like_a_sheet(name: str, text: str) -> bool:
     """A bet sheet, rather than an HKJC statement.
@@ -207,7 +211,8 @@ def import_bets_job(body: dict = Body(...)) -> JSONResponse:
     """
     from hkrd.jobs import import_betsheet, import_statement
 
-    account = body.get("account") or import_statement.DEFAULT_ACCOUNT
+    # Each importer's own default IS the owner of that kind of file, so none
+    # is passed: an `account` in the body is ignored rather than trusted.
     name = str(body.get("name") or "upload")
     text = body.get("text")
 
@@ -220,10 +225,8 @@ def import_bets_job(body: dict = Body(...)) -> JSONResponse:
         if not str(text).strip():
             raise HTTPException(400, "the uploaded file is empty")
         sheet = _looks_like_a_sheet(name, str(text))
-        report = (import_betsheet.run_text(str(text), name=name, account=account)
-                  if sheet else
-                  import_statement.run_text(str(text), name=name,
-                                            account=account))
+        report = (import_betsheet.run_text(str(text), name=name) if sheet
+                  else import_statement.run_text(str(text), name=name))
     else:
         src = Path(body.get("path", "")).expanduser()
         if not src.exists():
@@ -233,13 +236,15 @@ def import_bets_job(body: dict = Body(...)) -> JSONResponse:
         # neither reads the other's files.
         sheet = not src.is_dir() and _looks_like_a_sheet(
             src.name, src.read_text(encoding="utf-8-sig", errors="replace"))
-        report = (import_betsheet.run(src, account=account) if sheet
-                  else import_statement.run(src, account=account))
+        report = (import_betsheet.run(src) if sheet
+                  else import_statement.run(src))
 
     if isinstance(report, import_betsheet.SheetImportReport):
         payload = {
-            "kind": "bet sheet", "files": report.files,
+            "kind": "bet sheet", "account": report.account,
+            "files": report.files,
             "bets": report.tickets, "new_bets": report.new_tickets,
+            "settled": report.settled,
             "selections": report.selections, "cash_movements": 0,
             # Named separately because they mean different things: a horse the
             # card has never heard of is a name to fix, a stake that disagrees
@@ -250,7 +255,8 @@ def import_bets_job(body: dict = Body(...)) -> JSONResponse:
         }
     else:
         payload = {
-            "kind": "statement", "files": report.files, "bets": report.bets,
+            "kind": "statement", "account": import_statement.DEFAULT_ACCOUNT,
+            "files": report.files, "bets": report.bets,
             "new_bets": report.new_bets, "selections": report.selections,
             "cash_movements": report.cash_movements,
             "unparsed": report.unparsed, "errors": report.errors,

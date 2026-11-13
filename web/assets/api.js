@@ -94,8 +94,8 @@ export const api = {
   /* A statement, uploaded as TEXT. The dashboard runs on a machine in
    * Singapore and the file is downloaded on whichever device is to hand, so
    * the older `path` form is a route only the server can use. */
-  importStatementText: (text, name, account) => post('/jobs/import-statement',
-    { text, name, ...(account ? { account } : {}) }),
+  importStatementText: (text, name) => post('/jobs/import-statement',
+    { text, name }),
   betsAnchor: (qs) => get(`/bets/anchor${qs}`),
   meetings: (limit = 50) => get(`/meetings?limit=${limit}`),
   meeting: (date) => get(`/meeting/${date}`),

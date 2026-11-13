@@ -114,11 +114,11 @@ function renderViewToggle() {
 
 /* IMPORT WHAT WAS BET, from the browser.
  *
- * Two files, one button. The HKJC statement (.txt) is the bookie's record and
- * exists only after the meeting; the bet sheet (.csv) is the spreadsheet the
- * betting is planned in, covers both accounts, and is where an all-up is
- * worked out. The server tells them apart from their own first lines, so the
- * interface does not ask a question it can answer itself.
+ * Two files, one button. The HKJC statement (.txt) is the bookie's record of
+ * Brett's account; the bet sheet (.csv) is Kelvin's book. The server tells
+ * them apart from their own first lines, and the kind of file decides the
+ * ledger it goes into — the account filter above does not, because a sheet
+ * uploaded with it on BOTH once filed Kelvin's tickets under Brett.
  *
  * The file is read here and its TEXT is posted, because the server is in
  * Singapore and the download is on whatever device is to hand — the older
@@ -147,12 +147,12 @@ function importButton() {
     out.textContent = `reading ${file.name}…`;
     try {
       const text = await file.text();
-      // Whichever account the ledger is filtered to owns the import; with
-      // BOTH selected the server's default applies and says so in the result.
-      const r = await api.importStatementText(text, file.name, state.account);
-      const bits = [`${r.kind ?? 'file'}`,
+      const r = await api.importStatementText(text, file.name);
+      // Said every time, because it is the server's call and not the filter's.
+      const bits = [`${r.kind ?? 'file'} → ${(r.account ?? '?').toUpperCase()}`,
                     `${r.new_bets} new of ${r.bets} bets`,
                     `${r.selections} selections`];
+      if (r.settled) bits.push(`${r.settled} settled`);
       if (r.cash_movements) bits.push(`${r.cash_movements} cash`);
       out.textContent = bits.join(' · ');
       if (r.unparsed?.length) {

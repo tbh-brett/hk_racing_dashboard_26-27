@@ -1,22 +1,28 @@
-"""Import the bet sheet — the spreadsheet the betting is planned in.
+"""Import the bet sheet — Kelvin's book, kept in a spreadsheet.
 
     python -m hkrd.jobs.import_betsheet --src "Bets with Kelvin 26_27.csv"
-    python -m hkrd.jobs.import_betsheet --src sheets/ --account kelvin
 
-The statement import is the record of what the bookie settled. This is the
-record of what was INTENDED, kept in a spreadsheet alongside the betting, and
-it is the only place an all-up exists before the meeting. Both write into one
-ledger, and a bet that appears in both is one bet: the statement carries the
-bookie's reference and settles it, this one carries the sheet's own bet number
-and does not pretend to.
+WHOSE BOOK. Every ticket on the sheet was struck in Kelvin's account, and every
+HKJC statement imported here is Brett's. So the FILE decides the ledger, never
+the page's account filter: on 13 Nov 2026 eleven of Kelvin's tickets sat in
+Brett's ledger because the sheet was uploaded with the filter on both accounts,
+and Kelvin's ledger read empty.
 
-TWO THINGS THIS DOES THAT THE PARSER CANNOT.
+SETTLED FROM THE SHEET. No statement ever covers Kelvin's account, so the
+sheet's own `Return` and `P/L` are the settlement. A ticket with neither stays
+open. One a statement has already settled is never reopened or re-settled by
+the plan it was struck from.
+
+THREE THINGS THIS DOES THAT THE PARSER CANNOT.
 
 Horse names become numbers. The sheet names horses because that is what a
 person writes down; `bet_selections` stores numbers because that is what joins
 to a card. A name with no runner row is reported, never guessed at — a fuzzy
 match on a horse name is how a bet ends up recorded against the wrong horse,
-and nothing downstream would ever show it.
+and nothing downstream would ever show it. But the TICKET is still written,
+without that horse: its stake and its return are money that moved, and a typo
+in one cell must not take the whole ticket out of the ledger. (13 Nov 2026:
+twelve of 24 tickets, $95,000 staked, were missing for exactly that.)
 
 The arithmetic is checked. `query/tickets` computes what the ticket costs from
 its own structure, and the sheet states a total. On the file this was written
@@ -25,17 +31,22 @@ QQP legs and one WP leg make 20 lines rather than the 4 the formula code names.
 Where they disagree the sheet's figure is what is stored — it is what was
 actually staked — and the disagreement is reported, because it means one of the
 two has the ticket wrong.
+
+A Six Up is a pool of its own, not an all-up: one pick set per race over six
+races, and its lines are the product of the six counts.
 """
 from __future__ import annotations
 
-# Whose book an import belongs to when nobody says — the same default the
-# statement import uses, and one of the two accounts `query/prebet.ACCOUNTS`
-# knows. An unlabelled import must never land in a third account no page shows.
-DEFAULT_ACCOUNT = "brett"
+# Whose book a sheet is: Kelvin's, the other of the two accounts
+# `query/prebet.ACCOUNTS` knows. `--account` exists for a test database and
+# nothing else; the upload route never passes the page's filter here.
+DEFAULT_ACCOUNT = "kelvin"
 
 import argparse
 import hashlib
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from math import prod
 from pathlib import Path
 from typing import Any
 
@@ -54,17 +65,20 @@ class SheetImportReport:
     files: int = 0
     tickets: int = 0
     new_tickets: int = 0
+    settled: int = 0
     selections: int = 0
     left_deleted: int = 0
+    account: str = DEFAULT_ACCOUNT
     unmatched: list[str] = field(default_factory=list)
     disagreements: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
     def render(self) -> str:
-        lines = [f"  files read         {self.files:>6}",
+        lines = [f"  account            {self.account:>6}",
+                 f"  files read         {self.files:>6}",
                  f"  tickets            {self.tickets:>6}   "
-                 f"({self.new_tickets} new)",
+                 f"({self.new_tickets} new, {self.settled} settled)",
                  f"  selections         {self.selections:>6}"]
         if self.left_deleted:
             lines.append(f"  left deleted       {self.left_deleted:>6}   "
@@ -104,6 +118,12 @@ def _kind(raw: str) -> str:
     text = str(raw or "").strip().upper().replace(" ", "")
     if text in ("ALLUP", "ALL-UP", "ALL_UP", "CHAIN"):
         return "ALLUP"
+    if text in ("SIXUP", "SIX-UP", "SIX_UP", "6UP"):
+        return "SIXUP"
+    if text in ("Q", "QIN", "QUINELLA"):
+        return "QIN"
+    if text in ("QP", "QPL"):
+        return "QPL"
     if text in ("W", "WIN"):
         return "WIN"
     if text in ("P", "PLACE"):
@@ -112,10 +132,15 @@ def _kind(raw: str) -> str:
 
 
 def _resolve(ticket: dict, card: dict, report: SheetImportReport
-             ) -> list[dict[str, Any]] | None:
-    """Legs with numbered horses, or None if any horse could not be found."""
+             ) -> tuple[list[dict[str, Any]], bool]:
+    """Legs with numbered horses, and whether every cell was read.
+
+    A horse the card does not know is left out of its leg and reported; the
+    ticket keeps the rest. So does a leg whose pool is not named — it keeps its
+    horses and costs nothing the arithmetic can check.
+    """
     out: list[dict[str, Any]] = []
-    ok = True
+    whole = True
     for leg in ticket["legs"]:
         race_no = leg["race_no"]
         picks: list[int] = []
@@ -124,8 +149,9 @@ def _resolve(ticket: dict, card: dict, report: SheetImportReport
             if found is None:
                 report.unmatched.append(
                     f"{ticket['source']} line {leg['line']}: {name} is not a "
-                    f"declared runner in {ticket['race_date']} R{race_no}")
-                ok = False
+                    f"declared runner in {ticket['race_date']} R{race_no} — "
+                    f"left out of bet {ticket['bet_no']}")
+                whole = False
                 continue
             picks.append(found)
         banker = None
@@ -135,18 +161,20 @@ def _resolve(ticket: dict, card: dict, report: SheetImportReport
                 report.unmatched.append(
                     f"{ticket['source']} line {leg['line']}: banker "
                     f"{leg['banker']} is not a declared runner in "
-                    f"{ticket['race_date']} R{race_no}")
-                ok = False
+                    f"{ticket['race_date']} R{race_no} — left out of bet "
+                    f"{ticket['bet_no']}")
+                whole = False
         kind = _kind(leg["bet_type"])
-        if kind not in SINGLE_RACE_TYPES:
+        if kind not in SINGLE_RACE_TYPES and kind != "SIXUP":
             report.skipped.append(
                 f"{ticket['source']} line {leg['line']}: {leg['bet_type']!r} "
-                f"is not a pool this ledger knows")
-            ok = False
-            continue
+                f"is not a pool this ledger knows — bet {ticket['bet_no']} "
+                f"kept, its cost not checked")
+            whole = False
+            kind = None
         out.append({"race_no": race_no, "bet_type": kind,
                     "banker": banker, "selections": picks})
-    return out if ok else None
+    return out, whole
 
 
 def _outlay(ticket: dict, legs: list[dict]) -> tuple[float | None, str | None]:
@@ -157,6 +185,11 @@ def _outlay(ticket: dict, legs: list[dict]) -> tuple[float | None, str | None]:
     See `query/tickets`.
     """
     unit = ticket.get("unit_stake")
+    if not legs or any(l["bet_type"] is None for l in legs):
+        return None, None
+    if _kind(ticket["bet_type"]) == "SIXUP":
+        lines = prod(len(l["selections"]) for l in legs) if len(legs) == 6 else 0
+        return (lines * unit if unit and lines else None), None
     per_leg = [combination_count(l["bet_type"], len(l["selections"]),
                                  has_banker=l["banker"] is not None)
                for l in legs]
@@ -175,7 +208,31 @@ def _stored_type(ticket: dict, legs: list[dict], formula: str | None) -> str:
     kind = _kind(ticket["bet_type"])
     if kind == "ALLUP":
         return f"ALLUP_{formula or ticket.get('structure') or 'X'}"
+    if kind == "SIXUP":
+        return kind
     return f"{kind}_BANKER" if legs and legs[0]["banker"] is not None else kind
+
+
+def _settlement(ticket: dict, stake: float, report: SheetImportReport
+                ) -> tuple[float, float] | None:
+    """(returned, pnl) from the sheet's own columns, or None while open.
+
+    `Return` is the money; `P/L` stands in for it only where `Return` is blank,
+    which the sheet does on a ticket that lost. Where both are written and do
+    not agree with the stake, `Return` is kept and the gap reported.
+    """
+    returned, pnl = ticket.get("returned"), ticket.get("pnl")
+    if returned is None and pnl is None:
+        return None
+    if returned is None:
+        returned = stake + pnl
+    elif pnl is not None and abs(returned - stake - pnl) > 0.01:
+        report.disagreements.append(
+            f"{ticket['source']}: bet {ticket['bet_no']} on "
+            f"{ticket['race_date']} — stake ${stake:,.0f} and return "
+            f"${returned:,.0f} make P/L ${returned - stake:,.0f}, the sheet "
+            f"says ${pnl:,.0f}. Stored from the return.")
+    return float(returned), float(returned - stake)
 
 
 def _selection_rows(bet_id: str, legs: list[dict], *, all_up: bool
@@ -213,8 +270,9 @@ def run_text(text: str, *, name: str = "upload", db: Path | None = None,
 
 def _run(files: list[tuple[str, str]], *, db: Path | None = None,
          account: str = DEFAULT_ACCOUNT) -> SheetImportReport:
-    report = SheetImportReport()
+    report = SheetImportReport(account=account.lower())
     conn = get_conn(db if db is not None else db_path())
+    stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
     try:
         init_db(conn)
         cards: dict[str, dict] = {}
@@ -239,11 +297,11 @@ def _run(files: list[tuple[str, str]], *, db: Path | None = None,
                         f"{name}: no card stored for {date} — scrape the "
                         f"meeting before importing bets on it")
                     continue
-                legs = _resolve(ticket, card, report)
-                if legs is None:
-                    continue
+                legs, whole = _resolve(ticket, card, report)
 
-                all_up = _kind(ticket["bet_type"]) == "ALLUP"
+                # A chain spans races, so it has no race of its own and its
+                # legs are numbered.
+                multi = _kind(ticket["bet_type"]) in ("ALLUP", "SIXUP")
                 computed, formula = _outlay(ticket, legs)
                 stake = ticket.get("total_stake")
                 if stake is None:
@@ -252,14 +310,17 @@ def _run(files: list[tuple[str, str]], *, db: Path | None = None,
                     report.skipped.append(
                         f"{name}: bet {ticket['bet_no']} on {date} has no stake")
                     continue
-                if computed is not None and abs(computed - stake) > 0.01:
+                # A ticket with a horse left out costs less than the sheet
+                # says by construction, and that is already reported.
+                if whole and computed is not None \
+                        and abs(computed - stake) > 0.01:
                     report.disagreements.append(
                         f"{name}: bet {ticket['bet_no']} on {date} — the sheet "
                         f"says ${stake:,.0f}, the structure "
                         f"({formula or _stored_type(ticket, legs, None)}, legs "
-                        f"of {', '.join(str(combination_count(l['bet_type'], len(l['selections']), has_banker=l['banker'] is not None)) for l in legs)}) "
-                        f"comes to ${computed:,.0f}. Stored at the sheet's "
-                        f"figure — it is what was staked.")
+                        f"of {_leg_counts(legs)}) comes to ${computed:,.0f}. "
+                        f"Stored at the sheet's figure — it is what was "
+                        f"staked.")
 
                 bet_id = _bet_id(ticket)
                 # A sheet's ids are deterministic -- date and bet number -- so
@@ -268,13 +329,21 @@ def _run(files: list[tuple[str, str]], *, db: Path | None = None,
                 if bet_id in dead_ids:
                     report.left_deleted += 1
                     continue
+                settled = _settlement(ticket, float(stake), report)
+                returned, pnl = settled if settled else (None, None)
+                report.settled += settled is not None
                 bets.append((
-                    bet_id, account.lower(), date,
-                    _venue(conn, date), None if all_up else legs[0]["race_no"],
+                    bet_id, account.lower(), date, _venue(conn, date),
+                    None if multi or not legs else legs[0]["race_no"],
                     _stored_type(ticket, legs, formula), formula,
                     float(stake),
-                    f"Imported from bet sheet {name} (bet {ticket['bet_no']})."))
-                sels += _selection_rows(bet_id, legs, all_up=all_up)
+                    f"Imported from bet sheet {name} (bet {ticket['bet_no']}).",
+                    returned, pnl,
+                    "settled" if settled else "open",
+                    None if settled is None else int(returned > 0),
+                    "bet_sheet" if settled else None,
+                    stamp if settled else None))
+                sels += _selection_rows(bet_id, legs, all_up=multi)
 
         before = conn.execute("SELECT count(*) FROM bets").fetchone()[0]
         with transaction(conn):
@@ -282,17 +351,23 @@ def _run(files: list[tuple[str, str]], *, db: Path | None = None,
                 "INSERT INTO bets (bet_id, account, race_date, venue, race_no, "
                 "bet_type, all_up_formula, stake, notes, returned, pnl, status, "
                 "hit, settle_method, placed_at, settled_at, source) "
-                "VALUES (?,?,?,?,?,?,?,?,?, NULL, NULL, 'open', NULL, NULL, "
-                "  NULL, NULL, 'bet_sheet') "
-                # A re-import of a corrected sheet updates the ticket. It never
-                # touches settlement: the sheet has no return column, and a
-                # bet the statement has already settled must not be reopened
-                # by the plan it was struck from.
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, NULL, ?, 'bet_sheet') "
+                # A re-import of a corrected sheet updates the ticket, and its
+                # result where the sheet now has one. A result some other
+                # source settled (a statement, a hand edit) is never touched,
+                # and a sheet with the result cell emptied reopens nothing.
                 "ON CONFLICT (bet_id) DO UPDATE SET "
                 "account = excluded.account, race_no = excluded.race_no, "
                 "bet_type = excluded.bet_type, "
                 "all_up_formula = excluded.all_up_formula, "
-                "stake = excluded.stake, notes = excluded.notes", bets)
+                "stake = excluded.stake, notes = excluded.notes, "
+                + ", ".join(
+                    f"{col} = CASE WHEN excluded.status = 'settled' AND "
+                    f"coalesce(bets.settle_method, 'bet_sheet') = 'bet_sheet' "
+                    f"THEN excluded.{col} ELSE bets.{col} END"
+                    for col in ("returned", "pnl", "hit", "settled_at",
+                                "settle_method", "status")),
+                bets)
             conn.executemany(
                 "INSERT INTO bet_selections (bet_id, race_no, horse_no, "
                 "leg_no, is_banker) VALUES (?,?,?,?,?) "
@@ -305,6 +380,14 @@ def _run(files: list[tuple[str, str]], *, db: Path | None = None,
     finally:
         conn.close()
     return report
+
+
+def _leg_counts(legs: list[dict]) -> str:
+    return ", ".join(
+        str(len(l["selections"]) if l["bet_type"] == "SIXUP" else
+            combination_count(l["bet_type"], len(l["selections"]),
+                              has_banker=l["banker"] is not None))
+        for l in legs)
 
 
 def _venue(conn, date: str) -> str | None:
