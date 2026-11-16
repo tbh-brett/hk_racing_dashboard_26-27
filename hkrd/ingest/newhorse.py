@@ -154,11 +154,32 @@ def _sales(text: str) -> list[dict[str, Any]]:
     return out
 
 
-def _about(comments_html: str, name: str) -> str:
-    """The paragraphs about this horse — not the ones about its sire."""
-    first = name.split()[0]
-    paras = [_text(p) for p in re.split(r"</?p\s*/?>", comments_html)]
-    return " ".join(p for p in paras if p and first in p.upper())
+def _about(comments_html: str, name: str, sire: str | None = None) -> str:
+    """The paragraphs about this horse — not the ones about its sire.
+
+    The section usually opens with a paragraph on the sire's own career and
+    then turns to the horse. That first paragraph opens on the sire's name,
+    and it is skipped. Every other paragraph is kept if it names the horse as
+    whole words: its full name, or its first word when that is three letters
+    or more. This used to be "the first word anywhere in the paragraph". OUR
+    BOLD CHOICE then took FROSTED's career, because "OUR" sits inside other
+    words, and BLUE ILLUSION took BLUE POINT's (11 wins from 20, Charlie
+    Appleby). The sire's 6 wins from 19 starts were read as the horse's
+    overseas record. That happened on 51 of 617 profiles (16 Nov 2026)."""
+    upper = name.upper()
+    words = rf"(?<![A-Z0-9'’]){{}}(?![A-Z0-9])"
+    full = re.compile(words.format(re.escape(upper)))
+    first = upper.split()[0]
+    short = re.compile(words.format(re.escape(first))) if len(first) >= 3 else None
+    sire_up = (sire or "").strip().upper()
+    keep = []
+    for p in (_text(p) for p in re.split(r"</?p\s*/?>", comments_html)):
+        up = p.upper()
+        if not p or (sire_up and up.startswith(sire_up) and not up.startswith(upper)):
+            continue
+        if full.search(up) or (short and short.search(up)):
+            keep.append(p)
+    return " ".join(keep)
 
 
 def _trainer(s: str) -> str | None:
@@ -199,7 +220,9 @@ def parse(html: str, entry: Mapping[str, Any]) -> dict[str, Any]:
     imp = re.search(r"IMPORT TYPE:\s*([A-Z]+)", html)
     if not imp:
         raise NewHorseError(f"{name}: profile has no import type")
-    about = _about(_section(html, "COMMENTS AND PROSPECT:"), name)
+    sire = re.search(r"PEDIGREE:.*?<td[^>]*>([^<(]+?)\s*\(", html, re.S)
+    about = _about(_section(html, "COMMENTS AND PROSPECT:"), name,
+                   sire.group(1).strip() if sire else None)
     sales = _sales(_text(_section(html, "SALES HISTORY:")))
     sold = [s for s in sales if s["sold"] and s["aud"]]
     best = max(sold, key=lambda s: s["aud"]) if sold else None
@@ -215,7 +238,6 @@ def parse(html: str, entry: Mapping[str, Any]) -> dict[str, Any]:
     kept = re.search(rf"(?:trained by|yard)[^.]*?\b({places})\b", about)
     country = kept.group(1) if kept else next(
         (c for c in _COUNTRIES if re.search(rf"\b{c}\b", about)), None)
-    sire = re.search(r"PEDIGREE:.*?<td[^>]*>([^<(]+?)\s*\(", html, re.S)
     dam = re.search(r"DAM:\s*<br />\s*([^<]+?)\s*</td>", html)
     starters = re.search(r"NO\. OF STARTERS:\s*<br />\s*(\d+)", html)
     winners = re.search(r"NO\. OF WINNERS:\s*<br />\s*(\d+)", html)

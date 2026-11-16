@@ -77,6 +77,8 @@ def test_a_profile_that_names_no_trip_for_the_horse_says_nothing(about):
 #   N  a profile with no trip.         X  no profile.
 #   1 Oct, 1400 m: S won at 4.0, M 2nd at 2.0, X 3rd; place paid 18 / 12 / 14.
 #   20 Nov, 1600 m (after the test starts): M won, S 4th; no dividends stored.
+#     The first time either has run 1600 m+ here.
+#   25 Nov, 1650 m: M won again, S 2nd. Both had run 1600 m+ here before.
 
 ABOUT = {"S": "The bay gelding should be most suited over 1600M or farther.",
          "M": "The chestnut should be fine to handle up to mile.",
@@ -91,9 +93,11 @@ def db(tmp_path) -> Path:
     with transaction(conn):
         upsert.upsert_races(conn, [
             {"race_date": "2026-10-01", "race_no": 1, "venue": "ST", "distance": 1400},
-            {"race_date": "2026-11-20", "race_no": 1, "venue": "ST", "distance": 1600}])
+            {"race_date": "2026-11-20", "race_no": 1, "venue": "ST", "distance": 1600},
+            {"race_date": "2026-11-25", "race_no": 1, "venue": "HV", "distance": 1650}])
         field = {"2026-10-01": [("S", "1", 4.0), ("M", "2", 2.0), ("X", "3", 3.0)],
-                 "2026-11-20": [("S", "4", 5.0), ("M", "1", 2.5), ("X", "2", 2.0)]}
+                 "2026-11-20": [("S", "4", 5.0), ("M", "1", 2.5), ("X", "2", 2.0)],
+                 "2026-11-25": [("S", "2", 3.0), ("M", "1", 2.0), ("X", "3", 4.0)]}
         upsert.upsert_runners(conn, [
             {"race_date": d, "race_no": 1, "horse_no": i + 1, "horse_name": h,
              "place": pl, "win_odds": o}
@@ -148,10 +152,20 @@ def test_the_record_scores_the_verdict_by_run_date_win_and_place_apart(db):
     assert s["ae"] == round(1 / ((1 / 4.0) / (1 / 4 + 1 / 2 + 1 / 3)), 2)
     assert (s["paid_runs"], s["place_return"]) == (1, 1.8)
     assert eras["origin"][("miler", short)]["place_return"] == 1.2
-    # 20 Nov is a test run; no dividends stored, so no place return rather than a loss.
+    # 20 and 25 Nov are test runs; no dividends stored, so no place return
+    # rather than a loss.
     t = eras["test"][("stayer", long_)]
-    assert (t["runs"], t["won"], t["paid_runs"], t["place_return"]) == (1, 0, 0, None)
-    assert eras["test"][("miler", long_)]["won"] == 1
+    assert (t["runs"], t["won"], t["placed"], t["paid_runs"], t["place_return"]) == (2, 0, 1, 0, None)
+    assert eras["test"][("miler", long_)]["won"] == 2
+    # Each long run is also counted once under whether the horse had been
+    # that far here before: 20 Nov was the first time for both, 25 Nov not.
+    first, again = "first time at 1600 m+ here", "had run 1600 m+ here"
+    assert (eras["test"][("stayer", first)]["runs"], eras["test"][("stayer", again)]["runs"]) == (1, 1)
+    assert eras["test"][("stayer", again)]["placed"] == 1
+    assert eras["test"][("miler", first)]["won"] == 1 and eras["test"][("miler", again)]["won"] == 1
+    assert eras["test"][("stayer", first)]["sub"] and not t["sub"]
+    test_era = next(e for e in rec["eras"] if e["key"] == "test")
+    assert test_era["runs"] == 4          # the split rows are not counted twice
     # The horse with no profile is not scored; N never ran.
     assert all(x["horses"] <= 1 for e in eras.values() for x in e.values())
 

@@ -114,9 +114,11 @@ function renderVerdictRecord(host, d) {
   box.append(head);
   if (!era.lines.length) box.append(el('div', 'bf-rec-note', 'No runs yet.'));
   era.lines.forEach((x) => {
-    const row = el('div', 'bf-rec-row bf-vdrow');
+    // The 1600 m+ line is split under itself by whether the horse had already
+    // run that far here: when its own HK form takes over is for the test to say.
+    const row = el('div', `bf-rec-row bf-vdrow${x.sub ? ' sub' : ''}`);
     const src = el('span', 'c c-src');
-    src.append(el('span', 'gn', `${x.verdict.toUpperCase()} · ${x.trip}`));
+    src.append(el('span', 'gn', x.sub ? `└ ${x.trip}` : `${x.verdict.toUpperCase()} · ${x.trip}`));
     const won = el('span', 'c c-won', `${x.won}/${x.runs}`);
     won.append(el('span', 'p', ` ${pct(x.won, x.runs)}`));
     won.title = `the closing prices expected ${x.expected}`;
@@ -135,5 +137,7 @@ function renderVerdictRecord(host, d) {
                   : 'These runs came after the idea was formed: they are its test. '}`
                 + 'PLACE $1 is what a $1 place bet returned at the tote; the takeout makes about 0.82 '
                 + 'the norm. A horse counts under the trip of each race it ran, so one horse can sit '
-                + 'in both rows. The verdict is the contractor’s sentence read by rule.'));
+                + 'in more than one row. Under each 1600 m+ line, its runs split by whether the horse '
+                + 'had already run 1600 m+ here — whether its own HK form makes the profile redundant. '
+                + 'The verdict is the contractor’s sentence read by rule.'));
 }

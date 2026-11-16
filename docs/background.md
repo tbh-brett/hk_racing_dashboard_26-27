@@ -117,4 +117,34 @@ It skips clauses about the dam, the sire's other runners or a race already run.
   $1 to place. Unlike the agent record, it is split by **run date**: the idea
   was formed on every run to 16 Nov, so the runs from 17 Nov are the test,
   whoever the horse.
+- **When HK form takes over** is left to the test. Each 1600 m+ line splits
+  into the horse's first time at 1600 m+ here and runs after it has been that
+  far. To 16 Nov, stayers on a first try won 5 where the price expected 3.9,
+  and stayers that had already run there won 36 where it expected 25.0. Both
+  are too few to set a cut-off, so the chip shows at any start.
 - **Not in the Screen or the model** until the test has something to say.
+
+## The sire's paragraph (fixed 16 Nov 2026)
+
+The comments section usually opens with a paragraph on the SIRE's career. The
+reader kept every paragraph containing the horse's first word anywhere, so it
+also kept the sire's whenever the two shared that word, or the word sat inside
+another one. 51 of 617 stored profiles were affected, 45 of them with an
+overseas record that was the sire's:
+
+- BLUE ILLUSION took BLUE POINT's 11 wins from 20 and Charlie Appleby.
+- JUSTIFY YOURSELF, never raced, took Justify's 6 from 6 and Bob Baffert.
+- EVER LUCK and CAP LINER were credited to James Harron Bloodstock, who owned
+  their sire Capitalist.
+
+Only one trip reading was affected (BLUE LIGHTNING). `ingest/newhorse._about`
+now skips the paragraph that opens on the sire's name and matches the horse's
+name as whole words. Checked on 113 live pages: all 51 affected changed, and
+61 of the other 62 read exactly as before. The other one, OUR BOLD CHOICE,
+had the same fault and had not been stored yet.
+
+**The stored rows stay wrong until they are read again.** After deploying,
+run this once on the server (about 720 pages, roughly 15 minutes at the
+courtesy rate):
+
+    nice -n 19 python -m hkrd.jobs.scrape_background --refresh

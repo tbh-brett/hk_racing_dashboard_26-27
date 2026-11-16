@@ -76,6 +76,47 @@ def test_a_trial_won_is_read(fx):
     assert parsed(fx, "FAITHFUL WARRIOR")["trial_won"] is True
 
 
+def page(sire: str, *paras: str) -> str:
+    """A profile cut to what `parse` reads: its sire, then its comments, the
+    sire's career first, as HKJC lays them out."""
+    return ("<h6>IMPORT TYPE: PP</h6><h6>PEDIGREE:</h6><table><tr>"
+            f"<td>{sire} (USA)</td></tr></table><h6>COMMENTS AND PROSPECT:</h6><p>"
+            + "".join(f"<p>{p}</p>" for p in paras) + "</p>")
+
+
+@pytest.mark.parametrize("name, sire, sire_para, own_para, trainer, record", [
+    # OUR BOLD CHOICE, 18 Nov 2026: "OUR" sits inside other words, so the
+    # sire's paragraph used to be read as the horse's.
+    ("OUR BOLD CHOICE", "FROSTED",
+     "FROSTED was owned by Godolphin and trained by Kiaran Mclaughlin with a record of "
+     "6 wins, 6 seconds and 2 thirds in 19 starts with 3 G1 titles. His fee in 2026 is "
+     "USD$ 12,500 for your mare.",
+     "OUR BOLD CHOICE was formerly known as CLOISTERS that originally owned by Godolphin "
+     "and was trained by James Cummings. He should be most suited over mile or under.",
+     "James Cummings", (None, None)),
+    # The horse's first word IS the sire's.
+    ("BLUE ILLUSION", "BLUE POINT",
+     "BLUE POINT was owned by Godolphin that trained by Charlie Appleby with 11 wins, "
+     "3 seconds in 20 starts.",
+     "BLUE ILLUSION was trained by James Cummings with 1 win in 8 starts.",
+     "James Cummings", (1, 8)),
+    # The horse's name opens with the sire's: its own paragraph is kept.
+    ("IMPENDING LEGACY", "IMPENDING",
+     "IMPENDING, former Godolphin's runner, was trained by John O'Shea with 5 wins in "
+     "18 starts.",
+     "IMPENDING LEGACY was trained by Mick Price with 2 wins in 6 starts.",
+     "Mick Price", (2, 6)),
+])
+def test_the_sires_own_career_is_not_read_as_the_horses(name, sire, sire_para, own_para,
+                                                         trainer, record):
+    got = newhorse.parse(page(sire.title(), sire_para, own_para),
+                         {"horse_name": name, "brand_no": "M1", "race_date": "2026-11-18",
+                          "race_no": 9, "path": "p"})
+    assert got["about"] == own_para
+    assert got["prev_trainer"] == trainer
+    assert (got["overseas_wins"], got["overseas_starts"]) == record
+
+
 def test_a_page_without_a_profile_is_refused():
     with pytest.raises(newhorse.NewHorseError):
         newhorse.parse("<div>maintenance</div>", {"horse_name": "X", "brand_no": "L1",

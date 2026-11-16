@@ -255,7 +255,13 @@ def _record(conn: Connection) -> dict[str, Any]:
 
 
 _VERDICT_ORDER = (*distance_verdict.VERDICTS, None)
-_TRIPS = (f"{SHOWN_FROM_M} m and over", f"under {SHOWN_FROM_M} m")
+# The long runs are also split by whether the horse had already run that far
+# here: when its own HK form at the trip takes over from the profile is a
+# question for the runs from DISTANCE_TEST_FROM, not one to settle by guess
+# (Brett, 16 Nov 2026).
+_LONG, _SHORT = f"{SHOWN_FROM_M} m and over", f"under {SHOWN_FROM_M} m"
+_FIRST, _AGAIN = f"first time at {SHOWN_FROM_M} m+ here", f"had run {SHOWN_FROM_M} m+ here"
+_TRIPS = (_LONG, _FIRST, _AGAIN, _SHORT)
 
 
 def _distance_record(conn: Connection, bg: dict[str, dict],
@@ -284,20 +290,23 @@ def _distance_record(conn: Connection, bg: dict[str, dict],
 
     table: dict[str, dict[tuple, dict]] = {e: defaultdict(cell) for e in ("test", "origin")}
     for h, rs in runs.items():
-        for r in rs:
-            if r.p is None or not r.distance:
-                continue
-            era = "test" if r.key[0] >= DISTANCE_TEST_FROM else "origin"
-            trip = _TRIPS[0] if r.distance >= SHOWN_FROM_M else _TRIPS[1]
-            c = table[era][(verdict.get(h), trip)]
-            c["horses"].add(h)
-            c["runs"] += 1
-            c["won"] += r.place == 1
-            c["expected"] += r.p
-            c["placed"] += r.place is not None and r.place <= 3
-            if r.key in paid:
-                c["paid_runs"] += 1
-                c["paid"] += paid[r.key].get(r.horse_no, 0.0)
+        been_long = False           # an earlier start here at SHOWN_FROM_M or over
+        for r in rs:                # in date order
+            long_ = bool(r.distance) and r.distance >= SHOWN_FROM_M
+            if r.p is not None and r.distance:
+                era = "test" if r.key[0] >= DISTANCE_TEST_FROM else "origin"
+                for trip in ((_LONG, _AGAIN if been_long else _FIRST) if long_ else (_SHORT,)):
+                    c = table[era][(verdict.get(h), trip)]
+                    c["horses"].add(h)
+                    c["runs"] += 1
+                    c["won"] += r.place == 1
+                    c["expected"] += r.p
+                    c["placed"] += r.place is not None and r.place <= 3
+                    if r.key in paid:
+                        c["paid_runs"] += 1
+                        c["paid"] += paid[r.key].get(r.horse_no, 0.0)
+            # An unpriced start still counts as having been that far.
+            been_long = been_long or long_
 
     labels = {"test": f"runs from {DISTANCE_TEST_FROM} — the test",
               "origin": f"runs before {DISTANCE_TEST_FROM} — where the idea came from"}
@@ -311,6 +320,7 @@ def _distance_record(conn: Connection, bg: dict[str, dict],
                     continue
                 lines.append({
                     "verdict": v or "no trip named", "trip": trip,
+                    "sub": trip in (_FIRST, _AGAIN),
                     "horses": len(c["horses"]), "runs": c["runs"], "won": c["won"],
                     "expected": round(c["expected"], 1),
                     "ae": round(c["won"] / c["expected"], 2) if c["expected"] else None,
@@ -318,5 +328,5 @@ def _distance_record(conn: Connection, bg: dict[str, dict],
                     "place_return": (round(c["paid"] / (10 * c["paid_runs"]), 2)
                                      if c["paid_runs"] else None)})
         out.append({"key": era, "label": label, "lines": lines,
-                    "runs": sum(x["runs"] for x in lines)})
+                    "runs": sum(x["runs"] for x in lines if not x["sub"])})
     return {"test_from": DISTANCE_TEST_FROM, "shown_from_m": SHOWN_FROM_M, "eras": out}
