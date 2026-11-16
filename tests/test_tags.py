@@ -31,6 +31,67 @@ def test_trip_trouble_is_recognised(text, expected):
     assert expected <= names(text)
 
 
+@pytest.mark.parametrize("text", [
+    # LUCKY BALERION, 2026-10-19 ST 1800: tagged `jumped_fairly` alone, so
+    # the page drew a clean trip.
+    "Jumped only fairly, settled midfield, had difficulty obtaining clear "
+    "running near the 200M, ran on fairly (See Incident Report).",
+    "Near the 200 Metres had some difficulty obtaining clear running when "
+    "being shifted to the outside of BIG BIG WORLD.",
+    "Had difficulty securing clear running in the Straight.",
+    "Had some trouble finding clear running near the 300 Metres.",
+    "Near the 150 Metres was checked when disappointed for clear running.",
+    "Tracked leaders against rail, unable to secure clear run until 100m out.",
+    "Was unable to obtain clear running until the final 100 Metres.",
+    "Failed to obtain clear running in the Straight.",
+    "Did not obtain clear running until after the 50 Metres.",
+    "Saved ground to turn, no clear running in straight.",
+    "Was denied clear running from 100M to the finish.",
+])
+def test_the_stewards_words_for_no_run_are_tagged(text):
+    """HKJC almost never writes "short of room". 2,177 texts said it in these
+    words instead, and 561 of their runs read as clean trips. They get their
+    own tag and leave `short_of_room` as it was, because that is the tag the
+    model counts and counting these measured worse (derive/tags)."""
+    tagged = names(text)
+    assert "no_clear_running" in tagged
+    assert "short_of_room" not in tagged
+
+
+@pytest.mark.parametrize("text", [
+    "Near the 300 Metres was shifted out to obtain clear running.",
+    "Shifted to the outside of RUNNER to continue into clear running.",
+    "Had clear running on straightening and finished well.",
+    "Was eventually able to obtain clear running near the 100 Metres.",
+])
+def test_finding_a_run_is_not_being_denied_one(text):
+    """The cure is not the trouble: a horse that switched out and found clear
+    running is tagged by what it did (`shifted_out`), not as denied a run."""
+    assert not {"no_clear_running", "short_of_room"} & names(text)
+
+
+def test_held_up_for_clear_running_stays_one_tag():
+    """`held_up` already owns this phrase; it must not also read as no run."""
+    assert names("Held up for clear running near the 200 Metres.") == {"held_up"}
+
+
+def test_the_short_form_is_still_short_of_room():
+    """"no clear run" has always been `short_of_room` and still is; only
+    "no clear running", which the \\b never matched, is the new tag."""
+    assert names("Raced on the rail, no clear run in the straight.") == {"short_of_room"}
+
+
+def test_the_model_does_not_count_no_clear_running():
+    """A measured decision, not an oversight. Walk-forward 16 Nov 2026,
+    2021-22 to 2025-26, nine seeds averaged: counting these runs as trouble
+    made the model worse by 0.0010 a race (t -2.4), which the gate refuses.
+    Re-measure before adding it to any fitted model's list."""
+    from hkrd.model.screen import HARD_TROUBLE
+    from hkrd.store.gbm import TROUBLE_TAGS
+    assert "no_clear_running" not in TROUBLE_TAGS
+    assert "no_clear_running" not in HARD_TROUBLE
+
+
 # ── routine must never look like trouble ─────────────────────────────────────
 
 def test_a_passed_veterinary_examination_is_routine():

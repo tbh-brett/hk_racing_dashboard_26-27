@@ -32,6 +32,8 @@ __all__ = ["load_runs", "load_trials", "trial_days_by_season", "settled_dates", 
 
 # What each stewards' count in the model means. The tag names are
 # `derive/tags`' vocabulary; a tag not listed here is not a model input.
+# `no_clear_running` is left out on measurement, not by oversight: counted as
+# trouble it made the walk-forward worse (16 Nov 2026, derive/tags).
 TROUBLE_TAGS = ("checked", "crowded", "hampered", "short_of_room", "barred", "steadied",
                 "bumped", "held_up", "awkwardly_away", "stumbled", "contact")
 WIDE_TAGS = ("wide", "lane:wide", "lane:three_wide", "lane:four_wide",

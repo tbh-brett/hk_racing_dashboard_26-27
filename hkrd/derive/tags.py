@@ -21,7 +21,8 @@ from typing import Any
 __all__ = ["DERIVE_VERSION", "Tag", "TAG_RULES", "NAMED_VET", "VET_TAGS",
            "VET_CATEGORY", "tag_comment", "tag_rows"]
 
-DERIVE_VERSION = "tags-1.1"      # 1.1: `disappointing`
+DERIVE_VERSION = "tags-1.2"      # 1.1: `disappointing`
+#                                  1.2: `no_clear_running`
 
 
 @dataclass(frozen=True)
@@ -50,6 +51,38 @@ TAG_RULES: tuple[tuple[str, str, int, str], ...] = (
     ("hampered",        "trouble", +1, r"\bhamper(ed|ing)\b"),                #  1.8%
     ("short_of_room",   "trouble", +1, r"\bshort of room\b|\bdenied a run\b|"
                                        r"\bno clear run\b"),
+    # The stewards' own words for a horse that could not get a run, which
+    # `short_of_room` never read: "had (some) difficulty obtaining clear
+    # running" (931 texts), "unable to obtain clear run(ning)" (500), "was
+    # disappointed for clear running" (333), "did not obtain clear running"
+    # (114), and the race call's "no clear running" (294), which `no clear
+    # run` misses because \b does not fall inside a word. 2,177 texts on 1,685
+    # runs, 561 of which carried no other trouble tag and read as clean on the
+    # page -- LUCKY BALERION's on 2026-10-19 was one (measured 16 Nov 2026).
+    #
+    # A tag of its own, not more `short_of_room`, because `short_of_room` is
+    # what the model counts (store/gbm TROUBLE_TAGS) and counting these made
+    # it slightly WORSE. Walk-forward 2021-22 to 2025-26, nine seeds averaged
+    # into one model: -0.0010 +- 0.0004 a race (t -2.4), which the gate
+    # refuses. Their next starts won 125 where the model expected 112 without
+    # the count and 115 with it: it lifts the ones that lose as much as the
+    # ones that win. Kept apart it is neutral (+0.0003 +- 0.0004). So the page
+    # shows the fact, and the model, the Screen and the auto-blackbook read
+    # what they were measured on until someone measures this for them.
+    #
+    # Only the forms that say the run was NOT there: "shifted out to obtain
+    # clear running" is the cure, tagged by what was done, and "held up for
+    # clear running" is `held_up`'s.
+    ("no_clear_running", "trouble", +1, r"\bno clear running\b|"
+                                        r"\bdenied (?:for )?(?:a )?(?:clear )?running\b|"
+                                        r"\bdenied (?:for )?(?:a )?clear run\b|"
+                                        r"\bdisappointed for (?:a |this |that )?(?:clear )?"
+                                        r"run(?:ning)?\b|"
+                                        r"(?:\b(?:difficulty|trouble)(?: in| to)?|"
+                                        r"\b(?:difficult|unable|failed|not able|not being able)"
+                                        r" to|\b(?:could|did|had|has)(?: not|n't|n’t))"
+                                        r" (?:obtain|secur|find|get|establish)\w*"
+                                        r" (?:a )?clear run(?:ning)?\b"),
     # Start descriptors. HKJC phrases these several ways and they were the
     # largest genuine gap in the first pass: "Jumped awkwardly" (61),
     # "Slow to begin" (48) and "Jumped only fairly" (209) all went untagged.
