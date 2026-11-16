@@ -127,7 +127,8 @@ def _stage(date: str, now: dt.datetime, clock: list[dict],
 def _runner(s: dict, tip: dict | None, odds: dict | None, zh: str | None,
             move: dict | None, mrank: int | None, priced: bool,
             bg: dict | None = None,
-            sections: list[dict] | None = None) -> dict[str, Any]:
+            sections: list[dict] | None = None,
+            trip_verdict: dict | None = None) -> dict[str, Any]:
     ident = ("horse_no", "horse_name", "draw", "jockey", "trainer", "rating",
              "weight", "gear", "style")
     gear_first = [g[:-1] for g in (s["gear"] or "").replace(",", " ").split()
@@ -140,6 +141,8 @@ def _runner(s: dict, tip: dict | None, odds: dict | None, zh: str | None,
         "blackbook": s["blackbook"],
         # Where it came from, for its first few starts (query/background).
         "background": bg,
+        # What its profile says of the trip, where today's trip bears on it.
+        "distance_verdict": trip_verdict,
         "support": None if not tip else {
             "sources": tip["supporters"], "top_picks": tip["top_picks"],
             "interviewed": tip["interviewed"], "backed_by": tip["backed_by"]},
@@ -317,11 +320,15 @@ def _meeting(conn: Connection, date: str, now: dt.datetime) -> dict[str, Any]:
         mrank = {n: i + 1 for i, (_, n) in enumerate(wins)}
         moves = ({m["horse_no"]: m for m in movement.split_move(
             date, no, off_time=sr["off_time"], conn=conn)} if tote_in else {})
+        trips = background.distance_verdicts(
+            [s["horse_name"] for s in sr["runners"]], distance=sr["distance"],
+            before=date, conn=conn)
         runners = [_runner(s, picks.get(s["horse_no"]), odds.get(s["horse_no"]),
                            zh.get(s["horse_name"]), moves.get(s["horse_no"]),
                            mrank.get(s["horse_no"]), priced,
                            bgs.get(s["horse_name"]),
-                           sections.get((no, s["horse_no"])))
+                           sections.get((no, s["horse_no"])),
+                           trips.get(s["horse_name"]))
                    for s in sr["runners"]]
         tipped = {b["source"] for p in tr["picks"] for b in p["backed_by"]}
         conc = market.concentration(date, no, conn=conn) if tote_in else None

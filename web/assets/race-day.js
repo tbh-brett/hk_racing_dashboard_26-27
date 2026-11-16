@@ -21,7 +21,7 @@ import { recordPanel } from './record-panel.js';
 import { install as installPalette } from './palette.js';
 import { isSystem } from './book-origin.js';
 import { tierChip, tierRank } from './book-tier.js';
-import { agentShort, backgroundBlock, backgroundView } from './background.js';
+import { agentShort, backgroundBlock, backgroundView, verdictChip } from './background.js';
 
 const svg = (tag, attrs) => {
   const n = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -1046,6 +1046,9 @@ function cardRow(r, index) {
   if (r.background?.agents?.length) {
     facts.append(el('span', 'bf-agent', `AG ${agentShort(r.background.agents[0])}`));
   }
+  // What its profile says of the trip, where today's trip bears on it.
+  const verdict = verdictChip(r.distance_verdict);
+  if (verdict) facts.append(verdict);
   name.append(box);
   if (facts.childElementCount) name.append(facts);
   tr.append(name);

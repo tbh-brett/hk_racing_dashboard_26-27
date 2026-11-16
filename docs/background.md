@@ -88,3 +88,33 @@ starts; no manual "whispers".
   import type, sale price and trial, for each era apart.
 - **Not in the Screen.** A factor needs walk-forward over seasons that have
   the data; there is one. Revisit after 2026/27.
+
+## The profile's trip verdict (16 Nov 2026)
+
+The profile closes with how far the contractor thinks the horse should get.
+`derive/distance_verdict` reads that sentence by rule into the longest trip it
+allows:
+
+- **stayer:** 1800 m and over, or "mile or further"
+- **miler:** 1500-1799 m, or "1400M or upper"
+- **sprinter:** 1400 m and under
+
+It skips clauses about the dam, the sire's other runners or a race already run.
+528 of the 617 profiles stored on 16 Nov name a trip.
+
+- **What it showed, on every run to 16 Nov:** stayers at 1600 m and over won
+  41 of 390 runs where the closing price expected 28.9 (A/E 1.42). That holds
+  whatever the sire. To place they returned $0.75 on the dollar, which is
+  ordinary. Found while answering Brett on pedigree
+  (`Claude outputs/pedigree-research-2026-11-16.md`).
+- **The chip:** `PROFILE STAYER / MILER / SPRINTER` sits on a runner's row
+  on Race Day and the Briefing, at any start, where today's trip bears on it:
+  1600 m and over, or further than the horse has run here. The contractor's
+  sentence is in its tooltip (`query/background.distance_verdicts`,
+  `background.js`).
+- **The record:** the Briefing's background record has a PROFILE TRIP VERDICT
+  table below it. It shows each verdict at 1600 m+ and under, with win A/E and
+  $1 to place. Unlike the agent record, it is split by **run date**: the idea
+  was formed on every run to 16 Nov, so the runs from 17 Nov are the test,
+  whoever the horse.
+- **Not in the Screen or the model** until the test has something to say.

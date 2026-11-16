@@ -11,12 +11,12 @@
   font-size: 10px; line-height: 1.35; letter-spacing: .03em; text-transform: uppercase;
 }
 .facts > * + *::before { content: '·'; margin: 0 5px; color: var(--text-faint); }
-.facts .trip, .facts .gear-chip, .facts .bf-agent, .facts .trip-more,
+.facts .trip, .facts .gear-chip, .facts .bf-agent, .facts .bf-tripcall, .facts .trip-more,
 .facts .trips > * {
   border: 0; padding: 0; background: none; font-size: inherit;
 }
 .facts .trips { display: inline-flex; gap: 4px; }
 .facts .trip.vet { font-weight: 600; }
 .facts .gear-chip.trial-withheld { font-style: italic; }
-.facts .bf-agent { color: var(--text-dim); }
+.facts .bf-agent, .facts .bf-tripcall { color: var(--text-dim); }
 .horse .bt { font-size: 9px; line-height: 13px; }

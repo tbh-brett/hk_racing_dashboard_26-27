@@ -8,6 +8,7 @@
  */
 import { el, classCell } from './vocab.js';
 import { bookLineEl, tierChip } from './book-tier.js';
+import { verdictChip } from './background.js';
 import {
   wordRows, markEl, chipEl, kindEl, paceBar, styleEl, link, nameEl, bar,
   interviewBox, screenBlock, saidBlock, priceBlock,
@@ -132,6 +133,8 @@ function opened(r, ctx) {
     x.marks.forEach((m) => l2.append(markEl(m)));
     x.chips.forEach((ch) => l2.append(chipEl(ch)));
     if (x.agent) l2.append(el('span', 'bf-agent', `AG ${x.agent}`));
+    const verdict = verdictChip(x.verdict);
+    if (verdict) l2.append(verdict);
     if (x.move) l2.append(el('span', `move t-${x.move.tone}`, x.move.t));
     row.append(l1, l2);
     box.append(row);

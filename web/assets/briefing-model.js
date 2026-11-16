@@ -443,6 +443,8 @@ function runnerView(x, r, { books, srcIn, saidOf, isBooked, cap, toteEarly, ctx 
     bg: x.background ? backgroundView(x.background, s.starts ?? 0) : null,
     agent: x.background && (x.background.agents || []).length
       ? agentShort(x.background.agents[0]) : '',
+    // What its profile says of the trip, where today's trip bears on it.
+    verdict: x.distance_verdict || null,
     notes: (s.notes || []).map((n) => (typeof n === 'string' ? n : n.note || n.text || '')).filter(Boolean),
     reversals: (s.reversals || []).map((v) => ({ no: v.vs_no, name: v.vs_name, note: v.note,
                                                 moved: (v.moved || []).join(', ') })),

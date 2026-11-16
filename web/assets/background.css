@@ -16,7 +16,10 @@
 }
 .bf-bg .about.open { display: block; }
 /* The agent, on the row and in the block: a name, not a verdict. */
-.bf-agent {
+.bf-agent, .bf-tripcall {
   padding: 0 4px; border: 1px solid var(--line-3); white-space: nowrap;
   font-family: var(--font-mono); font-size: 10px; letter-spacing: .04em; color: var(--text);
 }
+/* The profile's trip verdict: the contractor's words, read by rule. Drawn as
+   plainly as the agent until its test (from 17 Nov 2026) says otherwise. */
+.bf-tripcall { color: var(--text-dim); border-style: dashed; cursor: help; }

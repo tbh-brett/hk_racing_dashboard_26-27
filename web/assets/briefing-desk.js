@@ -9,7 +9,7 @@
  * the Screen's reasons, what was said about it verbatim, and its prices.
  */
 import { el, classCell, styleClass } from './vocab.js';
-import { backgroundBlock } from './background.js';
+import { backgroundBlock, verdictChip } from './background.js';
 import { unseenBlock } from './briefing-unseen.js';
 import { bookLineEl, noteLine, tierChip } from './book-tier.js';
 import { shortDate } from './briefing-format.js';
@@ -309,6 +309,8 @@ function raceDetail(r, ctx) {
     const tail = el('span', 'tail');
     x.chips.forEach((c) => tail.append(chipEl(c)));
     if (x.agent) tail.append(el('span', 'bf-agent', `AG ${x.agent}`));
+    const verdict = verdictChip(x.verdict);
+    if (verdict) tail.append(verdict);
     tail.append(el('span', 'caret', open ? '▾' : '▸'));
     row.append(tail);
     box.append(row);

@@ -14,6 +14,21 @@ const IMPORT = { PP: 'PP · raced before import', PPG: 'PPG · unraced import',
 /** "Price Bloodstock" -> "PRICE": what fits on a chip. */
 export const agentShort = (a) => a.replace(/\s+(Bloodstock|Equine)$/i, '').toUpperCase();
 
+/** What the profile says of the trip, as a chip on the runner's row — at any
+ *  start, but only where today's trip bears on it: 1600 m and over, or further
+ *  than the horse has run (query/background.distance_verdicts). Its record,
+ *  win and place apart, is on the Briefing under the background record. */
+export function verdictChip(v) {
+  if (!v) return null;
+  const chip = el('span', `bf-tripcall v-${v.verdict}`, `PROFILE ${v.verdict.toUpperCase()}`);
+  const why = v.step_up ? `Today is further than its longest run here (${v.longest_m} m).`
+    : 'Shown at 1600 m and over.';
+  chip.title = `HKJC's new-horse profile: “${v.sentence}” Read as up to ${v.ceiling_m} m. ${why} `
+    + 'Stayers beat their win price at 1600 m+ to 16 Nov 2026, but not their place price; '
+    + 'scored from 17 Nov in the Briefing’s background record.';
+  return chip;
+}
+
 function sale(b) {
   if (!b.sale_amount) return '';
   const n = Math.round(b.sale_amount).toLocaleString('en-US');

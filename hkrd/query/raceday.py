@@ -257,6 +257,11 @@ def build_card(date: str, race_no: int, *,
             [r.horse_name for r in race.runners
              if prior_runs.get(r.horse_name, 0) < background_q.EARLY_STARTS],
             conn=conn)
+        # What the profile says of the trip, at any start, wherever today's
+        # trip bears on it: 1600 m and over, or further than it has been.
+        trip_verdicts = background_q.distance_verdicts(
+            [r.horse_name for r in race.runners], distance=race.distance,
+            before=date, conn=conn)
 
         runners: list[dict[str, Any]] = []
         for r in race.runners:
@@ -324,6 +329,7 @@ def build_card(date: str, race_no: int, *,
                         if mine and r.horse_no in win_pct else None),
                 "sarr_prior": prior_runs.get(r.horse_name, 0),
                 "background": backgrounds.get(r.horse_name),
+                "distance_verdict": trip_verdicts.get(r.horse_name),
                 "sarr_unrated": rating_q.unrated_reason(
                     r.sarr_rank, prior_runs.get(r.horse_name, 0),
                     card_scored=scored_card),

@@ -75,4 +75,65 @@ export function renderBackgroundRecord(host, rec) {
                    : 'These horses were profiled after the idea was formed: they are its test. '}`
                  + 'A horse with two agents counts under each. The profile is written by HKJC’s '
                  + 'contractor and read by rule; a group is only as good as what the profiles say.'));
+  if (rec.distance) renderVerdictRecord(host, rec.distance);
+}
+
+/* ── the profile's trip verdict ────────────────────────────────────────── */
+
+let shownVd = null;
+
+/** How the profile's stayers, milers and sprinters ran, at 1600 m and over
+ *  and under it: wins against the win price, and what $1 to place returned
+ *  at the tote. Split by RUN date — the idea came from every run to 16 Nov
+ *  2026 (query/background), so only the runs after it test it. */
+function renderVerdictRecord(host, d) {
+  const box = el('div', 'bf-vdrec');
+  host.append(box);
+  const test = d.eras.find((e) => e.key === 'test');
+  const era = d.eras.find((e) => e.key === (shownVd || (test && test.runs >= 60 ? 'test' : 'origin')));
+  const cap = el('div', 'bf-rec-cap');
+  cap.append(el('span', 'l', 'PROFILE TRIP VERDICT'),
+             el('span', 'r', 'what the profile says of the trip · A/E against the closing win price · '
+               + '$1 to place at the tote'));
+  box.append(cap);
+  const tabs = el('div', 'bf-bgtabs');
+  d.eras.forEach((e) => {
+    const b = el('button', `tab${e.key === era.key ? ' on' : ''}`, `${e.label} · ${e.runs} runs`);
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      shownVd = e.key;
+      box.remove();
+      renderVerdictRecord(host, d);
+    });
+    tabs.append(b);
+  });
+  box.append(tabs);
+  const head = el('div', 'bf-rec-row bf-vdrow bf-rec-head');
+  [['src', 'PROFILE SAID · TRIP'], ['hr', 'HORSES'], ['runs', 'RUNS'], ['won', 'WON'], ['ae', 'A/E'],
+   ['pl', 'PLACED'], ['pr', 'PLACE $1']].forEach(([k, h]) => head.append(el('span', `c c-${k}`, h)));
+  box.append(head);
+  if (!era.lines.length) box.append(el('div', 'bf-rec-note', 'No runs yet.'));
+  era.lines.forEach((x) => {
+    const row = el('div', 'bf-rec-row bf-vdrow');
+    const src = el('span', 'c c-src');
+    src.append(el('span', 'gn', `${x.verdict.toUpperCase()} · ${x.trip}`));
+    const won = el('span', 'c c-won', `${x.won}/${x.runs}`);
+    won.append(el('span', 'p', ` ${pct(x.won, x.runs)}`));
+    won.title = `the closing prices expected ${x.expected}`;
+    const ae = el('span', `c c-ae${x.ae > 1.15 ? ' good' : x.ae !== null && x.ae < 0.85 ? ' neg' : ''}`,
+                  x.ae === null || x.ae === undefined ? DASH : x.ae.toFixed(2));
+    const pr = el('span', 'c c-pr', x.place_return === null ? DASH : x.place_return.toFixed(2));
+    pr.title = `${x.paid_runs} runs in races with place dividends stored`;
+    row.append(src, el('span', 'c c-hr', String(x.horses)), el('span', 'c c-runs', String(x.runs)),
+               won, ae, el('span', 'c c-pl', `${x.placed}/${x.runs}`), pr);
+    box.append(row);
+  });
+  box.append(el('div', 'bf-rec-note',
+                `${era.key === 'origin'
+                  ? 'These runs formed the idea — stayers at 1600 m and over beat their win price — '
+                    + 'so they cannot also test it. '
+                  : 'These runs came after the idea was formed: they are its test. '}`
+                + 'PLACE $1 is what a $1 place bet returned at the tote; the takeout makes about 0.82 '
+                + 'the norm. A horse counts under the trip of each race it ran, so one horse can sit '
+                + 'in both rows. The verdict is the contractor’s sentence read by rule.'));
 }
