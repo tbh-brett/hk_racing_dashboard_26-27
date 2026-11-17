@@ -48,8 +48,8 @@ from hkrd.query import trials as trials_q
 from hkrd.store.connect import Connection, db_file, get_conn
 
 __all__ = ["TIERS", "LABEL", "ACTION", "EXCUSE_TAGS", "TESTED_STARTS",
-           "RECORD_FROM", "classify", "for_meeting", "race_line", "record",
-           "stale_entries"]
+           "RECORD_FROM", "classify", "for_meeting", "tiers_for", "race_line",
+           "record", "stale_entries"]
 
 TIERS = ("NOTE", "STANDOUT", "EXCUSE", "QUIET", "STALE", "RUN_NOTE")
 LABEL = {"NOTE": "Trial note", "STANDOUT": "Standout trial", "EXCUSE": "Excuse",
@@ -280,6 +280,14 @@ def _tiers(conn: Connection, runs: list[dict]) -> dict[tuple, dict]:
         if t:
             out[(date, r["race_no"], r["horse_no"])] = t
     return out
+
+
+def tiers_for(runs: list[dict[str, Any]], *, conn: Connection) -> dict[tuple, dict]:
+    """Tier as at its own race for each of `runs` (race_date, race_no, horse_no,
+    horse_name, off_time), keyed (race_date, race_no, horse_no): the same rule
+    as a card's, asked of any runs. The ledger's bankers are read with it
+    (`query/ticket_ledger`)."""
+    return _tiers(conn, runs)
 
 
 _CARD_SQL = """

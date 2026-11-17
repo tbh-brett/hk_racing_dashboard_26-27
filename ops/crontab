@@ -120,6 +120,20 @@
 40 7  * * *   nice -n 19 python -m hkrd.jobs.auto_book --pending --db /data/hkrd.db
 30 20 * * *   nice -n 19 python -m hkrd.jobs.auto_book --pending --db /data/hkrd.db
 
+# The ticket desk's paper record (jobs/record_tickets): the ticket the engine
+# would have built for each banker the owner had evidence on, kept once per
+# race after its pool has shut. NOT time-critical, which is why it is three
+# lines and not a hook in the capture: a paper ticket is read from the last
+# capture at least five minutes before the close, captures are never deleted,
+# and so it is the same ticket whenever this runs. 19:50 follows an afternoon
+# meeting and 23:55 a night one; 07:50 picks up anything a restart missed. A
+# run with nothing outstanding costs one query and, with --quiet, says nothing.
+# The same run keeps each runner's facts as at its race once the result is in
+# (`runner_fact`), which the banker scorecard reads (docs/banker-card.md).
+50 7  * * *   nice -n 19 python -m hkrd.jobs.record_tickets --pending --quiet --db /data/hkrd.db
+50 19 * * *   nice -n 19 python -m hkrd.jobs.record_tickets --pending --quiet --db /data/hkrd.db
+55 23 * * *   nice -n 19 python -m hkrd.jobs.record_tickets --pending --quiet --db /data/hkrd.db
+
 # Chinese horse names, for the tips layer. Half an hour behind the two nightly
 # runs that fetch a card — a card published at noon is stored by 13:00 and
 # named by 13:30. `--pending` makes the quiet days free: it only asks HKJC

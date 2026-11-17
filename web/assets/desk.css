@@ -1,0 +1,127 @@
+/* desk.css — the Bets page's DESK and BANKERS views (desk.js, banker-card.js).
+ *
+ * Every class is prefixed dk- or bc-, so nothing here can collide with a page
+ * stylesheet (tests/test_smoke.py). Colours are tokens only. One meaning each:
+ * --win is "at or past the break-even line", --loss "below the market",
+ * --book "your own evidence", --book-sys "the system's".
+ */
+
+#desk-host, #bankers-host { padding: 16px 14px 28px; }
+
+/* ── a race ─────────────────────────────────────────────────────────────── */
+.dk-race { border: 1px solid var(--line-2); margin-top: var(--sp-4); }
+.dk-race.gone { opacity: .55; }
+.dk-race-hd {
+  display: flex; align-items: baseline; gap: var(--sp-3);
+  padding: 7px 12px; background: var(--surface); border-bottom: 1px solid var(--line-2);
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+}
+.dk-race-hd .no { color: var(--text); font-weight: 600; }
+.dk-race-hd .meta { color: var(--text-muted); }
+.dk-race-hd .at { margin-left: auto; color: var(--text-dim); font-size: var(--fs-xs); letter-spacing: .08em; }
+.dk-quiet {
+  padding: 7px 12px; color: var(--text-dim);
+  font-family: var(--font-mono); font-size: var(--fs-xs);
+}
+
+/* ── a candidate ────────────────────────────────────────────────────────── */
+.dk-cand { border-top: 1px solid var(--line); }
+.dk-cand:first-of-type { border-top: none; }
+.dk-cand-hd {
+  display: flex; align-items: baseline; gap: var(--sp-3); width: 100%;
+  padding: 8px 12px; background: none; border: none; cursor: pointer; text-align: left;
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-2);
+}
+.dk-cand-hd:hover { background: var(--row-hover); }
+.dk-cand.open > .dk-cand-hd { background: var(--detail); }
+.dk-cand-hd .caret { color: var(--text-faint); width: 10px; }
+.dk-cand-hd .name { color: var(--text); font-weight: 600; min-width: 190px; }
+.dk-cand-hd .px, .dk-cand-hd .pl { color: var(--text-muted); }
+.dk-cand-hd .tally { margin-left: auto; color: var(--text-dim); letter-spacing: .06em; }
+.dk-who {
+  font-size: var(--fs-xs); letter-spacing: .08em; padding: 1px 6px; border: 1px solid var(--line-2);
+}
+.dk-who.own { color: var(--book); border-color: var(--book-ground); }
+.dk-who.sys { color: var(--book-sys); border-color: var(--book-sys-ground); }
+.dk-who.none { color: var(--text-dim); }
+.dk-state { font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .08em; }
+.dk-state.accepted, .dk-state.edited { color: var(--win); }
+.dk-state.rejected { color: var(--text-muted); }
+.dk-state.late { color: var(--incident); }
+
+.dk-cand-body {
+  display: grid; grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr); gap: var(--sp-5);
+  padding: 10px 12px 14px 34px; background: var(--detail); border-top: 1px solid var(--detail-rule);
+}
+.dk-decide { grid-column: 1 / -1; }
+@media (max-width: 900px) {
+  .dk-cand-body { grid-template-columns: 1fr; padding-left: 12px; }
+  .dk-cand-hd { flex-wrap: wrap; }
+  .dk-cand-hd .name { min-width: 0; }
+}
+.dk-sub {
+  display: flex; align-items: baseline; gap: var(--sp-3); margin-bottom: 6px;
+  font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .1em;
+}
+.dk-sub .t { color: var(--text-2); font-weight: 600; }
+.dk-sub .n { margin-left: auto; color: var(--text-faint); }
+
+/* ── the brief ──────────────────────────────────────────────────────────── */
+.dk-fact {
+  display: grid; grid-template-columns: 1.3fr 1fr minmax(150px, auto) 92px; gap: var(--sp-2);
+  padding: 3px 0; border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+}
+.dk-fact .k { color: var(--text-muted); }
+.dk-fact .v { color: var(--text-2); }
+.dk-fact .rec { color: var(--text-dim); text-align: right; white-space: nowrap; }
+.dk-fact .mark { text-align: right; font-size: var(--fs-xs); letter-spacing: .08em; white-space: nowrap; }
+/* The mark is against his usual and stays in the text colours; colour is kept
+   for the money -- the number at break-even or past it, or below the market. */
+.dk-fact.m-stronger .mark { color: var(--text); font-weight: 600; }
+.dk-fact.m-weaker .mark { color: var(--text-muted); font-weight: 600; }
+.dk-fact.m-usual .mark { color: var(--text-dim); }
+.dk-fact.m-thin .mark, .dk-fact.m-unknown .mark { color: var(--text-faint); }
+.dk-fact.p-breakeven .rec, .dk-usual.p-breakeven .rec, .dk-usual.p-breakeven .mark { color: var(--win); }
+.dk-fact.p-below .rec, .dk-usual.p-below .rec, .dk-usual.p-below .mark { color: var(--loss); }
+.dk-usual {
+  display: grid; grid-template-columns: 2.3fr minmax(150px, auto) 92px; gap: var(--sp-2);
+  padding: 4px 0 6px; border-bottom: 1px solid var(--line-2);
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+}
+.dk-usual .k { color: var(--text-2); }
+.dk-usual .rec { text-align: right; color: var(--text-2); white-space: nowrap; }
+.dk-usual .mark { text-align: right; font-size: var(--fs-xs); letter-spacing: .08em; color: var(--text-muted); }
+.dk-more { margin-top: 6px; }
+
+/* ── the ticket ─────────────────────────────────────────────────────────── */
+.dk-lines td, .dk-lines th { padding: 3px 6px; }
+.dk-under { color: var(--text-faint); }
+.dk-flag {
+  margin-top: 5px; padding-left: 8px; border-left: 2px solid var(--incident);
+  font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted);
+}
+.dk-pick { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); margin-top: var(--sp-3); }
+
+/* ── the decision ───────────────────────────────────────────────────────── */
+.dk-decide .chips { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.dk-note {
+  width: 100%; max-width: 640px; margin-top: var(--sp-2); padding: 5px 8px;
+  background: var(--surface); border: 1px solid var(--line-2); color: var(--text);
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+}
+.dk-acts { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-3); }
+.dk-nominate { padding: 7px 12px; border-top: 1px solid var(--line); }
+.dk-nominate select {
+  background: var(--surface); color: var(--text-muted); border: 1px solid var(--line-2);
+  font-family: var(--font-mono); font-size: var(--fs-sm); padding: 3px 6px;
+}
+
+/* ── the scorecard ──────────────────────────────────────────────────────── */
+.bc-tab td, .bc-tab th { padding: 4px 8px; }
+.bc-tab tr.thin .name { color: var(--text-dim); }
+.bc-tab td .n { color: var(--text-faint); font-weight: 400; }
+.bc-tab td.bc-for b { color: var(--win); }
+.bc-tab td.bc-against b { color: var(--loss); }
+.bc-tab td.bc-level b { color: var(--text-2); }
+.bc-tab td.bc-thin b, .bc-tab td.bc-nil { color: var(--text-faint); }

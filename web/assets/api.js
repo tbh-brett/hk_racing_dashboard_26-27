@@ -247,6 +247,15 @@ export const api = {
   modelGbmRecord: () => get('/model/gbm/record'),
   status: () => get('/status'),
   rebuildEt: (months = 24) => post(`/jobs/rebuild-et?window_months=${months}`),
+  // The ticket desk and the banker scorecard (docs/ticket-desk.md, docs/banker-card.md).
+  desk: (date) => get(`/tickets/${date}`),
+  deskTicket: (date, no, banker, partners) => get(
+    `/tickets/${date}/${no}/${banker}`
+    + (partners && partners.length ? `?partners=${partners.join(',')}` : '')),
+  deskDecide: (date, no, banker, body) => post(
+    `/tickets/${date}/${no}/${banker}/decision`, body),
+  bankerScorecard: (account) => get(
+    `/tickets/scorecard${account ? `?account=${encodeURIComponent(account)}` : ''}`),
 };
 
 /** Numbers never render bare: a null becomes an explicit dash, not a blank. */

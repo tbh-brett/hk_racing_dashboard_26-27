@@ -11,12 +11,15 @@
 <link rel="stylesheet" href="../assets/tokens.css">
 <link rel="stylesheet" href="../assets/pages.css">
 <link rel="stylesheet" href="../assets/bets.css">
+<link rel="stylesheet" href="../assets/desk.css">
 <!-- every module this page imports, asked for at once (tests/test_web_preload.py keeps the list true) -->
 <link rel="modulepreload" href="../assets/api.js">
+<link rel="modulepreload" href="../assets/banker-card.js">
 <link rel="modulepreload" href="../assets/bets-edit.js">
 <link rel="modulepreload" href="../assets/bets-entry.js">
 <link rel="modulepreload" href="../assets/bets.js">
 <link rel="modulepreload" href="../assets/context.js">
+<link rel="modulepreload" href="../assets/desk.js">
 <link rel="modulepreload" href="../assets/overlay.js">
 <link rel="modulepreload" href="../assets/palette.js">
 <link rel="modulepreload" href="../assets/vocab.js">
@@ -50,6 +53,13 @@
   <div class="entry-wrap" id="entry-host"></div>
 </section>
 
+<!-- The desk: a banker ticket around a horse you have evidence on, your own
+     record beside every fact about it, and TAKE or PASS with your reasons.
+     desk.js, docs/ticket-desk.md and docs/banker-card.md. -->
+<section id="view-desk" hidden>
+  <div id="desk-host"></div>
+</section>
+
 <section id="view-ledger" hidden>
   <div class="filter-bar">
     <div class="search">
@@ -77,6 +87,12 @@
 
 <section id="view-analysis" hidden>
   <div class="analysis" id="analysis"></div>
+</section>
+
+<!-- What you lean towards when you pick a banker, and which of it has paid.
+     banker-card.js. -->
+<section id="view-bankers" hidden>
+  <div id="bankers-host"></div>
 </section>
 
 <section id="view-recon" hidden>

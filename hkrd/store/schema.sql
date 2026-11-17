@@ -1069,3 +1069,133 @@ CREATE TABLE IF NOT EXISTS day_bias_record (
   through     TEXT NOT NULL,
   record_json TEXT NOT NULL
 );
+
+-- ---- The ticket desk (query/suggest, jobs/decide_ticket, jobs/record_tickets). ----
+-- A QIN + QPL banker ticket built around a horse the OWNER has evidence on, or
+-- nominated: the owner picks the banker, the engine picks the partners. Measured
+-- 17 Nov 2026 (docs/ticket-desk.md): this season's bankers with the owner's own
+-- evidence placed 37 where the place pool expected 28.3, the ones without it 21
+-- against 20.3, and no machine banker beat the price over 4,307 walk-forward
+-- races.
+--
+-- `ticket_suggestion` is the PAPER record: every candidate banker's ticket as
+-- the engine would have built it, written ONCE per race after its pool shut,
+-- from the last capture at least `lead_minutes` before the close -- the prices
+-- a person could still have bet on. RAW, never rebuilt: the engine's rules move,
+-- and a rebuilt record would rescore every race under rules it was not judged
+-- by (the reason `screen_pick` is kept). A row that exists is never rewritten.
+CREATE TABLE IF NOT EXISTS ticket_suggestion (
+  race_date        TEXT    NOT NULL,
+  race_no          INTEGER NOT NULL,
+  banker_no        INTEGER NOT NULL,
+  tier             TEXT,                 -- query/book_tier at the off; NULL = none
+  own              INTEGER NOT NULL,     -- 1 = the owner's own evidence, 0 = system or none
+  partner_source   TEXT,                 -- QPL pool | QIN pool | win market
+  unit_stake       REAL    NOT NULL,
+  field_size       INTEGER,
+  market_rank      INTEGER,
+  win_odds         REAL,
+  place_pct        REAL,
+  place_source     TEXT,                 -- place pool | model
+  model_pct        REAL,
+  top2_pct         REAL,                 -- from the QIN pool; NULL where none was captured
+  win_captured_at  TEXT,
+  pair_captured_at TEXT,
+  lead_minutes     REAL,                 -- how long before the close the prices were read
+  engine           TEXT    NOT NULL,     -- query/suggest.ENGINE
+  recorded_at      TEXT    NOT NULL,
+  PRIMARY KEY (race_date, race_no, banker_no),
+  FOREIGN KEY (race_date, race_no, banker_no)
+    REFERENCES runners(race_date, race_no, horse_no)
+);
+
+-- One row per partner, in the engine's order: six horses are six rows, for the
+-- reason `bet_selections` gives.
+CREATE TABLE IF NOT EXISTS ticket_suggestion_partner (
+  race_date TEXT    NOT NULL,
+  race_no   INTEGER NOT NULL,
+  banker_no INTEGER NOT NULL,
+  horse_no  INTEGER NOT NULL,
+  rank      INTEGER NOT NULL,            -- 1 = the engine's first partner
+  win_odds  REAL,
+  qin_odds  REAL,
+  qpl_odds  REAL,
+  PRIMARY KEY (race_date, race_no, banker_no, horse_no),
+  FOREIGN KEY (race_date, race_no, banker_no)
+    REFERENCES ticket_suggestion(race_date, race_no, banker_no)
+);
+
+-- What the owner did with a ticket: took it as built, changed the partners, or
+-- passed. RAW -- his. One per banker per race. `seen_json` is the ticket as the
+-- engine showed it at that moment, so the record never has to guess what he was
+-- looking at. `late` = 1 when it was made after the pool shut: kept, reported,
+-- and left out of every figure, as a tipster's late pick is (query/tips_record).
+-- A decision made in time is never replaced by a late one (jobs/decide_ticket).
+-- It does NOT write a bet: this season every bet reached the ledger from an
+-- HKJC statement, and a second copy here is the duplicate import_statement
+-- already had to learn to undo. The ledger is matched at read time.
+CREATE TABLE IF NOT EXISTS ticket_decision (
+  race_date  TEXT    NOT NULL,
+  race_no    INTEGER NOT NULL,
+  banker_no  INTEGER NOT NULL,
+  decision   TEXT    NOT NULL CHECK (decision IN ('accepted','edited','rejected')),
+  account    TEXT,
+  unit_stake REAL,
+  reason     TEXT,
+  late       INTEGER NOT NULL DEFAULT 0,
+  seen_json  TEXT    NOT NULL,
+  engine     TEXT    NOT NULL,
+  decided_at TEXT    NOT NULL,           -- ISO-8601 UTC
+  PRIMARY KEY (race_date, race_no, banker_no),
+  FOREIGN KEY (race_date, race_no, banker_no)
+    REFERENCES runners(race_date, race_no, horse_no)
+);
+
+-- The partners of a ticket he took: the engine's when accepted, his when edited.
+CREATE TABLE IF NOT EXISTS ticket_decision_partner (
+  race_date TEXT    NOT NULL,
+  race_no   INTEGER NOT NULL,
+  banker_no INTEGER NOT NULL,
+  horse_no  INTEGER NOT NULL,
+  PRIMARY KEY (race_date, race_no, banker_no, horse_no),
+  FOREIGN KEY (race_date, race_no, banker_no)
+    REFERENCES ticket_decision(race_date, race_no, banker_no)
+);
+
+-- What was knowable about each runner before the off, in the owner's terms
+-- (`query/banker_facts`), kept once its race has a result: the banker
+-- scorecard reads it rather than working fourteen facts out for every runner
+-- of every race he banked in on each request. Written once per version, never
+-- rewritten: a fact is AS AT THE RACE, and a note or book entry made later can
+-- never change it. A NULL fact is one that was not kept then (the tips before
+-- 6 Sep 2026, the model before 1 Oct 2026), never "no".
+CREATE TABLE IF NOT EXISTS runner_fact (
+  race_date   TEXT    NOT NULL,
+  race_no     INTEGER NOT NULL,
+  horse_no    INTEGER NOT NULL,
+  version     TEXT    NOT NULL,         -- banker_facts.VERSION
+  own         TEXT,  tier       TEXT,  model      TEXT,  course_trip TEXT,
+  market      TEXT,  last_start TEXT,  close_last TEXT, since_last  TEXT,
+  class       TEXT,  draw       TEXT,  style      TEXT, rider       TEXT,
+  trial       TEXT,  gear       TEXT,  tips       TEXT,
+  recorded_at TEXT    NOT NULL,
+  PRIMARY KEY (race_date, race_no, horse_no, version),
+  FOREIGN KEY (race_date, race_no, horse_no)
+    REFERENCES runners(race_date, race_no, horse_no)
+);
+
+-- Why he took (or passed) a banker, in his words: the taps beside a decision,
+-- from `query/banker_record.REASONS` -- the things the database cannot see
+-- (what a trial looked like, a riding change, a pace read). RAW, his. The facts
+-- the database CAN see are not tapped: they are in the decision's snapshot
+-- (`ticket_decision.seen_json`, the brief) and recomputed for the scorecard.
+-- Replaced with the decision, so a changed mind leaves no stale reason behind.
+CREATE TABLE IF NOT EXISTS ticket_reason (
+  race_date TEXT    NOT NULL,
+  race_no   INTEGER NOT NULL,
+  banker_no INTEGER NOT NULL,
+  reason    TEXT    NOT NULL,
+  PRIMARY KEY (race_date, race_no, banker_no, reason),
+  FOREIGN KEY (race_date, race_no, banker_no)
+    REFERENCES ticket_decision(race_date, race_no, banker_no)
+);
