@@ -77,9 +77,11 @@ def _warm() -> None:
     request is the one that matters most.
     """
     from hkrd.jobs import init_store
+    from hkrd.query import banker_record
 
     init_store.run()
     market_q.warm()
+    banker_record.warm()
 
 
 @app.get("/api/health")

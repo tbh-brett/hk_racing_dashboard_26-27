@@ -22,7 +22,7 @@ import pytest
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 from hkrd.jobs import decide_ticket, record_tickets
-from hkrd.query import banker_brief, banker_facts, banker_record, suggest
+from hkrd.query import banker_brief, banker_facts, banker_record, book_tier, suggest
 from hkrd.store.connect import get_conn, init_db, transaction
 
 DAY = "2026-11-18"
@@ -231,6 +231,75 @@ def test_a_new_result_does_redo_it(db, monkeypatch):
                                     for h in range(1, 9)])
         _bet(db, "b9", "2026-10-20", 1, 1, [2, 3])
     assert banker_record.record(conn=db)["overall"]["bankers"] == 5 and calls == [1]
+
+
+def _counting_rows(monkeypatch):
+    calls = []
+    real = banker_record._rows
+    monkeypatch.setattr(banker_record, "_rows", lambda *a: calls.append(1) or real(*a))
+    return calls
+
+
+def test_a_note_or_a_book_entry_does_not_redo_it(db, monkeypatch):
+    # Measured on the server, 17 Nov 2026: each one made the next DESK or
+    # BANKERS open the slow one, several times a day, and changed nothing --
+    # a note or entry only counts for a race it was written before.
+    with transaction(db):
+        _season(db)
+    banker_record.record(conn=db)
+    calls = _counting_rows(monkeypatch)
+    with transaction(db):
+        db.execute("INSERT INTO trial_notes (horse_name, trial_date, trial_no, note, written_at) "
+                   "VALUES ('H4-0', '2026-11-16', 1, 'asked', '2026-11-16T10:00:00+00:00')")
+        db.execute("INSERT INTO run_notes (horse_name, race_date, race_no, note, written_at) "
+                   "VALUES ('H4-0', '2026-10-10', 1, 'blocked', '2026-11-16T10:00:00+00:00')")
+        db.execute("INSERT INTO blackbook (id, horse_name, added_date, status, origin) "
+                   "VALUES ('bb_9', 'H4-0', '2026-11-16', 'active', 'owner')")
+    assert banker_record.record(conn=db)["overall"]["bankers"] == 4 and calls == []
+
+
+def test_an_edited_bet_does_redo_it(db, monkeypatch):
+    with transaction(db):
+        _season(db)
+    banker_record.record(conn=db)
+    calls = _counting_rows(monkeypatch)
+    with transaction(db):
+        db.execute("INSERT INTO bet_edits (bet_id, edited_at, field, old_value, new_value) "
+                   "VALUES ('b0', '2026-11-17T01:00:00+00:00', 'selections', '[]', '[]')")
+    banker_record.record(conn=db)
+    assert calls == [1]
+
+
+def test_it_is_kept_for_a_day_not_an_hour(db, monkeypatch):
+    with transaction(db):
+        _season(db)
+    banker_record.record(conn=db)
+    calls = _counting_rows(monkeypatch)
+    now = banker_record.time.monotonic()
+    monkeypatch.setattr(banker_record.time, "monotonic", lambda: now + 2 * 3600)
+    banker_record.record(conn=db)
+    assert calls == []
+    monkeypatch.setattr(banker_record.time, "monotonic", lambda: now + 25 * 3600)
+    banker_record.record(conn=db)
+    assert calls == [1]
+
+
+def test_the_warm_up_runs_off_the_request_path_and_fills_the_cache(db):
+    with transaction(db):
+        _season(db)
+    t = banker_record.warm()
+    t.join(timeout=30)
+    assert not t.is_alive() and banker_record._KEPT
+
+
+def test_the_desk_never_works_out_the_tier_record(db, monkeypatch):
+    # 155 ms worked out, 405 the first time in a process, and the desk shows
+    # his own record rather than the tier's (17 Nov 2026).
+    _card(db)
+    monkeypatch.setattr(book_tier, "record",
+                        lambda *a, **k: pytest.fail("the desk asked for the tier record"))
+    assert suggest.meeting(DAY, conn=db)["races"][0]["candidates"]
+    assert suggest.ticket(DAY, 1, 4, conn=db)["brief"]
 
 
 def test_kept_facts_are_read_back_and_never_recomputed(db, monkeypatch):

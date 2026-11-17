@@ -181,7 +181,7 @@ def ticket(date: str, race_no: int, banker_no: int, *, k: int | None = None,
         field = _field(conn, date, race_no)
         if not field:
             raise NotOnCard(f"no card stored for {date} race {race_no}")
-        tiers = book_tier.for_meeting(date, conn=conn)
+        tiers = book_tier.for_meeting(date, conn=conn, with_record=False)
         prices = _read(conn, date, race_no, field, None)
         out = _assemble(date, race_no, banker_no, prices,
                         tiers.get((race_no, banker_no)), k=k, unit_stake=unit_stake,
@@ -278,7 +278,12 @@ def meeting(date: str, *, conn: Connection | None = None) -> dict[str, Any]:
             "SELECT race_no, off_time, venue, distance, race_class FROM races "
             "WHERE race_date = ? ORDER BY race_no", (date,))]
         gone = races_gone_off(conn, date) if races else set()
-        tiers = book_tier.for_meeting(date, conn=conn) if races else {}
+        # Without each tier's record: the desk shows his own record in the
+        # brief, not the tier's. Measured on the 17 Nov copy, the tier record
+        # costs 155 ms to work out (405 ms the first time in a process) against
+        # 21-31 ms for the card's tiers alone, and it is worked out again
+        # hourly and after every note -- the desk was paying for it unseen.
+        tiers = book_tier.for_meeting(date, conn=conn, with_record=False) if races else {}
         decided = {(r["race_no"], r["banker_no"]) for r in conn.execute(
             "SELECT race_no, banker_no FROM ticket_decision WHERE race_date = ?", (date,))}
         out, every, market = [], [], {}

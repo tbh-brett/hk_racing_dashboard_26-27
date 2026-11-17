@@ -123,10 +123,29 @@ Your books only: `brett` and the legacy `personal` log. Kelvin's sheet is his.
 every runner of every race you banked in took 535 ms of a 640 ms read.
 `jobs/record_tickets` now keeps them once per race with a result
 (`runner_fact`, versioned, never rewritten), and the scorecard reads them back.
-A race not kept yet is worked out on the spot. What's kept is the slow half,
-held until a bet, a result, a note or the book changes. Your decisions and taps
-are the quick half, read on every request, so deciding never triggers the slow
-read. Measured on the copy: 212 ms cold, about 30 ms warm.
+A race not kept yet is worked out on the spot. What's kept in memory is the slow
+half, held until a bet is added, edited or removed, or a result lands, and a
+day at most. Your decisions and taps are the quick half, read on every request,
+so deciding never triggers the slow read.
+
+**When it is slow, measured on the server (17 Nov).** The first version also
+worked the slow half out again after every note or book entry and every hour.
+That made the next DESK or BANKERS open the slow one several times a day (6
+trial notes, 7 run notes and 7 book entries on 16 Nov alone) without changing
+any answer: a note only counts for a race it was written before. The desk also
+worked out the book tiers' own record, which it never shows: 155 ms, or 405 ms
+the first time. Both are gone, and the API works the scorecard out on a thread
+as it starts, so a deploy does not leave the cost to your first open. On a fully
+priced eleven-race card (14 Nov, 53 candidates, on the copy), the DESK view's
+work now takes:
+
+| When | Before | After |
+|---|---|---|
+| The first open in a fresh process | 469 ms | 240 ms (and warmed at start-up) |
+| The first open after a new result or bet | 391 ms | 241 ms |
+| Any other open | 112 ms | 118 ms |
+
+The BANKERS view alone: about 165 ms after a result, 26 ms otherwise.
 
 ## To deploy
 

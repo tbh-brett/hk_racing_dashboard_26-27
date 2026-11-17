@@ -38,6 +38,7 @@ acting on when it holds as the record grows, which is what this is for.
 """
 from __future__ import annotations
 
+import threading
 import time
 from collections import defaultdict
 from typing import Any
@@ -48,7 +49,7 @@ from hkrd.query.banker_facts import FACTS, VERSION, facts_for
 from hkrd.store.connect import Connection, db_file, get_conn
 from hkrd.store.tickets import FACT_COLUMNS
 
-__all__ = ["REASONS", "REASON_LABEL", "OWN_ACCOUNTS", "TAKEOUT", "BREAKEVEN", "THIN",
+__all__ = ["REASONS", "REASON_LABEL", "OWN_ACCOUNTS", "TAKEOUT", "BREAKEVEN", "THIN", "warm",
            "SINCE", "record", "line"]
 
 # What he can tell the desk that the database cannot see. Short on purpose: a
@@ -76,19 +77,27 @@ THIN = 30                        # bet_analysis.THIN_BETS: below it a figure is 
 SINCE = "2026-04-01"             # the book, and so "your own evidence", begins here
 
 # The heavy half -- every runner in his banker races with its facts and its
-# price's place chance -- is kept until a bet, a result, a note or the book
-# changes, an hour at most. A decision on the desk does not touch it: a race he
-# decides on enters it only once it has a result, which moves the mark anyway.
+# price's place chance -- is kept until a bet is added, edited or removed, or a
+# result lands, and a day at most.
+#
+# NOT on a note or a book entry, which the first version waited for. Measured
+# on the server on 17 Nov 2026, it made the next DESK or BANKERS open the slow
+# one (257 ms on a priced card against 117-133) several times a day -- 6 trial
+# notes, 7 run notes and 7 book entries on 16 Nov alone -- and never changed an
+# answer: a race's facts are kept once its result is in (`runner_fact`), and a
+# note or entry only counts for a race it was written before. Nor hourly: the
+# heavy half reads nothing else that moves. The day is the backstop for a
+# result corrected in place, which leaves the count where it was.
+#
+# A decision on the desk does not touch it: a race he decides on enters it only
+# once it has a result, which moves the mark anyway.
 _KEPT: dict[tuple, tuple[tuple, float, list]] = {}
-_KEEP_FOR = 3600.0
+_KEEP_FOR = 86400.0
 _MARK_SQL = """
 SELECT (SELECT count(*) || ',' || coalesce(max(rowid), 0) FROM bets),
+       (SELECT coalesce(max(edit_id), 0) FROM bet_edits),
        (SELECT count(*) || ',' || coalesce(max(race_date), '') FROM runners
-         WHERE place IS NOT NULL AND race_date >= ?),
-       (SELECT count(*) || ',' || coalesce(max(written_at), '') FROM trial_notes),
-       (SELECT count(*) || ',' || coalesce(max(written_at), '') FROM run_notes),
-       (SELECT count(*) || ',' || coalesce(max(added_date), '') || ','
-               || coalesce(max(closed_date), '') || ',' || sum(status = 'active') FROM blackbook)
+         WHERE place IS NOT NULL AND race_date >= ?)
 """
 
 
@@ -249,6 +258,21 @@ def _aggregate(rows: list[dict[str, Any]], decided: dict[tuple, str],
         "desk": {"taken": line([r for r in mine if decided.get(r["key"]) == "taken"]),
                  "passed": line(passed),
                  "with_reasons": sum(1 for r in mine + passed if reasons.get(r["key"]))}}
+
+
+def warm() -> threading.Thread:
+    """Work the scorecard out once, so the first DESK or BANKERS open after a
+    deploy does not pay for it. Measured on the server on 17 Nov 2026: the
+    first read in a fresh process 188-205 ms, a warm one 26 ms. The API calls
+    this at startup (api/app._warm).
+
+    On a thread of its own, so start-up does not wait on it and a failure in it
+    cannot keep the dashboard from serving. A thread's exception is printed to
+    the log by Python, never swallowed; the next request simply works the
+    scorecard out itself."""
+    t = threading.Thread(target=record, name="warm-banker-record", daemon=True)
+    t.start()
+    return t
 
 
 def record(*, account: str | None = None, conn: Connection | None = None) -> dict[str, Any]:
