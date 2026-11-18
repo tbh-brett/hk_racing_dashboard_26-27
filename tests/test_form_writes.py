@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from hkrd.jobs import write_notes
+from hkrd.jobs import write_book, write_notes
 from hkrd.query import formguide as fg
 from hkrd.query import pace as pace_q
 from hkrd.store import upsert
@@ -144,7 +144,7 @@ def test_a_horse_name_is_normalised_on_the_way_in(db):
 # ── promotion ────────────────────────────────────────────────────────────────
 
 def test_promotion_records_the_run_it_came_from(db):
-    entry = write_notes.promote_to_blackbook(
+    entry = write_book.promote_to_blackbook(
         "HORSE 0", reasoning="blocked at the 300", source_date="2026-05-01",
         source_race_no=1, tags=["traffic", "bad_draw"], db=db)
     assert entry["source_race"] == "2026-05-01 R1"
@@ -165,7 +165,7 @@ def test_promotion_records_the_run_it_came_from(db):
 def test_an_entry_without_a_reason_is_refused(db):
     """The reason is what makes it a thesis rather than a favourite."""
     with pytest.raises(ValueError):
-        write_notes.promote_to_blackbook("HORSE 0", reasoning="", db=db)
+        write_book.promote_to_blackbook("HORSE 0", reasoning="", db=db)
 
 
 def test_ids_continue_the_legacy_sequence(db):
@@ -174,22 +174,22 @@ def test_ids_continue_the_legacy_sequence(db):
     with transaction(conn):
         conn.execute("INSERT INTO blackbook (id, horse_name, added_date, status) "
                      "VALUES ('bb_0196', 'HORSE 9', '2026-01-01', 'expired')")
-    assert write_notes.next_entry_id(conn) == "bb_0197"
+    assert write_book.next_entry_id(conn) == "bb_0197"
     conn.close()
 
-    first = write_notes.promote_to_blackbook("HORSE 0", reasoning="one", db=db)
-    second = write_notes.promote_to_blackbook("HORSE 1", reasoning="two", db=db)
+    first = write_book.promote_to_blackbook("HORSE 0", reasoning="one", db=db)
+    second = write_book.promote_to_blackbook("HORSE 1", reasoning="two", db=db)
     assert (first["id"], second["id"]) == ("bb_0197", "bb_0198")
 
 
 def test_the_first_entry_in_an_empty_book_starts_at_one(db):
-    entry = write_notes.promote_to_blackbook("HORSE 0", reasoning="first", db=db)
+    entry = write_book.promote_to_blackbook("HORSE 0", reasoning="first", db=db)
     assert entry["id"] == "bb_0001"
 
 
 def test_a_source_run_with_no_date_still_records_the_race(db):
     """The same shape the legacy export used: 'R7' with no day."""
-    entry = write_notes.promote_to_blackbook(
+    entry = write_book.promote_to_blackbook(
         "HORSE 0", reasoning="from the trial", source_race_no=7, db=db)
     assert entry["source_race"] == "R7"
     conn = get_conn(db)

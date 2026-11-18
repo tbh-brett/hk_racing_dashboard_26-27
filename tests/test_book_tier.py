@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from hkrd.jobs import write_notes
+from hkrd.jobs import write_book, write_notes
 from hkrd.query import book_tier as bt
 from hkrd.store.connect import get_conn, init_db, transaction
 
@@ -135,7 +135,7 @@ def test_three_starts_since_booking_is_stale_and_renewing_restarts_it(tmp_path):
     assert bt.stale_entries(today=CARD, conn=conn) == {"bb_0001": 3}
     conn.close()
 
-    write_notes.renew("bb_0001", today="2026-09-24", db=path)
+    write_book.renew("bb_0001", today="2026-09-24", db=path)
     conn = get_conn(path)
     tiers = bt.for_meeting(CARD, conn=conn, with_record=False)
     assert tiers[(7, 2)]["tier"] == "EXCUSE"
@@ -210,11 +210,11 @@ def test_renew_refuses_a_closed_entry_and_an_unadopted_system_one(tmp_path):
         _entry(conn, "bb_0002", "SYSTEMS", "2026-09-01", origin="system")
     conn.close()
     with pytest.raises(ValueError):
-        write_notes.renew("bb_0001", db=path)
+        write_book.renew("bb_0001", db=path)
     with pytest.raises(ValueError):
-        write_notes.renew("bb_0002", db=path)
+        write_book.renew("bb_0002", db=path)
     with pytest.raises(KeyError):
-        write_notes.renew("bb_9999", db=path)
+        write_book.renew("bb_9999", db=path)
 
 
 # ── the race in one line, and the record ─────────────────────────────────────

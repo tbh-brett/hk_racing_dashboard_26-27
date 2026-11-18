@@ -18,7 +18,7 @@ import pytest
 
 from pathlib import Path
 
-from hkrd.jobs import write_notes
+from hkrd.jobs import write_book, write_notes
 from hkrd.query import trials as tq
 from hkrd.store import upsert
 from hkrd.store.connect import get_conn, init_db, transaction
@@ -154,7 +154,7 @@ def test_the_two_notes_are_addressed_differently_by_the_same_form() -> None:
 def test_a_trial_sourced_entry_is_marked_as_a_trial_not_a_race(db) -> None:
     """`2026-08-21 R1` would point the book at a race that was never run, and
     every later reader of `source_race` would believe it."""
-    entry = write_notes.promote_to_blackbook(
+    entry = write_book.promote_to_blackbook(
         "GOLDEN SIXTY", reasoning="trialled sharply",
         source_date=TRIAL, source_trial_no=1, db=db)
     assert entry["source_race"] == f"{TRIAL} T1"
@@ -173,7 +173,7 @@ def test_a_trial_sourced_entry_is_marked_as_a_trial_not_a_race(db) -> None:
 
 def test_a_race_sourced_entry_is_unchanged(db) -> None:
     """The trial path must not have moved the race path."""
-    entry = write_notes.promote_to_blackbook(
+    entry = write_book.promote_to_blackbook(
         "GOLDEN SIXTY", reasoning="ran on strongly",
         source_date=RACE, source_race_no=2, db=db)
     assert entry["source_race"] == f"{RACE} R2"
@@ -188,7 +188,7 @@ def test_the_trials_page_says_which_horses_are_already_followed(db) -> None:
     finally:
         conn.close()
 
-    write_notes.promote_to_blackbook(
+    write_book.promote_to_blackbook(
         "GOLDEN SIXTY", reasoning="trialled sharply",
         source_date=TRIAL, source_trial_no=1, db=db)
 

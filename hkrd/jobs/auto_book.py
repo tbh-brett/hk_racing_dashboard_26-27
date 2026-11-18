@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from hkrd.derive import book_candidates as bc
-from hkrd.jobs import write_notes
+from hkrd.jobs import write_book, write_notes
 from hkrd.query import auto_book as auto_q
 from hkrd.store import auto_book as auto_store, job_log
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
@@ -123,7 +123,7 @@ def _results(conn, report: AutoBookReport, date: str, basis: str, *,
         return
     with transaction(conn):
         for c in new:
-            write_notes.insert_entry(
+            write_book.insert_entry(
                 conn, c.horse_name, reasoning=c.reasoning(basis=basis),
                 added_date=_added(date, today), source_date=date,
                 source_race_no=c.source_no, tags=c.tags,
@@ -157,7 +157,7 @@ def _trials(conn, report: AutoBookReport, date: str, *, today: str,
         return
     with transaction(conn):
         for c in new:
-            write_notes.insert_entry(
+            write_book.insert_entry(
                 conn, c.horse_name, reasoning=c.reasoning(),
                 added_date=_added(date, today), source_date=date,
                 source_trial_no=c.source_no, tags=c.tags,
@@ -184,8 +184,8 @@ def _close_tested(conn, report: AutoBookReport) -> None:
             reason = (f"System entry, tested over its {auto_q.TESTED_RUNS} "
                       f"starts since booking: {wins} win{'s' * (wins != 1)}, "
                       f"{top3} in the first three. Not adopted.")
-            write_notes.close_tested(conn, r["id"], closed_date=closed,
-                                     reason=reason)
+            write_book.close_tested(conn, r["id"], closed_date=closed,
+                                    reason=reason)
             report.closed.append(f"{r['id']}  {wins}W {top3} top-3 in "
                                  f"{auto_q.TESTED_RUNS}")
 

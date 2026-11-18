@@ -87,10 +87,10 @@ def adopt_blackbook_entry(entry_id: str) -> dict:
     """Take a system entry into the owner's book. It keeps its origin — the
     system's record keeps every horse it booked — and from today it counts as
     the owner's too, and is no longer closed at the end of its test."""
-    from hkrd.jobs import write_notes
+    from hkrd.jobs import write_book
 
     try:
-        return write_notes.adopt(entry_id)
+        return write_book.adopt(entry_id)
     except KeyError as exc:
         raise HTTPException(404, f"no blackbook entry {exc.args[0]}") from exc
     except ValueError as exc:
@@ -101,10 +101,10 @@ def adopt_blackbook_entry(entry_id: str) -> dict:
 def renew_blackbook_entry(entry_id: str) -> dict:
     """Keep following a stale entry: its starts are counted again from today.
     Nothing else about it changes."""
-    from hkrd.jobs import write_notes
+    from hkrd.jobs import write_book
 
     try:
-        return write_notes.renew(entry_id)
+        return write_book.renew(entry_id)
     except KeyError as exc:
         raise HTTPException(404, f"no blackbook entry {exc.args[0]}") from exc
     except ValueError as exc:
@@ -120,12 +120,12 @@ def set_blackbook_status(entry_id: str, body: dict = Body(...)) -> dict:
     thesis and only means anything when reopening — the old one is kept on the
     entry's history rather than typed over.
     """
-    from hkrd.jobs import write_notes
+    from hkrd.jobs import write_book
 
     try:
-        return write_notes.set_status(entry_id, body.get("status", ""),
-                                      reason=body.get("reason"),
-                                      reasoning=body.get("reasoning"))
+        return write_book.set_status(entry_id, body.get("status", ""),
+                                     reason=body.get("reason"),
+                                     reasoning=body.get("reasoning"))
     except KeyError as exc:
         raise HTTPException(404, f"no blackbook entry {exc.args[0]}") from exc
     except ValueError as exc:
@@ -156,10 +156,10 @@ def set_blackbook_conditions(entry_id: str, body: dict = Body(...)) -> dict:
     condition, not two that contradict each other. An empty list clears them,
     which says the claim is about the horse rather than about a race.
     """
-    from hkrd.jobs import write_notes
+    from hkrd.jobs import write_book
 
     try:
-        return write_notes.set_triggers(entry_id, body.get("conditions") or [])
+        return write_book.set_triggers(entry_id, body.get("conditions") or [])
     except KeyError as exc:
         raise HTTPException(404, f"no blackbook entry {exc.args[0]}") from exc
     except ValueError as exc:

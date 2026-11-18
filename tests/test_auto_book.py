@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 from hkrd.derive import book_candidates as bc
-from hkrd.jobs import auto_book, write_notes
+from hkrd.jobs import auto_book, write_book, write_notes
 from hkrd.query import auto_book as auto_q, bets as bets_q, blackbook as bb
 from hkrd.store import upsert
 from hkrd.store.connect import get_conn, init_db, transaction
@@ -270,16 +270,16 @@ def test_a_meeting_is_read_once_so_a_dismissed_horse_stays_dismissed(db):
     _publish_comments(db)
     auto_book.run(db, since=MEETING, today=WAITING)
     first = _system(db)
-    write_notes.set_status(first[0]["id"], "retired", reason="not for me",
-                           db=db)
+    write_book.set_status(first[0]["id"], "retired", reason="not for me",
+                          db=db)
     auto_book.run(db, since=MEETING, today=BACKSTOP)
     assert len(_system(db)) == len(first)
 
 
 def test_a_horse_the_book_already_follows_is_not_booked_again(db):
-    write_notes.promote_to_blackbook("HELD UP LATE", reasoning="mine",
-                                     source_date=MEETING, source_race_no=1,
-                                     db=db)
+    write_book.promote_to_blackbook("HELD UP LATE", reasoning="mine",
+                                    source_date=MEETING, source_race_no=1,
+                                    db=db)
     _publish_comments(db)
     auto_book.run(db, since=MEETING, today=WAITING)
     assert "HELD UP LATE" not in {e["horse_name"] for e in _system(db)}
@@ -304,7 +304,7 @@ def _run_note(path, horse):
 def test_a_horse_already_followed_gets_the_reason_on_its_run_instead(db):
     """LET'S HAVE FUN, 2026-09-27: picked, already in the book, so no second
     entry — the reason it was picked goes on the run as its note."""
-    write_notes.promote_to_blackbook("HELD UP LATE", reasoning="mine", db=db)
+    write_book.promote_to_blackbook("HELD UP LATE", reasoning="mine", db=db)
     _publish_comments(db)
     report = auto_book.run(db, since=MEETING, today=WAITING)
     note = _run_note(db, "HELD UP LATE")
@@ -314,7 +314,7 @@ def test_a_horse_already_followed_gets_the_reason_on_its_run_instead(db):
 
 
 def test_the_owners_note_on_a_run_is_never_replaced(db):
-    write_notes.promote_to_blackbook("HELD UP LATE", reasoning="mine", db=db)
+    write_book.promote_to_blackbook("HELD UP LATE", reasoning="mine", db=db)
     write_notes.save_note("HELD UP LATE", MEETING, 1, "my own words", db=db)
     _publish_comments(db)
     report = auto_book.run(db, since=MEETING, today=WAITING)
@@ -403,7 +403,7 @@ def test_an_adopted_entry_is_the_owners_and_is_never_closed_for_them(db):
     _publish_comments(db)
     auto_book.run(db, since=MEETING, today=WAITING)
     e = next(e for e in _system(db) if e["horse_name"] == "HELD UP LATE")
-    out = write_notes.adopt(e["id"], db=db)
+    out = write_book.adopt(e["id"], db=db)
     assert out["origin"] == "system" and out["adopted_date"]
     _later_runs(db, "HELD UP LATE", [4, 1, 6])
     auto_book.run(db, since=MEETING, today="2026-10-20")
@@ -412,30 +412,30 @@ def test_an_adopted_entry_is_the_owners_and_is_never_closed_for_them(db):
 
 
 def test_nothing_but_the_owner_closes_an_owners_entry(db):
-    mine = write_notes.promote_to_blackbook("NOTHING", reasoning="mine", db=db)
+    mine = write_book.promote_to_blackbook("NOTHING", reasoning="mine", db=db)
     conn = get_conn(db)
     try:
         with pytest.raises(ValueError):
             with transaction(conn):
-                write_notes.close_tested(conn, mine["id"],
-                                         closed_date="2026-10-01", reason="x")
+                write_book.close_tested(conn, mine["id"],
+                                        closed_date="2026-10-01", reason="x")
     finally:
         conn.close()
 
 
 def test_only_a_system_entry_can_be_adopted(db):
-    mine = write_notes.promote_to_blackbook("NOTHING", reasoning="mine", db=db)
+    mine = write_book.promote_to_blackbook("NOTHING", reasoning="mine", db=db)
     with pytest.raises(ValueError):
-        write_notes.adopt(mine["id"], db=db)
+        write_book.adopt(mine["id"], db=db)
     with pytest.raises(KeyError):
-        write_notes.adopt("bb_nope", db=db)
+        write_book.adopt("bb_nope", db=db)
 
 
 # ── the owner's record stays the owner's ─────────────────────────────────────
 
 def test_system_entries_stay_out_of_the_owners_record(db):
-    write_notes.promote_to_blackbook("OUTRAN IT", reasoning="mine",
-                                     tags=["traffic"], db=db)
+    write_book.promote_to_blackbook("OUTRAN IT", reasoning="mine",
+                                    tags=["traffic"], db=db)
     _publish_comments(db)
     auto_book.run(db, since=MEETING, today=WAITING)
     _later_runs(db, "HELD UP LATE", [1])
@@ -459,7 +459,7 @@ def test_an_adopted_entry_counts_in_both_records(db):
     _publish_comments(db)
     auto_book.run(db, since=MEETING, today=WAITING)
     e = next(e for e in _system(db) if e["horse_name"] == "HELD UP LATE")
-    write_notes.adopt(e["id"], db=db)
+    write_book.adopt(e["id"], db=db)
     conn = get_conn(db)
     try:
         assert bb.book_summary(conn=conn)["total"] == 1
@@ -524,7 +524,7 @@ def test_a_standout_trial_is_booked_with_its_comment(db):
 def test_a_standout_already_followed_gets_a_trial_note_not_a_run_note(db):
     """A trial is a T, not an R: its note goes on the trial, where a note on
     race 3 of that date would be a different run altogether."""
-    write_notes.promote_to_blackbook("TRIAL STAR", reasoning="mine", db=db)
+    write_book.promote_to_blackbook("TRIAL STAR", reasoning="mine", db=db)
     _trials(db)
     auto_book.run(db, since=TRIAL_DAY, today=TRIAL_DAY)
     conn = get_conn(db)

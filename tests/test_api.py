@@ -180,10 +180,10 @@ def test_retiring_an_entry_stops_it_reading_as_live_on_the_card(booked, monkeypa
     18th in UTC, and the hour this used to fail at. The close is dated on Hong
     Kong's calendar, so "today" below is Hong Kong's and never the machine's.
     """
-    from hkrd.jobs import write_notes
+    from hkrd.jobs import clock
 
     at = dt.datetime(2026, 11, 18, 17, 0, tzinfo=dt.timezone.utc)
-    monkeypatch.setattr(write_notes, "_clock", lambda: at)
+    monkeypatch.setattr(clock, "_clock", lambda: at)
     today = "2026-11-19"
 
     out = booked.post("/api/blackbook/bb_1/status",
