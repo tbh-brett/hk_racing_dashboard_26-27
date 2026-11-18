@@ -50,6 +50,10 @@ __all__ = ["run", "AutoBookReport", "FIRST_DAY"]
 # `--pending` never looks before it.
 FIRST_DAY = "2026-09-01"
 
+# Today, unless told, is Hong Kong's: `_added` can stamp it on an entry, and
+# every race date it is then compared with is a Hong Kong date. UTC+8 all year.
+_HK = dt.timezone(dt.timedelta(hours=8))
+
 
 @dataclass
 class AutoBookReport:
@@ -220,7 +224,7 @@ def run(db: Path | None = None, *, since: str = FIRST_DAY,
     """Read every day that is ready, or exactly `dates`, then close the
     system entries whose test is over."""
     report = AutoBookReport()
-    today = today or dt.date.today().isoformat()
+    today = today or dt.datetime.now(_HK).date().isoformat()
     conn = get_conn(db if db is not None else db_path())
     try:
         init_db(conn)

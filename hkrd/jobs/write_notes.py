@@ -16,7 +16,7 @@ it does save them is the typing: the note text and the run arrive pre-filled.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from hkrd.store.connect import db_path, get_conn, transaction
@@ -29,9 +29,29 @@ __all__ = ["save_note", "delete_note", "save_trial_note",
 #: The trial note's second tap: what the horse found when it was asked.
 RESPONSES = ("strong", "fair", "none")
 
+#: Hong Kong, whose calendar every race date is on: UTC+8 all year round.
+_HK = timezone(timedelta(hours=8))
+
+
+def _clock() -> datetime:
+    """Now, in UTC: the one read of the time here, so a test can stop it."""
+    return datetime.now(timezone.utc)
+
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return _clock().isoformat(timespec="seconds")
+
+
+def _today() -> str:
+    """Today in Hong Kong, the calendar the race dates are on: a day stamped
+    here is read beside them, so it has to mean the same day they do.
+
+    Not SQLite's `date('now')`, which is UTC whatever the machine is set to:
+    an entry retired at 01:00 after a Wednesday night meeting was dated the
+    Wednesday, and read as already closed over the card it was followed on.
+    Not `date.today()` either, which is only right where TZ is Hong Kong.
+    """
+    return _clock().astimezone(_HK).date().isoformat()
 
 
 def save_note(horse_name: str, race_date: str, race_no: int, note: str, *,
@@ -193,14 +213,12 @@ def promote_to_blackbook(horse_name: str, *, reasoning: str,
     used to write was a decision nobody took, and it closed entries quietly
     while the row still read ACTIVE everywhere the date was not checked.
     """
-    from datetime import date
-
     conn = get_conn(db if db is not None else db_path())
     try:
         with transaction(conn):
             return insert_entry(
                 conn, horse_name, reasoning=reasoning,
-                added_date=date.today().isoformat(), source_date=source_date,
+                added_date=_today(), source_date=source_date,
                 source_race_no=source_race_no, source_trial_no=source_trial_no,
                 tags=tags, conditions=conditions, confidence=confidence)
     finally:
@@ -382,11 +400,12 @@ def set_status(entry_id: str, status: str, *, reason: str | None = None,
             if was is None:
                 raise KeyError(entry_id)
             if status in CLOSED:
-                # `date.today()`, not the run that prompted it: the decision was
-                # taken today whatever it was taken about.
+                # Today in Hong Kong, not the run that prompted it: the
+                # decision was taken today whatever it was taken about.
                 conn.execute(
-                    "UPDATE blackbook SET status = ?, closed_date = date('now'), "
-                    "closed_reason = ? WHERE id = ?", (status, reason, entry_id))
+                    "UPDATE blackbook SET status = ?, closed_date = ?, "
+                    "closed_reason = ? WHERE id = ?",
+                    (status, _today(), reason, entry_id))
             else:
                 # Reopening clears the close. A date left behind would make the
                 # entry read as live now and closed then at the same time.
@@ -428,8 +447,8 @@ def adopt(entry_id: str, *, db: Path | None = None) -> dict:
                 raise ValueError("only an entry the system booked can be "
                                  "adopted; this one is already yours")
             if row["adopted_date"] is None:
-                conn.execute("UPDATE blackbook SET adopted_date = date('now') "
-                             "WHERE id = ?", (entry_id,))
+                conn.execute("UPDATE blackbook SET adopted_date = ? "
+                             "WHERE id = ?", (_today(), entry_id))
         return dict(conn.execute(
             "SELECT id, horse_name, status, origin, adopted_date "
             "FROM blackbook WHERE id = ?", (entry_id,)).fetchone())
@@ -448,9 +467,7 @@ def renew(entry_id: str, *, today: str | None = None,
     count restarts. A system entry is renewed by adopting it first, since
     the system closes its own entries at the end of their test.
     """
-    from datetime import date
-
-    today = today or date.today().isoformat()
+    today = today or _today()
     conn = get_conn(db if db is not None else db_path())
     try:
         with transaction(conn):

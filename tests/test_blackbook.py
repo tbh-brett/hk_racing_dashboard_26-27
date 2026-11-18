@@ -896,13 +896,17 @@ def test_a_close_with_no_recorded_day_is_read_as_closed_today(db):
 # ── reopening, on a new reason ──────────────────────────────────────────────
 
 
-def test_retiring_stamps_the_day_and_the_reason(booked):
+def test_retiring_stamps_the_day_and_the_reason(booked, monkeypatch):
     """"Was I watching this horse THAT day" is a different question from "am I
-    watching it now", and the closing date is the only thing that answers it."""
-    import datetime as dt
+    watching it now", and the closing date is the only thing that answers it.
 
+    The clock is stopped, so the day is known whatever the hour and whatever
+    zone the machine is in: mid-afternoon in Hong Kong. The small hours, when
+    UTC is still on the day before, are the next test."""
     from hkrd.jobs import write_notes
 
+    at = dt.datetime(2026, 11, 19, 6, 30, tzinfo=dt.timezone.utc)   # 14:30 HKT
+    monkeypatch.setattr(write_notes, "_clock", lambda: at)
     conn = get_conn(booked)
     with transaction(conn):
         conn.execute("UPDATE blackbook SET status = 'active', "
@@ -913,8 +917,67 @@ def test_retiring_stamps_the_day_and_the_reason(booked):
                                  reason="beaten four times, thesis is dead",
                                  db=booked)
     assert out["status"] == "retired"
-    assert out["closed_date"] == dt.date.today().isoformat()
+    assert out["closed_date"] == "2026-11-19"
     assert out["closed_reason"] == "beaten four times, thesis is dead"
+
+
+def test_retiring_in_the_small_hours_stamps_the_hong_kong_day(booked, monkeypatch):
+    """01:00 on Thursday 19 November in Hong Kong is 17:00 on Wednesday the
+    18th in UTC, and SQLite's `date('now')` is UTC. A horse retired after
+    Wednesday night's meeting was dated the Wednesday -- and so read as
+    already closed over the very card it had been followed on.
+
+    Found 19 Nov 2026 at about 01:00 HKT, as two tests that only ever failed
+    before eight in the morning."""
+    from hkrd.jobs import write_notes
+
+    at = dt.datetime(2026, 11, 18, 17, 0, tzinfo=dt.timezone.utc)
+    monkeypatch.setattr(write_notes, "_clock", lambda: at)
+    conn = get_conn(booked)
+    with transaction(conn):
+        conn.execute("UPDATE blackbook SET status = 'active', "
+                     "closed_date = NULL WHERE id = 'bb_1'")
+        # Wednesday night at Happy Valley, the meeting it was retired after.
+        upsert.upsert_races(conn, [
+            {"race_date": "2026-11-18", "race_no": 1, "venue": "HV",
+             "course": "C", "surface": "Turf", "going": "G", "distance": 1650}])
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-11-18", "race_no": 1, "horse_no": 1,
+             "horse_name": "FAST ONE", "draw": 1}])
+    conn.close()
+
+    out = write_notes.set_status("bb_1", "retired", reason="beaten again",
+                                 db=booked)
+    assert out["closed_date"] == "2026-11-19"     # Hong Kong's day, not UTC's
+
+    conn = get_conn(booked)
+    wednesday = bb.for_race("2026-11-18", 1, conn=conn)[0]
+    conn.close()
+    assert wednesday["live_at_race"] == 1, "still followed on Wednesday night"
+
+
+def test_booking_adopting_and_renewing_are_dated_in_hong_kong_too(db, monkeypatch):
+    """Booked, renewed and adopted are days on the race dates' calendar -- an
+    entry is live from the day it was booked, and its starts count again from
+    the day it was renewed -- so each is the Hong Kong day, even at 01:00
+    when UTC is still on the day before."""
+    from hkrd.jobs import write_notes
+
+    at = dt.datetime(2026, 11, 18, 17, 0, tzinfo=dt.timezone.utc)   # 01:00 HKT
+    monkeypatch.setattr(write_notes, "_clock", lambda: at)
+
+    mine = write_notes.promote_to_blackbook("FAST ONE", reasoning="blocked",
+                                            db=db)
+    assert mine["added_date"] == "2026-11-19"
+    assert write_notes.renew(mine["id"], db=db)["renewed_date"] == "2026-11-19"
+
+    conn = get_conn(db)
+    with transaction(conn):
+        theirs = write_notes.insert_entry(
+            conn, "FILLER 2", reasoning="the system's pick",
+            added_date="2026-11-01", origin="system")
+    conn.close()
+    assert write_notes.adopt(theirs["id"], db=db)["adopted_date"] == "2026-11-19"
 
 
 def test_reopening_takes_a_new_thesis_and_keeps_the_old_one(booked):
