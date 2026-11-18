@@ -3,7 +3,12 @@
  *
  * docs/banker-card.md. Every banker you have taken since April -- the ledger's
  * and the desk's -- read with the facts knowable before its race, beside the
- * rest of the same fields read the same way. For each fact:
+ * rest of the same fields read the same way.
+ *
+ * It OPENS on the answer (rebuilt 19 Nov 2026, when the owner found the first
+ * version's fifteen panels a scroll without a point): what has paid for you,
+ * what has not, and your reasons' record. Every fact in full is folded below.
+ * For each fact there:
  *
  *   LEAN       how much more often your banker had it than the field did
  *   YOURS      how your bankers with it placed, against the price's own chance
@@ -95,13 +100,76 @@ function draw() {
   host.append(stats);
   host.append(el('div', 'caveat',
     'Your books only (Kelvin’s sheet is his). The price’s chance is the place pool where it was '
-    + 'captured, else the starting prices. LEAN is how much more often your banker had the fact '
-    + 'than the rest of the field did.'));
+    + 'captured, else the starting prices. A line needs ' + d.thin + ' bankers to be listed; '
+    + 'fourteen facts are read, so a few will clear by luck — what matters is which keep clearing.'));
 
+  const lists = el('div', 'bc-lists');
+  const { pays, costs } = verdicts(d);
+  lists.append(listEl('WHAT HAS PAID FOR YOU', `AT ${d.breakeven.toFixed(2)} OR BETTER`, 'pays', pays,
+    'Nothing yet has placed often enough to cover the takeout.'));
+  lists.append(listEl('WHAT HAS NOT', 'BELOW THE PRICE', 'costs', costs,
+    'Nothing with enough bankers has placed less often than the price said.'));
+  host.append(lists);
   const panels = el('div', 'panels');
-  d.facts.forEach((f) => panels.append(factPanel(f, d.breakeven)));
   panels.append(reasonsPanel(d));
   host.append(panels);
+
+  const fold = el('details', 'bc-fold');
+  fold.append(el('summary', null, `EVERY FACT IN FULL (${d.facts.length}) ▸`));
+  const all = el('div', 'panels');
+  d.facts.forEach((f) => all.append(factPanel(f, d.breakeven)));
+  fold.append(all);
+  host.append(fold);
+}
+
+/* Every line with enough bankers behind it that has paid, or has placed less
+ * often than the price -- the fact itself, and a side of your own evidence
+ * only where it says something the fact alone does not (the fact is thin, or
+ * lands on the other side of a line). Best and worst first. */
+function verdicts(d) {
+  const pays = [];
+  const costs = [];
+  const side = { with_own: 'with your evidence on it', without_own: 'without your evidence on it' };
+  const verdict = (ln) => (!ln || ln.thin || ln.ae === null || ln.ae === undefined ? null
+    : ln.ae >= d.breakeven ? 'pays' : ln.ae < 1 ? 'costs' : null);
+  d.facts.forEach((f) => f.values.forEach((v) => {
+    const whole = verdict(v);
+    const lines = [[v, null]];
+    if (f.key !== 'own') lines.push([v.with_own, 'with_own'], [v.without_own, 'without_own']);
+    lines.forEach(([ln, s]) => {
+      const got = verdict(ln);
+      if (!got || (s && got === whole)) return;
+      const item = { what: `${f.label}: ${v.value}${s ? ` — ${side[s]}` : ''}`, ln,
+                     lean: s ? null : v.lean, field: s ? null : v.field?.ae };
+      (got === 'pays' ? pays : costs).push(item);
+    });
+  }));
+  pays.sort((a, b) => b.ln.ae - a.ln.ae);
+  costs.sort((a, b) => a.ln.ae - b.ln.ae);
+  return { pays: pays.slice(0, 8), costs: costs.slice(0, 8) };
+}
+
+function listEl(title, note, cls, items, empty) {
+  const box = el('section', `bc-list ${cls}`);
+  const hd = el('div', 'bc-hd', title);
+  hd.append(el('span', null, note));
+  box.append(hd);
+  if (!items.length) box.append(el('div', 'empty-line', empty));
+  items.forEach((it) => {
+    const row = el('div', 'bc-item');
+    row.append(el('span', 'what', it.what));
+    const num = el('span', 'num');
+    num.append(el('b', null, ae(it.ln.ae)));
+    num.append(el('span', 'n', ` · ${it.ln.placed} of ${Number(it.ln.expected ?? 0).toFixed(1)} · ${it.ln.bankers} bankers`));
+    row.append(num);
+    const why = [];
+    if (it.lean !== null && it.lean !== undefined) why.push(`you pick it ${Number(it.lean).toFixed(1)}× as often as it turns up`);
+    if (it.field !== null && it.field !== undefined) why.push(`the runners like it you did not bank: ${ae(it.field)}`);
+    why.push(`95% interval ${ae(it.ln.ae_lo)} to ${ae(it.ln.ae_hi)}`);
+    row.append(el('span', 'why', why.join(' · ')));
+    box.append(row);
+  });
+  return box;
 }
 
 function factPanel(f, breakeven) {

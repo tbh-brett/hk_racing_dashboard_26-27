@@ -154,9 +154,9 @@ are given: `--since 2026-09-06 --facts-since 2026-04-01`.
 ## Not built
 
 - ~~**The page.**~~ **Built 17 Nov**, as the DESK and BANKERS views of the Bets
-  page, in the dashboard's own style with no artboard yet. Each candidate opens
-  to a brief of your own record, the ticket and TAKE or PASS. See
-  `docs/banker-card.md`.
+  page, in the dashboard's own style with no artboard yet. **Rebuilt 19 Nov**
+  one race at a time, with the candidates compared in a table, a multi check,
+  and races that have gone off kept for review. See `docs/banker-card.md`.
 - **Your verdict after the result ("whose fault").** The record names what went
   wrong with a ticket, and your taps say why you took it; your own verdict
   after the result has no table yet.

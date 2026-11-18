@@ -81,7 +81,7 @@ def _ts(stamp: str) -> dt.datetime:
 
 def _field(conn: Connection, date: str, race_no: int) -> list[dict[str, Any]]:
     return [dict(r) for r in conn.execute(
-        "SELECT horse_no, horse_name, draw, jockey FROM runners "
+        "SELECT horse_no, horse_name, draw, jockey, place FROM runners "
         "WHERE race_date = ? AND race_no = ? AND coalesce(place_code, '') NOT LIKE 'W%' "
         "ORDER BY horse_no", (date, race_no))]
 
@@ -186,6 +186,8 @@ def ticket(date: str, race_no: int, banker_no: int, *, k: int | None = None,
         out = _assemble(date, race_no, banker_no, prices,
                         tiers.get((race_no, banker_no)), k=k, unit_stake=unit_stake,
                         partners=partners)
+        out["banker"].update(_reads(_form_reads(conn, date), race_no, banker_no,
+                                    prices["book"]["by_no"][banker_no]))
         out["gone"] = race_no in races_gone_off(conn, date)
         out["decision"] = _decision(store.decision(conn, date, race_no, banker_no))
         banker_brief.attach(conn, [out], _market(date, race_no, prices),
@@ -201,17 +203,63 @@ def _market(date: str, race_no: int, prices: dict[str, Any]) -> dict[tuple, int]
     return {(date, race_no, h): r for h, r in prices["book"]["market_rank"].items()}
 
 
-def _runners(bk: dict[str, Any], tiers: dict[tuple, dict], race_no: int
-             ) -> list[dict[str, Any]]:
+def _runners(bk: dict[str, Any], tiers: dict[tuple, dict], race_no: int,
+             reads: dict[str, dict]) -> list[dict[str, Any]]:
     """The field, for nominating a banker or choosing partners: number, name,
-    price, place in the market and tier."""
+    price, place in the market, tier, chance of leading, the model's rank and,
+    once run, where it finished."""
     out = []
     for h, r in sorted(bk["by_no"].items()):
         t = tiers.get((race_no, h))
         out.append({"horse_no": h, "horse_name": r.get("horse_name"), "draw": r.get("draw"),
                     "jockey": r.get("jockey"), "win_odds": bk["win"].get(h),
                     "market_rank": bk["market_rank"].get(h),
-                    "tier": t["tier"] if t else None})
+                    "tier": t["tier"] if t else None, **_reads(reads, race_no, h, r)})
+    return out
+
+
+def _form_reads(conn: Connection, date: str) -> dict[str, dict]:
+    """Two things the desk compares candidates on that a ticket does not
+    carry, read once for the card: the pace model's chance of leading at the
+    first call (`runner_shape`, what the Speed Map shows) and the fundamental
+    model's rank in the race (`runner_gbm`, as the page showed it). A runner
+    either model has not scored is absent, never a guess."""
+    lead = {(r["race_no"], r["horse_no"]): r["p_lead"] for r in conn.execute(
+        "SELECT race_no, horse_no, p_lead FROM runner_shape WHERE race_date = ? "
+        "AND p_lead IS NOT NULL", (date,))}
+    p: dict[int, dict[int, float]] = {}
+    for r in conn.execute("SELECT race_no, horse_no, p_win FROM runner_gbm "
+                          "WHERE race_date = ? AND stage = 'latest'", (date,)):
+        p.setdefault(r["race_no"], {})[r["horse_no"]] = r["p_win"]
+    rank = {(n, h): i + 1 for n, m in p.items()
+            for i, h in enumerate(sorted(m, key=lambda x: (-m[x], x)))}
+    return {"lead": lead, "rank": rank}
+
+
+def _reads(reads: dict[str, dict], race_no: int, horse_no: int,
+           runner: dict[str, Any]) -> dict[str, Any]:
+    lead = reads["lead"].get((race_no, horse_no))
+    return {"lead_pct": None if lead is None else round(100 * lead, 1),
+            "model_rank": reads["rank"].get((race_no, horse_no)),
+            "finish": runner.get("place")}
+
+
+def _results(conn: Connection, date: str) -> dict[int, dict[str, Any]]:
+    """Each run race's first four and its quinella and quinella place
+    dividends, for reviewing a race on the desk once it is over."""
+    out: dict[int, dict[str, Any]] = {}
+    for r in conn.execute(
+            "SELECT race_no, horse_no, horse_name, place, win_odds FROM runners "
+            "WHERE race_date = ? AND place IS NOT NULL AND place <= 4 "
+            "ORDER BY race_no, place, horse_no", (date,)):
+        out.setdefault(r["race_no"], {"order": [], "dividends": {}})["order"].append(dict(r))
+    for r in conn.execute(
+            "SELECT race_no, pool, combination, dividend_per_10 FROM dividends "
+            "WHERE race_date = ? AND pool IN ('QIN', 'QPL') ORDER BY race_no, pool, "
+            "dividend_per_10", (date,)):
+        res = out.setdefault(r["race_no"], {"order": [], "dividends": {}})
+        res["dividends"].setdefault(r["pool"], []).append(
+            {"combination": r["combination"], "dividend": r["dividend_per_10"]})
     return out
 
 
@@ -269,8 +317,12 @@ def paper(date: str, race_no: int, *, lead: float = LEAD_MINUTES,
 def meeting(date: str, *, conn: Connection | None = None) -> dict[str, Any]:
     """Every race on a card with its candidate bankers -- the runners the owner
     has a tier on, his own evidence first -- each with the ticket the engine
-    builds from the latest capture. A race that has gone off lists none: what
-    was said about it is the record's to show (`query/ticket_record`)."""
+    builds from the latest capture, its chance of leading and the model's rank.
+
+    A race that has gone off stays listed, for reviewing the night race by
+    race: its candidates as they stood at the close, where each finished, and
+    the race's result and pair dividends. Deciding on it is late
+    (`jobs/decide_ticket`), so the page offers no decision there."""
     own = conn is None
     conn = conn or get_conn()
     try:
@@ -286,22 +338,26 @@ def meeting(date: str, *, conn: Connection | None = None) -> dict[str, Any]:
         tiers = book_tier.for_meeting(date, conn=conn, with_record=False) if races else {}
         decided = {(r["race_no"], r["banker_no"]) for r in conn.execute(
             "SELECT race_no, banker_no FROM ticket_decision WHERE race_date = ?", (date,))}
+        reads = _form_reads(conn, date) if races else {"lead": {}, "rank": {}}
+        results = _results(conn, date) if gone else {}
         out, every, market = [], [], {}
         for race in races:
             n = race["race_no"]
             field = _field(conn, date, n)
             entry = {**race, "field_size": len(field), "gone": n in gone,
-                     "captured_at": None, "runners": [], "candidates": []}
+                     "captured_at": None, "runners": [], "candidates": [],
+                     "result": results.get(n)}
             out.append(entry)
-            if n in gone or not field:
+            if not field:
                 continue
             prices = _read(conn, date, n, field, None)
             entry["captured_at"] = prices["win_at"]
-            entry["runners"] = _runners(prices["book"], tiers, n)
+            entry["runners"] = _runners(prices["book"], tiers, n, reads)
             market.update(_market(date, n, prices))
             on_card = {r["horse_no"] for r in field}
             for h in {h for (rn, h) in set(tiers) | decided if rn == n and h in on_card}:
                 t = _assemble(date, n, h, prices, tiers.get((n, h)))
+                t["banker"].update(_reads(reads, n, h, prices["book"]["by_no"][h]))
                 t["decision"] = (_decision(store.decision(conn, date, n, h))
                                  if (n, h) in decided else None)
                 entry["candidates"].append(t)

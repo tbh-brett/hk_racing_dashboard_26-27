@@ -224,12 +224,37 @@ def test_a_scratched_runner_is_out_of_the_field(db):
         suggest.ticket(DAY, 1, 5, conn=db)
 
 
-def test_a_race_that_has_gone_off_proposes_nothing(db):
+def test_a_race_that_has_gone_off_stays_listed_for_review(db):
+    # The owner reviews a night race by race (his 18 Nov reflection), so a run
+    # race keeps its candidates, with where each finished and the dividends.
     _card(db)
-    db.execute("INSERT INTO market_close VALUES (?, 1, ?, 'STOP_SELL')",
-               (DAY, f"{DAY}T20:01:00"))
+    with transaction(db):
+        _result(db, (3, 5, 1, 2, 4), close=f"{DAY}T20:01:00",
+                qin={(3, 5): 300.0}, qpl={(3, 5): 90.0, (1, 3): 40.0, (1, 5): 60.0})
     race = suggest.meeting(DAY, conn=db)["races"][0]
-    assert race["gone"] and race["candidates"] == []
+    assert race["gone"]
+    finish = {c["banker"]["horse_no"]: c["banker"]["finish"] for c in race["candidates"]}
+    assert finish == {3: 1, 9: None, 7: None}
+    assert [x["horse_no"] for x in race["result"]["order"]] == [3, 5, 1, 2]
+    assert race["result"]["dividends"]["QIN"] == [{"combination": "3,5", "dividend": 300.0}]
+
+
+def test_each_candidate_carries_its_chance_of_leading_and_the_models_rank(db):
+    _card(db)
+    with transaction(db):
+        db.execute("INSERT INTO runner_shape (race_date, race_no, horse_no, p_lead, "
+                   "model_version, inputs_key, scored_at) VALUES (?, 1, 3, 0.29, 'm', 'k', 'now')",
+                   (DAY,))
+        for h, p in ((3, 0.2), (9, 0.05), (1, 0.4)):
+            db.execute("INSERT INTO runner_gbm (race_date, race_no, horse_no, stage, p_win, "
+                       "model_version, derive_version, inputs_key, scored_at) VALUES "
+                       "(?, 1, ?, 'latest', ?, 'm', 'd', 'k', 'now')", (DAY, h, p))
+    race = suggest.meeting(DAY, conn=db)["races"][0]
+    b = {c["banker"]["horse_no"]: c["banker"] for c in race["candidates"]}
+    assert (b[3]["lead_pct"], b[3]["model_rank"], b[9]["model_rank"]) == (29.0, 2, 3)
+    assert b[9]["lead_pct"] is None and b[7]["model_rank"] is None     # not scored: absent
+    assert next(r for r in race["runners"] if r["horse_no"] == 1)["model_rank"] == 1
+    assert suggest.ticket(DAY, 1, 3, conn=db)["banker"]["lead_pct"] == 29.0
 
 
 # ── the decision ─────────────────────────────────────────────────────────────

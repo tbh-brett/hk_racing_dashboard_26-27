@@ -66,6 +66,42 @@ run · class against its last start · draw · how it usually runs · rider's la
 The market is the starting price for a run with a result, and the capture the
 ticket was priced on for a card.
 
+## The desk page, rebuilt 19 Nov
+
+The first DESK view (17 Nov) put all nine races on one long page, one click per
+candidate, with a fourteen-fact brief on each. Brett did not use it: "not at all
+intuitive (infinite scroll)", and its purpose was unclear. He wrote his banker
+reasoning for 18 Nov in a text file instead. Rebuilt the next day around how he
+actually decides, race by race, comparing his own horses (`web/assets/desk.js`,
+`desk-detail.js`):
+
+- **Race chips.** One per race, showing how many of his horses run and a ✓
+  once he has decided. The next race to run opens first.
+- **One table per race.** His candidates side by side, with:
+  - how strong his evidence is (the trial-note response he tapped, or the
+    book entry and its excuse) and how many days before the race he wrote it;
+  - the place pool's chance;
+  - the pace model's chance of leading (`runner_shape`, as the Speed Map has
+    it), with the race's three likeliest leaders listed above the table;
+  - the model's rank;
+  - the facts his record has gone better (▲) or worse (▼) with, by name.
+
+  On 18 Nov his R7 case rested on RIDING TOGETHER leading, which the pace
+  model gave 13%.
+- **One row opens.** His words, his record, the ticket, then TAKE or PASS.
+- **The multi.** How often the bankers he has taken would all place, beside
+  the likeliest of his own horses in the same races. On 18 Nov his three were
+  about 5% at five minutes out; PRESTIGE GOOD and VIRTUS GLORY, both his own
+  book horses, would have made it about 10%.
+- **Races that have gone off stay on the page** with the result, the pair
+  dividends and where each of his horses finished, so a night can be reviewed
+  race by race.
+
+The BANKERS view opens on two lists, what has paid for him (at break-even or
+better) and what has not (below the price), each line with its count and
+interval. A side of his evidence is listed only where it says something the
+fact alone does not. His reasons follow, and every fact in full is folded below.
+
 ## The brief
 
 Everything is read on one side of your evidence. Each side has a usual: 1.30
