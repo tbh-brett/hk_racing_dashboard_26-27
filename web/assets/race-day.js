@@ -22,6 +22,7 @@ import { install as installPalette } from './palette.js';
 import { isSystem } from './book-origin.js';
 import { tierChip, tierRank } from './book-tier.js';
 import { agentShort, backgroundBlock, backgroundView, verdictChip } from './background.js';
+import { sidePanel } from './side-panel.js';
 
 const svg = (tag, attrs) => {
   const n = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -964,7 +965,12 @@ function flagsCell(r) {
 function cardRow(r, index) {
   const tr = el('tr');
   tr.setAttribute('aria-selected', String(index === state.selected));
-  tr.addEventListener('mouseenter', () => { state.selected = index; renderDetail(); });
+  // A mouse selects by passing over the row and a finger by tapping it.
+  // Safari's imitation hover on a tap is left unheard: it would redraw the
+  // panel before the tap lands, and a tap on a link in the row could be lost.
+  tr.addEventListener('pointerenter', (e) => {
+    if (e.pointerType !== 'touch') { state.selected = index; renderDetail(); }
+  });
   tr.addEventListener('click', () => { state.selected = index; renderDetail(); });
 
   const no = el('td', 'td-no');
@@ -1650,6 +1656,7 @@ async function init() {
   renderNav($('nav'), 'raceday.html');
   installPalette();
   document.addEventListener('keydown', onKey);
+  sidePanel({ panel: $('detail-panel'), toggle: $('detail-toggle'), key: 'race-day-detail' });
   context.onChange(onContext);
   await context.init();
   await onContext(context, 'meeting');

@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="../assets/background.css">
 <link rel="stylesheet" href="../assets/book-tier.css">
 <link rel="stylesheet" href="../assets/record-panel.css">
+<link rel="stylesheet" href="../assets/side-panel.css">
 <!-- every module this page imports, asked for at once (tests/test_web_preload.py keeps the list true) -->
 <link rel="modulepreload" href="../assets/api.js">
 <link rel="modulepreload" href="../assets/background.js">
@@ -26,6 +27,7 @@
 <link rel="modulepreload" href="../assets/palette.js">
 <link rel="modulepreload" href="../assets/race-day.js">
 <link rel="modulepreload" href="../assets/record-panel.js">
+<link rel="modulepreload" href="../assets/side-panel.js">
 <link rel="modulepreload" href="../assets/vocab.js">
 </head>
 <body>
@@ -40,6 +42,12 @@
   <div class="label">RACE</div>
   <div class="race-chips" id="race-chips"></div>
   <div class="strip-right" id="strip-right"></div>
+  <!-- Beside the changes rather than in them: race-day.js rewrites
+       #strip-right whole on every refresh. -->
+  <div class="panel-slot">
+    <button class="panel-toggle" id="detail-toggle"
+            aria-controls="detail-panel" aria-expanded="false">DETAIL PANEL</button>
+  </div>
 </div>
 
 <div class="band band-bb" id="band-bb"></div>
@@ -59,7 +67,13 @@
     </table>
     <div class="card-foot" id="card-foot"></div>
   </div>
-  <aside class="detail" id="detail"></aside>
+  <!-- Docked beside the card on a wide window, laid over it on a narrow one;
+       DETAIL PANEL in the strip brings it out either way. See side-panel.js. -->
+  <aside class="detail side-panel" id="detail-panel" aria-label="Selected runner">
+    <div class="side-panel-bar">DETAIL PANEL
+      <button class="side-panel-close" type="button">HIDE ✕</button></div>
+    <div id="detail"></div>
+  </aside>
 </div>
 
 <script type="module" src="../assets/race-day.js"></script>

@@ -1,0 +1,62 @@
+/* side-panel.css — a right-hand panel that docks on a wide window and lies
+ * over the page on a narrow one. Open or shut is side-panel.js's; where it
+ * sits is this file's, keyed to the same 1440px. */
+
+.side-panel-bar {
+  display: flex; align-items: center; gap: 8px; height: 30px;
+  padding: 0 6px 0 12px; border-bottom: 1px solid var(--line-2);
+  background: var(--surface-2); font-family: var(--font-mono);
+  font-size: var(--fs-xs); letter-spacing: .1em; color: var(--text-muted);
+}
+.side-panel-close {
+  margin-left: auto; padding: 2px 8px; cursor: pointer;
+  font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .1em;
+  color: var(--text-muted); background: transparent; border: 1px solid var(--line-3);
+}
+.side-panel-close:hover { color: var(--text); background: var(--surface); }
+
+/* The strip button. Drawn here whole rather than borrowed from the Form
+   Guide's `.strip-btn`, because Race Day does not load that sheet. Pressed, it
+   says the panel is out the way a pressed race chip says which race is showing. */
+.panel-toggle {
+  font-family: var(--font-mono); font-size: var(--fs-sm); cursor: pointer;
+  color: var(--text-muted); background: transparent;
+  border: 1px solid var(--line-3); padding: 1px 8px; letter-spacing: .06em;
+  white-space: nowrap;
+}
+.panel-toggle:hover { color: var(--text); background: var(--surface-2); }
+.panel-toggle[aria-expanded="true"] {
+  color: var(--text); background: var(--surface-2);
+  box-shadow: inset 0 -2px 0 var(--alert);
+}
+
+/* A place for the button in a strip whose right side the page rewrites. */
+.panel-slot {
+  display: flex; align-items: center; padding: 0 14px;
+  border-left: 1px solid var(--line-2);
+}
+
+/* Docked: in the page's flow, as drawn. Shut, it gives its width back. */
+@media (min-width: 1440px) {
+  .side-panel:not(.open) { display: none; }
+}
+
+/* Over the page: pinned to the window's right edge, full height, scrolling on
+   its own. The card underneath stays live, so a tap on another runner's row
+   changes what the panel shows without shutting it. */
+@media (max-width: 1439.98px) {
+  .side-panel {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: var(--z-panel);
+    max-width: 100vw; overflow-y: auto; overscroll-behavior: contain;
+    box-shadow: var(--shadow-panel);
+    transform: translateX(100%); visibility: hidden;
+    transition: transform .18s ease, visibility 0s linear .18s;
+  }
+  .side-panel.open {
+    transform: none; visibility: visible;
+    transition: transform .18s ease;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .side-panel, .side-panel.open { transition: none; }
+}

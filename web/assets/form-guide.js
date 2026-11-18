@@ -21,6 +21,7 @@ import { install as installPalette } from './palette.js';
 import { loadTags, renderReview, trialSubject } from './review.js';
 import { isSystem } from './book-origin.js';
 import { replayLink } from './replay.js';
+import { sidePanel } from './side-panel.js';
 
 
 /* The trend tint's threshold, measured rather than chosen. Over 12,540 six-run
@@ -363,8 +364,16 @@ function horseRow(runner) {
   const sys = live && isSystem(bb);
   const row = el('div', `fg-row${open ? ' open' : ''}${live ? ' booked' : ''}${sys ? ' sys' : ''}`);
   row.setAttribute('role', 'row');
-  row.addEventListener('click', () => toggleHorse(runner.horse_no));
-  row.addEventListener('mouseenter', () => focusHorse(runner));
+  // A mouse names the runner the fit panel shows by passing over the row. A
+  // finger never passes over anything, so on a touch screen the tap that opens
+  // the row names it; Safari's imitation hover on a tap is left unheard.
+  row.addEventListener('click', () => {
+    toggleHorse(runner.horse_no);
+    focusHorse(runner);
+  });
+  row.addEventListener('pointerenter', (e) => {
+    if (e.pointerType !== 'touch') focusHorse(runner);
+  });
 
   row.append(el('div', 'no', String(runner.horse_no ?? DASH)));
 
@@ -1013,10 +1022,11 @@ function detailBlock(runner) {
 /* ── condition-fit aside ─────────────────────────────────────────────────── */
 
 function renderAside() {
-  const host = $('fit-aside');
+  const host = $('fit-body');
   const runner = state.focus;
   if (!runner) {
-    host.replaceChildren(el('div', 'fit-sub', 'HOVER A RUNNER'));
+    host.replaceChildren(el('div', 'fit-sub',
+      window.matchMedia('(hover: hover)').matches ? 'HOVER A RUNNER' : 'TAP A RUNNER'));
     return;
   }
   const bb = state.guide?.blackbook?.[runner.horse_name];
@@ -1477,6 +1487,7 @@ async function init() {
     render();
   });
   document.addEventListener('keydown', onKey);
+  sidePanel({ panel: $('fit-panel'), toggle: $('fit-toggle'), key: 'form-guide-fit' });
 
   await loadTags();
   context.onChange(onContext);

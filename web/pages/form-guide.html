@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="../assets/pages.css">
 <link rel="stylesheet" href="../assets/formguide.css">
 <link rel="stylesheet" href="../assets/replay.css">
+<link rel="stylesheet" href="../assets/side-panel.css">
 <!-- every module this page imports, asked for at once (tests/test_web_preload.py keeps the list true) -->
 <link rel="modulepreload" href="../assets/api.js">
 <link rel="modulepreload" href="../assets/book-origin.js">
@@ -21,6 +22,7 @@
 <link rel="modulepreload" href="../assets/palette.js">
 <link rel="modulepreload" href="../assets/replay.js">
 <link rel="modulepreload" href="../assets/review.js">
+<link rel="modulepreload" href="../assets/side-panel.js">
 <link rel="modulepreload" href="../assets/vocab.js">
 </head>
 <body>
@@ -39,6 +41,8 @@
     <span id="open-count">0 EXPANDED</span>
     <button class="strip-btn" id="expand-all">EXPAND ALL</button>
     <button class="strip-btn" id="collapse-all">COLLAPSE ALL</button>
+    <button class="strip-btn panel-toggle" id="fit-toggle"
+            aria-controls="fit-panel" aria-expanded="false">FIT PANEL</button>
   </div>
 </div>
 
@@ -56,7 +60,13 @@
     <div class="fg-foot" id="fg-foot"></div>
   </div>
 
-  <aside class="fit-aside" id="fit-aside"></aside>
+  <!-- Docked beside the card on a wide window, laid over it on a narrow one;
+       FIT PANEL in the strip brings it out either way. See side-panel.js. -->
+  <aside class="fit-aside side-panel" id="fit-panel" aria-label="How this horse fits today">
+    <div class="side-panel-bar">FIT PANEL
+      <button class="side-panel-close" type="button">HIDE ✕</button></div>
+    <div id="fit-body"></div>
+  </aside>
 </div>
 
 <!-- The floating host. `review` is the content vocabulary it carries; the
