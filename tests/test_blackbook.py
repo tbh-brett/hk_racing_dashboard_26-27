@@ -265,9 +265,13 @@ def test_an_entry_with_no_runs_since_reports_zero_not_absent(booked):
     """A booking that has not been tested yet must still appear, with a zero.
     Dropping it would make the book look better tested than it is."""
     conn = get_conn(booked)
+    # A month before today, not a fixed day. The review rule reads the real
+    # clock, and an untested booking is owed a verdict at 180 days: the
+    # 2026-08-01 this used to be turns 180 on 2027-01-28.
+    booked_on = (dt.date.today() - dt.timedelta(days=30)).isoformat()
     with transaction(conn):
         conn.execute("INSERT INTO blackbook (id, horse_name, added_date, status)"
-                     " VALUES ('bb_new', 'FAST ONE', '2026-08-01', 'active')")
+                     " VALUES ('bb_new', 'FAST ONE', ?, 'active')", (booked_on,))
     rows = {e["id"]: e for e in bb.list_entries(conn=conn)}
     conn.close()
     assert rows["bb_new"]["runs_since"] == 0
@@ -345,13 +349,18 @@ def test_runs_that_did_not_meet_the_conditions_do_not_count_against_it(booked):
 
     conn = get_conn(booked)
     today = dt.date.today()
-    # Five recent runs, every one of them at the wrong trip. Recent, so the
+    # Six recent runs, every one of them at the wrong trip. Recent, so the
     # other half of the rule — the thesis that never gets its race — has not
     # run out and cannot be what answers this.
+    #
+    # All six are dated from today, like the booking. The sixth used to be
+    # the fixture's 2026-07-01 run, which a booking 100 days back passed on
+    # 2026-10-10, and the count fell to five. The fixture's runs are all
+    # before the booking now and only get further before it.
     with transaction(conn):
         conn.execute("INSERT INTO blackbook_trigger (id, kind, op, value) "
                      "VALUES ('bb_1', 'distance', 'is', '1200')")
-        for n, back in enumerate((70, 50, 30, 20, 10), start=2):
+        for n, back in enumerate((90, 70, 50, 30, 20, 10), start=2):
             day = (today - dt.timedelta(days=back)).isoformat()
             conn.execute("INSERT INTO races (race_date, race_no, venue, course, "
                          "surface, going, distance) VALUES (?, ?, 'HV', 'C', "
@@ -370,16 +379,19 @@ def test_a_thesis_that_never_gets_its_race_is_eventually_owed_one_too(booked):
     """Every entry in the archive that eventually placed did so within 150 days
     of being booked. At 180 with no qualifying run, the silence is the answer —
     and the question it raises is whether the condition was ever realistic."""
-    import datetime as dt
-
     conn = get_conn(booked)
     with transaction(conn):
         conn.execute("UPDATE races SET distance = 1650")
         conn.execute("INSERT INTO blackbook_trigger (id, kind, op, value) "
                      "VALUES ('bb_1', 'distance', 'is', '1200')")
-    long_ago = (dt.date.today() - dt.timedelta(days=200)).isoformat()
-    entry = _live(conn, added_date=long_ago)
+    # A fixed day, not "200 days ago". The fixture's runs are fixed too, and a
+    # booking that moves with the calendar moves past them: from 2027-01-18
+    # this horse would have no runs since at all, and the test would go on
+    # passing about an entry that never ran rather than one that ran and never
+    # got its trip. Its age only grows, so it stays past the rule's 180 days.
+    entry = _live(conn, added_date="2026-01-01")
     conn.close()
+    assert entry["runs_since"] == 4, "it ran, just never at the trip"
     assert entry["runs_on_conditions"] == 0 and entry["review_due"] is True
     assert entry["review_reason"].endswith("has not run its conditions yet")
 
