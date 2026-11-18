@@ -14,13 +14,38 @@ two callers that need them is what stops a third page inventing a third answer.
 """
 from __future__ import annotations
 
+import datetime as dt
 from typing import Any
 
 from hkrd.query import triggers as trig_q
 from hkrd.store.connect import Connection, get_conn
 
-__all__ = ["for_race", "declared_on", "LIVE_AT_RACE_SQL"]
+__all__ = ["for_race", "declared_on", "today", "LIVE_AT_RACE_SQL"]
 
+#: Hong Kong, whose calendar every race date is on: UTC+8 all year round.
+_HK = dt.timezone(dt.timedelta(hours=8))
+
+
+def _clock() -> dt.datetime:
+    """Now, in UTC: the one read of the time here, so a test can stop it."""
+    return dt.datetime.now(dt.timezone.utc)
+
+
+def today() -> str:
+    """Today in Hong Kong: the day a close nobody dated is read as (below).
+
+    One value for both copies of the rule. The band binds it into its SQL and
+    `book_tier` hands it to `_live`, so the two cannot read two different days.
+    """
+    return _clock().astimezone(_HK).date().isoformat()
+
+
+# Was this entry a LIVE thesis over that race — as opposed to one I hold now?
+#
+# Two different questions, and the band over an archived card asks the second
+# one. A horse retired in December must not rewrite every September card to say
+# the thesis had never been standing; equally, a horse retired in June must not
+# go on lighting up today's card as though it were still being followed. That
 # is the bug this replaces: nothing here read `status` at all, so an entry
 # retired by hand stayed live everywhere except the Blackbook page itself.
 #
@@ -29,11 +54,17 @@ __all__ = ["for_race", "declared_on", "LIVE_AT_RACE_SQL"]
 # and over an archived card the honest default is the one that does not erase a
 # thesis that was, as far as anything here knows, standing at the time. Every
 # close from now on carries its date, so this fallback only ever covers entries
-# retired before there was a column to record it in.
+# retired before there was a column to record it in: six on 19 Nov 2026.
+#
+# TODAY IS HONG KONG'S, BOUND IN AS `:today` from `today()`. It was SQLite's
+# `date('now')`, which is UTC: at 01:00 after a Wednesday night meeting UTC is
+# still on Wednesday, so the card just run read the entry as already closed.
+# And `book_tier._live` read the same missing day as never closed, which put a
+# tier chip on today's card beside a band saying the entry was not live.
 LIVE_AT_RACE_SQL = """
     (b.added_date <= r.race_date
      AND (b.status = 'active'
-          OR coalesce(b.closed_date, date('now')) > r.race_date))"""
+          OR coalesce(b.closed_date, :today) > r.race_date))"""
 
 # Did this run ask the question the thesis was about — "first time at the trip
 # since you booked it" rather than merely "runs today".
@@ -75,7 +106,7 @@ def for_race(date: str, race_no: int, *, conn: Connection | None = None
     Closed entries are returned too, flagged: a horse I once followed and gave
     up on is worth knowing about when it turns up, and dropping it is how the
     band silently under-reports. What it must NOT do is read as a live thesis —
-    see `_LIVE_AT_RACE_SQL`, which is what every caller gates its highlight on.
+    see `LIVE_AT_RACE_SQL`, which is what every caller gates its highlight on.
 
     `status` is the entry's state NOW. On an archived race that is not the same
     question as "was I watching this horse that day", so `live_at_race` is
@@ -99,9 +130,9 @@ def for_race(date: str, race_no: int, *, conn: Connection | None = None
             JOIN runners r ON r.horse_name = b.horse_name
             LEFT JOIN races a ON a.race_date = r.race_date
                              AND a.race_no = r.race_no
-            WHERE r.race_date = ? AND r.race_no = ?
+            WHERE r.race_date = :date AND r.race_no = :race_no
             ORDER BY r.horse_no
-        """, (date, race_no)).fetchall()])
+        """, {"date": date, "race_no": race_no, "today": today()}).fetchall()])
     finally:
         if own:
             conn.close()
@@ -135,9 +166,9 @@ def declared_on(date: str, *, conn: Connection | None = None
             JOIN runners r ON r.horse_name = b.horse_name
             LEFT JOIN races a ON a.race_date = r.race_date
                              AND a.race_no = r.race_no
-            WHERE r.race_date = ?
+            WHERE r.race_date = :date
             ORDER BY r.race_no, r.horse_no
-        """, (date,)).fetchall()])
+        """, {"date": date, "today": today()}).fetchall()])
     finally:
         if own:
             conn.close()
