@@ -470,23 +470,29 @@ def summary(*, account: str | None = None,
         clauses.append(frag)
         params.extend(wp)
         where = f"WHERE {' AND '.join(clauses)}"
+        # Strike rate over bets that RESOLVED, as `bet_analysis.slice_stats`
+        # has it: counted as misses, 150 split Q+QP halves with money back
+        # read as losers (17 Nov 2026).
         total = conn.execute(f"""
             SELECT count(*) bets, sum(stake) staked, sum(returned) returned,
                    sum(CASE WHEN hit = 1 THEN 1 ELSE 0 END) hits,
+                   count(hit) resolved,
                    min(race_date) first_date, max(race_date) last_date,
                    count(DISTINCT race_date) meetings
             FROM bets {where}""", params).fetchone()
         by_type = _rows(conn, f"""
             SELECT bet_type, count(*) bets, sum(stake) staked,
                    sum(returned) returned,
-                   sum(CASE WHEN hit = 1 THEN 1 ELSE 0 END) hits
+                   sum(CASE WHEN hit = 1 THEN 1 ELSE 0 END) hits,
+                   count(hit) resolved
             FROM bets {where}
             GROUP BY bet_type ORDER BY sum(stake) DESC""", params)
         for row in by_type:
             row["roi"] = (round((row["returned"] - row["staked"]) / row["staked"], 3)
                           if row["staked"] else None)
-            row["strike_rate"] = (round(row["hits"] / row["bets"], 3)
-                                  if row["bets"] else None)
+            row["unresolved"] = row["bets"] - row["resolved"]
+            row["strike_rate"] = (round(row["hits"] / row["resolved"], 3)
+                                  if row["resolved"] else None)
 
         staked = total["staked"] or 0
         return {
@@ -496,8 +502,10 @@ def summary(*, account: str | None = None,
             "pnl": round((total["returned"] or 0) - staked, 2),
             "roi": round(((total["returned"] or 0) - staked) / staked, 3) if staked else None,
             "hits": total["hits"] or 0,
-            "strike_rate": (round(total["hits"] / total["bets"], 3)
-                            if total["bets"] else None),
+            "resolved": total["resolved"] or 0,
+            "unresolved": (total["bets"] or 0) - (total["resolved"] or 0),
+            "strike_rate": (round(total["hits"] / total["resolved"], 3)
+                            if total["resolved"] else None),
             "meetings": total["meetings"] or 0,
             "span": [total["first_date"], total["last_date"]],
             "by_type": by_type,

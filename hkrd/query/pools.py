@@ -42,7 +42,8 @@ from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["place_probabilities", "ranked_pairs", "pair_probabilities",
            "latest_pair_odds", "places_paid", "PLACE_PAYING_FIELD",
-           "PAIR_POOLS", "doubles_conditional", "doubles_after_leg"]
+           "PAIR_POOLS", "doubles_conditional", "doubles_after_leg",
+           "frozen_legs"]
 
 # HKJC pays three places in fields of seven or more, two below that, and runs
 # no quinella place pool at all under seven. One definition, because the
@@ -462,3 +463,38 @@ def doubles_after_leg(date: str, leg_no: int, *,
     finally:
         if own:
             conn.close()
+
+
+def frozen_legs(conn: Connection, date: str, live: set[int]
+                ) -> tuple[set[int], set[int]]:
+    """The doubles legs whose final grid is already stored, and every leg seen.
+
+    The property `doubles_after_leg` reads, from the capture's side: once a
+    leg's first race shuts, every later read of its grid is the same grid. On
+    production's copy of 16 Nov 2026, the first capture after the close held
+    the final grid exactly on all 168 legs with a recorded close, and the last
+    capture before it differed on 167. So a leg is read ONCE after its first
+    race shuts, and that read is its settled book. Before this, 868,034 of
+    2,174,538 stored doubles rows (40%) were that frozen grid read again, up to
+    67 times a leg.
+
+    `live` is the races the capture still prices. A first race that is not live
+    and has no recorded close went by the clock backstop, so what is stored is
+    all there will be. A leg with no first race on record stays open.
+    """
+    closes = {r["race_no"]: r["closed_at"] for r in conn.execute(
+        "SELECT race_no, closed_at FROM market_close WHERE race_date = ?",
+        (date,))}
+    frozen: set[int] = set()
+    known: set[int] = set()
+    for r in conn.execute(
+            "SELECT leg_no, race_first, max(captured_at) last FROM odds_doubles "
+            "WHERE race_date = ? GROUP BY leg_no", (date,)):
+        known.add(r["leg_no"])
+        first = r["race_first"]
+        if first is None or first in live:
+            continue
+        closed = closes.get(first)
+        if closed is None or (r["last"] or "") >= closed:
+            frozen.add(r["leg_no"])
+    return frozen, known

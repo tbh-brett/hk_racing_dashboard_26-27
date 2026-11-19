@@ -30,6 +30,7 @@ from pathlib import Path
 
 from hkrd.ingest import statement
 from hkrd.store.bet_edits import deleted_identities, reassert_edits
+from hkrd.store.bets import resolve_split_hits
 from hkrd.store.coerce import to_date
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
@@ -47,6 +48,9 @@ class StatementImportReport:
     # were not written back. Counted, because a statement that quietly read
     # fewer bets than it holds looks exactly like one that failed to parse.
     left_deleted: int = 0
+    # Halves of a split Q+QP credit whose hit the dividends settled, this
+    # statement's and any earlier one's still unknown.
+    split_settled: int = 0
     unparsed: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
@@ -58,6 +62,9 @@ class StatementImportReport:
         if self.left_deleted:
             lines.append(f"  left deleted       {self.left_deleted:>6}   "
                          f"(removed from the ledger by hand)")
+        if self.split_settled:
+            lines.append(f"  Q+QP halves hit    {self.split_settled:>6}   "
+                         f"(settled from the dividends)")
         if self.unparsed:
             lines.append(f"  UNPARSED BLOCKS    {len(self.unparsed):>6}")
             lines += [f"    {u}" for u in self.unparsed[:10]]
@@ -286,6 +293,9 @@ def _run(files: list[tuple[str, str]], *, db: Path | None = None,
             # just wrote -- only the fields they touched. A bet whose account
             # was moved still takes this statement's settlement.
             reassert_edits(conn, [b[0] for b in bets])
+            # A split Quinella/Quinella-Place half is written with `hit`
+            # unknown; where the race's dividends are in, they settle it.
+            report.split_settled = resolve_split_hits(conn)
         after = conn.execute("SELECT count(*) FROM bets").fetchone()[0]
         report.bets, report.new_bets = len(bets), after - before
         report.selections = len(sels)

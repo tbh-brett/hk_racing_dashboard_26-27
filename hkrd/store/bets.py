@@ -24,7 +24,7 @@ from typing import Any
 from hkrd.store.connect import Connection, transaction
 
 __all__ = ["new_bet_id", "insert_bet", "settings", "set_setting",
-           "normalise_accounts",
+           "normalise_accounts", "resolve_split_hits",
            "overrides_for", "DEFAULT_SETTINGS"]
 
 # What the guardrails compare against until the user sets their own. These are
@@ -131,6 +131,71 @@ def overrides_for(conn: Connection, bet_ids: Sequence[str]) -> dict[str, list[di
             {"flag": r["flag"], "detail": r["detail"],
              "overridden_at": r["overridden_at"]})
     return out
+
+
+# A "Quinella - Quinella Place" block on a statement pays ONE credit across two
+# pools, so the import halves it and leaves `hit` unknown on both halves
+# (`jobs/import_statement`). The results say what the statement cannot: a half
+# paid when one of its pairs is among that pool's dividend combinations.
+_SPLIT_POOL = {"QIN": "QIN", "QIN_BANKER": "QIN",
+               "QPL": "QPL", "QPL_BANKER": "QPL"}
+
+
+def _ticket_pairs(selections: Sequence[Any]) -> set[frozenset[int]]:
+    """Every pair a single-race quinella ticket covers: banker with each
+    partner, or every pair of a box."""
+    bankers = {s["horse_no"] for s in selections if s["is_banker"]}
+    others = {s["horse_no"] for s in selections if not s["is_banker"]}
+    if bankers:
+        return {frozenset((b, o)) for b in bankers for o in others if b != o}
+    nos = sorted(others)
+    return {frozenset((a, b)) for i, a in enumerate(nos) for b in nos[i + 1:]}
+
+
+def _paid_pair(combination: str) -> frozenset[int] | None:
+    """'1,11' -> {1, 11}; None for anything that does not read as one pair."""
+    parts = [p.strip() for p in str(combination).split(",")]
+    if len(parts) != 2 or not all(p.isdigit() for p in parts):
+        return None
+    pair = frozenset(int(p) for p in parts)
+    return pair if len(pair) == 2 else None
+
+
+def resolve_split_hits(conn: Connection) -> int:
+    """Settle `hit` on the halves of a split Quinella/Quinella-Place credit.
+
+    Only where that race's dividends for the half's pool are stored and every
+    one of them reads as a pair. Anything else stays unknown, which the ledger
+    counts as unresolved rather than as a miss. The money is not touched: the
+    statement's apportionment is still the only figure there is for it.
+
+    Every unknown half is tried, not only one statement's, so the next import
+    also settles halves written before this existed. Returns how many it
+    settled.
+    """
+    marks = ",".join("?" * len(_SPLIT_POOL))
+    todo = conn.execute(
+        f"SELECT bet_id, race_date, race_no, bet_type FROM bets "
+        f"WHERE hit IS NULL AND settle_method = 'statement_apportioned' "
+        f"AND race_no IS NOT NULL AND bet_type IN ({marks})",
+        tuple(_SPLIT_POOL)).fetchall()
+    settled = 0
+    for bet in todo:
+        paid = [_paid_pair(r["combination"]) for r in conn.execute(
+            "SELECT combination FROM dividends "
+            "WHERE race_date = ? AND race_no = ? AND pool = ?",
+            (bet["race_date"], bet["race_no"], _SPLIT_POOL[bet["bet_type"]]))]
+        if not paid or None in paid:
+            continue
+        pairs = _ticket_pairs(conn.execute(
+            "SELECT horse_no, is_banker FROM bet_selections "
+            "WHERE bet_id = ? AND leg_no = 0", (bet["bet_id"],)).fetchall())
+        if not pairs:
+            continue
+        conn.execute("UPDATE bets SET hit = ? WHERE bet_id = ?",
+                     (1 if pairs & set(paid) else 0, bet["bet_id"]))
+        settled += 1
+    return settled
 
 
 # The two books the interface knows. A bet filed under anything else is a bet

@@ -259,6 +259,7 @@ def import_bets_job(body: dict = Body(...)) -> JSONResponse:
             "files": report.files, "bets": report.bets,
             "new_bets": report.new_bets, "selections": report.selections,
             "cash_movements": report.cash_movements,
+            "split_settled": report.split_settled,
             "unparsed": report.unparsed, "errors": report.errors,
         }
     return JSONResponse(payload, status_code=200 if not report.errors else 500)
