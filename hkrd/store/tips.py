@@ -32,7 +32,7 @@ __all__ = [
     "upsert_horse_names", "upsert_quotes", "upsert_selections",
     "upsert_quarantine", "quarantine_row_id", "replace_absent",
     "meeting_card", "meeting_venue", "meeting_names_zh",
-    "dates_missing_names", "races_gone_off",
+    "dates_missing_names", "races_gone_off", "stance_texts", "set_stances",
 ]
 
 Row = dict[str, Any]
@@ -247,6 +247,30 @@ def replace_absent(conn: sqlite3.Connection, date: str,
     conn.executemany("DELETE FROM tips_quarantine WHERE quarantine_id = ?",
                      gone_x)
     return len(gone_q) + len(gone_s)
+
+
+# ── stance ───────────────────────────────────────────────────────────────────
+
+def stance_texts(conn: sqlite3.Connection, source: str
+                 ) -> list[tuple[str, str, str | None]]:
+    """(quote_id, the words in English, stored stance) for one source."""
+    return [(r[0], r[1] or r[2] or "", r[3]) for r in conn.execute(
+        "SELECT quote_id, quote_en, quote, stance FROM connections_quote "
+        "WHERE source = ?", (source,))]
+
+
+def set_stances(conn: sqlite3.Connection, stances: dict[str, str]) -> int:
+    """Write a stance on each quote. Returns how many changed.
+
+    The one column a race gone off may still have written: a stance is a
+    reading of the stored words, and the words are what stay as they were.
+    """
+    changed = 0
+    for qid, stance in stances.items():
+        changed += conn.execute(
+            "UPDATE connections_quote SET stance = ? WHERE quote_id = ? "
+            "AND stance IS NOT ?", (stance, qid, stance)).rowcount
+    return changed
 
 
 # ── what an import resolves against ──────────────────────────────────────────

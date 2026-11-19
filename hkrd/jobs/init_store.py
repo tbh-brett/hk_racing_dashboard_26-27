@@ -18,7 +18,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from hkrd.store.connect import db_path, get_conn, init_db
+from hkrd.jobs import read_stance
+from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
 __all__ = ["run"]
 
@@ -29,9 +30,14 @@ def run(db: Path | None = None) -> dict:
     conn = get_conn(db if db is not None else db_path())
     try:
         init_db(conn)
+        # A reading of stored words that a release can change: re-read at
+        # start, so a deploy reaches every row without a job run by hand.
+        with transaction(conn, immediate=True):
+            stances = read_stance.fill(conn)
         tables = [r[0] for r in conn.execute(
             "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")]
-        return {"database": str(db or db_path()), "tables": tables}
+        return {"database": str(db or db_path()), "tables": tables,
+                "stances": stances}
     finally:
         conn.close()
 

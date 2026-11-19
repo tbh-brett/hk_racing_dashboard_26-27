@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from hkrd.derive import names
+from hkrd.jobs import read_stance
 from hkrd.ingest.tips_payload import PayloadError, parse
 from hkrd.store import job_log, tips
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
@@ -58,6 +59,8 @@ class ImportReport:
     # Rows this push carried for races already off that were stored already,
     # and so were left exactly as they stood at the off.
     settled: int = 0
+    # Interview answers whose stance this import wrote or changed.
+    stances: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return {"race_date": self.race_date, "quotes": self.quotes,
@@ -65,7 +68,7 @@ class ImportReport:
                 "quarantined": self.quarantined,
                 "quarantine_reasons": dict(sorted(self.reasons.items())),
                 "unplaced_quotes": self.unplaced_quotes,
-                "removed": self.removed}
+                "removed": self.removed, "stances": self.stances}
 
     def render(self) -> str:
         lines = [f"  tips               {self.race_date}",
@@ -81,6 +84,9 @@ class ImportReport:
         if self.settled:
             lines.append(f"  kept as at the off {self.settled:>6}   "
                          f"(races already run: not rewritten)")
+        if self.stances:
+            lines.append(f"  stance read        {self.stances:>6}   "
+                         f"(interview answers, {read_stance.stance.RULE})")
         return "\n".join(lines)
 
 
@@ -240,6 +246,7 @@ def _import(conn, body: object) -> ImportReport:
             selection_keys=kept,
             quarantine_ids=[tips.quarantine_row_id(r) for r in held],
             settled=off)
+        report.stances = read_stance.fill(conn)["changed"]
         job_log.record_source(
             conn, "import_tips", ok=True,
             detail=(f"{report.race_date} · {report.quotes} quotes · "
