@@ -22,34 +22,55 @@
  * blinkers off, second at 19.0 — and the card said "B OFF" in the colour it
  * gives every removal. Three readings now change the chip:
  *
- *   B KEEN 1/1        wearing them again after a keen FIRST run in them — the
- *                     caution, in the loss colour (83 such runs returned 39-47
- *                     cents a dollar worse than their price)
- *   B KEEN 3/5        keen the last time, in gear it had worn before — the
- *                     horse's history, neutral: those runs placed 1.05x
- *   B OFF AFTER KEEN  taken off after a keen run in them
- *   HOOD OFF          the hood comes off
+ *   B KEEN 2/2        wearing blinkers / visor / cheek pieces and keen the last
+ *                     time in them: keen again 14.6% of the time against 8% of
+ *                     all runs. A caution about how it will RUN, in the loss
+ *                     colour; NOT shown to cost it against the price.
+ *   B OFF AFTER KEEN  taken off after a keen run in them. A fact, no colour of
+ *                     a claim: whether it helps the result is not settled.
+ *   HOOD OFF / CP OFF a lead (won 1.72x / 1.47x their price over two seasons,
+ *                     found by testing eight pieces), scored forward.
  *
- * The last two take the edge colour because the archive put them on the right
- * side of the price over two seasons; the tooltip says how far, on how many
- * runs, and that neither has been scored forward yet.
+ * The confirmed finding behind all of it is that blinkers switch horses on
+ * for their first three runs in them (query/gear_history.py has the test).
+ *
+ * The tooltip ends with the runs themselves, newest first: the token worn,
+ * which source called it keen (race call, stewards), where it sat at the first
+ * call and how it finished. The reading is shown with its evidence so it can be
+ * disagreed with.
  *
  * Only the notable states get a chip. A tongue tie worn every start for two
  * years is on the card and in the flyout; a chip that fires on everyone stops
  * being read, which is the same rule the vet badge follows. */
-import { el } from './vocab.js';
+import { compactDate, el, ordinal } from './vocab.js';
 
 const STATE_LABEL = { first: '1ST', second: '2ND', off: 'OFF' };
 
 function label(p) {
-  if (p.signal === 'hood_off') return 'HOOD OFF';
   if (p.signal === 'off_after_keen') return `${p.code} OFF AFTER KEEN`;
+  if (p.code === 'H' && p.state === 'off') return 'HOOD OFF';
   const base = p.reinstated ? `${p.code} BACK`
     : STATE_LABEL[p.state] ? `${p.code} ${STATE_LABEL[p.state]}` : p.code;
-  if ((p.signal === 'keen_in' || p.signal === 'keen_first') && p.history) {
+  if (p.signal === 'keen_in' && p.history) {
     return `${base} KEEN ${p.history.keen}/${p.history.read}`;
   }
   return base;
+}
+
+/** One line per run, newest first: when, what it wore, what was said, where
+ *  it sat and how it finished. */
+function timelineText(p) {
+  const runs = p.timeline ?? [];
+  if (!runs.length) return '';
+  const lines = runs.map((r) => {
+    const said = r.keen == null ? 'no comment'
+      : r.keen ? `KEEN (${r.keen_by.join(' + ')})` : 'settled';
+    const early = r.first_call ? `${ordinal(r.first_call)} early` : '';
+    const fin = r.finish == null ? '' : `${ordinal(r.finish)}${r.odds ? ` at ${r.odds}` : ''}`;
+    return [compactDate(r.race_date), r.token ?? `no ${p.code}`, said, early, fin]
+      .filter(Boolean).join(' · ');
+  });
+  return `\n\nLast runs with gear on record:\n${lines.join('\n')}`;
 }
 
 export function gearChips(r) {
@@ -60,7 +81,7 @@ export function gearChips(r) {
     const cls = `gear-chip g-${p.reinstated ? 'back' : p.state}`
       + (p.signal ? ` s-${p.signal.replace(/_/g, '-')}` : '');
     const chip = el('span', cls, label(p));
-    chip.title = p.detail;
+    chip.title = p.detail + timelineText(p);
     out.push(chip);
   });
   // The schooling step, and only where it says something. `carried` is a horse

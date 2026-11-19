@@ -18,13 +18,12 @@
 .facts .trips { display: inline-flex; gap: 4px; }
 .facts .trip.vet { font-weight: 600; }
 .facts .gear-chip.trial-withheld { font-style: italic; }
-/* The horse's own record in its gear (query/gear_history.py). Keen after a
-   first try in the gear it wears today is a caution; keen in it otherwise is
-   history. Taken off after a keen run, and a hood off, are the two removals
-   the archive put on the right side of the price. */
-.facts .gear-chip.s-keen-first { color: var(--loss); font-weight: 600; }
-.facts .gear-chip.s-keen-in { color: var(--text-2); }
+/* The horse's own record in its gear (query/gear_history.py). Keen in the gear
+   it wears today is a caution about how it will run, which the archive
+   confirmed. Off after a keen run, and the hood and cheek-piece leads, are
+   facts whose effect on the result is not settled: emphasis, no claim colour. */
+.facts .gear-chip.s-keen-in { color: var(--loss); font-weight: 600; }
 .facts .gear-chip.s-off-after-keen,
-.facts .gear-chip.s-hood-off { color: var(--edge); font-weight: 600; }
+.facts .gear-chip.s-lead-off { color: var(--text-2); font-weight: 600; }
 .facts .bf-agent, .facts .bf-tripcall { color: var(--text-dim); }
 .horse .bt { font-size: 9px; line-height: 13px; }

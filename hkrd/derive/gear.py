@@ -76,6 +76,10 @@ SWITCH_ON_CODES: frozenset[str] = frozenset({"B", "BO", "V", "VO", "CP"})
 # What the comments-on-running page prints for a horse it has nothing on. It
 # is not a comment that the horse settled; it is no comment at all.
 _NO_COMMENT = re.compile(r"no comments on running information", re.I)
+# Horse names, which the stewards print in capitals. KEEN MOLLY and KEEN
+# UNITY made 15 reports read as keen runs, some of them other horses' (19 Nov
+# 2026); a name is not a description, so it is taken out before reading.
+_NAMES = re.compile(r"\b[A-Z]{2,}[A-Z'\-]*(?:\s+[A-Z]{2,}[A-Z'\-]*)*\b")
 
 # A code is letters, then an optional state marker. The marker is a digit (how
 # many times it has been worn, 1 being the first) or a hyphen (taken off).
@@ -181,4 +185,4 @@ def raced_keen(texts: Iterable[str | None]) -> bool | None:
     said = [t for t in texts if t and t.strip() and not _NO_COMMENT.search(t)]
     if not said:
         return None
-    return any(KEEN.search(t) for t in said)
+    return any(KEEN.search(_NAMES.sub(" ", t)) for t in said)

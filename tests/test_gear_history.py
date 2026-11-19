@@ -3,6 +3,10 @@
 The owner's case, 19 Nov 2026: PRIVATE WEALTH, blinkers first time on 25 Oct
 and keen; blinkers on 11 Nov and keen throughout, a warning on its manners;
 blinkers off on 18 Nov and second at 19.0. The card said only "B OFF".
+
+What the chips claim follows what was confirmed: blinkers make horses keener
+(a caution about how it will run); nothing here is shown to beat the price,
+so no chip is coloured as if it did.
 """
 from __future__ import annotations
 
@@ -32,6 +36,9 @@ NOTHING = "No Comments on Running information for this horse."
     ([NOTHING], None),
     ([None, ""], None),
     ([], None),
+    # a horse's NAME is not a description of the run (15 reports, 19 Nov 2026)
+    (["Near the 800 Metres shifted in and away from KEEN MOLLY."], False),
+    (["KEEN UNITY was slow to begin."], False),
 ])
 def test_a_keen_run_is_read_and_an_unwritten_one_is_not_a_settled_one(texts, keen):
     assert raced_keen(texts) is keen
@@ -45,16 +52,18 @@ def test_the_switch_on_family_is_the_gear_that_narrows_sight():
 
 # ─── the record ───────────────────────────────────────────────────────────────
 
-# (horse_no, name, [(gear, comment) for DATES], today's gear)
+# (horse_no, name, [(gear, race call, stewards) for DATES], today's gear)
 HORSES = [
-    (1, "OFF AFTER KEEN", [("XB", SETTLED), ("XB/B1", KEEN), ("B/XB", KEEN)], "B-/XB"),
-    (2, "KEPT ON", [("XB", SETTLED), ("XB/B1", KEEN), ("B/XB", KEEN)], "B/XB"),
-    (3, "SETTLED IN THEM", [("XB", SETTLED), ("B1", KEEN), ("B", SETTLED)], "B"),
-    (4, "UNREAD", [("XB", SETTLED), ("B1", KEEN), ("B", None)], "B-"),
-    (5, "HOOD", [("H", SETTLED), ("H", SETTLED), ("H", SETTLED)], "H-"),
-    (6, "FIRST TIME", [("TT", KEEN), ("TT", SETTLED), ("TT", SETTLED)], "B1/TT"),
-    (7, "NO GEAR RECORD", [("XB/B1", KEEN), ("B", KEEN), (None, KEEN)], "B-"),
-    (8, "KEEN FIRST TRY", [("XB", SETTLED), ("XB", SETTLED), ("XB/B1", KEEN)], "B2/XB"),
+    (1, "OFF AFTER KEEN", [("XB", SETTLED, None), ("XB/B1", KEEN, "In the middle stages raced keenly."),
+                           ("B/XB", KEEN, None)], "B-/XB"),
+    (2, "KEPT ON", [("XB", SETTLED, None), ("XB/B1", KEEN, None), ("B/XB", KEEN, None)], "B/XB"),
+    (3, "SETTLED IN THEM", [("XB", SETTLED, None), ("B1", KEEN, None), ("B", SETTLED, None)], "B"),
+    (4, "UNREAD", [("XB", SETTLED, None), ("B1", KEEN, None), ("B", None, None)], "B-"),
+    (5, "HOOD", [("H", SETTLED, None), ("H", SETTLED, None), ("H", SETTLED, None)], "H-"),
+    (6, "FIRST TIME", [("TT", KEEN, None), ("TT", SETTLED, None), ("TT", SETTLED, None)], "B1/TT"),
+    (7, "NO GEAR RECORD", [("XB/B1", KEEN, None), ("B", KEEN, None), (None, KEEN, None)], "B-"),
+    (8, "SECOND TRY", [("XB", SETTLED, None), ("XB", SETTLED, None), ("XB/B1", SETTLED, None)], "B2/XB"),
+    (9, "CHEEKS OFF", [("CP", SETTLED, None), ("CP", SETTLED, None), ("CP", SETTLED, None)], "CP-"),
 ]
 
 
@@ -69,15 +78,15 @@ def db(tmp_path):
              "surface": "Turf", "going": "G", "distance": 1200}
             for d in (*DATES, TODAY)])
         for no, name, history, today in HORSES:
-            for date, (gear, comment) in zip(DATES, history):
+            for date, (gear, call, stewards) in zip(DATES, history):
                 upsert.upsert_runners(conn, [
-                    {"race_date": date, "race_no": 1, "horse_no": no,
-                     "horse_name": name, "gear": gear, "place": "5"}])
-                if comment:
-                    conn.execute(
-                        "INSERT INTO runner_comments (race_date, race_no, horse_no, "
-                        "comment_text, source) VALUES (?, 1, ?, ?, 'corunning')",
-                        (date, no, comment))
+                    {"race_date": date, "race_no": 1, "horse_no": no, "horse_name": name,
+                     "gear": gear, "place": "5", "win_odds": 12.0, "running_positions": "7 6 5"}])
+                for source, text in (("corunning", call), ("incident", stewards)):
+                    if text:
+                        conn.execute(
+                            "INSERT INTO runner_comments (race_date, race_no, horse_no, "
+                            "comment_text, source) VALUES (?, 1, ?, ?, ?)", (date, no, text, source))
             upsert.upsert_runners(conn, [
                 {"race_date": TODAY, "race_no": 1, "horse_no": no,
                  "horse_name": name, "gear": today}])
@@ -105,33 +114,37 @@ def piece(card, no, code):
     return next(p for p in card[no]["pieces"] if p["code"] == code)
 
 
-def test_blinkers_off_after_keen_runs_in_them_is_named(card):
-    """Private Wealth's path: the chip must say more than "B OFF"."""
+def test_blinkers_off_after_keen_runs_in_them_is_named_without_claiming_an_edge(card):
+    """Private Wealth's path: the chip must say more than "B OFF", and no more
+    than was shown: the result effect did not hold in 2024-25."""
     b = piece(card, 1, "B")
     assert b["signal"] == "off_after_keen" and b["notable"] is True
     assert (b["history"]["keen"], b["history"]["read"]) == (2, 2)
     assert (b["history"]["without_keen"], b["history"]["without_read"]) == (0, 1)
     assert "Raced keenly in 2 of its 2 runs in blinkers" in b["detail"]
-    assert "not yet scored forward" in b["detail"]
+    assert "not settled" in b["detail"]
+
+
+def test_the_timeline_shows_each_run_and_which_source_called_it_keen(card):
+    """The reading comes with its evidence: newest first, token, sources, early, finish."""
+    tl = piece(card, 1, "B")["timeline"]
+    assert [r["race_date"] for r in tl] == ["2026-11-11", "2026-10-25", "2026-10-01"]
+    assert [r["token"] for r in tl] == ["B", "B1", None]
+    assert tl[1]["keen_by"] == ["race call", "stewards"]
+    assert tl[0]["keen_by"] == ["race call"] and tl[2]["keen"] is False
+    assert (tl[0]["first_call"], tl[0]["finish"], tl[0]["odds"]) == (7, 5, 12.0)
 
 
 def test_a_withdrawal_is_not_a_run_in_the_gear(card):
     assert piece(card, 1, "B")["history"]["runs"] == 2
 
 
-def test_kept_on_after_a_keen_run_is_the_horses_history_not_a_caution(card):
-    """Kept on after a keen run in gear worn before: 577 runs placed 1.05x."""
+def test_kept_on_after_a_keen_run_is_a_caution_about_how_it_will_run(card):
+    """Keen again 14.6% of the time against 8% of all runs: confirmed."""
     b = piece(card, 2, "B")
     assert b["state"] == "on" and b["signal"] == "keen_in"
     assert b["notable"] is True, "a plain B is not news; a plain B on a horse keen in it is"
-    assert "A history, not a caution" in b["detail"]
-
-
-def test_kept_on_after_a_keen_first_try_is_the_caution(card):
-    """83 such runs returned 39 to 47 cents a dollar worse than their price."""
-    b = piece(card, 8, "B")
-    assert b["state"] == "second" and b["signal"] == "keen_first"
-    assert "keen FIRST run" in b["detail"]
+    assert "not shown to cost it against the price" in b["detail"]
 
 
 def test_keen_once_but_settled_last_time_in_them_says_nothing(card):
@@ -146,17 +159,28 @@ def test_a_last_run_nobody_described_is_not_evidence_either_way(card):
     assert b["signal"] is None and b["state"] == "off"
 
 
-def test_a_hood_off_is_its_own_reading(card):
+def test_a_hood_off_is_a_lead_with_its_record_not_a_claim(card):
     h = piece(card, 5, "H")
-    assert h["signal"] == "hood_off" and h["notable"] is True
-    assert "Hood off: 222 runs" in h["detail"]
+    assert h["signal"] == "lead_off" and h["notable"] is True
+    assert "Hood off: 247 runs" in h["detail"] and "not a confirmed edge" in h["detail"]
 
 
-def test_first_time_blinkers_carry_the_measured_keen_rate_and_the_horses_own(card):
+def test_cheek_pieces_off_is_the_other_lead(card):
+    cp = piece(card, 9, "CP")
+    assert cp["signal"] == "lead_off" and "Cheek pieces off: 530 runs" in cp["detail"]
+
+
+def test_first_time_blinkers_carry_the_confirmed_keen_rate_and_the_horses_own(card):
     b = piece(card, 6, "B")
     assert b["state"] == "first" and b["signal"] is None
-    assert "First time in blinkers, a visor or cheek pieces" in b["detail"]
+    assert "11.4% of runs against 7.7% for comparable horses" in b["detail"]
     assert "raced keenly in 1 of its 3 runs on record" in b["detail"]
+
+
+def test_the_second_run_in_blinkers_is_still_inside_the_keen_window(card):
+    b = piece(card, 8, "B")
+    assert b["state"] == "second" and b["signal"] is None
+    assert "first three runs in blinkers" in b["detail"]
 
 
 def test_a_trial_in_gear_it_has_raced_in_since_is_not_a_withheld_schooling(db):
