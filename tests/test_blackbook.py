@@ -876,33 +876,53 @@ def test_a_retired_entry_is_not_live_over_today_but_still_was_over_june(booked):
     assert after["live_at_race"] == 0
 
 
-def test_a_close_with_no_recorded_day_is_read_as_closed_today(db):
+def test_a_close_with_no_recorded_day_is_read_as_closed_on_17_september(db):
     """Entries retired before there was a column to record it in.
 
-    Reading the unknown day as today is the only reading that satisfies both
-    things at once: it is certainly not live over a card being looked at now,
-    and over an archived card it does not erase a thesis that was, as far as
-    anything here knows, standing at the time.
-    """
-    import datetime as dt
+    Every close since the release that added `closed_date` carries its date,
+    and that release was live by 17 Sep 2026, so an undated close was made no
+    later than that day. Read as closed on it, the entry is not live over a
+    card being looked at now, nor over any card from that day on, when it was
+    certainly closed. Over the cards before it, it does not erase a thesis
+    that was, as far as anything here knows, standing at the time.
 
-    conn = get_conn(db)
+    It used to be read as closed TODAY, which kept six real entries live over
+    cards weeks after they were closed (RISING PHOENIX on 7 Oct among them).
+    And both copies of the rule are asked, because they once gave two answers:
+    the band's `live_at_race`, and the book tier, which read the missing day as
+    never closed and put a chip on today's card beside a band saying not live.
+    """
+    from hkrd.query import book_tier
+
     today = dt.date.today().isoformat()
+    conn = get_conn(db)
     with transaction(conn):
         conn.execute("INSERT INTO blackbook (id, horse_name, added_date, "
                      "status, reasoning) VALUES ('bb_x', 'FAST ONE', "
                      "'2026-01-01', 'retired', 'gave up on it')")
-        upsert.upsert_races(conn, [
-            {"race_date": today, "race_no": 1, "venue": "HV", "course": "C",
-             "surface": "Turf", "going": "G", "distance": 1650}])
-        upsert.upsert_runners(conn, [
-            {"race_date": today, "race_no": 1, "horse_no": 1,
-             "horse_name": "FAST ONE", "draw": 1}])
-    now = bb.for_race(today, 1, conn=conn)[0]
-    old = bb.for_race("2026-05-01", 1, conn=conn)[0]
+        # The last meeting before the day, the day itself, 7 Oct, and today.
+        for day in ("2026-09-16", "2026-09-17", "2026-10-07", today):
+            upsert.upsert_races(conn, [
+                {"race_date": day, "race_no": 1, "venue": "HV", "course": "C",
+                 "surface": "Turf", "going": "G", "distance": 1650}])
+            upsert.upsert_runners(conn, [
+                {"race_date": day, "race_no": 1, "horse_no": 1,
+                 "horse_name": "FAST ONE", "draw": 1}])
+
+    def live(day):
+        """(the band's flag, whether the tier reads it as a book horse)"""
+        band = bb.for_race(day, 1, conn=conn)[0]["live_at_race"]
+        tier = book_tier.for_meeting(day, conn=conn, with_record=False).get((1, 1))
+        return band, bool(tier and tier["in_book"])
+
+    seen = {day: live(day) for day in
+            ("2026-05-01", "2026-09-16", "2026-09-17", "2026-10-07", today)}
     conn.close()
-    assert now["live_at_race"] == 0        # not a thesis I hold
-    assert old["live_at_race"] == 1        # but one I held then
+    assert seen["2026-05-01"] == (1, True)     # a thesis I held then
+    assert seen["2026-09-16"] == (1, True)     # up to the last card before the day
+    assert seen["2026-09-17"] == (0, False)    # and not from the day itself
+    assert seen["2026-10-07"] == (0, False)
+    assert seen[today] == (0, False)           # nor now
 
 
 # ── reopening, on a new reason ──────────────────────────────────────────────

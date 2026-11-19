@@ -44,7 +44,7 @@ import time
 from collections import defaultdict
 from typing import Any
 
-from hkrd.query import trials as trials_q
+from hkrd.query import blackbook_band, trials as trials_q
 from hkrd.store.connect import Connection, db_file, get_conn
 
 __all__ = ["TIERS", "LABEL", "ACTION", "EXCUSE_TAGS", "TESTED_STARTS",
@@ -232,9 +232,13 @@ def _standouts(conn: Connection, names: list[str], since: str) -> dict[str, list
 
 def _live(e: dict, date: str) -> bool:
     """`blackbook_band.LIVE_AT_RACE_SQL`, in Python: booked by the race day and
-    not closed before it."""
+    not closed before it, a close nobody dated read as closed on
+    `blackbook_band.UNDATED_CLOSE`, the name the band's SQL reads. It read that
+    day as never closed ("9999"), so a hand-retired legacy entry got a chip on
+    today's card while the band beside it said the entry was not live."""
     return e["added_date"] <= date and (
-        e["status"] == "active" or (e["closed_date"] or "9999") > date)
+        e["status"] == "active"
+        or (e["closed_date"] or blackbook_band.UNDATED_CLOSE) > date)
 
 
 def _tiers(conn: Connection, runs: list[dict]) -> dict[tuple, dict]:
