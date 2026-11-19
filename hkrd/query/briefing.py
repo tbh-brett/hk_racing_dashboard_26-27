@@ -15,12 +15,13 @@ things, and never blended into one score:
   PRICED    the markets: the tote from about midday the day before, the
             bookmakers from race-day morning, money moving until the off.
 
-WHICH RACES FIRST. Every race carries its `reasons`: facts worth reading,
-each of one kind, each measured elsewhere (the Screen's factors) or simply
-observed (who said what, what is priced). The card is ordered by how many
-DIFFERENT reasons a race has, then by race number. That is a count of things
-to read and not a chance of anything, and it is unmeasured: a first rule for
-the owner to judge against his own reading of the card.
+RACE ORDER. Every race carries its `reasons`: facts worth reading, each of
+one kind, each measured elsewhere (the Screen's factors) or simply observed
+(who said what, what is priced). They used to order the card, most different
+reasons first, and the page drew three races in full and the rest on a line.
+Brett, 19 Nov 2026: every race in race order, each in full, with the races
+where a Racing To Win interview was held marked. The reasons are still there
+to read; they no longer decide what is read first.
 
 A PRICE BEFORE RACE DAY IS SHOWN, NEVER REASONED FROM. The tote opens about
 midday the day before on almost no money, and there one bet prices a runner
@@ -46,8 +47,7 @@ LATE_FIRMING = 10.0     # % a price shortens in its last minutes to be a reason
 MARKET_APART = 6        # the Screen's top two, this far down the betting
 CONSENSUS = 3           # distinct sources on one horse
 _GOOD_TRIAL = ("trial_standout", "trial_positive")   # model/gbm_unseen facts worth a reason
-ORDER_RULE = ("races with more different things to read first, then race "
-              "order; a count of reasons, not a chance of anything")
+ORDER_RULE = "race order, every race in full"
 _MARKET = {"tote": "the tote", "ladbrokes": "Ladbrokes", "unibet": "Unibet",
            "books": "the bookmakers"}
 
@@ -360,16 +360,12 @@ def _meeting(conn: Connection, date: str, now: dt.datetime) -> dict[str, Any]:
             race, runners, tr["interviews"], tips["edges"], race_day, tipped))
         races.append(race)
 
-    live = [r for r in races if not r["run"]]
-    order = sorted(live, key=lambda r: (-len({x["key"] for x in r["reasons"]}),
-                                        r["race_no"]))
     return {
         "race_date": date, "venue": races[0]["venue"],
         "as_of": now.isoformat(timespec="minutes"),
         "stage": _stage(date, now, clock, races),
         "clock": clock,
-        "order": [r["race_no"] for r in order]
-        + [r["race_no"] for r in races if r["run"]],
+        "order": sorted(r["race_no"] for r in races),
         "order_rule": ORDER_RULE,
         "fit": scr["fit"], "factors": scr["factors"],
         "meeting_total": cash.get("meeting_total"),

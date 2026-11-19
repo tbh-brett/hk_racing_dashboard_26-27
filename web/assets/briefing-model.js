@@ -108,10 +108,11 @@ export function buildView(d, ui) {
 
   const nextRace = isRD ? d.races.find((r) => !r.run && r.minutes_to_off !== null
     && r.minutes_to_off > 0) : null;
-  const featNos = d.order.filter((n) => {
-    const r = d.races.find((z) => z.race_no === n);
-    return r && !r.run && r.reasons.length;
-  }).slice(0, 3);
+  // Brett, 19 Nov 2026: every race in race order, each in full, rather than
+  // three "worth studying first" and the rest on a line. The race opened in
+  // detail is the next to run, else the first still to run.
+  const firstLive = (d.races.find((r) => !r.run) || {}).race_no ?? null;
+  const dflt = nextRace ? nextRace.race_no : firstLive;
   // A race in the address that has since run is not a race to open: the
   // shared header writes the first race of the card there on every load. A
   // race someone clicks opens whether it has run or not — after the off it
@@ -119,23 +120,21 @@ export function buildView(d, ui) {
   const hasRun = (no) => d.races.some((r) => r.race_no === no && r.run);
   const pick = (v, dflt) => (v === undefined
     || (v !== null && v === ui.urlRace && hasRun(v)) ? dflt : v);
-  const openD = pick(ui.openD, featNos[0] ?? null);
-  const openM = pick(ui.openM, nextRace ? nextRace.race_no : (featNos[0] ?? null));
+  const openD = pick(ui.openD, dflt);
+  const openM = pick(ui.openM, dflt);
 
   const ctx = { d, ui, asOf, isRD, cap, toteEarly, stale, nextRace, openD, openM,
                 isBooked, nextSaid };
   const races = d.races.map((r) => raceView(r, ctx));
   const byNo = Object.fromEntries(races.map((r) => [r.no, r]));
   const nRun = races.filter((r) => r.run).length;
-  const list = [{ head: true, l: 'WORTH STUDYING FIRST',
-                  r: 'most different things to read first · a count of reasons, not a chance of anything',
-                  rs: 'a count of reasons to read, not a chance of anything' }]
-    .concat(featNos.map((n) => ({ ...byNo[n], mode: 'feat' })))
-    .concat([{ head: true, l: 'THE REST · IN RACE ORDER',
-               r: nRun ? `${nRun} run, collapsed to their result` : 'quieter: fewer things to read',
-               rs: nRun ? `${nRun} run` : 'in race order' }])
-    .concat(races.filter((r) => !featNos.includes(r.no))
-      .map((r) => ({ ...r, mode: r.run ? 'run' : 'quiet' })));
+  const ivRaces = races.filter((r) => r.interview && !r.run).map((r) => r.label);
+  const ivNote = ivRaces.length ? `interviews in ${ivRaces.join(' ')}` : 'no interviews yet';
+  const list = [{ head: true, l: 'EVERY RACE · IN RACE ORDER',
+                  r: [ivNote, nRun ? `${nRun} run, collapsed to their result` : ''].filter(Boolean).join(' · '),
+                  rs: [ivRaces.length ? `interviews ${ivRaces.join(' ')}` : '', nRun ? `${nRun} run` : '']
+                    .filter(Boolean).join(' · ') || 'in race order' }]
+    .concat(races.map((r) => ({ ...r, mode: r.run ? 'run' : 'feat' })));
 
   const nowItems = [];
   if (isRD) {
@@ -192,7 +191,7 @@ export function buildView(d, ui) {
   const fitLine = f.top4_has_winner
     ? `The Screen’s four held the winner in ${Math.round(f.top4_has_winner.screen * 100)}% of `
       + `${(f.test_races || 0).toLocaleString('en-US')} test races (the market’s four: `
-      + `${Math.round(f.top4_has_winner.market * 100)}%) · the order is a reading order, and `
+      + `${Math.round(f.top4_has_winner.market * 100)}%) · races in card order; `
       + 'nothing here re-ranks the race card' : '';
   const dt = pd(d.race_date);
   const at = pd(asOf);
@@ -304,6 +303,11 @@ function raceView(r, ctx) {
     poolBits, reasons, kindCounts, firstReason: reasons[0] ? reasons[0].text : '',
     bookLine: r.book_line || null,
     pace, shortlist, slCompact: shortlist.map((x) => `#${x.no} ${x.place}`).join(' · '),
+    // A Racing To Win interview on this race, marked on its row (Brett, 19 Nov
+    // 2026): who spoke, and about which runner.
+    interview: ivs.length > 0,
+    ivWho: [...new Map(ivs.map((iv) => [`${iv.speaker}-${iv.horse_no}`,
+                                         `${iv.speaker} on #${iv.horse_no}`])).values()].join(' · '),
     interviews: ivs.map((iv) => {
       const rr = r.runners.find((z) => z.horse_no === iv.horse_no);
       return { role: (iv.role || '').toUpperCase(), speaker: iv.speaker,
