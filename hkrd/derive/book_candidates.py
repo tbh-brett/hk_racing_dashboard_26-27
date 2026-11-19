@@ -42,7 +42,7 @@ from hkrd.store.coerce import parse_running_positions
 
 __all__ = ["DERIVE_VERSION", "RESULTS_CAP", "TRIALS_CAP", "Evidence",
            "Candidate", "race_candidates", "pick", "trial_candidates",
-           "margin_text"]
+           "margin_text", "KEEN"]
 
 DERIVE_VERSION = "book-1.0"
 
@@ -84,6 +84,9 @@ _LATE = re.compile(r"\bstraight\b|\bfinal\b|\bconcluding\b|\bclosing stages\b|"
 # — and neither was a run that hid its form.
 _KEEN = re.compile(r"\bkeen(?:ly)?\b|\bover[- ]?rac(?:ed|ing)\b|"
                    r"\bpull(?:ed|ing) hard\b", re.I)
+# The one reading of a keen run: the Race Day gear history (derive/gear.py)
+# counts keen runs with this same pattern, so the book and the chip agree.
+KEEN = _KEEN
 # Gear that failed during the run: a saddle that slipped, a plate or shoe lost,
 # an iron lost. Not in the tag vocabulary, and rare — 12 saddles and 124
 # plates in 18,867 reports — but it is the whole story when it happens. THE

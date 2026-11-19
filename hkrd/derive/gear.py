@@ -31,10 +31,13 @@ chip that says "blinkers" about something else is worse than one that says
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 
+from hkrd.derive.book_candidates import KEEN
+
 __all__ = ["GearPiece", "parse_pieces", "GEAR_NAMES", "FOCUS_CODES",
-           "describe", "pieces_by_code"]
+           "SWITCH_ON_CODES", "describe", "pieces_by_code", "raced_keen"]
 
 # HKJC's own glossary, restricted to the codes this archive contains. Anything
 # else falls through to its raw token — see the module docstring.
@@ -61,6 +64,18 @@ GEAR_NAMES: dict[str, str] = {
 # a breathing aid and a shadow roll stops a horse looking down; neither is the
 # thing a trainer schools a horse in before committing to it in a race.
 FOCUS_CODES: frozenset[str] = frozenset({"B", "BO", "V", "VO", "XB", "H", "CP"})
+
+# The pieces that narrow what a horse sees, and so can SWITCH IT ON: blinkers,
+# visor (each also with one cup) and cheek pieces. Measured 19 Nov 2026 on
+# 1,083 first runs in one of them (Sep 2024 to Nov 2026): 10.1% raced keenly
+# that day against 5.6% the run before, where horses in none of them either
+# run held level (9.2% after 8.9%). A nose band, hood or shadow roll is not in
+# it: those are fitted to settle or steer, not to sharpen.
+SWITCH_ON_CODES: frozenset[str] = frozenset({"B", "BO", "V", "VO", "CP"})
+
+# What the comments-on-running page prints for a horse it has nothing on. It
+# is not a comment that the horse settled; it is no comment at all.
+_NO_COMMENT = re.compile(r"no comments on running information", re.I)
 
 # A code is letters, then an optional state marker. The marker is a digit (how
 # many times it has been worn, 1 being the first) or a hyphen (taken off).
@@ -152,3 +167,18 @@ def describe(piece: GearPiece) -> str:
     if piece.state == "off":
         return f"{piece.name} taken off for this run"
     return f"{piece.name}, worn"
+
+
+def raced_keen(texts: Iterable[str | None]) -> bool | None:
+    """Did a run's comments say the horse raced keenly?
+
+    `texts` are everything written about the one run — the race-call comment
+    and the stewards' report. True or False when something was written; None
+    when nothing was, because a run nobody described is not a run in which
+    the horse settled. The reading is the blackbook's (`book_candidates.KEEN`):
+    "raced keenly", "travelled keenly", "over-raced", "pulled hard".
+    """
+    said = [t for t in texts if t and t.strip() and not _NO_COMMENT.search(t)]
+    if not said:
+        return None
+    return any(KEEN.search(t) for t in said)

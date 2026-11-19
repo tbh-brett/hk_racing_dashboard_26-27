@@ -40,6 +40,7 @@ from __future__ import annotations
 from typing import Any
 
 from hkrd.derive.gear import FOCUS_CODES, describe, parse_pieces, pieces_by_code
+from hkrd.query import gear_history
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["for_race", "for_horses", "trial_school", "TRIAL_LOOKBACK_DAYS"]
@@ -152,6 +153,8 @@ def for_horses(names: list[str], declared: dict[str, str | None], *,
         prev = _prev_run(conn, clean, before)
         ever = _ever_worn(conn, clean, before)
         schooled = trial_school(conn, clean, before=before)
+        # The horse's own record in its gear: keen in it, and off after that.
+        history = gear_history.runs(conn, clean, before)
 
         out: dict[str, dict[str, Any]] = {}
         for name in clean:
@@ -195,6 +198,7 @@ def for_horses(names: list[str], declared: dict[str, str | None], *,
                         "detail": f"{p.name} removed since last start",
                     })
 
+            gear_history.annotate(pieces, history.get(name, []), before=before)
             trials = schooled.get(name, [])
             out[name] = {
                 "horse_name": name,
@@ -205,7 +209,8 @@ def for_horses(names: list[str], declared: dict[str, str | None], *,
                 "comparable": last_known,
                 "pieces": sorted(pieces, key=lambda p: (not p["notable"],
                                                         p["code"])),
-                "trial_gear": _trial_signals(trials, today, worn_ever),
+                "trial_gear": _trial_signals(trials, today, worn_ever,
+                                             _last_worn(history.get(name, []))),
             }
         return out
     finally:
@@ -213,8 +218,18 @@ def for_horses(names: list[str], declared: dict[str, str | None], *,
             conn.close()
 
 
+def _last_worn(history: list[dict[str, Any]]) -> dict[str, str]:
+    """The last race date each code was worn in, from `gear_history.runs`."""
+    out: dict[str, str] = {}
+    for run in history:                    # oldest first, so the last wins
+        for code in run["worn"]:
+            out[code] = run["race_date"]
+    return out
+
+
 def _trial_signals(trials: list[dict[str, Any]], today: dict[str, Any],
-                   worn_ever: set[str]) -> list[dict[str, Any]]:
+                   worn_ever: set[str], last_worn: dict[str, str] | None = None
+                   ) -> list[dict[str, Any]]:
     """What the barrier trials say about gear, one entry per piece.
 
     Only the headgear family — see `derive.gear.FOCUS_CODES`. A tongue tie in a
@@ -239,21 +254,31 @@ def _trial_signals(trials: list[dict[str, Any]], today: dict[str, Any],
         new_today = declared and (code not in worn_ever
                                   or (piece is not None
                                       and piece.state == "first"))
+        # RACED SINCE: trialled in it, then raced in it, and not in it today.
+        # "Schooled, not yet committed to" is then false: the stable committed
+        # and has since taken it off. PRIVATE WEALTH on 18 Nov 2026 read
+        # TRIALLED B beside its blinkers coming off after two races in them.
+        raced_since = (not declared
+                       and (last_worn or {}).get(code, "") > t["trial_date"])
         out.append({
             "code": code, "name": t["name"],
             "trial_date": t["trial_date"], "trial_no": t["trial_no"],
             "venue": t["venue"], "trial_place": t["place"],
             "declared_today": declared,
             "new_today": new_today,
-            # Three readings, and only two of them are worth a chip.
+            # Four readings, and only two of them are worth a chip.
             "signal": ("applied" if new_today else
-                       "carried" if declared else "withheld"),
+                       "carried" if declared else
+                       "raced_since" if raced_since else "withheld"),
             "detail": (
                 f"trialled in {t['name']} on {t['trial_date']} and wearing "
                 f"them for the first time today"
                 if new_today else
                 f"trialled in {t['name']} on {t['trial_date']}, already worn"
                 if declared else
+                f"trialled in {t['name']} on {t['trial_date']}, raced in them "
+                f"since and taken off"
+                if raced_since else
                 f"trialled in {t['name']} on {t['trial_date']} and NOT "
                 f"declared today — schooled, not yet committed to"),
         })
