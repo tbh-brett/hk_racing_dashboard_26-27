@@ -230,24 +230,23 @@ def _standouts(conn: Connection, names: list[str], since: str) -> dict[str, list
     return out
 
 
-def _live(e: dict, date: str, today: str) -> bool:
+def _live(e: dict, date: str) -> bool:
     """`blackbook_band.LIVE_AT_RACE_SQL`, in Python: booked by the race day and
-    not closed before it, a close nobody dated read as closed `today` -- the
-    `blackbook_band.today()` the band binds into its SQL. It read that day as
-    never closed ("9999"), so a hand-retired legacy entry got a chip on today's
-    card while the band beside it said the entry was not live."""
+    not closed before it, a close nobody dated read as closed on
+    `blackbook_band.UNDATED_CLOSE`, the name the band's SQL reads. It read that
+    day as never closed ("9999"), so a hand-retired legacy entry got a chip on
+    today's card while the band beside it said the entry was not live."""
     return e["added_date"] <= date and (
-        e["status"] == "active" or (e["closed_date"] or today) > date)
+        e["status"] == "active"
+        or (e["closed_date"] or blackbook_band.UNDATED_CLOSE) > date)
 
 
-def _tiers(conn: Connection, runs: list[dict], *,
-           today: str | None = None) -> dict[tuple, dict]:
+def _tiers(conn: Connection, runs: list[dict]) -> dict[tuple, dict]:
     """Tier for each of `runs` (race_date, race_no, horse_no, horse_name,
     off_time), keyed (race_date, race_no, horse_no). Five queries however many
-    meetings are asked about. `today` defaults to `blackbook_band.today()`."""
+    meetings are asked about."""
     if not runs:
         return {}
-    today = today or blackbook_band.today()
     names = sorted({r["horse_name"] for r in runs})
     latest = max(r["race_date"] for r in runs)
     earliest = min(r["race_date"] for r in runs)
@@ -271,7 +270,7 @@ def _tiers(conn: Connection, runs: list[dict], *,
                 and _written(n["written_at"]) < off]
         # The owner's own (or adopted) entry before the system's, the newest
         # first: two sorts, the second stable.
-        live = sorted((e for e in entries.get(name, []) if _live(e, date, today)),
+        live = sorted((e for e in entries.get(name, []) if _live(e, date)),
                       key=lambda e: e["added_date"], reverse=True)
         live.sort(key=lambda e: e["origin"] != "owner" and not e["adopted_date"])
         entry = live[0] if live else None
@@ -399,15 +398,12 @@ def record(*, conn: Connection | None = None) -> dict[str, dict[str, Any]]:
     conn = conn or get_conn()
     try:
         where = db_file(conn)
-        # The day is in the mark: a close nobody dated reads as closed today,
-        # so at midnight the card just run becomes one it was live over.
-        today = blackbook_band.today()
-        mark = (*conn.execute(_RECORD_MARK_SQL).fetchone(), today)
+        mark = tuple(conn.execute(_RECORD_MARK_SQL).fetchone())
         kept = _KEPT.get(where)
         if where and kept and kept[0] == mark and time.monotonic() - kept[1] < _KEEP_FOR:
             return kept[2]
         rows = [dict(r) for r in conn.execute(_RECORD_RUNS_SQL, (RECORD_FROM, RECORD_FROM))]
-        tiers = _tiers(conn, rows, today=today)
+        tiers = _tiers(conn, rows)
     finally:
         if own:
             conn.close()

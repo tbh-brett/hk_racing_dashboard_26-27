@@ -864,32 +864,32 @@ def test_a_retired_entry_is_not_live_over_today_but_still_was_over_june(booked):
     assert after["live_at_race"] == 0
 
 
-def test_a_close_with_no_recorded_day_is_read_as_closed_today(db, monkeypatch):
+def test_a_close_with_no_recorded_day_is_read_as_closed_on_17_september(db):
     """Entries retired before there was a column to record it in.
 
-    Reading the unknown day as today is the only reading that satisfies both
-    things at once: it is certainly not live over a card being looked at now,
-    and over an archived card it does not erase a thesis that was, as far as
-    anything here knows, standing at the time.
+    Every close since the release that added `closed_date` carries its date,
+    and that release was live by 17 Sep 2026, so an undated close was made no
+    later than that day. Read as closed on it, the entry is not live over a
+    card being looked at now, nor over any card from that day on, when it was
+    certainly closed. Over the cards before it, it does not erase a thesis
+    that was, as far as anything here knows, standing at the time.
 
-    Asked of both copies of the rule, which gave two answers: the band's
-    `live_at_race`, and the book tier, which read the missing day as never
-    closed and put a chip on today's card beside a band saying the entry was
-    not live. And today is Hong Kong's. The clock is stopped at 01:00 on
-    Thursday, when UTC is still on Wednesday and Wednesday night's card has
-    already been run.
+    It used to be read as closed TODAY, which kept six real entries live over
+    cards weeks after they were closed (RISING PHOENIX on 7 Oct among them).
+    And both copies of the rule are asked, because they once gave two answers:
+    the band's `live_at_race`, and the book tier, which read the missing day as
+    never closed and put a chip on today's card beside a band saying not live.
     """
-    from hkrd.query import blackbook_band, book_tier
+    from hkrd.query import book_tier
 
-    at = dt.datetime(2026, 11, 18, 17, 0, tzinfo=dt.timezone.utc)   # 01:00 HKT
-    monkeypatch.setattr(blackbook_band, "_clock", lambda: at)
+    today = dt.date.today().isoformat()
     conn = get_conn(db)
     with transaction(conn):
         conn.execute("INSERT INTO blackbook (id, horse_name, added_date, "
                      "status, reasoning) VALUES ('bb_x', 'FAST ONE', "
                      "'2026-01-01', 'retired', 'gave up on it')")
-        # Wednesday night's card, and one dated today.
-        for day in ("2026-11-18", "2026-11-19"):
+        # The last meeting before the day, the day itself, 7 Oct, and today.
+        for day in ("2026-09-16", "2026-09-17", "2026-10-07", today):
             upsert.upsert_races(conn, [
                 {"race_date": day, "race_no": 1, "venue": "HV", "course": "C",
                  "surface": "Turf", "going": "G", "distance": 1650}])
@@ -903,11 +903,14 @@ def test_a_close_with_no_recorded_day_is_read_as_closed_today(db, monkeypatch):
         tier = book_tier.for_meeting(day, conn=conn, with_record=False).get((1, 1))
         return band, bool(tier and tier["in_book"])
 
-    now, wednesday, may = live("2026-11-19"), live("2026-11-18"), live("2026-05-01")
+    seen = {day: live(day) for day in
+            ("2026-05-01", "2026-09-16", "2026-09-17", "2026-10-07", today)}
     conn.close()
-    assert now == (0, False)               # not a thesis I hold
-    assert wednesday == (1, True)          # but one I held then
-    assert may == (1, True)
+    assert seen["2026-05-01"] == (1, True)     # a thesis I held then
+    assert seen["2026-09-16"] == (1, True)     # up to the last card before the day
+    assert seen["2026-09-17"] == (0, False)    # and not from the day itself
+    assert seen["2026-10-07"] == (0, False)
+    assert seen[today] == (0, False)           # nor now
 
 
 # ── reopening, on a new reason ──────────────────────────────────────────────

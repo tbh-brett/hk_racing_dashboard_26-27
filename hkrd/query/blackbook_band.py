@@ -14,31 +14,26 @@ two callers that need them is what stops a third page inventing a third answer.
 """
 from __future__ import annotations
 
-import datetime as dt
 from typing import Any
 
 from hkrd.query import triggers as trig_q
 from hkrd.store.connect import Connection, get_conn
 
-__all__ = ["for_race", "declared_on", "today", "LIVE_AT_RACE_SQL"]
+__all__ = ["for_race", "declared_on", "UNDATED_CLOSE", "LIVE_AT_RACE_SQL"]
 
-#: Hong Kong, whose calendar every race date is on: UTC+8 all year round.
-_HK = dt.timezone(dt.timedelta(hours=8))
-
-
-def _clock() -> dt.datetime:
-    """Now, in UTC: the one read of the time here, so a test can stop it."""
-    return dt.datetime.now(dt.timezone.utc)
-
-
-def today() -> str:
-    """Today in Hong Kong: the day a close nobody dated is read as (below).
-
-    One value for both copies of the rule. The band binds it into its SQL and
-    `book_tier` hands it to `_live`, so the two cannot read two different days.
-    """
-    return _clock().astimezone(_HK).date().isoformat()
-
+# The day a close nobody dated is read as: the last day it can have been made.
+# `closed_date` and `blackbook_status_log` arrived in one commit (fc05473), and
+# the release carrying them went out after 565d218 (16 Sep 2026, 15:56 HKT).
+# It was live by 17 Sep at 15:55 HKT, when the log took its first row. From
+# then on every close is dated, so an undated one is no later than 17 Sep.
+# Fly's history no longer reaches back far enough to say whether the release
+# went out on the 16th or the 17th, so the later day is taken. On the cards the
+# six such entries ran in it reads the same as the 16th: there was no meeting
+# on the 17th, and none of the six ran on the 16th.
+#
+# `book_tier._live` reads this same name, so the band and the tier cannot
+# answer the question two ways.
+UNDATED_CLOSE = "2026-09-17"
 
 # Was this entry a LIVE thesis over that race — as opposed to one I hold now?
 #
@@ -49,22 +44,24 @@ def today() -> str:
 # is the bug this replaces: nothing here read `status` at all, so an entry
 # retired by hand stayed live everywhere except the Blackbook page itself.
 #
-# An entry closed on a day nobody recorded reads as closed TODAY. It is
-# certainly not live over a card being looked at now, which is the complaint;
-# and over an archived card the honest default is the one that does not erase a
-# thesis that was, as far as anything here knows, standing at the time. Every
-# close from now on carries its date, so this fallback only ever covers entries
+# An entry closed on a day nobody recorded reads as closed on UNDATED_CLOSE,
+# above. It is certainly not live over a card being looked at now, which is the
+# complaint. Over the archived cards before that day the honest default is the
+# one that does not erase a thesis that was, as far as anything here knows,
+# standing at the time. Over the cards after it the entry was certainly closed.
+# Every close since carries its date, so this fallback only covers entries
 # retired before there was a column to record it in: six on 19 Nov 2026.
 #
-# TODAY IS HONG KONG'S, BOUND IN AS `:today` from `today()`. It was SQLite's
-# `date('now')`, which is UTC: at 01:00 after a Wednesday night meeting UTC is
-# still on Wednesday, so the card just run read the entry as already closed.
-# And `book_tier._live` read the same missing day as never closed, which put a
-# tier chip on today's card beside a band saying the entry was not live.
-LIVE_AT_RACE_SQL = """
+# It used to be read as closed TODAY, which kept those six live over every
+# archived card, including cards weeks after they were closed: RISING PHOENIX
+# on 7 Oct, 4 Nov and 11 Nov, ILLUMINOUS on 19 Oct and 8 Nov. That "today" was
+# SQLite's `date('now')`, which is UTC. And `book_tier._live` read the same
+# missing day as never closed, which put a tier chip on today's card beside a
+# band saying the entry was not live.
+LIVE_AT_RACE_SQL = f"""
     (b.added_date <= r.race_date
      AND (b.status = 'active'
-          OR coalesce(b.closed_date, :today) > r.race_date))"""
+          OR coalesce(b.closed_date, '{UNDATED_CLOSE}') > r.race_date))"""
 
 # Did this run ask the question the thesis was about — "first time at the trip
 # since you booked it" rather than merely "runs today".
@@ -130,9 +127,9 @@ def for_race(date: str, race_no: int, *, conn: Connection | None = None
             JOIN runners r ON r.horse_name = b.horse_name
             LEFT JOIN races a ON a.race_date = r.race_date
                              AND a.race_no = r.race_no
-            WHERE r.race_date = :date AND r.race_no = :race_no
+            WHERE r.race_date = ? AND r.race_no = ?
             ORDER BY r.horse_no
-        """, {"date": date, "race_no": race_no, "today": today()}).fetchall()])
+        """, (date, race_no)).fetchall()])
     finally:
         if own:
             conn.close()
@@ -166,9 +163,9 @@ def declared_on(date: str, *, conn: Connection | None = None
             JOIN runners r ON r.horse_name = b.horse_name
             LEFT JOIN races a ON a.race_date = r.race_date
                              AND a.race_no = r.race_no
-            WHERE r.race_date = :date
+            WHERE r.race_date = ?
             ORDER BY r.race_no, r.horse_no
-        """, {"date": date, "today": today()}).fetchall()])
+        """, (date,)).fetchall()])
     finally:
         if own:
             conn.close()
