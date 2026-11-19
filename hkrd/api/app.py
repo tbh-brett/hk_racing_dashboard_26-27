@@ -367,10 +367,10 @@ def remove_trial_note(horse_name: str, trial_date: str,
 @app.post("/api/blackbook")
 def create_blackbook_entry(body: dict = Body(...)) -> dict:
     """Promote a run to a blackbook entry — the deliberate step."""
-    from hkrd.jobs import write_notes
+    from hkrd.jobs import write_book
 
     try:
-        return write_notes.promote_to_blackbook(
+        return write_book.promote_to_blackbook(
             body["horse_name"],
             reasoning=body.get("reasoning", ""),
             source_date=body.get("source_date"),

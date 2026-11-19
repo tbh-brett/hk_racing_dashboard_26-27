@@ -40,7 +40,7 @@ record a figure is), `web/assets/book-origin.js` (the colour). Runs from
 - **Closes a system entry after its next three starts** — RETIRED, dated the
   day after the third, with its record in the reason — unless the owner adopted
   it. Nothing else here ever closes an entry, and this never touches one the
-  owner booked or adopted (`write_notes.close_tested` refuses).
+  owner booked or adopted (`write_book.close_tested` refuses).
 
 On the page a system entry is orchid (`--book-sys`) everywhere a booked horse
 shows: the Blackbook list (with its reason under the row, and ADOPT / DISMISS),

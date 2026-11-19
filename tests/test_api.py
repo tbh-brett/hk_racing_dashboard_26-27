@@ -168,21 +168,29 @@ def test_the_race_card_flags_its_booked_runners(booked):
             == [r["horse_name"] for r in booked_rows])
 
 
-def test_retiring_an_entry_stops_it_reading_as_live_on_the_card(booked):
+def test_retiring_an_entry_stops_it_reading_as_live_on_the_card(booked, monkeypatch):
     """The complaint this answers: a retired horse went on being highlighted.
 
     Race Day and the Form Guide both light a name up on `live_at_race`, so this
     is the one flag that has to change. The entry stays ON the card — the horse
     IS in the book and that is worth seeing when it turns up — it just stops
     claiming to be a thesis still being followed.
+
+    The clock is stopped at 01:00 on 19 November in Hong Kong -- still the
+    18th in UTC, and the hour this used to fail at. The close is dated on Hong
+    Kong's calendar, so "today" below is Hong Kong's and never the machine's.
     """
-    import datetime as dt
+    from hkrd.jobs import clock
+
+    at = dt.datetime(2026, 11, 18, 17, 0, tzinfo=dt.timezone.utc)
+    monkeypatch.setattr(clock, "_clock", lambda: at)
+    today = "2026-11-19"
 
     out = booked.post("/api/blackbook/bb_1/status",
                       json={"status": "retired",
                             "reason": "beaten four times off this"})
     assert out.status_code == 200
-    assert out.json()["closed_date"] == dt.date.today().isoformat()
+    assert out.json()["closed_date"] == today
 
     card = booked.get("/api/raceday/2025-06-13/1").json()
     row = next(r for r in card["runners"] if r["horse_name"] == "HORSE 0")
@@ -196,7 +204,6 @@ def test_retiring_an_entry_stops_it_reading_as_live_on_the_card(booked):
     assert row["blackbook"]["live_at_race"] is True
 
     # A card from today is the other half, and the one that was wrong.
-    today = dt.date.today().isoformat()
     band = booked.get(f"/api/blackbook/declared/{today}").json()
     for entry in band["entries"]:
         if entry["id"] == "bb_1":

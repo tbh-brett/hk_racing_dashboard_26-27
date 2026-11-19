@@ -836,9 +836,9 @@ def test_a_passed_expiry_retires_nothing_on_the_way_past(tmp_path):
 
 def test_promoting_a_run_no_longer_stamps_an_end_date(tmp_path, db):
     """An entry runs until somebody closes it. Nothing closes it for them."""
-    from hkrd.jobs import write_notes
+    from hkrd.jobs import write_book
 
-    out = write_notes.promote_to_blackbook(
+    out = write_book.promote_to_blackbook(
         "FAST ONE", reasoning="blocked at the 300", db=db)
     assert out["status"] == "active" and out["closed_date"] is None
 
@@ -896,39 +896,102 @@ def test_a_close_with_no_recorded_day_is_read_as_closed_today(db):
 # ── reopening, on a new reason ──────────────────────────────────────────────
 
 
-def test_retiring_stamps_the_day_and_the_reason(booked):
+def test_retiring_stamps_the_day_and_the_reason(booked, monkeypatch):
     """"Was I watching this horse THAT day" is a different question from "am I
-    watching it now", and the closing date is the only thing that answers it."""
-    import datetime as dt
+    watching it now", and the closing date is the only thing that answers it.
 
-    from hkrd.jobs import write_notes
+    The clock is stopped, so the day is known whatever the hour and whatever
+    zone the machine is in: mid-afternoon in Hong Kong. The small hours, when
+    UTC is still on the day before, are the next test."""
+    from hkrd.jobs import clock, write_book
 
+    at = dt.datetime(2026, 11, 19, 6, 30, tzinfo=dt.timezone.utc)   # 14:30 HKT
+    monkeypatch.setattr(clock, "_clock", lambda: at)
     conn = get_conn(booked)
     with transaction(conn):
         conn.execute("UPDATE blackbook SET status = 'active', "
                      "closed_date = NULL WHERE id = 'bb_1'")
     conn.close()
 
-    out = write_notes.set_status("bb_1", "retired",
-                                 reason="beaten four times, thesis is dead",
-                                 db=booked)
+    out = write_book.set_status("bb_1", "retired",
+                                reason="beaten four times, thesis is dead",
+                                db=booked)
     assert out["status"] == "retired"
-    assert out["closed_date"] == dt.date.today().isoformat()
+    assert out["closed_date"] == "2026-11-19"
     assert out["closed_reason"] == "beaten four times, thesis is dead"
+
+
+def test_retiring_in_the_small_hours_stamps_the_hong_kong_day(booked, monkeypatch):
+    """01:00 on Thursday 19 November in Hong Kong is 17:00 on Wednesday the
+    18th in UTC, and SQLite's `date('now')` is UTC. A horse retired after
+    Wednesday night's meeting was dated the Wednesday -- and so read as
+    already closed over the very card it had been followed on.
+
+    Found 19 Nov 2026 at about 01:00 HKT, as two tests that only ever failed
+    before eight in the morning."""
+    from hkrd.jobs import clock, write_book
+
+    at = dt.datetime(2026, 11, 18, 17, 0, tzinfo=dt.timezone.utc)
+    monkeypatch.setattr(clock, "_clock", lambda: at)
+    conn = get_conn(booked)
+    with transaction(conn):
+        conn.execute("UPDATE blackbook SET status = 'active', "
+                     "closed_date = NULL WHERE id = 'bb_1'")
+        # Wednesday night at Happy Valley, the meeting it was retired after.
+        upsert.upsert_races(conn, [
+            {"race_date": "2026-11-18", "race_no": 1, "venue": "HV",
+             "course": "C", "surface": "Turf", "going": "G", "distance": 1650}])
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-11-18", "race_no": 1, "horse_no": 1,
+             "horse_name": "FAST ONE", "draw": 1}])
+    conn.close()
+
+    out = write_book.set_status("bb_1", "retired", reason="beaten again",
+                                db=booked)
+    assert out["closed_date"] == "2026-11-19"     # Hong Kong's day, not UTC's
+
+    conn = get_conn(booked)
+    wednesday = bb.for_race("2026-11-18", 1, conn=conn)[0]
+    conn.close()
+    assert wednesday["live_at_race"] == 1, "still followed on Wednesday night"
+
+
+def test_booking_adopting_and_renewing_are_dated_in_hong_kong_too(db, monkeypatch):
+    """Booked, renewed and adopted are days on the race dates' calendar -- an
+    entry is live from the day it was booked, and its starts count again from
+    the day it was renewed -- so each is the Hong Kong day, even at 01:00
+    when UTC is still on the day before."""
+    from hkrd.jobs import clock, write_book
+
+    at = dt.datetime(2026, 11, 18, 17, 0, tzinfo=dt.timezone.utc)   # 01:00 HKT
+    monkeypatch.setattr(clock, "_clock", lambda: at)
+
+    mine = write_book.promote_to_blackbook("FAST ONE", reasoning="blocked",
+                                           db=db)
+    assert mine["added_date"] == "2026-11-19"
+    assert write_book.renew(mine["id"], db=db)["renewed_date"] == "2026-11-19"
+
+    conn = get_conn(db)
+    with transaction(conn):
+        theirs = write_book.insert_entry(
+            conn, "FILLER 2", reasoning="the system's pick",
+            added_date="2026-11-01", origin="system")
+    conn.close()
+    assert write_book.adopt(theirs["id"], db=db)["adopted_date"] == "2026-11-19"
 
 
 def test_reopening_takes_a_new_thesis_and_keeps_the_old_one(booked):
     """Reopening on a fresh reason used to type over the reason the horse was
     booked for — and a thesis that failed is the most useful thing in the book.
     """
-    from hkrd.jobs import write_notes
+    from hkrd.jobs import write_book
 
     conn = get_conn(booked)
     before = bb.entry_detail("bb_1", conn=conn)
     conn.close()
     assert before["reasoning"] == "blocked at the 300"
 
-    out = write_notes.set_status(
+    out = write_book.set_status(
         "bb_1", "active", reason="new trainer, first-up off a trial",
         reasoning="handles the going and is 8lb below its last winning mark",
         db=booked)
@@ -954,28 +1017,28 @@ def test_reopening_without_a_new_thesis_keeps_the_one_it_had(booked):
     """The reason is optional. Reopening on the ORIGINAL thesis is a real
     thing to want — the horse was right and the timing was wrong — and it must
     not blank the field."""
-    from hkrd.jobs import write_notes
+    from hkrd.jobs import write_book
 
-    out = write_notes.set_status("bb_1", "active", db=booked)
+    out = write_book.set_status("bb_1", "active", db=booked)
     assert out["reasoning"] == "blocked at the 300"
 
 
 def test_a_new_thesis_cannot_be_smuggled_into_a_closure(booked):
     """Closing an entry records what happened; it does not rewrite what was
     claimed. Otherwise the book can be made to look right after the fact."""
-    from hkrd.jobs import write_notes
+    from hkrd.jobs import write_book
 
     with pytest.raises(ValueError, match="reopening"):
-        write_notes.set_status("bb_1", "retired", reasoning="actually I meant",
-                               db=booked)
+        write_book.set_status("bb_1", "retired", reasoning="actually I meant",
+                              db=booked)
 
 
 def test_expired_is_no_longer_a_status_anything_can_be_set_to(booked):
-    from hkrd.jobs import write_notes
+    from hkrd.jobs import write_book
 
-    assert "expired" not in write_notes.STATUSES
+    assert "expired" not in write_book.STATUSES
     with pytest.raises(ValueError, match="status must be one of"):
-        write_notes.set_status("bb_1", "expired", db=booked)
+        write_book.set_status("bb_1", "expired", db=booked)
 
 
 def test_a_run_on_the_day_it_was_booked_counts(db):
@@ -1208,20 +1271,20 @@ def test_the_preferred_columns_became_conditions_and_then_went(tmp_path):
 def test_a_condition_nothing_can_evaluate_is_refused(booked):
     """A trigger that never matches is worse than no trigger: the horse
     silently stops appearing and the book looks empty rather than broken."""
-    from hkrd.jobs import write_notes
+    from hkrd.jobs import write_book
 
     with pytest.raises(ValueError, match="kind must be one of"):
-        write_notes.set_triggers("bb_1", [{"kind": "vibes", "op": "is",
-                                           "value": "good"}], db=booked)
+        write_book.set_triggers("bb_1", [{"kind": "vibes", "op": "is",
+                                          "value": "good"}], db=booked)
     with pytest.raises(ValueError, match="compares numbers"):
-        write_notes.set_triggers("bb_1", [{"kind": "distance", "op": ">=",
-                                           "value": "sprint"}], db=booked)
+        write_book.set_triggers("bb_1", [{"kind": "distance", "op": ">=",
+                                          "value": "sprint"}], db=booked)
     with pytest.raises(ValueError, match="needs a numeric condition"):
-        write_notes.set_triggers("bb_1", [{"kind": "going", "op": ">=",
-                                           "value": "3"}], db=booked)
+        write_book.set_triggers("bb_1", [{"kind": "going", "op": ">=",
+                                          "value": "3"}], db=booked)
     with pytest.raises(ValueError, match="needs a value"):
-        write_notes.set_triggers("bb_1", [{"kind": "going", "op": "is",
-                                           "value": "  "}], db=booked)
+        write_book.set_triggers("bb_1", [{"kind": "going", "op": "is",
+                                          "value": "  "}], db=booked)
     # Nothing was written by any of the four.
     conn = get_conn(booked)
     assert bb.entry_detail("bb_1", conn=conn)["conditions"] == []
@@ -1231,14 +1294,14 @@ def test_a_condition_nothing_can_evaluate_is_refused(booked):
 def test_setting_conditions_replaces_them_rather_than_appending(booked):
     """Editing 1200m to 1200-1400m has to leave ONE condition. Two would
     contradict each other and match nothing between them."""
-    from hkrd.jobs import write_notes
+    from hkrd.jobs import write_book
 
-    write_notes.set_triggers("bb_1", [{"kind": "distance", "op": "is",
-                                       "value": "1200"}], db=booked)
-    out = write_notes.set_triggers(
+    write_book.set_triggers("bb_1", [{"kind": "distance", "op": "is",
+                                      "value": "1200"}], db=booked)
+    out = write_book.set_triggers(
         "bb_1", [{"kind": "distance", "op": "between", "value": "1200-1400"}],
         db=booked)
     assert out["conditions"] == [{"kind": "distance", "op": "between",
                                   "value": "1200-1400"}]
     # And an empty list clears them, which says the claim is about the horse.
-    assert write_notes.set_triggers("bb_1", [], db=booked)["conditions"] == []
+    assert write_book.set_triggers("bb_1", [], db=booked)["conditions"] == []

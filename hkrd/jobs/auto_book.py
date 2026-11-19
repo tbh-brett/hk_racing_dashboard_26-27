@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from hkrd.derive import book_candidates as bc
-from hkrd.jobs import write_notes
+from hkrd.jobs import write_book, write_notes
 from hkrd.query import auto_book as auto_q
 from hkrd.store import auto_book as auto_store, job_log
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
@@ -49,6 +49,10 @@ __all__ = ["run", "AutoBookReport", "FIRST_DAY"]
 # meeting still waiting for its comments would strand that meeting, since
 # `--pending` never looks before it.
 FIRST_DAY = "2026-09-01"
+
+# Today, unless told, is Hong Kong's: `_added` can stamp it on an entry, and
+# every race date it is then compared with is a Hong Kong date. UTC+8 all year.
+_HK = dt.timezone(dt.timedelta(hours=8))
 
 
 @dataclass
@@ -119,7 +123,7 @@ def _results(conn, report: AutoBookReport, date: str, basis: str, *,
         return
     with transaction(conn):
         for c in new:
-            write_notes.insert_entry(
+            write_book.insert_entry(
                 conn, c.horse_name, reasoning=c.reasoning(basis=basis),
                 added_date=_added(date, today), source_date=date,
                 source_race_no=c.source_no, tags=c.tags,
@@ -153,7 +157,7 @@ def _trials(conn, report: AutoBookReport, date: str, *, today: str,
         return
     with transaction(conn):
         for c in new:
-            write_notes.insert_entry(
+            write_book.insert_entry(
                 conn, c.horse_name, reasoning=c.reasoning(),
                 added_date=_added(date, today), source_date=date,
                 source_trial_no=c.source_no, tags=c.tags,
@@ -180,8 +184,8 @@ def _close_tested(conn, report: AutoBookReport) -> None:
             reason = (f"System entry, tested over its {auto_q.TESTED_RUNS} "
                       f"starts since booking: {wins} win{'s' * (wins != 1)}, "
                       f"{top3} in the first three. Not adopted.")
-            write_notes.close_tested(conn, r["id"], closed_date=closed,
-                                     reason=reason)
+            write_book.close_tested(conn, r["id"], closed_date=closed,
+                                    reason=reason)
             report.closed.append(f"{r['id']}  {wins}W {top3} top-3 in "
                                  f"{auto_q.TESTED_RUNS}")
 
@@ -220,7 +224,7 @@ def run(db: Path | None = None, *, since: str = FIRST_DAY,
     """Read every day that is ready, or exactly `dates`, then close the
     system entries whose test is over."""
     report = AutoBookReport()
-    today = today or dt.date.today().isoformat()
+    today = today or dt.datetime.now(_HK).date().isoformat()
     conn = get_conn(db if db is not None else db_path())
     try:
         init_db(conn)
