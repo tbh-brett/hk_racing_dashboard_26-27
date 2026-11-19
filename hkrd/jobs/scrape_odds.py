@@ -36,6 +36,7 @@ from hkrd.ingest import doubles as doubles_ingest
 from hkrd.ingest import odds as odds_ingest
 from hkrd.ingest import turnover as turnover_ingest
 from hkrd.query import market as market_q
+from hkrd.query import pools as pools_q
 from hkrd.store import job_log, upsert
 from hkrd.store.connect import db_path, get_conn, init_db, transaction
 
@@ -429,13 +430,19 @@ def run(date: str | None = None, venue: str | None = None, *,
         # both switched off still costs nothing extra.
         known_id = (odds_ingest.meeting_id(date, venue, session=session)
                     if due_pairs and (doubles or turnover) else None)
-        if due_pairs and doubles:
+        # A leg stops moving when its first race shuts, and is kept once more
+        # after that: the read that IS its settled book (`pools.frozen_legs`).
+        # When every leg on record is past that, the request is not made.
+        frozen, legs_seen = (pools_q.frozen_legs(conn, date, set(live_races))
+                             if due_pairs and doubles else (set(), set()))
+        if due_pairs and doubles and not (legs_seen and legs_seen <= frozen):
             try:
                 rows = doubles_ingest.fetch_doubles(date, venue, session=session,
                                                     expect_id=known_id)
             except odds_ingest.OddsError as exc:
                 report.notes.append(f"doubles: {exc}")
             else:
+                rows = [r for r in rows if r["leg_no"] not in frozen]
                 with transaction(conn):
                     report.doubles += upsert.upsert_odds_doubles(conn, rows)
                 report.legs = len({r["leg_no"] for r in rows})
