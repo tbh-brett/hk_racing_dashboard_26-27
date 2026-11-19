@@ -94,16 +94,32 @@
 .bf-ranrow .win { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; }
 .bf-ranrow .res { margin-left: auto; font-size: 10px; color: var(--text-dim); }
 
-.bf-feat, .bf-quiet {
+.bf-feat {
   display: grid; grid-template-columns: 156px minmax(0, 1fr) 176px 392px;
   border-bottom: 1px solid var(--line); border-left: 3px solid transparent; cursor: pointer;
 }
-.bf-quiet { align-items: center; min-height: 34px; font-family: var(--font-mono); }
-.bf-feat:hover, .bf-quiet:hover { background: var(--row-hover); }
-.bf-feat.open, .bf-quiet.open { background: var(--surface-2); }
-.bf-feat.e-open, .bf-quiet.e-open { border-left-color: var(--text); }
-.bf-feat.e-next, .bf-quiet.e-next { border-left-color: var(--text-2); }
-.bf-feat.e-running, .bf-quiet.e-running { border-left-color: var(--text-muted); }
+.bf-feat:hover { background: var(--row-hover); }
+.bf-feat.open { background: var(--surface-2); }
+.bf-feat.e-open { border-left-color: var(--text); }
+.bf-feat.e-next { border-left-color: var(--text-2); }
+.bf-feat.e-running { border-left-color: var(--text-muted); }
+/* A race where a Racing To Win interview was held (Brett, 19 Nov 2026): the
+   row is tinted in the voice colour and names who spoke, on whom. */
+.bf-feat.iv, .bf-pcard.iv { background: color-mix(in srgb, var(--voice) 6%, transparent); }
+.bf-feat.iv:hover { background: color-mix(in srgb, var(--voice) 10%, var(--row-hover)); }
+.bf-feat.iv.open, .bf-pcard.iv.open { background: color-mix(in srgb, var(--voice) 9%, var(--surface-2)); }
+.bf-ivtag {
+  margin-top: 6px; font-family: var(--font-mono); font-size: 10px; line-height: 1.4;
+  color: var(--text-2); overflow-wrap: anywhere;
+}
+.bf-ivtag .k {
+  display: inline-block; margin-right: 6px; padding: 0 4px; letter-spacing: .08em; font-weight: 600;
+  color: var(--voice); border: 1px solid color-mix(in srgb, var(--voice) 45%, transparent);
+  background: color-mix(in srgb, var(--voice) 12%, transparent);
+}
+.bf-ivtag.p { margin-top: 4px; }
+.bf-ivtag.run { margin: 0 0 0 9px; }
+.bf-ivtag.run .k { margin-right: 0; }
 
 .bf-feat .c-id { padding: 9px 9px 9px 11px; font-family: var(--font-mono); }
 .bf-feat .c-why, .bf-feat .c-pace, .bf-feat .c-four { border-left: 1px solid var(--line); }
@@ -141,25 +157,6 @@
 .bf-four .said { white-space: nowrap; font-size: 10px; }
 .bf-four .r { text-align: right; white-space: nowrap; }
 .bf-four .r .dim { font-size: 10px; }
-
-.bf-quiet .c-id { padding: 4px 9px 4px 11px; min-width: 0; }
-.bf-quiet .c-id .top, .bf-quiet .c-id .meta { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
-.bf-quiet .c-id .meta { margin-top: 1px; line-height: 1.2; }
-.bf-quiet .lbl { font-size: 13px; font-weight: 600; color: var(--text-2); }
-.bf-quiet .off { font-size: 12px; color: var(--text-muted); }
-.bf-quiet .dist { font-size: 10px; color: var(--text-dim); }
-.bf-quiet .c-why { display: flex; align-items: baseline; gap: 9px; padding: 0 14px 0 9px; min-width: 0; }
-.bf-quiet .counts { flex: none; font-size: 10px; color: var(--text-dim); white-space: nowrap; }
-.bf-quiet .first {
-  flex: 1; min-width: 0; font-family: var(--font); font-size: 12px; color: var(--text-muted);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.bf-quiet .c-pace { padding: 0 9px; }
-.bf-quiet .short, .bf-quiet .c-four {
-  font-size: 10px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.bf-quiet .short { margin-top: 3px; }
-.bf-quiet .c-four { padding: 0 14px 0 9px; }
 
 /* SCREEN · SAID · PRICE — the three kinds, never one colour. */
 .bf-kind {
@@ -463,11 +460,6 @@
 .bf-pcard .bf-pacebar { margin-top: 6px; }
 .bf-pcard .pace { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-top: 3px; }
 .bf-pcard .four { margin-top: 6px; border-top: 1px solid var(--line); }
-.bf-pcard .quiet {
-  display: flex; gap: 6px; margin-top: 3px; font-family: var(--font-mono); font-size: 10px;
-  color: var(--text-dim); white-space: nowrap; overflow: hidden;
-}
-.bf-pcard .quiet .sl { overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); }
 .bf-pfour {
   display: grid; grid-template-columns: minmax(0, 1fr) 40px 30px 40px 44px; gap: 0 6px;
   align-items: center; height: 24px; font-family: var(--font-mono); font-size: 12px;

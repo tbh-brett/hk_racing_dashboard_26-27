@@ -10,6 +10,11 @@ Owner's decisions, 25 Sep 2026: races worth studying first, the rest in race
 order; the page follows race day to the last race; Horse Detective counts as
 a source; the combined data is built before the new design.
 
+Changed 19 Nov 2026 (Brett): every race in race order, each drawn in full (its
+reasons, pace and the Screen's four), and a race where a Racing To Win
+interview was held is tinted in the voice colour and names who spoke on whom.
+The race opened in detail is the next to run, else the first still to run.
+
 ---
 
 ## Where each kind of evidence comes from
@@ -111,9 +116,6 @@ What it adds on top of its parts:
 
 ## What is not measured yet
 
-- **The order.** A count of reason kinds is a reading order, not a finding.
-  Worth checking after a few meetings: are the races it puts first the ones
-  the owner ends up studying? Is the Screen's shortlist any sharper in them?
 - **Tipster support** has no history to score (it began 23 Sep 2026). It is
   shown and counted, never weighted.
 - **The bookmakers' and Horse Detective's timing** rest on one observation

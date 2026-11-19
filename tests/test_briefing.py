@@ -144,10 +144,12 @@ def test_race_day_follows_the_market(db):
     assert ranks == list(range(1, len(NAMES) + 1))
 
 
-def test_the_order_is_by_how_much_there_is_to_read(db):
+def test_the_card_is_in_race_order(db):
+    """Brett, 19 Nov 2026: race order, every race in full -- no longer the
+    races with the most reasons first."""
     out = _race(db, TWO_DAYS_OUT)
-    assert out["order"] == [1]
-    assert "not a chance" in out["order_rule"]
+    assert out["order"] == sorted(r["race_no"] for r in out["races"])
+    assert out["order_rule"] == "race order, every race in full"
 
 
 def test_the_route_404s_without_a_card(monkeypatch, db):

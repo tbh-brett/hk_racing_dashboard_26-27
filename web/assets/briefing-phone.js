@@ -1,8 +1,8 @@
 /* briefing-phone.js — the Briefing at 390px, at the course.
  *
- * The same list as the desktop, in the same order, stacked: a race card
- * carries its time to the off, the favourite, its lead reasons, the pace and
- * the Screen's four; opened, its interviews come first, then every runner in
+ * The same list as the desktop, in race order, stacked: a race card carries
+ * its time to the off, the favourite, any interview held on it, its lead
+ * reasons, the pace and the Screen's four; opened, its interviews come first, then every runner in
  * the Screen's order with how many sources back it and its tote price, each
  * opening to its reasons, what was said and every market's price.
  */
@@ -11,7 +11,7 @@ import { bookLineEl, tierChip } from './book-tier.js';
 import { verdictChip } from './background.js';
 import {
   wordRows, markEl, chipEl, kindEl, paceBar, styleEl, link, nameEl, bar,
-  interviewBox, screenBlock, saidBlock, priceBlock,
+  interviewBox, interviewTag, screenBlock, saidBlock, priceBlock,
 } from './briefing-desk.js';
 
 export function renderPhone(host, view, ctx) {
@@ -49,7 +49,8 @@ export function renderPhone(host, view, ctx) {
 }
 
 function card(r, ctx) {
-  const c = el('div', `bf-pcard e-${r.mEdge || 'none'}${r.mOpen ? ' open' : ''}`);
+  const c = el('div', `bf-pcard e-${r.mEdge || 'none'}${r.mOpen ? ' open' : ''}`
+    + `${r.interview ? ' iv' : ''}`);
   c.addEventListener('click', () => ctx.act.raceM(r.no));
   const hd = el('div', 'hd');
   hd.append(el('span', 'lbl', r.label), el('span', 'off', r.off),
@@ -59,31 +60,27 @@ function card(r, ctx) {
   hd.append(el('span', 'dist', r.dist),
             el('span', 'fav', r.market ? `FAV #${r.market.favNo} ${r.market.favWin}` : ''));
   c.append(hd);
-  if (r.mode === 'feat') {
-    const why = el('div', 'why');
-    r.reasons.slice(0, 3).forEach((x) => {
-      const line = el('div', 'reason');
-      line.append(kindEl(x), el('span', 'txt', x.text));
-      why.append(line);
-    });
-    if (r.reasons.length > 3) why.append(el('div', 'more', `+${r.reasons.length - 3} more · ${r.kindCounts}`));
-    c.append(why, paceBar(r.pace.segs, 'thin'), el('div', 'pace', r.pace.head));
-    const four = el('div', 'four');
-    r.shortlist.forEach((x) => {
-      const line = el('div', 'bf-pfour');
-      const said = el('span', 'said');
-      said.append(el('span', x.tip ? 'tip' : 'dim', x.saidS));
-      if (x.int) said.append(el('span', 'voice', ' INT'));
-      line.append(nameEl(`${x.no} ${x.name}`, x.booked), bar(x.bar), el('span', 'pl', x.place),
-                  said, el('span', 'px', x.price));
-      four.append(line);
-    });
-    c.append(four);
-  } else {
-    const q = el('div', 'quiet');
-    q.append(el('span', null, r.kindCounts), el('span', 'sl', r.slCompact));
-    c.append(q);
-  }
+  const tag = interviewTag(r, 'bf-ivtag p');
+  if (tag) c.append(tag);
+  const why = el('div', 'why');
+  r.reasons.slice(0, 3).forEach((x) => {
+    const line = el('div', 'reason');
+    line.append(kindEl(x), el('span', 'txt', x.text));
+    why.append(line);
+  });
+  if (r.reasons.length > 3) why.append(el('div', 'more', `+${r.reasons.length - 3} more · ${r.kindCounts}`));
+  c.append(why, paceBar(r.pace.segs, 'thin'), el('div', 'pace', r.pace.head));
+  const four = el('div', 'four');
+  r.shortlist.forEach((x) => {
+    const line = el('div', 'bf-pfour');
+    const said = el('span', 'said');
+    said.append(el('span', x.tip ? 'tip' : 'dim', x.saidS));
+    if (x.int) said.append(el('span', 'voice', ' INT'));
+    line.append(nameEl(`${x.no} ${x.name}`, x.booked), bar(x.bar), el('span', 'pl', x.place),
+                said, el('span', 'px', x.price));
+    four.append(line);
+  });
+  c.append(four);
   return c;
 }
 

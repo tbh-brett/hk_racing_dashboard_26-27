@@ -1,10 +1,11 @@
 /* briefing-desk.js — the Briefing's desktop list, and the pieces the phone
  * list shares with it.
  *
- * Off web/design-source/Briefing.dc.html: "worth studying first" races at
- * full height — their reasons marked SCREEN, SAID or PRICE, the pace, the
- * Screen's four with who backs them and their price — then the rest in race
- * order, one line each, and races already run collapsed to their winner. An
+ * Off web/design-source/Briefing.dc.html: every race in race order at full
+ * height (Brett, 19 Nov 2026) — its reasons marked SCREEN, SAID or PRICE, the
+ * pace, the Screen's four with who backs them and their price, and a mark
+ * where a Racing To Win interview was held — with races already run collapsed
+ * to their winner. An
  * open race shows its interviews first, then every runner, each opening to
  * the Screen's reasons, what was said about it verbatim, and its prices.
  */
@@ -109,8 +110,7 @@ export function renderDesk(host, view, ctx) {
     }
     const wrap = el('div', 'bf-race');
     wrap.dataset.race = String(r.no);
-    if (r.mode === 'run') wrap.append(runRow(r, ctx));
-    else wrap.append(r.mode === 'feat' ? featRow(r, ctx) : quietRow(r, ctx));
+    wrap.append(r.mode === 'run' ? runRow(r, ctx) : featRow(r, ctx));
     if (r.open) wrap.append(raceDetail(r, ctx));
     host.append(wrap);
   });
@@ -136,17 +136,35 @@ function runRow(r, ctx) {
              el('span', 'first', r.verdict.first));
     row.append(v);
   }
+  if (r.interview) {
+    const iv = el('span', 'bf-ivtag run');
+    iv.append(el('span', 'k', 'INTERVIEW'));
+    iv.title = r.ivWho;
+    row.append(iv);
+  }
   row.append(link(`results.html?date=${ctx.date}&race=${r.no}`, 'RESULT ▸', 'res'),
              el('span', 'bf-ran-caret', r.open ? '▾' : '▸'));
   return row;
 }
 
+/** The interview mark: a race where a Racing To Win interview was held. */
+export function interviewTag(r, cls = 'bf-ivtag') {
+  if (!r.interview) return null;
+  const t = el('div', cls);
+  t.append(el('span', 'k', 'INTERVIEW'), el('span', 'who', r.ivWho));
+  t.title = r.ivWho;
+  return t;
+}
+
 function featRow(r, ctx) {
-  const row = el('div', `bf-feat e-${r.edge || 'none'}${r.open ? ' open' : ''}`);
+  const row = el('div', `bf-feat e-${r.edge || 'none'}${r.open ? ' open' : ''}`
+    + `${r.interview ? ' iv' : ''}`);
   row.addEventListener('click', () => ctx.act.race(r.no));
 
   const a = el('div', 'c-id');
   a.append(timeCell(r, true));
+  const tag = interviewTag(r);
+  if (tag) a.append(tag);
   const meta = el('div', 'meta');
   meta.append(el('span', null, r.dist));
   const cls = classCell(r.raceClass, { restricted: r.restricted });
@@ -198,31 +216,6 @@ function featRow(r, ctx) {
                 bar(x.bar), el('span', 'pl', x.place), said, price);
     d.append(line);
   });
-  row.append(a, b, c, d);
-  return row;
-}
-
-function quietRow(r, ctx) {
-  const row = el('div', `bf-quiet e-${r.edge || 'none'}${r.open ? ' open' : ''}`);
-  row.addEventListener('click', () => ctx.act.race(r.no));
-  // Class and distance get a line of their own under the time, as in a
-  // featured row: on one line a countdown like "in 11h 40m" ran them into
-  // the next column.
-  const a = el('div', 'c-id');
-  const top = el('div', 'top');
-  top.append(el('span', 'lbl', r.label), el('span', 'off', r.off),
-             el('span', `mins${r.minsStrong ? ' strong' : ''}`, r.mins));
-  const meta = el('div', 'meta');
-  const cls = classCell(r.raceClass, { restricted: r.restricted });
-  if (cls) meta.append(cls);
-  meta.append(el('span', 'dist', r.dist));
-  a.append(top, meta);
-  const b = el('div', 'c-why');
-  b.append(el('span', 'counts', r.kindCounts), el('span', 'first', r.firstReason));
-  const c = el('div', 'c-pace');
-  c.append(paceBar(r.pace.segs, 'thin'), el('div', 'short', r.pace.head));
-  const d = el('div', 'c-four');
-  d.append(document.createTextNode("SCREEN'S FOUR · PLACE "), el('span', 'v', r.slCompact));
   row.append(a, b, c, d);
   return row;
 }
