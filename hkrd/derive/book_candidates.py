@@ -42,7 +42,7 @@ from hkrd.store.coerce import parse_running_positions
 
 __all__ = ["DERIVE_VERSION", "RESULTS_CAP", "TRIALS_CAP", "Evidence",
            "Candidate", "race_candidates", "pick", "trial_candidates",
-           "margin_text", "KEEN"]
+           "margin_text", "KEEN", "WIDE_TRIP", "EQUIPMENT", "is_traffic"]
 
 DERIVE_VERSION = "book-1.0"
 
@@ -100,6 +100,10 @@ _EQUIPMENT = re.compile(
     r"\bspread a plate\b|\bbit (?:slipped|through)\b|\breins? (?:broke|snapped)\b",
     re.I)
 _QUOTE_MAX = 180
+# The same two readings for the banker review (`derive/circumstances`), so a
+# trip the book calls wide without cover is wide without cover there too.
+WIDE_TRIP = _WIDE_TRIP
+EQUIPMENT = _EQUIPMENT
 
 
 @dataclass(frozen=True)
@@ -220,8 +224,11 @@ def _texts(run: dict[str, Any]) -> list[tuple[str, str]]:
     return out
 
 
-def _is_traffic(sentence: str) -> bool:
-    hit = {t.name for t in tagger.tag_comment(sentence)} & _TRAFFIC
+def _is_traffic(sentence: str, names: set[str] | None = None) -> bool:
+    # `names`: the sentence's tags, when the caller has already read them.
+    if names is None:
+        names = {t.name for t in tagger.tag_comment(sentence)}
+    hit = names & _TRAFFIC
     if not hit:
         return False
     # Its own doing. Only the SENTENCE is read, so a horse keen early and held
@@ -235,6 +242,10 @@ def _is_traffic(sentence: str) -> bool:
     if hit == {"steadied"}:
         return bool(re.search(r"\bsteadied\b", sentence, re.I))
     return True
+
+
+# The book's traffic rule, read by the banker review as well.
+is_traffic = _is_traffic
 
 
 def _has_vet_finding(texts: list[tuple[str, str]]) -> bool:

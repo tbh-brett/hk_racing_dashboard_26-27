@@ -37,6 +37,7 @@ export const NAV = [
   ['Race Day', 'raceday.html'],
   ['Speed Map', 'speed-map.html'],
   ['Form Guide', 'form-guide.html'],
+  ['Desk', 'desk.html'],
   ['Bets', 'bets.html'],
   ['Blackbook', 'blackbook.html'],
   ['Results', 'results.html'],

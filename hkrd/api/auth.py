@@ -83,7 +83,10 @@ _attempts: dict[str, deque[float]] = {}
 # What the bets password guards: the page, every route under /api/bets, and the
 # statement import, which writes into the same ledger. Endpoints elsewhere that
 # only JOIN the ledger (the blackbook's backed-vs-missed) are not on it.
-_BETS_PATHS = frozenset({"/pages/bets.html", "/api/jobs/import-statement"})
+# The desk page and its routes (/api/tickets) are his bankers and his reasons,
+# so they are behind it too since the desk left the Bets page (20 Nov 2026).
+_BETS_PATHS = frozenset({"/pages/bets.html", "/pages/desk.html",
+                         "/api/jobs/import-statement"})
 
 
 class AuthError(RuntimeError):
@@ -159,8 +162,8 @@ def _is_bets_path(path: str) -> bool:
     # Normalised first: `//pages/bets.html`, `/pages/./bets.html` and, on a
     # case-blind disk, `/pages/BETS.html` all reach the same file.
     path = posixpath.normpath(re.sub(r"/+", "/", path)).lower()
-    return (path in _BETS_PATHS or path == "/api/bets"
-            or path.startswith("/api/bets/"))
+    return (path in _BETS_PATHS or path in ("/api/bets", "/api/tickets")
+            or path.startswith(("/api/bets/", "/api/tickets/")))
 
 
 def _sign(expires_at: int, secret: str | None = None) -> str:

@@ -28,6 +28,12 @@ saw that the database cannot (a trial, a run, the pace, the rider ...) -- and
 and both are replaced with the decision. The facts the database can see are not
 asked for: they are in the brief, which is kept with the ticket he saw.
 
+HOW SURE, AND THE SENTENCE, ARE HIS CLAIM. `confidence` (strong, fair, weak) and
+`reason` are also written as the horse's claim on the banker review
+(`jobs/review_banker.claim`), which is where they are graded after the race.
+Only a decision made in time writes one: a claim is a forecast, and the review
+keeps the ones written after the off apart.
+
 A flag never blocks a decision. What is refused is a ticket that describes
 nothing -- a banker not in the race, no partner, a partner named twice -- and a
 reason that is not in the vocabulary, which would be a tap nothing can score.
@@ -39,6 +45,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from hkrd.jobs import review_banker
 from hkrd.query import banker_record, suggest
 from hkrd.store import tickets
 from hkrd.store.connect import get_conn, transaction
@@ -55,7 +62,7 @@ class DecisionClosed(RuntimeError):
 def decide(date: str, race_no: int, banker_no: int, *, decision: str,
            partners: list[int] | None = None, unit_stake: float | None = None,
            account: str | None = None, reason: str | None = None,
-           reasons: list[str] | None = None,
+           reasons: list[str] | None = None, confidence: str | None = None,
            db: Path | None = None, now: dt.datetime | None = None) -> dict[str, Any]:
     """Record one decision. Returns the decision as stored and the ticket it
     was made on. Raises `suggest.TicketError` for a ticket that describes
@@ -70,6 +77,11 @@ def decide(date: str, race_no: int, banker_no: int, *, decision: str,
         raise suggest.TicketError(
             f"not a reason the desk knows: {', '.join(unknown)} (known: "
             f"{', '.join(banker_record.REASON_LABEL)})")
+    sure = (confidence or "").strip().lower() or None
+    if sure is not None and sure not in dict(review_banker.CONFIDENCE):
+        raise suggest.TicketError(
+            f"confidence must be one of {', '.join(dict(review_banker.CONFIDENCE))}: "
+            f"{confidence!r}")
     conn = get_conn(db) if db else get_conn()
     try:
         # The engine's ticket as it stands now, at the size he is taking.
@@ -103,6 +115,14 @@ def decide(date: str, race_no: int, banker_no: int, *, decision: str,
         stamp = (now or dt.datetime.now(dt.timezone.utc)).astimezone(
             dt.timezone.utc).isoformat(timespec="seconds")
         with transaction(conn, immediate=True):
+            if not late:
+                # Before the decision is replaced, so a claim the desk wrote
+                # earlier keeps the moment it was first made.
+                said = (reason or "").strip() or None
+                review_banker.claim(conn, date, race_no, banker_no, reasoning=said,
+                                    confidence=sure,
+                                    picked_by="me" if (said or sure) else review_banker.UNSET,
+                                    now=now)
             tickets.save_decision(conn, {
                 "race_date": date, "race_no": race_no, "banker_no": banker_no,
                 "decision": kind, "account": account,

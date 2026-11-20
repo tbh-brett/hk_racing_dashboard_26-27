@@ -153,13 +153,17 @@ are given: `--since 2026-09-06 --facts-since 2026-04-01`.
 
 ## Not built
 
-- ~~**The page.**~~ **Built 17 Nov**, as the DESK and BANKERS views of the Bets
+- ~~**The page.**~~ **Moved 20 Nov** to a page of its own, `pages/desk.html`,
+  with the review of each race once it has run (`docs/banker-review.md`).
+  **Built 17 Nov**, as the DESK and BANKERS views of the Bets
   page, in the dashboard's own style with no artboard yet. **Rebuilt 19 Nov**
   one race at a time, with the candidates compared in a table, a multi check,
   and races that have gone off kept for review. See `docs/banker-card.md`.
-- **Your verdict after the result ("whose fault").** The record names what went
-  wrong with a ticket, and your taps say why you took it; your own verdict
-  after the result has no table yet.
+- ~~**Your verdict after the result ("whose fault").**~~ **Built 20 Nov** as the
+  REVIEW view of the Bets page: your claim (a sentence and how sure, written
+  before the off on the desk or afterwards from memory, kept apart) and your
+  verdict, with what the stewards' report says beside it. See
+  `docs/banker-review.md`.
 - **Anything learned.** Nothing here is fitted. The first things worth fitting
   are which evidence carries the banker edge and whether your edits pay, and
   both need more than one season.

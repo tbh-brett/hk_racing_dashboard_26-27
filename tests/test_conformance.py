@@ -249,11 +249,13 @@ def test_no_page_redeclares_the_shared_vocabulary() -> None:
 
 def test_the_navigation_is_defined_once_and_in_order() -> None:
     """Design note 11 §4, plus Model Analysis last — the owner's decision —
-    and the Briefing first, as the front page the owner asked for."""
+    and the Briefing first, as the front page the owner asked for. The Desk,
+    his bankers before and after each race, joined on 20 Nov 2026 beside Bets
+    when it left that page at his request."""
     text = VOCAB.read_text(encoding="utf-8")
     order = re.findall(r"\['([^']+)', '([^']+\.html)'\]", text)
     assert [name for name, _ in order] == [
-        "Briefing", "Race Day", "Speed Map", "Form Guide", "Bets", "Blackbook",
+        "Briefing", "Race Day", "Speed Map", "Form Guide", "Desk", "Bets", "Blackbook",
         "Results", "Lookup", "Trials", "Model Analysis"]
 
 

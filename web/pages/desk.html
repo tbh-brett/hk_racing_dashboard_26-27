@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Desk</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/pages.css">
+<link rel="stylesheet" href="../assets/bets.css">
+<link rel="stylesheet" href="../assets/desk.css">
+<link rel="stylesheet" href="../assets/banker-review.css">
+<!-- every module this page imports, asked for at once (tests/test_web_preload.py keeps the list true) -->
+<link rel="modulepreload" href="../assets/api.js">
+<link rel="modulepreload" href="../assets/banker-review-form.js">
+<link rel="modulepreload" href="../assets/banker-review.js">
+<link rel="modulepreload" href="../assets/context.js">
+<link rel="modulepreload" href="../assets/desk-detail.js">
+<link rel="modulepreload" href="../assets/desk-page.js">
+<link rel="modulepreload" href="../assets/desk.js">
+<link rel="modulepreload" href="../assets/overlay.js">
+<link rel="modulepreload" href="../assets/palette.js">
+<link rel="modulepreload" href="../assets/review-race.js">
+<link rel="modulepreload" href="../assets/review-rows.js">
+<link rel="modulepreload" href="../assets/vocab.js">
+</head>
+<body>
+
+<!-- Layer 1. Rendered by context.js and identical on every page; no page
+     writes into it. See design brief 08 §1. -->
+<div class="chrome-meeting"></div>
+
+<nav class="chrome-nav" id="nav"></nav>
+
+<!-- The desk: your bankers chosen before each race and judged after it, one
+     race at a time. desk-page.js, docs/banker-review.md. Behind the Bets
+     password: these are your bets and your reasons. -->
+<div class="bet-strip" id="desk-strip">
+  <div class="bet-brand">
+    <span class="dot"></span>DESK
+    <span class="sub">YOUR BANKERS, BEFORE AND AFTER</span>
+  </div>
+  <div class="seg" id="view-toggle" role="group" aria-label="View"></div>
+  <div id="book"></div>
+</div>
+
+<section id="view-tonight">
+  <div id="desk-host"></div>
+  <div id="night-host"></div>
+</section>
+
+<section id="view-backlog" hidden>
+  <div id="review-host"></div>
+</section>
+
+<script type="module" src="../assets/desk-page.js"></script>
+</body>
+</html>
