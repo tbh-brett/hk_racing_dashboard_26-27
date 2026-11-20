@@ -1199,3 +1199,66 @@ CREATE TABLE IF NOT EXISTS ticket_reason (
   FOREIGN KEY (race_date, race_no, banker_no)
     REFERENCES ticket_decision(race_date, race_no, banker_no)
 );
+
+-- ── the banker review (docs/banker-review.md) ────────────────────────────────
+
+-- His own account of a horse he backed to carry a ticket -- a banker, or the
+-- only horse in a leg -- keyed by the horse in its race, whichever account
+-- or ticket it was on. RAW, his. Two halves with different rules, enforced by
+-- `jobs/review_banker`:
+--
+--   the CLAIM    why he chose it and how sure he was. `claim_at` is the first
+--                save and never moves; `claim_late` says whether that was
+--                after the pool shut -- written from memory, which the record
+--                keeps apart from a forecast. A claim made before the off
+--                cannot be changed once the race has gone.
+--   the VERDICT  what decided it, once there is a result.
+--
+-- `picked_by` is who chose the horse (`me`, `kelvin`, `other`): Kelvin's
+-- tickets carry legs other people picked. `claim_kind` is the kind of reason,
+-- given by the fortnightly review from the reasoning alone, never the result.
+CREATE TABLE IF NOT EXISTS banker_review (
+  race_date       TEXT    NOT NULL,
+  race_no         INTEGER NOT NULL,
+  horse_no        INTEGER NOT NULL,
+  reasoning       TEXT,
+  confidence      TEXT,                   -- strong | fair | weak
+  picked_by       TEXT,                   -- me | kelvin | other
+  claim_at        TEXT,                   -- ISO-8601 UTC, first save
+  claim_late      INTEGER,                -- 1 when first saved after the off
+  claim_edited_at TEXT,
+  claim_kind      TEXT,
+  verdict         TEXT,                   -- jobs/review_banker.VERDICTS
+  verdict_note    TEXT,
+  verdict_at      TEXT,
+  PRIMARY KEY (race_date, race_no, horse_no),
+  FOREIGN KEY (race_date, race_no, horse_no)
+    REFERENCES runners(race_date, race_no, horse_no)
+);
+
+-- The circumstances he says decided it (`derive/circumstances.CIRCUMSTANCES`),
+-- replaced with the verdict. What the record says is read fresh every time
+-- from the stewards' report, never stored here: this table is only his.
+CREATE TABLE IF NOT EXISTS banker_review_circumstance (
+  race_date    TEXT    NOT NULL,
+  race_no      INTEGER NOT NULL,
+  horse_no     INTEGER NOT NULL,
+  circumstance TEXT    NOT NULL,
+  PRIMARY KEY (race_date, race_no, horse_no, circumstance),
+  FOREIGN KEY (race_date, race_no, horse_no)
+    REFERENCES banker_review(race_date, race_no, horse_no)
+);
+
+-- His notes on a race once it is over, and on the night as a whole
+-- (`race_no` 0): what he would do differently, the horse he should have
+-- banked, why he left a race alone. RAW, his, free text; the desk page keeps
+-- one per race beside his bankers' verdicts. `written_at` is the first save
+-- and never moves.
+CREATE TABLE IF NOT EXISTS race_reflection (
+  race_date  TEXT    NOT NULL,
+  race_no    INTEGER NOT NULL,             -- 0 for the night as a whole
+  note       TEXT    NOT NULL,
+  written_at TEXT    NOT NULL,
+  edited_at  TEXT,
+  PRIMARY KEY (race_date, race_no)
+);

@@ -5,7 +5,8 @@ on intuition after plenty of deliberation and seldom keep track of why. I want
 to know whether my preferences pay, if they don't, and how to get the most out
 of the quinella.*
 
-Three pieces, all on the Bets page:
+Three pieces. Since 20 Nov 2026 the brief and the taps are on the Desk page
+(`pages/desk.html`) and the scorecard stays on the Bets page:
 
 - **The brief** (DESK view): every candidate banker's facts, each beside how
   *your* bankers with that fact have placed against the price.
@@ -206,5 +207,6 @@ correct, only slower.
 
 - **Ticket shape** (three partners by default, a flag on long-shot pair lines,
   weighted stakes past three). Measured on 17 Nov, not built.
-- **Your verdict after the result** (why it paid or failed, and whose fault).
-  The record names what went wrong; there is no table for your own verdict yet.
+- ~~**Your verdict after the result**~~ **Built 20 Nov**: the REVIEW view
+  (`docs/banker-review.md`). The desk's TAKE or PASS now also takes how sure
+  you are, and writes it with your sentence as the horse's claim there.

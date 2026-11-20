@@ -141,6 +141,8 @@
 }
 .dk-pick { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); margin-top: var(--sp-3); }
 .dk-decide .chips { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.dk-decide .dk-sure { align-items: center; margin-top: var(--sp-2); }
+.dk-sure-k { margin-right: var(--sp-2); color: var(--text-dim); font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .1em; }
 .dk-note {
   width: 100%; max-width: 640px; margin-top: var(--sp-2); padding: 5px 8px;
   background: var(--surface); border: 1px solid var(--line-2); color: var(--text);

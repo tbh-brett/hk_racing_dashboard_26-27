@@ -89,8 +89,9 @@ def ticket(date: str, race_no: int, banker_no: int, partners: str | None = None,
 @router.post("/api/tickets/{date}/{race_no}/{banker_no}/decision")
 def decide(date: str, race_no: int, banker_no: int, body: dict = Body(...)) -> dict:
     """Record what the owner did with a ticket: `accept` (with `partners` of
-    his own, it is stored as edited) or `reject`, with any `reasons` tapped
-    and a line of his own in `reason`. Writes no bet."""
+    his own, it is stored as edited) or `reject`, with any `reasons` tapped,
+    a line of his own in `reason` and how sure he is in `confidence` -- the
+    last two are also the horse's claim on the banker review. Writes no bet."""
     from hkrd.jobs import decide_ticket as job
 
     try:
@@ -101,7 +102,7 @@ def decide(date: str, race_no: int, banker_no: int, body: dict = Body(...)) -> d
             unit_stake=(float(body["unit_stake"])
                         if body.get("unit_stake") is not None else None),
             account=body.get("account"), reason=body.get("reason"),
-            reasons=body.get("reasons") or [])
+            reasons=body.get("reasons") or [], confidence=body.get("confidence"))
     except KeyError as exc:
         raise HTTPException(422, f"missing field: {exc.args[0]}") from exc
     except suggest.NotOnCard as exc:

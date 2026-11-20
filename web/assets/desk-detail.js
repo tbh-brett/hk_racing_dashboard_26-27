@@ -10,8 +10,10 @@
  *                  fourteen facts fold out.
  *   the ticket     the engine's partners by the pool that pays them, what each
  *                  line returns alone, the flags; tap runners to change them.
- *   the decision   TAKE or PASS with taps for what the database cannot see.
- *                  None once the race has gone off: that would be hindsight.
+ *   the decision   TAKE or PASS with taps for what the database cannot see,
+ *                  a line of your own and how sure you are: the line and the
+ *                  confidence are the horse's claim on the REVIEW view, graded
+ *                  after the race. None once it has gone off: that is hindsight.
  *
  * Also the shared vocabulary both modules use: the short name of every fact
  * and what a candidate's evidence amounts to in a table cell.
@@ -106,8 +108,8 @@ function sub(title, note) {
   return hd;
 }
 
-/** h: {race, raceDate, gone, all, onAll, taps, note, onNote, busy, msg,
- *       reasons, runners, onReprice(partners|null), onDecide(kind)} */
+/** h: {race, raceDate, gone, all, onAll, taps, note, onNote, sure, onSure, busy,
+ *       msg, reasons, runners, onReprice(partners|null), onDecide(kind)} */
 export function detailEl(t, h) {
   const box = el('div', 'dk-detail');
   const left = el('div', 'dk-col');
@@ -243,6 +245,7 @@ function goneEl(t) {
   const d = t.decision;
   box.append(el('div', 'dk-quiet', d
     ? `You ${d.decision === 'rejected' ? 'passed it' : 'took it'}${d.late ? ' after the off — kept, in no figure' : ''}`
+      + `${d.confidence ? ` · ${d.confidence}` : ''}`
       + `${d.reasons?.length ? ` · ${d.reasons.join(', ')}` : ''}${d.reason ? ` · “${d.reason}”` : ''}.`
     : 'No decision on the desk. Your bets reach the scorecard from the statement import.'));
   return box;
@@ -262,8 +265,18 @@ function decideEl(t, h) {
     chips.append(c);
   });
   box.append(chips);
+  const sure = el('div', 'chips dk-sure');
+  sure.append(el('span', 'dk-sure-k', 'HOW SURE'));
+  [['strong', 'STRONG'], ['fair', 'FAIR'], ['weak', 'WEAK']].forEach(([k, label]) => {
+    const c = el('button', `chip${h.sure === k ? ' on' : ''}`, label);
+    c.type = 'button';
+    c.setAttribute('aria-pressed', String(h.sure === k));
+    c.addEventListener('click', () => h.onSure(h.sure === k ? null : k));
+    sure.append(c);
+  });
+  box.append(sure);
   const note = el('input', 'dk-note');
-  note.placeholder = 'a line of your own (optional)';
+  note.placeholder = 'what has to happen for it to place (graded on REVIEW after the race)';
   note.value = h.note;
   note.addEventListener('input', () => h.onNote(note.value));
   box.append(note);

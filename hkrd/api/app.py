@@ -52,7 +52,7 @@ auth.install(app)
 for _module in (routes.lookup, routes.blackbook, routes.bets, routes.results,
                 routes.trials, routes.jobs, routes.tips, routes.screen,
                 routes.briefing, routes.background, routes.model_gbm, routes.shape,
-                routes.tickets):
+                routes.tickets, routes.review):
     app.include_router(_module.router)
 
 

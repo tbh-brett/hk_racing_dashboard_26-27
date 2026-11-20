@@ -85,6 +85,12 @@ def decision(conn: sqlite3.Connection, race_date: str, race_no: int,
     out["reasons"] = [r[0] for r in conn.execute(
         "SELECT reason FROM ticket_reason WHERE race_date = ? AND race_no = ? "
         "AND banker_no = ? ORDER BY reason", (race_date, race_no, banker_no))]
+    # How sure he was is kept with the horse's claim on the banker review
+    # (`jobs/review_banker`), where the desk writes it.
+    sure = conn.execute(
+        "SELECT confidence FROM banker_review WHERE race_date = ? AND race_no = ? "
+        "AND horse_no = ?", (race_date, race_no, banker_no)).fetchone()
+    out["confidence"] = sure[0] if sure else None
     return out
 
 

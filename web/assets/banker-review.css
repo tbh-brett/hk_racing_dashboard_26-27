@@ -1,0 +1,165 @@
+/* banker-review.css — the Bets page's REVIEW view (banker-review.js,
+ * banker-review-form.js).
+ *
+ * Every class is prefixed rv- or scoped under one, so nothing here can
+ * collide with a page stylesheet (tests/test_smoke.py). Colours are tokens
+ * only. --win is "it placed", --book "yours"; a reason written before the off
+ * reads in the text colour and one written after is dimmed, because the
+ * record keeps them apart.
+ */
+
+#review-host { padding: 16px 14px 28px; }
+
+.rv-purpose {
+  max-width: 96ch; margin: 2px 0 var(--sp-3); color: var(--text-muted);
+  font-size: var(--fs); line-height: 1.5;
+}
+.rv-quiet { padding: 4px 0; color: var(--text-dim); font-family: var(--font-mono); font-size: var(--fs-xs); }
+.rv-quiet-in { color: var(--text-faint); font-family: var(--font-mono); font-size: var(--fs-xs); }
+
+/* ── the record so far ──────────────────────────────────────────────────── */
+.rv-record {
+  /* Tall enough for the record before it arrives, so the chips below do not
+     jump under a finger when it does. */
+  min-height: 92px;
+  display: flex; flex-direction: column; gap: 5px; margin: var(--sp-3) 0 var(--sp-4);
+  padding: 8px 12px; border-left: 2px solid var(--edge-ground-2); background: var(--surface);
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted);
+}
+.rv-record-hd { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-3); }
+.rv-record-hd .t { color: var(--text-2); font-weight: 600; font-size: var(--fs-xs); letter-spacing: .1em; }
+.rv-record-hd .n { color: var(--text-dim); font-size: var(--fs-xs); }
+.rv-counts { display: flex; flex-wrap: wrap; gap: 4px var(--sp-4); color: var(--text-faint); }
+.rv-counts .on { color: var(--text-2); }
+.rv-counts b { margin-right: 2px; font-weight: 600; }
+.rv-line { display: flex; flex-wrap: wrap; gap: 2px var(--sp-3); align-items: baseline; }
+.rv-line .k { width: 300px; max-width: 100%; color: var(--text-dim); font-size: var(--fs-xs); letter-spacing: .06em; }
+.rv-line .v { color: var(--text-2); }
+.rv-line.thin .v { color: var(--text-dim); }
+.rv-more > summary {
+  cursor: pointer; padding: 3px 0; color: var(--text-muted);
+  font-size: var(--fs-xs); letter-spacing: .1em;
+}
+.rv-more[open] > summary { margin-bottom: 4px; }
+
+/* ── the meetings ───────────────────────────────────────────────────────── */
+.rv-chips {
+  border: 1px solid var(--line-2); border-right: 0; height: 34px;
+  width: max-content; max-width: 100%; overflow-x: auto; margin-bottom: var(--sp-3);
+}
+.rv-chips .race-chip { white-space: nowrap; }
+.rv-chips .race-chip .ok { color: var(--win); margin-left: 5px; font-size: var(--fs-xs); }
+
+.rv-meeting { border: 1px solid var(--line-2); }
+.rv-meeting-hd {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-3);
+  padding: 7px 12px; background: var(--surface); border-bottom: 1px solid var(--line-2);
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+}
+.rv-meeting-hd .no { color: var(--text); font-weight: 600; }
+.rv-meeting-hd .meta { color: var(--text-muted); }
+
+/* ── one horse ──────────────────────────────────────────────────────────── */
+.rv-row {
+  display: grid; align-items: baseline; gap: 4px var(--sp-3);
+  grid-template-columns: 12px minmax(180px, 1.4fr) minmax(150px, 1.4fr) 64px minmax(80px, 1fr) minmax(120px, 1.2fr) 104px;
+  padding: 7px 12px; border-bottom: 1px solid var(--line); cursor: pointer;
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-2);
+}
+.rv-row:hover { background: var(--surface); }
+.rv-row.open { background: var(--detail); }
+.rv-row:focus-visible { outline: 1px solid var(--page-accent); outline-offset: -1px; }
+.rv-row .caret { color: var(--text-faint); }
+.rv-row .name { font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.rv-row .tk { display: flex; flex-wrap: wrap; gap: 4px; }
+.rv-row .fin { color: var(--text-muted); }
+.rv-row .fin.placed { color: var(--win); font-weight: 600; }
+.rv-row .rec { color: var(--incident); font-size: var(--fs-xs); }
+.rv-row .st { color: var(--text-2); font-size: var(--fs-xs); }
+.rv-row.todo .st { color: var(--page-accent); letter-spacing: .08em; }
+.rv-row .why { text-align: right; font-size: var(--fs-xs); letter-spacing: .06em; }
+.rv-row .why.before { color: var(--text); }
+.rv-row .why.after { color: var(--text-dim); }
+.rv-row .why.none { color: var(--text-faint); }
+.rv-who {
+  padding: 0 5px; border: 1px solid var(--line-2);
+  font-size: var(--fs-xs); letter-spacing: .06em; white-space: nowrap;
+}
+.rv-who.brett { color: var(--book); border-color: var(--book-ground); }
+.rv-who.kelvin { color: var(--text-2); }
+
+@media (max-width: 900px) {
+  .rv-row { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  .rv-row .name { flex: 1 1 60%; }
+  .rv-row .tk { flex-basis: 100%; padding-left: 24px; }
+  .rv-row .fin { padding-left: 24px; }
+  .rv-row .why { margin-left: auto; }
+}
+
+/* ── the opened row ─────────────────────────────────────────────────────── */
+.rv-form {
+  padding: 12px 14px 14px; background: var(--detail);
+  border-bottom: 1px solid var(--detail-rule);
+}
+.rv-cols { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(300px, 1fr); gap: var(--sp-5); }
+@media (max-width: 900px) {
+  .rv-cols { grid-template-columns: 1fr; }
+}
+.rv-col { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.rv-sub {
+  display: flex; align-items: baseline; gap: var(--sp-3); margin-bottom: 4px;
+  font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .1em;
+}
+.rv-sub .t { color: var(--text-2); font-weight: 600; }
+.rv-sub .n { margin-left: auto; color: var(--text-faint); }
+.rv-label {
+  margin-top: var(--sp-3); color: var(--text-dim);
+  font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .1em;
+}
+.rv-say { display: flex; gap: var(--sp-3); align-items: baseline; padding: 2px 0; font-size: var(--fs-sm); }
+.rv-say .k { width: 140px; flex: none; color: var(--text-dim); font-family: var(--font-mono); font-size: var(--fs-xs); }
+.rv-say .q { color: var(--text-2); }
+.rv-say .w { margin-left: auto; flex: none; color: var(--text-faint); font-family: var(--font-mono); font-size: var(--fs-xs); }
+.rv-claim { color: var(--text); font-size: var(--fs-sm); }
+.rv-when { color: var(--text-dim); font-family: var(--font-mono); font-size: var(--fs-xs); }
+.rv-when.before { color: var(--text-muted); }
+.rv-run { color: var(--text-2); font-family: var(--font-mono); font-size: var(--fs-sm); }
+.rv-text, .rv-note {
+  width: 100%; padding: 6px 8px; resize: vertical;
+  background: var(--surface); border: 1px solid var(--line-2); color: var(--text);
+  font-family: var(--font-mono); font-size: var(--fs-sm); line-height: 1.45;
+}
+.rv-note { margin-top: var(--sp-2); }
+.rv-choices { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.rv-choices .rv-rec { color: var(--incident); }
+.rv-acts { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-4); }
+
+/* ── the desk page (desk-page.js, review-race.js) ───────────────────────── */
+#book { margin-left: auto; padding-right: 12px; }
+#night-host { padding: 0 14px 28px; }
+.rv-race {
+  margin: 0; padding: 8px 12px 10px; border-bottom: 1px solid var(--line-2);
+  background: var(--surface);
+}
+.rv-race-hd {
+  display: flex; align-items: baseline; gap: var(--sp-3); padding: 2px 0 6px;
+  font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .1em;
+}
+.rv-race-hd .t { color: var(--text-2); font-weight: 600; }
+.rv-race .rv-row { background: var(--bg); }
+.rv-race .rv-row.open, .rv-race .rv-row:hover { background: var(--detail); }
+.rv-todo { margin-left: 5px; color: var(--page-accent); font-size: var(--fs-xs); white-space: nowrap; }
+.rv-add { align-self: flex-start; margin-top: var(--sp-2); }
+.rv-state { color: var(--text-faint); font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: .08em; }
+.rv-state.busy { color: var(--page-accent); }
+.rv-notebox { margin-top: var(--sp-3); }
+.rv-notebox .rv-text { margin-top: 4px; }
+.rv-night { max-width: 960px; margin-top: var(--sp-4); }
+#desk-strip { flex-wrap: wrap; row-gap: 6px; }
+@media (max-width: 700px) {
+  #desk-strip .sub { display: none; }
+  #book { margin-left: 0; padding: 0 12px 6px; }
+  .rv-say { flex-wrap: wrap; gap: 2px var(--sp-3); }
+  .rv-say .k { width: 100%; }
+  .rv-say .w { margin-left: 0; }
+}

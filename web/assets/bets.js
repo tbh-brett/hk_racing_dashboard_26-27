@@ -21,7 +21,6 @@ import { el, $, DASH, MINUS, renderNav, periodPicker,
          accountPicker } from './vocab.js';
 import { context } from './context.js';
 import { initEntry, loadEntry, renderEntry } from './bets-entry.js';
-import { renderDesk } from './desk.js';
 import { renderBankers, staleBankers } from './banker-card.js';
 import { actionsCell, confirmStrip, deletedPanel, editorPanel, undoBar }
   from './bets-edit.js';
@@ -97,18 +96,19 @@ function renderScope() {
     onSeason: (yr) => { state.season = yr; loadLedger(); },
   }));
   // The entry view is about a bet not yet placed, so a window over past
-  // results has nothing to say about it. The desk is the same; the banker
-  // scorecard is every banker since the book began, in Brett's own books,
+  // results has nothing to say about it. The banker scorecard is every
+  // banker since the book began, in Brett's own books,
   // and a window or a ledger picker beside it would claim to filter it.
-  host.hidden = ['entry', 'desk', 'bankers'].includes(state.view);
+  host.hidden = ['entry', 'bankers'].includes(state.view);
 }
 
 function renderViewToggle() {
   // Entry first: the page's own subject is the decision, and the ledger is
   // what that decision left behind.
-  // The desk sits beside entry: both are the decision. The banker scorecard
-  // sits beside the analysis: both are what the decisions came to.
-  const views = [['entry', 'ENTRY'], ['desk', 'DESK'], ['ledger', 'LEDGER'],
+  // The banker scorecard sits beside the analysis: both are what the
+  // decisions came to. The desk and the review of your bankers left for a
+  // page of their own on 20 Nov 2026 (pages/desk.html).
+  const views = [['entry', 'ENTRY'], ['ledger', 'LEDGER'],
                  ['analysis', 'ANALYSIS'], ['bankers', 'BANKERS'], ['recon', 'RECONCILE']];
   $('view-toggle').replaceChildren(...views.map(([key, label]) => {
     const b = el('button', null, label);
@@ -826,13 +826,11 @@ function render() {
   renderScope();
   renderSummary();
   $('view-entry').hidden = state.view !== 'entry';
-  $('view-desk').hidden = state.view !== 'desk';
   $('view-ledger').hidden = state.view !== 'ledger';
   $('view-analysis').hidden = state.view !== 'analysis';
   $('view-bankers').hidden = state.view !== 'bankers';
   $('view-recon').hidden = state.view !== 'recon';
   if (state.view === 'entry') renderEntry($('entry-host'));
-  if (state.view === 'desk') renderDesk($('desk-host'), context.date, { account: state.account });
   if (state.view === 'bankers') renderBankers($('bankers-host'));
   if (state.view === 'ledger') renderLedger();
   if (state.view === 'analysis') renderAnalysis();

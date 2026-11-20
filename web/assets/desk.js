@@ -19,32 +19,40 @@
  *
  * A race that has gone off stays: its result, its dividends, and where each of
  * your horses finished, for reviewing the night race by race.
+ *
+ * Moved to a page of its own on 20 Nov 2026 (desk-page.js), where a race that
+ * has gone off also carries the review of your bankers in it: the page hands
+ * in `afterRace` (drawn under the result) and `chipNote` (a race chip's "to
+ * judge" count), and `firstRace` picks the race to open once every race has
+ * run. The facts column left the table that day: measured on 20 Nov its ▲/▼
+ * marks could not be told from noise. The facts stay in the opened row.
  */
 import { el, DASH } from './vocab.js';
 import { api } from './api.js';
-import { detailEl, evidenceCell, odds, ordinal, pct, short } from './desk-detail.js';
+import { detailEl, evidenceCell, odds, ordinal, pct } from './desk-detail.js';
 
 const S = {
-  host: null, date: null, data: null, error: null, account: 'brett',
+  host: null, date: null, data: null, error: null, account: 'brett', hooks: {},
   race: null,            // the race on screen
   open: null,            // the candidate opened, 'race-banker'
   all: new Set(),        // candidates showing every fact
   tickets: new Map(),    // a re-priced, decided or nominated ticket, by key
   nominated: new Map(),  // race -> [banker], runners he chose to look at
-  taps: new Map(), notes: new Map(), busy: new Set(), msg: new Map(),
+  taps: new Map(), notes: new Map(), sure: new Map(), busy: new Set(), msg: new Map(),
 };
 const key = (n, b) => `${n}-${b}`;
 
-export function renderDesk(host, date, { account } = {}) {
+export function renderDesk(host, date, { account, afterRace, chipNote, firstRace } = {}) {
   S.host = host;
   S.account = account || 'brett';
+  S.hooks = { afterRace, chipNote, firstRace };
   if (date !== S.date) {
     S.date = date;
     S.data = null;
     S.error = null;
     S.race = null;
     S.open = null;
-    [S.all, S.tickets, S.nominated, S.taps, S.notes, S.msg].forEach((m) => m.clear());
+    [S.all, S.tickets, S.nominated, S.taps, S.notes, S.sure, S.msg].forEach((m) => m.clear());
     load();
   }
   draw();
@@ -57,7 +65,9 @@ async function load() {
     S.error = null;
     const d = S.data;
     const next = d.races.find((r) => !r.gone && r.candidates.length) ?? d.races.find((r) => !r.gone);
-    S.race = (next ?? d.races[d.races.length - 1])?.race_no ?? null;
+    // Once every race has run the night is for reviewing, from the first race
+    // with something of yours still to judge.
+    S.race = (next?.race_no ?? S.hooks?.firstRace?.(d.races) ?? d.races[0]?.race_no) ?? null;
   } catch (err) {
     S.error = err.message;
   }
@@ -83,16 +93,19 @@ function draw() {
   host.replaceChildren();
   const head = el('div', 'section-head');
   head.append(el('span', 'title', `THE DESK · ${S.date ?? DASH}`));
-  head.append(el('span', 'sub', 'CHOOSE YOUR BANKER RACE BY RACE'));
+  head.append(el('span', 'sub', 'BEFORE THE OFF: CHOOSE · AFTER IT: JUDGE'));
   host.append(head);
   host.append(el('div', 'dk-purpose',
-    'Your horses in each race, side by side: how strong your evidence is, how likely each is to '
-    + 'place and to lead, and the facts your own record has gone better (▲) or worse (▼) with. '
-    + 'Open one for its ticket, then TAKE or PASS before the off — the BANKERS view scores it.'));
+    'Before a race: your horses side by side — your evidence, how likely each is to place and to '
+    + 'lead. Open one, say in a line what has to happen, how sure you are, and TAKE or PASS. '
+    + 'After it: one tap for what decided each of your bankers.'));
   if (S.error) { host.append(el('div', 'no-match', `DESK FAILED TO LOAD — ${S.error}`)); return; }
   if (!S.data) { host.append(el('div', 'empty-line', 'LOADING')); return; }
   if (!S.data.races.length) { host.append(el('div', 'empty-line', 'NO CARD FOR THIS MEETING')); return; }
-  host.append(chipsEl(), multiEl());
+  host.append(chipsEl());
+  // The multi is a question asked before racing; once every race has run, the
+  // review under each race has taken its place.
+  if (S.data.races.some((r) => !r.gone)) host.append(multiEl());
   const race = S.data.races.find((r) => r.race_no === S.race);
   if (race) host.append(raceEl(race));
 }
@@ -107,8 +120,12 @@ function chipsEl() {
     b.type = 'button';
     b.setAttribute('aria-pressed', String(r.race_no === S.race));
     if (yours) b.append(el('span', 'bb', String(yours)));
-    if (decided) b.append(el('span', 'ok', '✓'));
-    b.title = `${r.off_time ?? ''} · ${yours} of your horses${r.gone ? ' · gone off' : ''}`;
+    // Once the race has run, the chip says what is left to judge instead.
+    const note = r.gone ? S.hooks?.chipNote?.(r) : null;
+    if (decided && !note) b.append(el('span', 'ok', '✓'));
+    if (note) b.append(el('span', note.cls, note.text));
+    b.title = `${r.off_time ?? ''} · ${yours} of your horses${r.gone ? ' · gone off' : ''}`
+      + (note?.title ? ` · ${note.title}` : '');
     b.addEventListener('click', () => { S.race = r.race_no; S.open = null; draw(); });
     box.append(b);
   });
@@ -166,6 +183,11 @@ function raceEl(race) {
     : race.captured_at ? `PRICES AT ${race.captured_at.slice(11, 16)}` : 'NO PRICE YET'));
   box.append(hd);
   if (race.result) box.append(resultEl(race.result));
+  const after = race.gone ? S.hooks?.afterRace?.(race) : null;
+  if (after) {
+    box.append(after);
+    box.append(el('div', 'dk-line', 'YOUR HORSES HERE AS THEY STOOD BEFORE THE OFF'));
+  }
   const leaders = race.runners.filter((r) => r.lead_pct !== null && r.lead_pct !== undefined)
     .sort((a, b) => b.lead_pct - a.lead_pct).slice(0, 3);
   if (leaders.length) {
@@ -194,7 +216,7 @@ function resultEl(res) {
 function tableEl(race, list, topLead) {
   const tab = el('table', 'grid dk-compare');
   const tr0 = el('tr');
-  ['', 'YOUR HORSE', 'YOUR EVIDENCE', 'PLACES', 'LEADS', 'MODEL', 'YOUR RECORD ON ITS FACTS',
+  ['', 'YOUR HORSE', 'YOUR EVIDENCE', 'PLACES', 'LEADS', 'MODEL',
     race.gone ? 'FINISHED' : 'YOU'].forEach((x, i) => tr0.append(el('th', [3, 4, 5].includes(i) ? 'num' : null, x)));
   const thead = el('thead');
   thead.append(tr0);
@@ -223,7 +245,6 @@ function tableEl(race, list, topLead) {
     tr.append(pl);
     tr.append(el('td', `num${b.lead_pct !== null && b.lead_pct === topLead ? ' top' : ''}`, pct(b.lead_pct)));
     tr.append(el('td', 'num', b.model_rank ? `#${b.model_rank}` : DASH));
-    tr.append(factsTd(t));
     tr.append(lastTd(race, t));
     tr.addEventListener('click', () => { S.open = S.open === k ? null : k; draw(); });
     tbody.append(tr);
@@ -232,21 +253,6 @@ function tableEl(race, list, topLead) {
   const wrap = el('div', 'table-box');
   wrap.append(tab);
   return wrap;
-}
-
-function factsTd(t) {
-  const td = el('td', 'dk-facts');
-  const rows = (t.brief?.rows ?? []).filter((r) => r.key !== 'own'
-    && (r.mark === 'stronger' || r.mark === 'weaker'))
-    .sort((a, b) => (a.mark === b.mark ? 0 : a.mark === 'stronger' ? -1 : 1));
-  if (!rows.length) { td.append(el('span', 'dk-quiet-in', 'as your usual')); return td; }
-  rows.slice(0, 4).forEach((r) => {
-    const s = el('span', r.mark === 'stronger' ? 'up' : 'down', `${r.mark === 'stronger' ? '▲' : '▼'} ${short(r)}`);
-    s.title = `${r.label}: ${r.value} — your bankers like this ${r.line ? Number(r.line.ae).toFixed(2) : DASH} over ${r.line?.bankers ?? 0}`;
-    td.append(s);
-  });
-  if (rows.length > 4) td.append(el('span', 'more', `+${rows.length - 4}`));
-  return td;
 }
 
 function lastTd(race, t) {
@@ -266,16 +272,18 @@ function openEl(race, t) {
   const k = key(race.race_no, t.banker.horse_no);
   if (!S.taps.has(k)) S.taps.set(k, new Set(t.decision?.reasons ?? []));
   if (!S.notes.has(k)) S.notes.set(k, t.decision?.reason ?? '');
+  if (!S.sure.has(k)) S.sure.set(k, t.decision?.confidence ?? null);
   return detailEl(t, {
     race, raceDate: S.date, gone: race.gone, all: S.all.has(k), runners: race.runners,
     reasons: S.data.reasons, taps: S.taps.get(k), note: S.notes.get(k), busy: S.busy.has(k),
+    sure: S.sure.get(k), onSure: (v) => { S.sure.set(k, v); draw(); },
     msg: S.msg.get(k),
     onAll: () => { if (S.all.has(k)) S.all.delete(k); else S.all.add(k); draw(); },
     onNote: (v) => S.notes.set(k, v),
     onReprice: (partners) => act(k, () => api.deskTicket(S.date, race.race_no, t.banker.horse_no, partners)),
     onDecide: (kind) => act(k, async () => {
       const body = { decision: kind, account: S.account, reasons: [...S.taps.get(k)],
-                     reason: S.notes.get(k) || null };
+                     reason: S.notes.get(k) || null, confidence: S.sure.get(k) || null };
       if (kind === 'accept' && t.edited) body.partners = t.partners.map((p) => p.horse_no);
       return (await api.deskDecide(S.date, race.race_no, t.banker.horse_no, body)).ticket;
     }),

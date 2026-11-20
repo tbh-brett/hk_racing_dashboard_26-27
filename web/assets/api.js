@@ -256,6 +256,14 @@ export const api = {
     `/tickets/${date}/${no}/${banker}/decision`, body),
   bankerScorecard: (account) => get(
     `/tickets/scorecard${account ? `?account=${encodeURIComponent(account)}` : ''}`),
+  // The banker review (docs/banker-review.md): under /bets, behind its password.
+  review: (account) => get(`/bets/review${account ? `?account=${encodeURIComponent(account)}` : ''}`),
+  reviewSummary: (account) => get(
+    `/bets/review/summary${account ? `?account=${encodeURIComponent(account)}` : ''}`),
+  reviewMeeting: (date, account) => get(
+    `/bets/review/${date}${account ? `?account=${encodeURIComponent(account)}` : ''}`),
+  reviewSave: (date, no, horse, body) => post(`/bets/review/${date}/${no}/${horse}`, body),
+  reviewNote: (date, body) => post(`/bets/review/${date}/note`, body),
 };
 
 /** Numbers never render bare: a null becomes an explicit dash, not a blank. */
