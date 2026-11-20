@@ -189,6 +189,11 @@ The BANKERS view alone: about 165 ms after a result, 26 ms otherwise.
 `init_db` creates `runner_fact` and `ticket_reason`. The cron lines already
 carry `record_tickets --pending`, which keeps each new meeting's facts.
 
+**facts-1.1 (20 Nov 2026)** changes one rule — his run note on a horse's last
+start is his own evidence whatever its tier — so the facts kept under 1.0 are
+not read. Run the command below once after deploying it, or the scorecard
+works the season's facts out itself after each result (about 0.8 s, correct).
+
 **On the server, once, after this is deployed**, to give the scorecard the
 season so far (about 6,200 runners over 50 meetings, 5 s on the copy). From
 PowerShell on this PC, which hands the command to the Fly machine:

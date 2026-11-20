@@ -124,8 +124,8 @@ function opened(r, ctx) {
     const chip = tierChip(x.bookTier, { who: `${x.no} ${x.name}` });
     if (chip) l2.append(chip);
     else if (x.hasBB) {
-      l2.append(el('span', `bf-bbtag${x.bbSys ? ' sys' : ''}`,
-                   `${x.bbSys ? 'SYS' : 'BB'} ${x.setup}`));
+      l2.append(el('span', `bf-bbtag${x.bbSys ? ' sys' : x.bbBoth ? ' both' : ''}`,
+                   `${x.bbSys ? 'SYS' : x.bbBoth ? 'BB+SYS' : 'BB'} ${x.setup}`));
     }
     x.marks.forEach((m) => l2.append(markEl(m)));
     x.chips.forEach((ch) => l2.append(chipEl(ch)));

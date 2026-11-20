@@ -78,6 +78,40 @@ a note or the book changes. The tiers were drawn from the same runs they are
 scored on: they are a reading order with a record, not a proven edge, and the
 record from 7 Oct on is the test.
 
+### Re-measured 20 Nov 2026
+
+The owner asked what QUIET and STALE mean: fresh bookings were showing QUIET.
+QUIET is decided by the entry's TAGS, not by time: booked for improvement, a
+strong finish, a closing sectional, an exceptional run, a profile change, or a
+trial written into the book entry, it is QUIET from its next run. Measured on
+production's 20 Nov copy, April to 18 Nov, win and place A/E against the
+starting prices (Harville for place):
+
+| Tier | Runs | Win A/E | Place A/E |
+|---|---|---|---|
+| TRIAL NOTE | 156 | 1.26 | 1.05 |
+| STALE | 192 | 1.17 | 1.14 |
+| QUIET, other reasons | 176 | 1.04 | 1.10 |
+| EXCUSE | 424 | 1.03 | 1.06 |
+| QUIET, tagged trial | 192 | 0.79 | 0.93 |
+
+Every line is within about ±0.3–0.5 of the price: the October ordering (STALE
+and QUIET below it, so muted) has not held. A trial described in a book entry
+(tag `trial`, the most used) is not a TRIAL NOTE, and it has not carried the
+trial note's record. No tier was renamed or re-ordered; that is the owner's
+call.
+
+### The run note rides with every tier (20 Nov 2026)
+
+The owner: "the run note seemed to be disregarded". It decided a tier only for
+a horse outside the book, and 55 of the 79 next starts after a run note were
+horses in it, so the note vanished behind the entry's tier. Now `run_note` is
+on every tier (written before the off, or not at all), the chip carries a pen
+(EXCUSE ✎) and opens on the note, and the desk counts it as his own evidence
+(`banker_facts` 1.1). The tier itself is unchanged: over those 79 starts run
+notes won 8 where the price expected 7.6 (1.05) and placed 27 against 22.7
+(1.19) — too few to rank.
+
 ## The owner's decisions (5 Oct)
 
 - **A trial note counts whether or not the horse is booked.** The note is the

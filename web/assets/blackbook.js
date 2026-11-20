@@ -15,7 +15,7 @@ import { el, $, DASH, MINUS, renderNav, periodPicker, accountPicker,
          styleClass, conditionLabel } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
-import { isSystem, inBook, BOOKS, systemLine } from './book-origin.js';
+import { isBoth, isSystem, inBook, BOOKS, systemLine } from './book-origin.js';
 import { renewButton, staleBadge } from './book-renew.js';
 
 
@@ -53,6 +53,10 @@ const state = {
   view: 'list', entries: [], tags: [], summary: null, tagMeta: null,
   search: '', tag: null, status: 'all', range: 'all', today: null,
   todayOnly: false, declared: new Set(), open: new Set(), details: {},
+  // Where each declared horse runs at the meeting: name -> {race_no, horse_no}.
+  // RUNNING TODAY lists them in race order (owner, 20 Nov 2026), so the book
+  // reads in the order the card will be run.
+  declaredAt: new Map(), beforeToday: null,
   backedMissed: null, account: null, tagBvm: null,
   // How far back every figure on the analysis view is measured. Defaults to
   // the season now open, like the Bets page — the book carries forward but
@@ -184,7 +188,20 @@ function renderChips() {
   today.title = state.summary?.today
     ? `declared at the ${state.summary.today} meeting`
     : 'no meeting loaded';
-  today.addEventListener('click', () => { state.todayOnly = !state.todayOnly; render(); });
+  today.addEventListener('click', () => {
+    state.todayOnly = !state.todayOnly;
+    // Switching to the runners puts them in race order; switching back
+    // restores the order the list had before.
+    if (state.todayOnly) {
+      state.beforeToday = { sort: state.sort, sortDir: state.sortDir };
+      state.sort = 'next';
+      state.sortDir = 1;
+    } else if (state.beforeToday) {
+      ({ sort: state.sort, sortDir: state.sortDir } = state.beforeToday);
+      state.beforeToday = null;
+    }
+    render();
+  });
   $('today-chip').replaceChildren(today);
 
   const byStatus = {};
@@ -293,7 +310,11 @@ function sortValue(e, key) {
     // Best record first, and a horse with no runs sorts last rather than as a
     // 0% one — "not tested" is not the same as "tested and failed".
     case 'record': return e.runs_since ? e.wins_since / e.runs_since : -1;
-    case 'next': return state.declared.has(e.horse_name) ? 1 : 0;
+    // Race order: race, then number. A horse not running sorts after the card.
+    case 'next': {
+      const at = state.declaredAt.get(e.horse_name);
+      return at ? at.race_no * 100 + at.horse_no : 1e6;
+    }
     case 'status': return e.status;
     default: return 0;
   }
@@ -351,7 +372,7 @@ function entryRow(e) {
   const open = state.open.has(e.id);
   const today = state.declared.has(e.horse_name);
   const row = el('div', `bb-row${open ? ' open' : ''}${today ? ' today' : ''}`
-    + `${isSystem(e) ? ' system' : ''}`);
+    + `${isSystem(e) ? ' system' : isBoth(e) ? ' both' : ''}`);
   row.addEventListener('click', (event) => {
     if (event.target.closest('.acts')) return;
     toggleEntry(e);
@@ -411,8 +432,11 @@ function entryRow(e) {
   row.append(rec);
 
   const next = el('div');
+  const at = state.declaredAt.get(e.horse_name);
   next.append(el('span', today ? 'badge today' : 'badge quiet',
-    today ? 'DECLARED' : (e.last_run ? `LAST ${e.last_run}` : 'NO RUNS')));
+    today ? (at ? `R${at.race_no} · #${at.horse_no}` : 'DECLARED')
+      : (e.last_run ? `LAST ${e.last_run}` : 'NO RUNS')));
+  if (today) next.title = 'declared at the latest meeting — click NEXT to list in race order';
   row.append(next);
 
   const st = el('div');
@@ -1418,6 +1442,8 @@ async function init() {
     state.tagBvm = tagBvm?.tags ?? {};
     state.window = tags.window ?? null;
     state.declared = new Set(declared.entries.map((d) => d.horse_name));
+    state.declaredAt = new Map(declared.entries.map((d) => [d.horse_name,
+      { race_no: d.race_no, horse_no: d.horse_no }]));
   } catch (e) {
     $('entries').replaceChildren(el('div', 'no-match', `failed to load: ${e.message}`));
     return;

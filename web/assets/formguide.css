@@ -141,8 +141,11 @@
 .fg-row .nm.booked { color: var(--book); }
 /* Booked by the system and not adopted: orchid, as on every other page. */
 .fg-row .nm.booked.sys { color: var(--book-sys); }
+.fg-row .nm.booked.both { color: var(--book-both); }
 .fg-row.booked.sys { border-left-color: var(--book-sys); }
+.fg-row.booked.both { border-left-color: var(--book-both); }
 .flag.bb.sys { color: var(--book-sys); border-color: var(--book-sys-ground); }
+.flag.bb.both { color: var(--book-both); border-color: var(--book-both-ground); }
 .flag.tier-note { color: var(--bg); background: var(--win); border-color: var(--win); }
 .flag.tier-standout { color: var(--book-sys); border-color: var(--book-sys-ground); }
 /* The entry whose conditions today actually meets. Lit, because on a card of
@@ -521,6 +524,7 @@
 .fit-hd .nm { font-size: 14px; font-weight: 600; }
 .fit-hd .nm.booked { color: var(--book); }
 .fit-hd .nm.booked.sys { color: var(--book-sys); }
+.fit-hd .nm.booked.both { color: var(--book-both); }
 .fit-hd .odds { margin-left: auto; font-size: 14px; font-weight: 600; }
 .fit-sub { padding: 8px 12px; border-bottom: 1px solid var(--line-2); }
 .fit-sub .cap { font-size: var(--fs-xs); letter-spacing: .1em; color: var(--text-muted); }

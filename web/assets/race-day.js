@@ -19,7 +19,7 @@ import { context } from './context.js';
 import { Live } from './live.js';
 import { recordPanel } from './record-panel.js';
 import { install as installPalette } from './palette.js';
-import { isSystem } from './book-origin.js';
+import { bookClass, isBoth, isSystem } from './book-origin.js';
 import { tierChip, tierRank } from './book-tier.js';
 import { agentShort, backgroundBlock, backgroundView, verdictChip } from './background.js';
 import { gearCaveat, gearChips } from './gear-chips.js';
@@ -232,7 +232,7 @@ function renderBlackbookBand() {
       const item = el('div', 'band-item');
       if (!e.booked_before_race) item.classList.add('bb-stale');
       // Booked by the system off a result or a trial, not by the owner.
-      if (isSystem(e)) item.classList.add('sys');
+      if (bookClass(e)) item.classList.add(bookClass(e));
       if (!roomy) item.classList.add('tight');
       item.append(el('span', 'name', `${e.horse_no} ${e.horse_name}`));
       const tc = tierChip(e.book_tier, { who: `${e.horse_no} ${e.horse_name}`, on: state.date });
@@ -922,7 +922,7 @@ function cardRow(r, index) {
   // retired in June is not that, and colouring it anyway is what made the mark
   // stop being worth looking for.
   if (isLiveBooking(r.blackbook)) nm.classList.add('booked');
-  if (isLiveBooking(r.blackbook) && isSystem(r.blackbook)) nm.classList.add('sys');
+  if (isLiveBooking(r.blackbook) && bookClass(r.blackbook)) nm.classList.add(bookClass(r.blackbook));
   box.append(nm);
   const tier = tierChip(r.book_tier, { who: `${r.horse_no} ${r.horse_name}`, on: state.date });
   if (tier) box.append(tier);
@@ -1066,7 +1066,7 @@ function cardRow(r, index) {
     if (r.blackbook.booked_before_race === false) dot.classList.add('later');
     else if (!isLiveBooking(r.blackbook)) dot.classList.add('closed');
     // Only a live one is filled, in whichever colour says who booked it.
-    else if (isSystem(r.blackbook)) dot.classList.add('sys');
+    else if (bookClass(r.blackbook)) dot.classList.add(bookClass(r.blackbook));
     dot.title = [r.blackbook.reasoning,
                  r.blackbook.tags?.join(' · ').replace(/_/g, ' '),
                  `booked ${r.blackbook.added_date} · ${r.blackbook.status}`,
@@ -1107,8 +1107,10 @@ function renderDetail() {
   // look at all.
   if (r.blackbook?.reasoning) {
     const sys = isSystem(r.blackbook);
-    const bb = el('section', `bb-note${sys ? ' sys' : ''}`);
-    bb.append(el('h6', null, sys ? 'SYSTEM BLACKBOOK NOTE' : 'BLACKBOOK NOTE'));
+    const cls = bookClass(r.blackbook);
+    const bb = el('section', `bb-note${cls ? ` ${cls}` : ''}`);
+    bb.append(el('h6', null, sys ? 'SYSTEM BLACKBOOK NOTE'
+      : isBoth(r.blackbook) ? 'BLACKBOOK NOTE · THE SYSTEM PICKED IT TOO' : 'BLACKBOOK NOTE'));
     bb.append(el('p', null, r.blackbook.reasoning));
     // A thesis that was abandoned is the more recent fact about the horse and
     // usually the more useful one, so the panel says so in its own line rather

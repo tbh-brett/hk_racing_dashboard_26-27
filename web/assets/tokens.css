@@ -51,6 +51,12 @@
   --book-sys:        #d58fd0;
   --book-sys-ground: #2a1a2a;
   --book-sys-dim:    #7e6480;
+  /* Picked by BOTH: a system pick the owner adopted, or a horse in both
+   * books. Periwinkle, between the teal and the orchid it is made of, so it
+   * reads as neither one alone (owner, 20 Nov 2026).                       */
+  --book-both:        #8ea2ff;
+  --book-both-ground: #1d2340;
+  --book-both-dim:    #5d6aa3;
 
   --alert:        #e63946;   /* accent; odds firming        (named: UP)   */
   --win:          #35b37e;   /* a win / positive result     (named: WIN)  */

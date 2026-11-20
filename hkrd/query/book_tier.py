@@ -30,6 +30,16 @@ ONE TIER PER RUNNER, in the order above: a stale entry with a fresh trial note
 is NOTE. A horse outside the book with the owner's note on its last start is
 RUN_NOTE -- shown, quiet, unmeasured as a class (18 runs).
 
+THE RUN NOTE TRAVELS WITH EVERY TIER (owner, 20 Nov 2026: "the run note seemed
+to be disregarded"). It decided a tier only for a horse outside the book, and
+most run-noted horses are in it -- 55 of the 79 next starts measured that day
+-- so on every page the note on its last start vanished behind the entry's
+tier. It is carried as `run_note` whatever the tier, and counts as his own
+evidence on the desk (`banker_facts.evidence`). It does not change the tier:
+over those 79 starts run notes won 8 where the price expected 7.6 (1.05) and
+placed 27 against 22.7 (1.19), give or take 0.7 -- too few to rank. Like a
+trial note, it counts only when written before the off.
+
 AS AT THE RACE. Everything is read as it stood at the off: the last run before
 the race, a note written before the off, an entry live that day, and its starts
 counted from the day it was booked (or renewed) to the day before. The record
@@ -118,7 +128,7 @@ def classify(*, entry: dict | None, starts: int, notes: list[dict],
     return {"tier": tier, "label": LABEL[tier], "action": ACTION[tier],
             "note": notes[0] if notes else None,
             "notes": len(notes),
-            "standout": standout, "run_note": run_note if tier == "RUN_NOTE" else None,
+            "standout": standout, "run_note": run_note,
             "entry_id": entry["id"] if entry else None,
             "in_book": entry is not None, "starts": starts if entry else None,
             "excuse": sorted(EXCUSE_TAGS & set(entry["tags"])) if entry else [],
@@ -279,6 +289,8 @@ def _tiers(conn: Connection, runs: list[dict]) -> dict[tuple, dict]:
                          if (last is None or s["trial_date"] > last)
                          and s["trial_date"] < date), None) if entry else None
         run_note = run_notes.get((name, last, past[i - 1][1])) if last else None
+        if run_note and _written(run_note["written_at"]) >= off:
+            run_note = None             # written after the off: hindsight
         t = classify(entry=entry, starts=starts, notes=mine, standout=standout,
                      run_note=run_note)
         if t:

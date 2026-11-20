@@ -54,7 +54,9 @@ FACTS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
 LABEL = {k: label for k, label, _ in FACTS}
 VALUES = {k: values for k, _, values in FACTS}
 
-VERSION = "facts-1.0"         # runner_fact.version: a changed rule is a new version
+# runner_fact.version: a changed rule is a new version. 1.1 (20 Nov 2026): his
+# run note on the last start is his own evidence whatever the horse's tier.
+VERSION = "facts-1.1"
 TIPS_FROM = "2026-09-06"       # the first meeting the tips layer kept
 MODEL_FROM = "2026-10-01"      # the first card the fundamental model scored
 
@@ -67,12 +69,13 @@ _COMPARABLE_CLASS = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0}
 def evidence(tier: dict[str, Any] | None) -> dict[str, Any] | None:
     """A runner's tier, with whether it is the OWNER'S evidence: his trial or
     run note, or an entry he booked or adopted. An entry only the system wrote
-    is shown and is not his."""
+    is shown and is not his -- unless he wrote a run note on its last start,
+    which is his eye on the horse whoever booked it."""
     if tier is None:
         return None
     booking = tier.get("booking") or {}
     own = (tier["tier"] in ("NOTE", "RUN_NOTE") or booking.get("origin") == "owner"
-           or bool(booking.get("adopted_date")))
+           or bool(booking.get("adopted_date")) or bool(tier.get("run_note")))
     return {**tier, "own": own}
 
 
