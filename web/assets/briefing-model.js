@@ -11,7 +11,7 @@
  * anything — and nothing here re-ranks the Race Day card.
  */
 import { DASH } from './vocab.js';
-import { isSystem } from './book-origin.js';
+import { isBoth, isSystem } from './book-origin.js';
 import {
   AB, COUNTED, DAYS, MON, atShort, clock, dayDiff, hm, kindTag, mark,
   minutesBetween, money, moneyS, ordinal, pd, plural, px, sgn, shortDate,
@@ -101,7 +101,8 @@ export function buildView(d, ui) {
   const booked = new Map();
   d.races.forEach((r) => r.runners.forEach((x) => {
     if (x.blackbook && x.blackbook.live) {
-      booked.set(`${r.race_no}-${x.horse_no}`, isSystem(x.blackbook) ? 'system' : 'owner');
+      booked.set(`${r.race_no}-${x.horse_no}`, isBoth(x.blackbook) ? 'both'
+        : isSystem(x.blackbook) ? 'system' : 'owner');
     }
   }));
   const isBooked = (rn, no) => booked.get(`${rn}-${no}`) || false;
@@ -414,7 +415,7 @@ function runnerView(x, r, { books, srcIn, saidOf, isBooked, cap, toteEarly, ctx 
     bar: Math.min(100, s.place_pct), top: s.tier === 'SHORTLIST',
     place: `${Math.round(s.place_pct)}%`, win: `W ${Number(s.win_pct).toFixed(1)}%`,
     tier: s.tier === 'SHORTLIST' ? 'TOP 4' : s.tier === 'CASE' ? 'A CASE' : '',
-    hasBB: !!bb, bbSys: isSystem(bb),
+    hasBB: !!bb, bbSys: isSystem(bb), bbBoth: isBoth(bb),
     setup: bb ? s.setup : '', setupAgainst: s.setup === 'AGAINST',
     bbHead: bb ? `${s.setup} ×${s.setup_x} · ${bb.confidence || DASH} confidence · booked `
       + `${bb.added_date}${bb.conditions_text ? ` · ${bb.conditions_text}` : ''}` : '',

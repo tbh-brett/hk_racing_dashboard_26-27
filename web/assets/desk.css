@@ -68,6 +68,7 @@
 }
 .dk-who.own { color: var(--book); border-color: var(--book-ground); }
 .dk-who.sys { color: var(--book-sys); border-color: var(--book-sys-ground); }
+.dk-who.both { color: var(--book-both); border-color: var(--book-both-ground); }
 .dk-who.none { color: var(--text-dim); }
 .dk-ev { min-width: 170px; color: var(--text-2); }
 .dk-ev .w { display: block; color: var(--text-dim); font-size: var(--fs-xs); }

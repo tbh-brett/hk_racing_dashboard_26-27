@@ -86,7 +86,8 @@ export function link(href, text, cls) {
 }
 
 export function nameEl(text, booked, cls = 'nm') {
-  return el('span', `${cls}${booked ? ' booked' : ''}${booked === 'system' ? ' sys' : ''}`, text);
+  return el('span', `${cls}${booked ? ' booked' : ''}${booked === 'system' ? ' sys' : ''}`
+    + `${booked === 'both' ? ' both' : ''}`, text);
 }
 
 export function bar(pct, cls = '') {
@@ -281,7 +282,8 @@ function raceDetail(r, ctx) {
     const chip = tierChip(x.bookTier, { who: `${x.no} ${x.name}` });
     if (chip) bb.append(chip);
     else if (x.hasBB) {
-      bb.append(el('span', `bf-bbtag${x.bbSys ? ' sys' : ''}`, x.bbSys ? 'SYS' : 'BB'),
+      bb.append(el('span', `bf-bbtag${x.bbSys ? ' sys' : x.bbBoth ? ' both' : ''}`,
+                   x.bbSys ? 'SYS' : x.bbBoth ? 'BB+SYS' : 'BB'),
                 el('span', `bf-setup-${x.setupTone}`, ` ${x.setup}`));
     }
     const said = el('span', 'said');
@@ -355,8 +357,8 @@ export function screenBlock(x, { compact = false } = {}) {
   col.append(reasons);
   if (x.unseen.length) col.append(unseenBlock(x.unseen, { compact }));
   if (x.hasBB && !compact) {
-    const bb = el('div', `bf-bookbox${x.bbSys ? ' sys' : ''}`);
-    bb.append(el('div', 'hd', `${x.bbSys ? 'SYSTEM BOOK' : 'YOUR BOOK'} · ${x.bbHead}`),
+    const bb = el('div', `bf-bookbox${x.bbSys ? ' sys' : x.bbBoth ? ' both' : ''}`);
+    bb.append(el('div', 'hd', `${x.bbSys ? 'SYSTEM BOOK' : x.bbBoth ? 'YOUR BOOK + THE SYSTEM' : 'YOUR BOOK'} · ${x.bbHead}`),
               el('div', 'why', x.bbWhy));
     col.append(bb);
   }

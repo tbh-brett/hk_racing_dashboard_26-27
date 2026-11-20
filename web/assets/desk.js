@@ -30,6 +30,7 @@
 import { el, DASH } from './vocab.js';
 import { api } from './api.js';
 import { detailEl, evidenceCell, odds, ordinal, pct } from './desk-detail.js';
+import { isBoth } from './book-origin.js';
 
 const S = {
   host: null, date: null, data: null, error: null, account: 'brett', hooks: {},
@@ -230,7 +231,9 @@ function tableEl(race, list, topLead) {
     const name = el('td', 'name');
     name.append(el('span', null, `#${b.horse_no} ${b.horse_name ?? ''}`));
     const ev = t.evidence;
-    name.append(el('span', `dk-who ${ev?.own ? 'own' : ev ? 'sys' : 'none'}`, ev?.own ? 'YOURS' : ev ? 'SYSTEM' : 'NOMINATED'));
+    const both = isBoth(ev?.booking);
+    name.append(el('span', `dk-who ${both ? 'both' : ev?.own ? 'own' : ev ? 'sys' : 'none'}`,
+      both ? 'YOURS + SYSTEM' : ev?.own ? 'YOURS' : ev ? 'SYSTEM' : 'NOMINATED'));
     tr.append(name);
     const e = evidenceCell(t, S.date);
     const evTd = el('td', `dk-ev s-${e.strength}`);

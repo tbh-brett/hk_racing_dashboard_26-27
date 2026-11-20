@@ -89,6 +89,8 @@
    .today, so a system horse declared at this meeting still reads amber. */
 .bb-row.system { border-left-color: var(--book-sys); border-bottom-color: transparent; }
 .bb-row.system .who .nm { color: var(--book-sys); }
+.bb-row.both { border-left-color: var(--book-both); }
+.bb-row.both .who .nm { color: var(--book-both); }
 .bb-row.today { border-left-color: var(--edge); }
 .bb-row > * { padding: 0 8px; min-width: 0; }
 .bb-row .caret { padding: 0 6px; text-align: center; font-size: 9px; color: var(--text-faint); }

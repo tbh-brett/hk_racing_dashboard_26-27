@@ -80,6 +80,7 @@ def meeting_blackbook(date: str, *, conn: Connection | None = None
                 # Who booked it: the band draws a system entry in its own
                 # colour until the owner adopts it (`jobs/auto_book`).
                 "origin": e["origin"], "adopted_date": e["adopted_date"],
+                "both": bool(e.get("both")),
                 "closed_date": e["closed_date"],
                 "closed_reason": e["closed_reason"],
                 "reasoning": e["reasoning"],

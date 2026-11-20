@@ -94,9 +94,12 @@ export function evidenceCell(t, raceDate) {
   const b = ev.booking ?? {};
   const kind = ev.tier === 'EXCUSE' ? `excuse: ${(ev.excuse ?? []).map((x) => EXCUSE_WORD[x] ?? x).join(', ')}`
     : ev.tier === 'STALE' ? `stale · ${ev.starts} starts since` : ev.tier.toLowerCase();
-  return { text: `${ev.own ? 'book' : "system's book"} · ${kind}`,
+  const yours = b.origin === 'owner' || b.adopted_date;
+  return { text: `${yours ? 'book' : "system's book"} · ${kind}${ev.run_note ? ' + run note' : ''}`,
            when: b.added_date ? `booked ${age(daysBefore(b.added_date, raceDate))}` : '',
-           strength: ev.own ? 'book' : 'system', title: b.reasoning ? `“${b.reasoning}”` : '' };
+           strength: ev.own ? 'book' : 'system',
+           title: [b.reasoning ? `“${b.reasoning}”` : '',
+                   ev.run_note ? `your run note: “${ev.run_note.note}”` : ''].filter(Boolean).join('\n') };
 }
 
 /* ── the opened row ─────────────────────────────────────────────────────── */

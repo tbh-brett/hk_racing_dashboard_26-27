@@ -78,6 +78,12 @@ _BAND_TRIGGER_SQL = trig_q.met_sql(
 
 
 
+# A horse's entries, its preferred one last (`_mark_both`): live before closed,
+# then the owner's (or adopted) before the system's, then the newest.
+_PREFERRED_LAST = (f"{LIVE_AT_RACE_SQL}, (b.origin <> 'system' OR b.adopted_date IS NOT NULL), "
+                   "b.added_date")
+
+
 def _with_conditions(conn: Connection, rows: list[dict[str, Any]]
                      ) -> list[dict[str, Any]]:
     """The conditions in words, beside the flag saying whether they were met.
@@ -93,6 +99,29 @@ def _with_conditions(conn: Connection, rows: list[dict[str, Any]]
         row["conditions"] = conditions.get(row["id"], [])
         row["conditions_text"] = trig_q.describe(row["conditions"])
         row["on_conditions"] = bool(row["on_conditions"])
+    return _mark_both(rows)
+
+
+def _mark_both(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """`both` on every row of a horse in BOTH books at the race: a live system
+    entry and a live one of the owner's -- his own, or the system's he adopted
+    (owner, 20 Nov 2026: picked by both reads in a colour of its own,
+    web/assets/book-origin.isBoth).
+
+    The rows come ordered so a horse's preferred entry is its LAST: live before
+    closed, the owner's before the system's. Race Day and the Form Guide key the
+    band by horse name and keep the last row, so a horse with two entries used
+    to show whichever the database returned second."""
+    by: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        by.setdefault(row["horse_name"], []).append(row)
+    for name, entries in by.items():
+        live = [e for e in entries if e["live_at_race"]]
+        system = any(e["origin"] == "system" for e in live)
+        mine = any(e["origin"] != "system" or e["adopted_date"] for e in live)
+        for e in entries:
+            e["both"] = bool(system and mine and len(live) > 1) or bool(
+                e["origin"] == "system" and e["adopted_date"] and e["live_at_race"])
     return rows
 
 
@@ -128,7 +157,7 @@ def for_race(date: str, race_no: int, *, conn: Connection | None = None
             LEFT JOIN races a ON a.race_date = r.race_date
                              AND a.race_no = r.race_no
             WHERE r.race_date = ? AND r.race_no = ?
-            ORDER BY r.horse_no
+            ORDER BY r.horse_no, {_PREFERRED_LAST}
         """, (date, race_no)).fetchall()])
     finally:
         if own:
@@ -164,7 +193,7 @@ def declared_on(date: str, *, conn: Connection | None = None
             LEFT JOIN races a ON a.race_date = r.race_date
                              AND a.race_no = r.race_no
             WHERE r.race_date = ?
-            ORDER BY r.race_no, r.horse_no
+            ORDER BY r.race_no, r.horse_no, {_PREFERRED_LAST}
         """, (date,)).fetchall()])
     finally:
         if own:

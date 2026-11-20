@@ -22,7 +22,7 @@ import { el, $, DASH, MINUS, renderNav, paceCell, styleBadge,
          tripTagChips, drawText, replayUrl, externalLink } from './vocab.js';
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
-import { isSystem } from './book-origin.js';
+import { bookClass, bookWord, isSystem } from './book-origin.js';
 import { loadTags, renderReview } from './review.js';
 import { playerFrame } from './replay.js';
 
@@ -406,23 +406,22 @@ function resultRow(runner, booked, backed, here) {
   const horse = el('div', 'horse');
   horse.append(document.createTextNode(runner.horse_name));
   if (booked) {
-    const chip = el('span', `bb${isSystem(booked) ? ' sys' : ''}`,
-      isSystem(booked) ? 'SYS' : 'BB');
+    const chip = el('span', `bb${bookClass(booked) ? ` ${bookClass(booked)}` : ''}`, bookWord(booked));
     chip.title = `in the blackbook since ${booked.added_date}`
       + (booked.tags ? ` — ${booked.tags}` : '');
     horse.append(chip);
   } else if (here) {
     // Booked FROM this run, after it: the chip is hollow, because the book
     // takes no credit for this result — it was written from it.
-    const sys = isSystem(here);
-    const chip = el('span', `bb here${sys ? ' sys' : ''}`, sys ? 'SYS' : 'BB');
+    const cls = bookClass(here);
+    const chip = el('span', `bb here${cls ? ` ${cls}` : ''}`, bookWord(here));
     chip.title = `booked from this run on ${here.added_date}`
       + (here.reasoning ? ` — ${here.reasoning}` : '');
     horse.append(chip);
   }
   // The name in the system's colour wherever the system booked the horse and
   // the owner has not taken it on, as on every other page.
-  if (isSystem(booked ?? here)) horse.classList.add('sys');
+  if (bookClass(booked ?? here)) horse.classList.add(bookClass(booked ?? here));
   // Money was on this horse. A join, not something anyone had to log.
   if (backed) horse.append(el('span', 'backed', '$'));
   horse.title = runner.horse_name;

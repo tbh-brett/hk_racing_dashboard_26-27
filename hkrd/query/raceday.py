@@ -285,6 +285,8 @@ def build_card(date: str, race_no: int, *,
                     # colour until the owner adopts it (`jobs/auto_book`).
                     "origin": book["origin"],
                     "adopted_date": book["adopted_date"],
+                    # Picked by both books (`blackbook_band._mark_both`).
+                    "both": book["both"],
                     "added_date": book["added_date"],
                     "reasoning": book["reasoning"],
                     # A closed thesis is still worth knowing about when the

@@ -1337,3 +1337,30 @@ def test_setting_conditions_replaces_them_rather_than_appending(booked):
                                   "value": "1200-1400"}]
     # And an empty list clears them, which says the claim is about the horse.
     assert write_book.set_triggers("bb_1", [], db=booked)["conditions"] == []
+
+
+def test_a_horse_picked_by_both_books_is_flagged_and_its_own_entry_comes_last(tmp_path):
+    """Owner, 20 Nov 2026: a system pick he adopted, or a horse in both books,
+    reads in a colour of its own; a horse with two entries shows his."""
+    from hkrd.query import blackbook_band
+    from hkrd.store.connect import get_conn as _get, init_db as _init, transaction as _tx
+    conn = _get(tmp_path / "both.db")
+    _init(conn)
+    with _tx(conn):
+        conn.execute("INSERT INTO races (race_date, race_no, venue) VALUES ('2026-11-22', 1, 'ST')")
+        for no, name in ((1, "ADOPTED"), (2, "TWO BOOKS"), (3, "MINE"), (4, "SYSTEM")):
+            conn.execute("INSERT INTO runners (race_date, race_no, horse_no, horse_name) "
+                         "VALUES ('2026-11-22', 1, ?, ?)", (no, name))
+        rows = [("e1", "ADOPTED", "system", "2026-11-01"), ("e2", "TWO BOOKS", "owner", None),
+                ("e3", "TWO BOOKS", "system", None), ("e4", "MINE", "owner", None),
+                ("e5", "SYSTEM", "system", None)]
+        for eid, name, origin, adopted in rows:
+            conn.execute("INSERT INTO blackbook (id, horse_name, added_date, status, origin, "
+                         "adopted_date) VALUES (?, ?, '2026-10-01', 'active', ?, ?)",
+                         (eid, name, origin, adopted))
+    got = blackbook_band.for_race("2026-11-22", 1, conn=conn)
+    last = {r["horse_name"]: r for r in got}                 # what Race Day keeps
+    assert last["ADOPTED"]["both"] and last["TWO BOOKS"]["both"]
+    assert not last["MINE"]["both"] and not last["SYSTEM"]["both"]
+    assert last["TWO BOOKS"]["origin"] == "owner"            # his entry, not the system's
+    conn.close()

@@ -38,14 +38,18 @@ function startsText(t) {
  *  tier's record comes last, labelled as the tier's, not the horse's. */
 export function tierChip(t, { who = null, on = null } = {}) {
   if (!t) return null;
-  const c = el('span', `bt bt-${t.tier.toLowerCase()}`, SHORT[t.tier] || t.tier);
+  // Your run note on its last start rides with every tier (book_tier, 20 Nov
+  // 2026): the chip carries a pen, and the panel opens on the note.
+  const pen = t.run_note && t.tier !== 'RUN_NOTE';
+  const c = el('span', `bt bt-${t.tier.toLowerCase()}${pen ? ' bt-pen' : ''}`,
+               `${SHORT[t.tier] || t.tier}${pen ? ' ✎' : ''}`);
   if (t.tier === 'NOTE' && t.note) {
     notePanel(c, t, who, on);
     return c;
   }
   const rows = [t.booking ? bookingRow(t, on) : null,
                 t.tier === 'STANDOUT' && t.standout ? standoutRow(t.standout, on) : null,
-                t.tier === 'RUN_NOTE' && t.run_note ? runNoteRow(t.run_note, on) : null]
+                t.run_note ? runNoteRow(t.run_note, on) : null]
     .filter(Boolean);
   if (!rows.length) {
     const starts = startsText(t);

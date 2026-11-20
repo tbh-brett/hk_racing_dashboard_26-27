@@ -17,7 +17,7 @@ import { api, num } from './api.js';
 import { el, DASH, compactDate, ordinal, trialReplayUrl,
          classCell } from './vocab.js';
 import { renderReview, trialSubject } from './review.js';
-import { isSystem } from './book-origin.js';
+import { bookClass } from './book-origin.js';
 import { tierChip, tapsText } from './book-tier.js';
 import { replayLink } from './replay.js';
 
@@ -162,8 +162,8 @@ function runnerBlock(x, list, redraw) {
   const box = el('div', 'tc-runner');
   const head = el('div', 'tc-head');
   head.append(el('span', 'no', String(x.horse_no)));
-  const sys = x.blackbook && isSystem(x.blackbook);
-  head.append(el('span', `nm${x.blackbook ? ' booked' : ''}${sys ? ' sys' : ''}`, x.horse_name));
+  const who = x.blackbook ? bookClass(x.blackbook) : '';
+  head.append(el('span', `nm${x.blackbook ? ' booked' : ''}${who ? ` ${who}` : ''}`, x.horse_name));
   const tier = tierChip(x.book_tier, { who: `${x.horse_no} ${x.horse_name}` });
   if (tier) head.append(tier);
   head.append(el('span', 'meta', `dr ${x.draw ?? DASH} · ${x.jockey ?? DASH} · ${x.trainer ?? DASH}`));

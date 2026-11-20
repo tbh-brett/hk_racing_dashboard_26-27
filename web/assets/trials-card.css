@@ -35,6 +35,7 @@
 .tc-head .nm { color: var(--text); font-weight: 600; font-size: var(--fs); }
 .tc-head .nm.booked { color: var(--book); }
 .tc-head .nm.booked.sys { color: var(--book-sys); }
+.tc-head .nm.booked.both { color: var(--book-both); }
 .tc-head .meta { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
 .tc-head .tc-last { color: var(--text-dim); }
 .tc-head .tc-debut { color: var(--edge); letter-spacing: .06em; }

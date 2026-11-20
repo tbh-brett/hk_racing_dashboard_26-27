@@ -17,6 +17,24 @@ export function isSystem(e) {
   return !!e && e.origin === 'system' && !e.adopted_date;
 }
 
+/** Picked by BOTH (owner, 20 Nov 2026): a system pick the owner adopted, or a
+ *  horse with an entry in each book (`both` from the server). Adopting used to
+ *  turn a system horse the owner's teal, and the page forgot the system had
+ *  picked it too; it now reads in its own colour, --book-both. */
+export function isBoth(e) {
+  return !!e && ((e.origin === 'system' && !!e.adopted_date) || !!e.both);
+}
+
+/** The class a page paints a booked horse with: 'both', 'sys', or ''. */
+export function bookClass(e) {
+  return isBoth(e) ? 'both' : isSystem(e) ? 'sys' : '';
+}
+
+/** The chip's word: BB+SYS, SYS or BB. */
+export function bookWord(e) {
+  return isBoth(e) ? 'BB+SYS' : isSystem(e) ? 'SYS' : 'BB';
+}
+
 /** The three ways to read the book. */
 export const BOOKS = [['all', 'ALL'], ['owner', 'YOURS'], ['system', 'SYSTEM']];
 

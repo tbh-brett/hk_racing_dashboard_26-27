@@ -19,7 +19,7 @@ import { el, $, DASH, MINUS, renderNav, styleClass, styleOrdinal,
 import { context } from './context.js';
 import { install as installPalette } from './palette.js';
 import { loadTags, renderReview, trialSubject } from './review.js';
-import { isSystem } from './book-origin.js';
+import { bookClass } from './book-origin.js';
 import { replayLink } from './replay.js';
 import { sidePanel } from './side-panel.js';
 
@@ -250,7 +250,7 @@ function flagsFor(runner) {
     const live = isLiveBooking(bb);
     const onDay = live && bb.conditions_text && bb.on_conditions;
     out.push(live
-      ? { kind: `${onDay ? 'bb on-cond' : 'bb'}${isSystem(bb) ? ' sys' : ''}`,
+      ? { kind: `${onDay ? 'bb on-cond' : 'bb'}${bookClass(bb) ? ` ${bookClass(bb)}` : ''}`,
           text: onDay ? bb.conditions_text.toUpperCase() : 'BLACKBOOK',
           title: onDay
             ? `booked for ${bb.conditions_text}, and today is that race`
@@ -361,8 +361,8 @@ function horseRow(runner) {
   const live = isLiveBooking(bb);
   const open = state.open.has(runner.horse_no);
 
-  const sys = live && isSystem(bb);
-  const row = el('div', `fg-row${open ? ' open' : ''}${live ? ' booked' : ''}${sys ? ' sys' : ''}`);
+  const who = live ? bookClass(bb) : '';
+  const row = el('div', `fg-row${open ? ' open' : ''}${live ? ' booked' : ''}${who ? ` ${who}` : ''}`);
   row.setAttribute('role', 'row');
   // A mouse names the runner the fit panel shows by passing over the row. A
   // finger never passes over anything, so on a touch screen the tap that opens
@@ -379,7 +379,7 @@ function horseRow(runner) {
 
   const nameCell = el('div', 'name-cell');
   nameCell.append(el('span', 'caret', open ? '▼' : '▶'));
-  const nm = el('span', `nm${live ? ' booked' : ''}${sys ? ' sys' : ''}`, runner.horse_name);
+  const nm = el('span', `nm${live ? ' booked' : ''}${who ? ` ${who}` : ''}`, runner.horse_name);
   if (bb && !live) nm.title = closedNote(bb) ?? '';
   nameCell.append(nm);
   row.append(nameCell);
@@ -1033,7 +1033,7 @@ function renderAside() {
   const hd = el('div', 'fit-hd');
   hd.append(el('span', 'no', String(runner.horse_no)));
   hd.append(el('span', `nm${isLiveBooking(bb) ? ' booked' : ''}`
-                + `${isLiveBooking(bb) && isSystem(bb) ? ' sys' : ''}`, runner.horse_name));
+                + `${isLiveBooking(bb) && bookClass(bb) ? ` ${bookClass(bb)}` : ''}`, runner.horse_name));
   hd.append(el('span', 'odds', runner.win_odds ? num(runner.win_odds, 1) : DASH));
 
   const race = state.guide.race;

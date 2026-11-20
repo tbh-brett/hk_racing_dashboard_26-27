@@ -144,7 +144,9 @@
 .res-row .bb.here { border-style: dashed; }
 /* Booked by the system and not adopted (web/assets/book-origin.js). */
 .res-row .horse.sys { color: var(--book-sys); }
+.res-row .horse.both { color: var(--book-both); }
 .res-row .bb.sys { color: var(--book-sys); border-color: var(--book-sys-dim); }
+.res-row .bb.both { color: var(--book-both); border-color: var(--book-both-dim); }
 /* Money was on this horse. A join, not something anyone had to log. */
 .res-row .backed { color: var(--edge); margin-left: 4px; }
 

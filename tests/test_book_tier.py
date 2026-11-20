@@ -287,3 +287,35 @@ def test_a_tap_added_later_does_not_move_when_the_note_was_written(tmp_path):
     saved = write_notes.save_trial_note("CAVAMAZING", "2026-09-19", 7,
                                         "reacted very well, rewritten", db=path)
     assert saved["written_at"] > "2026-10-01"
+
+
+# ── the run note travels with every tier (owner, 20 Nov 2026) ───────────────
+
+def _run_note(conn, name, date, race_no, written_at, note="ran on late, unlucky"):
+    conn.execute("INSERT INTO run_notes (horse_name, race_date, race_no, note, written_at) "
+                 "VALUES (?, ?, ?, ?, ?)", (name, date, race_no, note, written_at))
+
+
+def test_a_run_note_rides_with_a_booked_horse_and_never_after_the_off(tmp_path):
+    from hkrd.query.banker_facts import evidence
+    _, conn = _db(tmp_path)
+    with transaction(conn):
+        _race(conn, "2026-09-20", 3, [(1, "BOOKED", 5, 6.0), (2, "SYS ONLY", 4, 8.0),
+                                      (3, "TOO LATE", 6, 9.0)])
+        _race(conn, CARD, 7, [(1, "BOOKED", None, None), (2, "SYS ONLY", None, None),
+                              (3, "TOO LATE", None, None)])
+        _entry(conn, "bb_1", "BOOKED", "2026-09-21", tags=["improvement"])
+        _entry(conn, "bb_2", "SYS ONLY", "2026-09-21", tags=["traffic"], origin="system")
+        _entry(conn, "bb_3", "TOO LATE", "2026-09-21", tags=["traffic"])
+        _run_note(conn, "BOOKED", "2026-09-20", 3, "2026-09-21T02:00:00+00:00")
+        _run_note(conn, "SYS ONLY", "2026-09-20", 3, "2026-09-21T02:00:00+00:00")
+        # Written after the 1 Oct off (16:10 HKT = 08:10 UTC): hindsight.
+        _run_note(conn, "TOO LATE", "2026-09-20", 3, "2026-10-01T09:00:00+00:00")
+    t = bt.for_meeting(CARD, conn=conn, with_record=False)
+    assert t[(7, 1)]["tier"] == "QUIET"                      # the tier is unchanged...
+    assert t[(7, 1)]["run_note"]["note"] == "ran on late, unlucky"   # ...the note rides with it
+    assert t[(7, 3)]["run_note"] is None
+    # His run note is his evidence even on a horse only the system booked.
+    assert evidence(t[(7, 2)])["own"] is True
+    assert evidence(t[(7, 3)])["own"] is True                # his own entry
+    conn.close()
