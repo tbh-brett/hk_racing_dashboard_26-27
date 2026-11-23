@@ -28,6 +28,8 @@ Every source, what fetches it, what runs that, and when.
 | Live odds (win, place, QIN, QPL) | `ingest/odds.py` | `jobs/scrape_odds` | every minute; the job decides |
 | Doubles | `ingest/doubles.py` | `jobs/scrape_odds` | on the pair cadence |
 | Pool turnover | `ingest/turnover.py` | `jobs/scrape_odds` | on the pair cadence |
+| Track weather (anemometers, weather station) | `ingest/track_weather.py` | `jobs/scrape_track_weather` | every 5 min; the job decides |
+| Going readings (penetrometer, Clegg hammer) | `ingest/going.py` | `jobs/scrape_track_weather --going` | 12:35, 19:35, 23:35 |
 | Account statements | `ingest/statement.py` | `jobs/import_statement` | by hand — see below |
 
 `ops/crontab` is the schedule; `docs/deploy.md` explains each line.
@@ -41,7 +43,7 @@ They arrive from account statements:
 .\.venv\Scripts\python -m hkrd.jobs.import_statement --src "C:\folder\statement.txt"
 ```
 
-**Odds are the one JSON source.** They are rendered by JavaScript on
+**Odds are a JSON source, not a page** (so is the track weather, below). They are rendered by JavaScript on
 `bet.hkjc.com`, so no fetch of that HTML can see them — but the page is a
 single-page app reading `info.cld.hkjc.com/graphql`, declared in the site's own
 `/Config/GlobalConfig.js`, and `ingest/odds.py` reads the same endpoint. A whole
@@ -89,6 +91,26 @@ a series that conflates them shows the whole pool arriving the instant a card
 opens. A cross-race pool is filed under the first race of its leg, which is
 where HKJC's own turnover page shows it; race 0 holds the meeting total and is
 not a race.
+
+### Track weather and the going readings
+
+The same endpoint again, with two more of the site's whitelisted queries, both
+read from `racing.hkjc.com`'s "Weather and Track Condition" page and its
+results pages rather than from the betting site.
+
+**The wind is live only.** `query Weather` takes no date and answers with the
+reading of the moment: four anemometers round each course and a weather
+station, both courses on every reply. HKJC keeps no history of it, so a reading
+not captured while a meeting is on is gone. `jobs/scrape_track_weather` runs
+every five minutes and captures from an hour before race 1 to half an hour
+after the last race; every other tick asks HKJC nothing.
+
+**The going readings are kept about two months.** `query rw_Summary` carries
+each meeting's penetrometer (turf) and Clegg hammer (all-weather) readings. It
+answers with at most ten meetings, simulcasts counted, and drops the rest
+silently, so it is asked one date at a time. `--going` asks about every stored
+meeting from the last two months with no reading on record, which on a first
+run is the backfill.
 
 ---
 
@@ -153,6 +175,8 @@ scrape that silently captured nothing must never look like one that worked.
 .\.venv\Scripts\python -m hkrd.jobs.nightly          # whatever is outstanding
 .\.venv\Scripts\python -m hkrd.jobs.scrape_odds      # today's meeting, if any
 .\.venv\Scripts\python -m hkrd.jobs.scrape_trials    # trial days not yet held
+.\.venv\Scripts\python -m hkrd.jobs.scrape_track_weather --force   # the wind, now
+.\.venv\Scripts\python -m hkrd.jobs.scrape_track_weather --going   # going readings outstanding
 .\ops\catch-up.ps1 -ShowOnly                         # what the database is missing
 ```
 

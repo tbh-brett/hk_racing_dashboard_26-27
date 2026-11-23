@@ -1262,3 +1262,60 @@ CREATE TABLE IF NOT EXISTS race_reflection (
   edited_at  TEXT,
   PRIMARY KEY (race_date, race_no)
 );
+
+-- ── track weather ────────────────────────────────────────────────────────────
+--
+-- HKJC's own instruments on each course (`jobs/scrape_track_weather`). RAW:
+-- what HKJC published, coerced on the way in, nothing computed from it.
+--
+-- Recorded because nothing else holds it. HKJC keeps no wind history -- the
+-- query its "Weather and Track Condition" page sends takes no date and answers
+-- with the reading of the moment -- and no Hong Kong Observatory station
+-- tracks the Happy Valley bowl (six were tried on 23 Nov 2026; none moves an
+-- HV sectional). A reading not captured while a meeting is on is gone, so like
+-- the odds this table is never pruned.
+--
+-- One row per reading of one instrument: four anemometers round each course
+-- (`location` A to D) and a weather station (E), for BOTH courses on every
+-- capture, because one reply carries the two. The station reads wind too; the
+-- five columns after `gust_speed` are the station's alone, NULL on an
+-- anemometer because it does not measure them, never because they were zero.
+--
+-- Keyed on the instrument's own clock, so a capture that finds a sensor has
+-- not reported since the last one adds nothing, and `captured_at` stays the
+-- FIRST capture that saw the reading. There is no race_date, so `store/asof`
+-- does not cut this table: a replay that reads it must cut on observed_at.
+CREATE TABLE IF NOT EXISTS track_weather (
+  venue       TEXT    NOT NULL,        -- ST | HV (HKJC's `racecourse`)
+  location    TEXT    NOT NULL,        -- A B C D anemometers, E the station
+  observed_at TEXT    NOT NULL,        -- the instrument's time: HK, ISO8601, ms
+  captured_at TEXT    NOT NULL,        -- first capture to read it: HK, ISO8601
+  wind_dir    REAL,                    -- degrees clockwise from north, read
+                                       -- from HKJC's bearing ("N60W" = 300)
+  wind_speed  REAL,                    -- km/h, HKJC's average
+  gust_dir    REAL,                    -- degrees, as wind_dir
+  gust_speed  REAL,                    -- km/h
+  temperature REAL,                    -- deg C               } the station
+  humidity    REAL,                    -- % relative          } (E) only
+  rain_10min  REAL,                    -- mm, last ten minutes }
+  rain_day    REAL,                    -- mm since midnight   }
+  soil_water  REAL,                    -- % volumetric        }
+  is_valid    INTEGER,                 -- HKJC's flag; 0 = it marked the
+                                       -- reading invalid (kept, not dropped)
+  PRIMARY KEY (venue, location, observed_at)
+);
+
+-- The going readings HKJC takes on the morning of a meeting and again before
+-- racing: the turf penetrometer and the all-weather track's Clegg hammer
+-- (`ingest/going`). Two instruments on two scales -- 2.72 and 8.60 at the same
+-- 11:30 reading on 4 Oct 2026 -- so `instrument` is in the key and the two are
+-- never averaged or compared. HKJC serves about two months of these, which is
+-- what the first run recovers.
+CREATE TABLE IF NOT EXISTS going_readings (
+  race_date  TEXT    NOT NULL,         -- the meeting
+  venue      TEXT    NOT NULL,         -- ST | HV
+  instrument TEXT    NOT NULL,         -- penetrometer (turf) | hammer (AWT)
+  read_at    TEXT    NOT NULL,         -- when HKJC took it: HK, ISO8601
+  reading    REAL    NOT NULL,
+  PRIMARY KEY (race_date, venue, instrument, read_at)
+);

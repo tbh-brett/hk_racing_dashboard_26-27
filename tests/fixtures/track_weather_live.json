@@ -1,0 +1,180 @@
+{
+ "data": {
+  "weather": [
+   {
+    "racecourse": "HV",
+    "sectional": [
+     {
+      "location": "A",
+      "date": "2026-11-23",
+      "time": "23:32:53.2",
+      "avgCorrectedWindDirection": "N60W",
+      "avgCorrectedWindSpeed": "2",
+      "correctedGustDirection": "N67W",
+      "correctedGustSpeed": "3",
+      "gpsPosition": "+22.274784:+114.182960:+0017.60",
+      "supplyVoltage": "12",
+      "status": "GPSNotification",
+      "isValid": true
+     },
+     {
+      "location": "B",
+      "date": "2026-11-23",
+      "time": "23:32:51.2",
+      "avgCorrectedWindDirection": "N23W",
+      "avgCorrectedWindSpeed": "2",
+      "correctedGustDirection": "N21W",
+      "correctedGustSpeed": "3",
+      "gpsPosition": "+22.271308:+114.184672:+0030.80",
+      "supplyVoltage": "12",
+      "status": "GPSNotification",
+      "isValid": true
+     },
+     {
+      "location": "C",
+      "date": "2026-11-23",
+      "time": "23:32:44.2",
+      "avgCorrectedWindDirection": "N40W",
+      "avgCorrectedWindSpeed": "2",
+      "correctedGustDirection": "N34W",
+      "correctedGustSpeed": "3",
+      "gpsPosition": "+22.270576:+114.183464:+0013.40",
+      "supplyVoltage": "11.6",
+      "status": "GPSNotification",
+      "isValid": true
+     },
+     {
+      "location": "D",
+      "date": "2026-11-23",
+      "time": "23:32:58.2",
+      "avgCorrectedWindDirection": "N16W",
+      "avgCorrectedWindSpeed": "3",
+      "correctedGustDirection": "N21W",
+      "correctedGustSpeed": "4",
+      "gpsPosition": "+22.272708:+114.180824:+0008.50",
+      "supplyVoltage": "12",
+      "status": "GPSNotification",
+      "isValid": true
+     }
+    ],
+    "weatherStation": {
+     "location": "E",
+     "date": "2026-11-23",
+     "time": "23:30:59.7",
+     "avgCorrectedWindDirection": "N70W",
+     "avgCorrectedWindSpeed": "2",
+     "correctedGustDirection": "N69W",
+     "correctedGustSpeed": "4",
+     "gpsPosition": "+22.270642:+114.183608:+0016.70",
+     "supplyVoltage": "12.1",
+     "relativeHumidity": "92.8",
+     "temperature": "22.7",
+     "solarRadiation": "0",
+     "sunshineHour": "71.35",
+     "pressure": "1018.5",
+     "correctedGustSpeedDailyMax": 29.3,
+     "relativeHumidityDailyMax": 94.4,
+     "relativeHumidityDailyMin": 80.5,
+     "temperatureDailyMax": 24.7,
+     "temperatureDailyMin": 21.3,
+     "rainFallPrecipitation1Min": 0,
+     "rainFallPrecipitation10Min": 0,
+     "rainPrecipitationDailyTotal": 0,
+     "soilVolumeticWaterContent": "20.8",
+     "soilMoistureLoss1Min": 0,
+     "soilMoistureLossDailyTotal": 1.3,
+     "soilMoistureLoss24H": 1.524,
+     "status": "GPSNotification",
+     "isValid": true
+    }
+   },
+   {
+    "racecourse": "ST",
+    "sectional": [
+     {
+      "location": "A",
+      "date": "2026-11-23",
+      "time": "23:32:47.2",
+      "avgCorrectedWindDirection": "N1E",
+      "avgCorrectedWindSpeed": "2",
+      "correctedGustDirection": "N1E",
+      "correctedGustSpeed": "2",
+      "gpsPosition": "+22.401022:+114.209960:+0015.10",
+      "supplyVoltage": "12",
+      "status": "GPSNotification",
+      "isValid": true
+     },
+     {
+      "location": "B",
+      "date": "2026-11-23",
+      "time": "23:32:53.1",
+      "avgCorrectedWindDirection": "N3W",
+      "avgCorrectedWindSpeed": "3",
+      "correctedGustDirection": "N4W",
+      "correctedGustSpeed": "3",
+      "gpsPosition": "+22.396168:+114.205336:+0014.50",
+      "supplyVoltage": "12.1",
+      "status": "GPSNotification",
+      "isValid": true
+     },
+     {
+      "location": "C",
+      "date": "2026-11-23",
+      "time": "23:32:53.2",
+      "avgCorrectedWindDirection": "S61E",
+      "avgCorrectedWindSpeed": "5",
+      "correctedGustDirection": "S61E",
+      "correctedGustSpeed": "6",
+      "gpsPosition": "+22.397828:+114.203472:+0013.30",
+      "supplyVoltage": "12",
+      "status": "GPSNotification",
+      "isValid": true
+     },
+     {
+      "location": "D",
+      "date": "2026-11-23",
+      "time": "23:32:58.2",
+      "avgCorrectedWindDirection": "N9W",
+      "avgCorrectedWindSpeed": "3",
+      "correctedGustDirection": "N6W",
+      "correctedGustSpeed": "4",
+      "gpsPosition": "+22.401590:+114.206832:+0014.70",
+      "supplyVoltage": "11.9",
+      "status": "GPSNotification",
+      "isValid": true
+     }
+    ],
+    "weatherStation": {
+     "location": "E",
+     "date": "2026-11-23",
+     "time": "23:30:58.3",
+     "avgCorrectedWindDirection": "S70E",
+     "avgCorrectedWindSpeed": "1",
+     "correctedGustDirection": "S60E",
+     "correctedGustSpeed": "2",
+     "gpsPosition": "+22.402580:+114.209960:+0014.00",
+     "supplyVoltage": "11.9",
+     "relativeHumidity": "95.2",
+     "temperature": "22.3",
+     "solarRadiation": "0",
+     "sunshineHour": "0.93",
+     "pressure": "1019.1",
+     "correctedGustSpeedDailyMax": 27.93,
+     "relativeHumidityDailyMax": 97.4,
+     "relativeHumidityDailyMin": 84.5,
+     "temperatureDailyMax": 23.2,
+     "temperatureDailyMin": 20.8,
+     "rainFallPrecipitation1Min": 0,
+     "rainFallPrecipitation10Min": 0,
+     "rainPrecipitationDailyTotal": 0.8,
+     "soilVolumeticWaterContent": "13.5",
+     "soilMoistureLoss1Min": 0,
+     "soilMoistureLossDailyTotal": 0.5,
+     "soilMoistureLoss24H": 1.016,
+     "status": "GPSNotification",
+     "isValid": true
+    }
+   }
+  ]
+ }
+}

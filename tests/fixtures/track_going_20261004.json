@@ -1,0 +1,463 @@
+{
+ "data": {
+  "commonMeetings": [
+   {
+    "date": "2026-10-04",
+    "venueCode": "ST",
+    "startTime": "2026-10-04T12:30:00+08:00",
+    "totalNumberOfRace": 11,
+    "pmPools": [],
+    "isActive": false,
+    "jkSuspensions": [],
+    "foPools": [
+     {
+      "oddsType": "TNC",
+      "oddsTypeDes": {
+       "chinese": "練馬師王 {0}",
+       "english": "TRAINER CHALLENGE {0}"
+      },
+      "instNo": "1"
+     },
+     {
+      "oddsType": "JKC",
+      "oddsTypeDes": {
+       "chinese": "騎師王 {0}",
+       "english": "JOCKEY CHALLENGE {0}"
+      },
+      "instNo": "1"
+     }
+    ],
+    "stewards": [],
+    "venueDes": {
+     "chinese": "沙田",
+     "english": "SHA TIN",
+     "code": null
+    },
+    "country": [],
+    "penetrometerReadings": [
+     {
+      "reading": "2.72",
+      "readingTime": "2026-10-04T11:30:00+08:00"
+     },
+     {
+      "reading": "2.72",
+      "readingTime": "2026-10-04T08:00:00+08:00"
+     }
+    ],
+    "hammerReadings": [
+     {
+      "readingTime": "2026-10-04T11:30:00+08:00",
+      "reading": "8.60"
+     },
+     {
+      "readingTime": "2026-10-04T08:00:00+08:00",
+      "reading": "8.23"
+     }
+    ],
+    "meetingTrack_ch": "全天候及草地跑道之混合賽事",
+    "meetingTrack_en": "MIXED",
+    "meetingType": "D",
+    "meetingTrackCode": "MIXED",
+    "status": "CLOSED",
+    "isSeasonLastMeeting": false,
+    "course": {
+     "chinese": "\"B\" 賽道",
+     "code": "B",
+     "english": "\"B\" COURSE"
+    },
+    "races": [
+     {
+      "no": 1,
+      "raceCourse": {
+       "code": "",
+       "displayCode": "",
+       "description_en": "",
+       "description_ch": ""
+      },
+      "raceTrack": {
+       "code": "AWT",
+       "description_en": "ALL WEATHER TRACK",
+       "description_ch": "全天候跑道"
+      },
+      "go_ch": "封地",
+      "go_en": "SEALED",
+      "goCode": "SE",
+      "venueCode": "ST"
+     },
+     {
+      "no": 2,
+      "raceCourse": {
+       "code": "B",
+       "displayCode": "B",
+       "description_en": "\"B\" COURSE",
+       "description_ch": "\"B\" 賽道"
+      },
+      "raceTrack": {
+       "code": "TURF",
+       "description_en": "TURF",
+       "description_ch": "草地"
+      },
+      "go_ch": "好地至快地",
+      "go_en": "GOOD TO FIRM",
+      "goCode": "GF",
+      "venueCode": "ST"
+     },
+     {
+      "no": 3,
+      "raceCourse": {
+       "code": "",
+       "displayCode": "",
+       "description_en": "",
+       "description_ch": ""
+      },
+      "raceTrack": {
+       "code": "AWT",
+       "description_en": "ALL WEATHER TRACK",
+       "description_ch": "全天候跑道"
+      },
+      "go_ch": "封地",
+      "go_en": "SEALED",
+      "goCode": "SE",
+      "venueCode": "ST"
+     },
+     {
+      "no": 4,
+      "raceCourse": {
+       "code": "B",
+       "displayCode": "B",
+       "description_en": "\"B\" COURSE",
+       "description_ch": "\"B\" 賽道"
+      },
+      "raceTrack": {
+       "code": "TURF",
+       "description_en": "TURF",
+       "description_ch": "草地"
+      },
+      "go_ch": "好地至快地",
+      "go_en": "GOOD TO FIRM",
+      "goCode": "GF",
+      "venueCode": "ST"
+     },
+     {
+      "no": 5,
+      "raceCourse": {
+       "code": "",
+       "displayCode": "",
+       "description_en": "",
+       "description_ch": ""
+      },
+      "raceTrack": {
+       "code": "AWT",
+       "description_en": "ALL WEATHER TRACK",
+       "description_ch": "全天候跑道"
+      },
+      "go_ch": "封地",
+      "go_en": "SEALED",
+      "goCode": "SE",
+      "venueCode": "ST"
+     },
+     {
+      "no": 6,
+      "raceCourse": {
+       "code": "B",
+       "displayCode": "B",
+       "description_en": "\"B\" COURSE",
+       "description_ch": "\"B\" 賽道"
+      },
+      "raceTrack": {
+       "code": "TURF",
+       "description_en": "TURF",
+       "description_ch": "草地"
+      },
+      "go_ch": "好地至快地",
+      "go_en": "GOOD TO FIRM",
+      "goCode": "GF",
+      "venueCode": "ST"
+     },
+     {
+      "no": 7,
+      "raceCourse": {
+       "code": "B",
+       "displayCode": "B",
+       "description_en": "\"B\" COURSE",
+       "description_ch": "\"B\" 賽道"
+      },
+      "raceTrack": {
+       "code": "TURF",
+       "description_en": "TURF",
+       "description_ch": "草地"
+      },
+      "go_ch": "好地至快地",
+      "go_en": "GOOD TO FIRM",
+      "goCode": "GF",
+      "venueCode": "ST"
+     },
+     {
+      "no": 8,
+      "raceCourse": {
+       "code": "B",
+       "displayCode": "B",
+       "description_en": "\"B\" COURSE",
+       "description_ch": "\"B\" 賽道"
+      },
+      "raceTrack": {
+       "code": "TURF",
+       "description_en": "TURF",
+       "description_ch": "草地"
+      },
+      "go_ch": "好地至快地",
+      "go_en": "GOOD TO FIRM",
+      "goCode": "GF",
+      "venueCode": "ST"
+     },
+     {
+      "no": 9,
+      "raceCourse": {
+       "code": "",
+       "displayCode": "",
+       "description_en": "",
+       "description_ch": ""
+      },
+      "raceTrack": {
+       "code": "AWT",
+       "description_en": "ALL WEATHER TRACK",
+       "description_ch": "全天候跑道"
+      },
+      "go_ch": "好地",
+      "go_en": "GOOD",
+      "goCode": "GD",
+      "venueCode": "ST"
+     },
+     {
+      "no": 10,
+      "raceCourse": {
+       "code": "B",
+       "displayCode": "B",
+       "description_en": "\"B\" COURSE",
+       "description_ch": "\"B\" 賽道"
+      },
+      "raceTrack": {
+       "code": "TURF",
+       "description_en": "TURF",
+       "description_ch": "草地"
+      },
+      "go_ch": "好地至快地",
+      "go_en": "GOOD TO FIRM",
+      "goCode": "GF",
+      "venueCode": "ST"
+     },
+     {
+      "no": 11,
+      "raceCourse": {
+       "code": "B",
+       "displayCode": "B",
+       "description_en": "\"B\" COURSE",
+       "description_ch": "\"B\" 賽道"
+      },
+      "raceTrack": {
+       "code": "TURF",
+       "description_en": "TURF",
+       "description_ch": "草地"
+      },
+      "go_ch": "好地至快地",
+      "go_en": "GOOD TO FIRM",
+      "goCode": "GF",
+      "venueCode": "ST"
+     }
+    ]
+   },
+   {
+    "date": "2026-10-04",
+    "venueCode": "S4",
+    "startTime": "2026-10-04T19:33:00+08:00",
+    "totalNumberOfRace": 9,
+    "pmPools": [],
+    "isActive": false,
+    "jkSuspensions": [],
+    "foPools": [],
+    "stewards": [],
+    "venueDes": null,
+    "country": [
+     {
+      "namech": "法國",
+      "nameen": "FRANCE",
+      "seq": "1"
+     }
+    ],
+    "penetrometerReadings": [],
+    "hammerReadings": [],
+    "meetingTrack_ch": "",
+    "meetingTrack_en": "",
+    "meetingType": "O",
+    "meetingTrackCode": "",
+    "status": "CLOSED",
+    "isSeasonLastMeeting": false,
+    "course": null,
+    "races": [
+     {
+      "no": 1,
+      "raceCourse": {
+       "code": "",
+       "displayCode": "",
+       "description_en": "ParisLongchamp Racecourse",
+       "description_ch": "巴黎隆尚馬場"
+      },
+      "raceTrack": {
+       "code": "",
+       "description_en": "Turf",
+       "description_ch": "草地"
+      },
+      "go_ch": "好地至黏地",
+      "go_en": "GOOD TO YIELDING",
+      "goCode": null,
+      "venueCode": "S4"
+     },
+     {
+      "no": 2,
+      "raceCourse": {
+       "code": "",
+       "displayCode": "",
+       "description_en": "ParisLongchamp Racecourse",
+       "description_ch": "巴黎隆尚馬場"
+      },
+      "raceTrack": {
+       "code": "",
+       "description_en": "Turf",
+       "description_ch": "草地"
+      },
+      "go_ch": "好地至黏地",
+      "go_en": "GOOD TO YIELDING",
+      "goCode": null,
+      "venueCode": "S4"
+     },
+     {
+      "no": 3,
+      "raceCourse": {
+       "code": "",
+       "displayCode": "",
+       "description_en": "ParisLongchamp Racecourse",
+       "description_ch": "巴黎隆尚馬場"
+      },
+      "raceTrack": {
+       "code": "",
+       "description_en": "Turf",
+       "description_ch": "草地"
+      },
+      "go_ch": "好地至黏地",
+      "go_en": "GOOD TO YIELDING",
+      "goCode": null,
+      "venueCode": "S4"
+     },
+     {
+      "no": 4,
+      "raceCourse": {
+       "code": "",
+       "displayCode": "",
+       "description_en": "ParisLongchamp Racecourse",
+       "description_ch": "巴黎隆尚馬場"
+      },
+      "raceTrack": {
+       "code": "",
+       "description_en": "Turf",
+       "description_ch": "草地"
+      },
+      "go_ch": "好地至黏地",
+      "go_en": "GOOD TO YIELDING",
+      "goCode": null,
+      "venueCode": "S4"
+     },
+     {
+      "no": 5,
+      "raceCourse": {
+       "code": "",
+       "displayCode": "",
+       "description_en": "ParisLongchamp Racecourse",
+       "description_ch": "巴黎隆尚馬場"
+      },
+      "raceTrack": {
+       "code": "",
+       "description_en": "Turf",
+       "description_ch": "草地"
+      },
+      "go_ch": "好地至黏地",
+      "go_en": "GOOD TO YIELDING",
+      "goCode": null,
+      "venueCode": "S4"
+     },
+     {
+      "no": 6,
+      "raceCourse": {
+       "code": "",
+       "displayCode": "",
+       "description_en": "ParisLongchamp Racecourse",
+       "description_ch": "巴黎隆尚馬場"
+      },
+      "raceTrack": {
+       "code": "",
+       "description_en": "Turf",
+       "description_ch": "草地"
+      },
+      "go_ch": "好地至黏地",
+      "go_en": "GOOD TO YIELDING",
+      "goCode": null,
+      "venueCode": "S4"
+     },
+     {
+      "no": 7,
+      "raceCourse": {
+       "code": "",
+       "displayCode": "",
+       "description_en": "ParisLongchamp Racecourse",
+       "description_ch": "巴黎隆尚馬場"
+      },
+      "raceTrack": {
+       "code": "",
+       "description_en": "Turf",
+       "description_ch": "草地"
+      },
+      "go_ch": "好地至黏地",
+      "go_en": "GOOD TO YIELDING",
+      "goCode": null,
+      "venueCode": "S4"
+     },
+     {
+      "no": 8,
+      "raceCourse": {
+       "code": "",
+       "displayCode": "",
+       "description_en": "ParisLongchamp Racecourse",
+       "description_ch": "巴黎隆尚馬場"
+      },
+      "raceTrack": {
+       "code": "",
+       "description_en": "Turf",
+       "description_ch": "草地"
+      },
+      "go_ch": "好地至黏地",
+      "go_en": "GOOD TO YIELDING",
+      "goCode": null,
+      "venueCode": "S4"
+     },
+     {
+      "no": 9,
+      "raceCourse": {
+       "code": "",
+       "displayCode": "",
+       "description_en": "ParisLongchamp Racecourse",
+       "description_ch": "巴黎隆尚馬場"
+      },
+      "raceTrack": {
+       "code": "",
+       "description_en": "Turf",
+       "description_ch": "草地"
+      },
+      "go_ch": "好地至黏地",
+      "go_en": "GOOD TO YIELDING",
+      "goCode": null,
+      "venueCode": "S4"
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -14,7 +14,7 @@ from datetime import date, datetime
 
 __all__ = [
     "CoerceError", "parse_lbw", "format_lbw", "parse_finish_time", "to_place",
-    "to_odds", "to_date", "to_int", "parse_section_times",
+    "to_odds", "to_date", "to_int", "to_real", "parse_section_times",
     "parse_running_positions", "parse_gear", "to_race_class", "RACE_CLASSES",
 ]
 
@@ -247,6 +247,29 @@ def to_int(token: object, *, field: str = "value") -> int | None:
         return int(float(s))
     except ValueError:
         raise CoerceError(f"{field}: expected an integer, got {token!r}") from None
+
+
+def to_real(token: object, *, field: str = "value") -> float | None:
+    """A measured quantity: a wind speed, a rainfall, a going reading.
+
+    Blank or a run of dashes is no reading, which is not zero. Anything else
+    that is not a finite number raises, naming the field -- and so does a
+    boolean, which `float()` would quietly read as 1.0.
+    """
+    if token is None:
+        return None
+    if isinstance(token, bool):
+        raise CoerceError(f"{field}: a flag is not a reading: {token!r}")
+    s = str(token).strip()
+    if not s or is_absent(s):
+        return None
+    try:
+        v = float(s)
+    except ValueError:
+        raise CoerceError(f"{field}: expected a number, got {token!r}") from None
+    if v != v or v in (float("inf"), float("-inf")):
+        raise CoerceError(f"{field}: not a finite number {token!r}")
+    return v
 
 
 _DATE_FORMATS = ("%Y-%m-%d", "%d/%m/%Y", "%Y%m%d", "%d %b %Y", "%d/%m/%y")

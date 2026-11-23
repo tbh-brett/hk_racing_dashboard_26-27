@@ -213,3 +213,27 @@
 # off (3,600 win/place and 8,238 pair rows on 6 Sep alone), and it no longer
 # runs the day before at all.
 * * * * *   python -m hkrd.jobs.scrape_odds --db /data/hkrd.db --quiet
+
+# HKJC's own track weather (jobs/scrape_track_weather): the four anemometers
+# round each course, its weather station, and the going readings. Recorded
+# because nothing else holds it -- HKJC keeps no wind history, and no
+# Observatory station tracks the Happy Valley bowl -- so that a season from
+# now the wind can be tested on both courses (the job's docstring has why).
+#
+# THE WIND IS LIVE ONLY: the query HKJC's page sends takes no date. So this
+# line is the odds line's idea at a slower pace -- every five minutes, and the
+# job decides. A tick captures when today has a card and the clock is between
+# an hour before race 1 and half an hour after the last race; every other tick
+# is one local query and an exit, which --quiet keeps out of the log. A
+# capture is one request, about 5 KB, both courses. Offset to :04/:09/..., clear
+# of every minute the lines above use (the odds' every-minute line aside).
+#
+# THE GOING READINGS (turf penetrometer, all-weather Clegg hammer) HKJC keeps
+# for about two months, so they need three runs, not a tick: 12:35 after Sha
+# Tin's pre-race reading, 19:35 after Happy Valley's and the end of a Sha Tin
+# afternoon, 23:35 after a Happy Valley night. Each asks about today's and
+# yesterday's meeting and any stored meeting of the last two months with no
+# reading yet -- on the first run, that is the backfill -- one request per
+# meeting. A day with none of those is one query and no request.
+4-59/5 * * * *     nice -n 19 python -m hkrd.jobs.scrape_track_weather --db /data/hkrd.db --quiet
+35 12,19,23 * * *  nice -n 19 python -m hkrd.jobs.scrape_track_weather --going --quiet --db /data/hkrd.db

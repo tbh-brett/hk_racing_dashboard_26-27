@@ -6,6 +6,9 @@ every stamp from `_now` and `_today` here, and both of those read `_clock`, so
 a test stops the time for the two of them at once:
 
     monkeypatch.setattr(clock, "_clock", lambda: at)
+
+`scrape_track_weather` reads `_hk_now` for the same reason, and decides from it
+whether today's meeting is on.
 """
 from __future__ import annotations
 
@@ -34,3 +37,10 @@ def _today() -> str:
     Not `date.today()` either, which is only right where TZ is Hong Kong.
     """
     return _clock().astimezone(_HK).date().isoformat()
+
+
+def _hk_now() -> datetime:
+    """Now on the Hong Kong wall clock, with no offset attached: the clock a
+    card's off times and HKJC's instruments are written on, so the three
+    compare directly whatever zone the machine is set to."""
+    return _clock().astimezone(_HK).replace(tzinfo=None)
