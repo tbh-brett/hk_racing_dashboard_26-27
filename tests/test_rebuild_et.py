@@ -113,6 +113,54 @@ def test_faster_time_always_gives_a_better_figure(tmp_path):
     assert bad == 0
 
 
+def test_both_figures_are_written_and_the_headline_is_the_field(tmp_path):
+    """et-v6.0: `figure` is 100 + lengths ahead of mid-field, `time_figure`
+    the par reading beside it. Every race's middle runner reads 100."""
+    db = tmp_path / "t.db"
+    _seed(db)
+    rebuild_et.rebuild(db, window_months=0)
+    conn = get_conn(db)
+    missing = conn.execute("SELECT count(*) FROM runner_et WHERE figure IS NULL "
+                           "OR time_figure IS NULL").fetchone()[0]
+    rows = conn.execute("SELECT race_date, figure, len_vs_race FROM runner_et").fetchall()
+    conn.close()
+    assert missing == 0
+    for r in rows:
+        assert r["figure"] == pytest.approx(
+            float(et.field_figure(r["len_vs_race"])), abs=0.051)
+    import statistics
+    by_race: dict[str, list[float]] = {}
+    for r in rows:
+        by_race.setdefault(r["race_date"], []).append(r["figure"])
+    assert all(abs(statistics.median(v) - 100) < 0.051 for v in by_race.values())
+
+
+def test_an_older_runner_et_gains_time_figure(tmp_path):
+    """A production table built before et-v6.0 has no `time_figure`. The
+    column is added on the way in, rather than every reader failing on the
+    one database that matters."""
+    import sqlite3
+    db = tmp_path / "old.db"
+    raw = sqlite3.connect(db)
+    raw.execute("""CREATE TABLE runner_et (
+        race_date TEXT NOT NULL, race_no INTEGER NOT NULL, horse_no INTEGER NOT NULL,
+        et REAL, et_level TEXT, et_n_eff INTEGER, et_shrunk INTEGER,
+        sec_vs_par REAL, len_vs_par REAL, sec_vs_race REAL, len_vs_race REAL,
+        figure REAL, confidence TEXT, derive_version TEXT NOT NULL,
+        PRIMARY KEY (race_date, race_no, horse_no))""")
+    raw.execute("INSERT INTO runner_et (race_date, race_no, horse_no, figure, "
+                "derive_version) VALUES ('2026-01-01', 1, 1, 103.7, 'et-v5.0')")
+    raw.commit()
+    raw.close()
+    conn = get_conn(db)
+    init_db(conn)
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(runner_et)")}
+    kept = conn.execute("SELECT figure, time_figure FROM runner_et").fetchone()
+    conn.close()
+    assert "time_figure" in cols
+    assert kept["figure"] == pytest.approx(103.7) and kept["time_figure"] is None
+
+
 def test_empty_database_reports_rather_than_crashing(tmp_path):
     db = tmp_path / "empty.db"
     conn = get_conn(db)

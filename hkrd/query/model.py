@@ -25,7 +25,8 @@ def et_breakdown(date: str, race_no: int, *,
     Exposes the two figures the v4 model conflated. len_vs_par answers "was this
     a fast time for these conditions"; len_vs_race answers "did this horse
     outrun the field it was in". They are different questions and the page shows
-    both rather than a single number standing for both.
+    both rather than a single number standing for both. From et-v6.0 `figure`
+    is len_vs_race on a 100 scale and `time_figure` is the par reading.
     """
     own = conn is None
     conn = conn or get_conn()
@@ -34,7 +35,7 @@ def et_breakdown(date: str, race_no: int, *,
             SELECT r.horse_no, r.horse_name, r.place, r.finish_time,
                    e.et, e.et_level, e.et_n_eff, e.et_shrunk,
                    e.sec_vs_par, e.len_vs_par, e.sec_vs_race, e.len_vs_race,
-                   e.figure, e.confidence, e.derive_version
+                   e.figure, e.time_figure, e.confidence, e.derive_version
             FROM runners r
             LEFT JOIN runner_et e USING (race_date, race_no, horse_no)
             WHERE r.race_date = ? AND r.race_no = ?
@@ -62,7 +63,7 @@ def et_breakdown(date: str, race_no: int, *,
                 marks = ",".join("?" * len(names))
                 for p in conn.execute(f"""
                     SELECT r.horse_name, r.race_date, r.race_no, r.place,
-                           e.figure, e.confidence, e.et_n_eff,
+                           e.figure, e.time_figure, e.confidence, e.et_n_eff,
                            e.len_vs_par, e.sec_vs_par, e.len_vs_race
                       FROM runners r
                       JOIN runner_et e USING (race_date, race_no, horse_no)

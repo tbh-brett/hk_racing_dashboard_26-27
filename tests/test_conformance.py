@@ -103,6 +103,11 @@ DIVERGENCES: dict[str, dict[str, str]] = {
                 "that ranked and coloured the disagreement; GAP shows it neutral, "
                 "because where the model is keener the price has been right",
     },
+    "Results": {
+        "ET FIGURE": "renamed FIGURE on 23 Nov 2026 (et-v6.0): the figure is lengths "
+                     "against the field, not expected time against par, after the "
+                     "par's race-speed part ranked next-run winners at a coin toss",
+    },
 }
 
 # Artboards with no tabular columns to check, each with the reason. An artboard

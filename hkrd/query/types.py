@@ -32,23 +32,36 @@ def format_race_time(seconds: float | None) -> str | None:
     return f"{int(minutes)}:{rest:05.2f}" if minutes >= 1 else f"{rest:.2f}"
 
 
-def format_figure(figure: float | None, len_vs_par: float | None,
-                  n_eff: int | None, confidence: str | None) -> str | None:
+def format_figure(figure: float | None, len_vs_race: float | None,
+                  field_size: int | None, len_vs_par: float | None,
+                  n_eff: int | None) -> str | None:
     """A figure never renders as a bare number.
 
     Every figure carries what it means and how much evidence sits behind it:
-    "103.7 (+3.9L vs par, n=41, medium)".
+    "104.0 (+4.0L vs mid-field of 12 · time +2.1L vs par, n=41)".
+
+    The figure is lengths against the field (et-v6.0), so the field is its
+    context and the field size its sample. The time against par follows as a
+    second reading with the par's own sample beside it. Its confidence word is
+    left off: it describes the par, and printed after the figure it read as a
+    verdict on the figure, which no longer depends on the par at all.
     """
     if figure is None:
         return None
+
+    def lengths(x: float) -> str:
+        # Rounded before signing, so a horse a hundredth of a length behind
+        # the middle reads +0.0L and not -0.0L.
+        return f"{round(x, 1) + 0.0:+.1f}L"
+
     bits = []
+    if len_vs_race is not None:
+        of = f" of {field_size}" if field_size else ""
+        bits.append(f"{lengths(len_vs_race)} vs mid-field{of}")
     if len_vs_par is not None:
-        bits.append(f"{len_vs_par:+.1f}L vs par")
-    if n_eff is not None:
-        bits.append(f"n={n_eff}")
-    if confidence:
-        bits.append(confidence)
-    return f"{figure:.1f}" + (f" ({', '.join(bits)})" if bits else "")
+        bits.append(f"time {lengths(len_vs_par)} vs par"
+                    + (f", n={n_eff}" if n_eff is not None else ""))
+    return f"{figure:.1f}" + (f" ({' · '.join(bits)})" if bits else "")
 
 
 @dataclass(frozen=True)
@@ -90,7 +103,10 @@ class RunnerLine:
     section_times: tuple[float, ...] = ()
 
     # derived — one definition, used everywhere
+    # The figure: 100 + lengths ahead of the middle of the field (et-v6.0).
     et_figure: float | None = None
+    # The par-based reading, which is what et_figure was up to et-v5.0.
+    et_time_figure: float | None = None
     et_len_vs_par: float | None = None
     et_len_vs_race: float | None = None
     # Seconds against the race's par, which is the axis the old Lookup's
@@ -129,8 +145,8 @@ class RunnerLine:
 
     @property
     def figure_display(self) -> str | None:
-        return format_figure(self.et_figure, self.et_len_vs_par,
-                             self.et_n_eff, self.et_confidence)
+        return format_figure(self.et_figure, self.et_len_vs_race,
+                             self.field_size, self.et_len_vs_par, self.et_n_eff)
 
     @property
     def style_ordinal(self) -> int:

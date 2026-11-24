@@ -67,7 +67,8 @@ def test_runner_lines_carry_precomputed_displays(client):
     differently on each page."""
     runner = client.get("/api/race/2025-01-04/1").json()["runners"][0]
     assert runner["finish_time_display"].startswith("1:")   # m:ss.xx, not 108.0
-    assert "vs par" in runner["figure_display"]             # never a bare number
+    assert "vs mid-field of 8" in runner["figure_display"]  # never a bare number
+    assert "vs par" in runner["figure_display"]             # the time reading too
     assert "n=" in runner["figure_display"]                 # always a sample size
 
 

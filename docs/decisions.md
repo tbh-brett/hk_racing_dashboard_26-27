@@ -984,3 +984,60 @@ rather than an entry, and the only ones that answer "as at that race" rather
 than "as it stands". Both are re-exported from `query/blackbook`, because they
 ARE the blackbook to every caller outside it and a split in that module is not a
 reason for `query/raceday` to learn a second import path.
+
+---
+
+## The figure is lengths against the field, not time against par (et-v6.0). **Settled**
+
+23 Nov 2026, at the owner's request after a review of the ET figure. Measured on
+the production copy of 19 Nov (72,867 timed runs, Sep 2019 to Nov 2026), with
+every par rebuilt walk-forward from the 24 months before each month.
+
+**What the par figure was.** Within a race it ordered runners exactly by
+finishing time, because every runner shares one par. Everything else it said was
+one number per race — how fast that race was against par — and that number
+carried the day's track speed (about a quarter of all figure variance was the
+meeting alone, ±3 points from the 10th to the 90th percentile), the pace
+(winners of Very Slow races averaged 100.9, of Neutral or Fast 105–106), the
+going (yielding read about 4 points low, soft about 9), the rail (Happy Valley's
+A course 2.5 below C+3) and class, which the par normalised away (a horse going
+up one class lost 3.2 points for a raw time 0.4 slower).
+
+**What each reading predicts.** Last three runs per horse, 4,032 races, how
+often the measure ranks the winner above a beaten horse from the same race:
+
+| | win | place |
+|---|---|---|
+| market, final odds | 76.5% | 74.7% |
+| SARR | 69.6% | 68.9% |
+| finishing position | 67.7% | 66.9% |
+| lengths against the field | 67.5% | 66.8% |
+| par figure + the day's track variant | 65.6% | 64.9% |
+| **par figure, as shown** | **64.2%** | **63.9%** |
+| the par figure's race-speed part alone | 51.1% | 51.2% |
+
+The order held in every class, venue, surface and experience slice. Added to the
+final odds in a conditional logit (train Sep 2021–Jul 2024, test Sep 2024–Nov
+2026, 1,903 races) none of them adds anything, SARR included: |z| ≤ 1.1, test
+log-likelihood unchanged within noise. The figure is for reading, as it always
+was.
+
+**The change.** `figure` = 100 + lengths ahead of the middle of the field
+(`len_vs_race`), one point a length out to six either side and bending smoothly
+toward 90 and 110 beyond, strictly increasing so a faster time never rates
+worse. Every cap from six to fifteen lengths and no cap at all scored within
+0.003 of one another, so the bend was chosen for reading. The par reading is
+kept, unchanged, as `time_figure`; its confidence word describes the par and is
+no longer printed against `figure`. `figure_display` reads
+`104.0 (+4.0L vs mid-field of 12 · time +2.1L vs par, n=41)`.
+
+**The Form Guide trend tint is gone.** Over 37,059 six-run windows a tint held to
+the next start 45% of the time; a horse tinted up gave back 3.0 points next start
+and one tinted down recovered 4.5; win rates against the odds were 1.06, 0.99 and
+1.06. The sequence's shading now follows the new scale: 102 and over is a run
+like a placed horse's (a third-placed horse's median is 102.3), under 98 is two
+lengths or more behind the middle.
+
+**After deploying**, run REBUILD ET once (Lab page, or `python -m
+hkrd.jobs.rebuild_et`): until then the table holds et-v5.0 rows, whose `figure`
+is the par reading, and `derive_version` says which a row is.

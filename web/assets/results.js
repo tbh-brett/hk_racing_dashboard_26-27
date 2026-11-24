@@ -41,7 +41,7 @@ import { playerFrame } from './replay.js';
 const COLS = [
   ['FIN', 'r'], ['NO', 'r'], ['HORSE', ''], ['WT', 'r'], ['DR', 'r'],
   ['JOCKEY', ''], ['TRAINER', ''], ['POSITIONS', ''], ['STYLE', ''],
-  ['MARGIN', 'r'], ['WIN SP', 'r'], ['PLC SP', 'r'], ['ET FIGURE', 'r'],
+  ['MARGIN', 'r'], ['WIN SP', 'r'], ['PLC SP', 'r'], ['FIGURE', 'r'],
   ['TRIP', ''],
 ];
 
@@ -456,6 +456,7 @@ function resultRow(runner, booked, backed, here) {
     runner.et_figure === null || runner.et_figure === undefined
       ? DASH : num(runner.et_figure, 1));
   // The figure never renders bare: what it is against, and on what sample.
+  // 100 is the middle of this field and a point is a length (et-v6.0).
   if (runner.figure_display) fig.title = runner.figure_display;
   row.append(fig);
 
