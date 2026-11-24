@@ -1,0 +1,10 @@
+/* The Form Guide's LAST 3 column (recent-form.js). Its own file because
+   formguide.css is at the file-size cap. */
+.fg-row .recent {
+  text-align: right; white-space: nowrap; padding-right: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.fg-row .recent .v { font-size: var(--fs-md); font-weight: 600; color: var(--text); }
+.fg-row .recent .rk { margin-left: 6px; font-size: var(--fs-xs); color: var(--text-muted); }
+.fg-row .recent.thin .v { font-weight: 400; color: var(--text-2); }
+.fg-row .recent .none { color: var(--text-faint); }

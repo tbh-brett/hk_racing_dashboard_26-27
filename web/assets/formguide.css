@@ -10,7 +10,7 @@
   /* Widened with the type. The columns were measured against 9px text and
      truncated their own headers at 10px — the density was winning over the
      legibility it exists to serve. */
-  --fg-grid: 36px 194px 82px 30px 94px 92px 36px 58px 250px 1fr;
+  --fg-grid: 36px 194px 82px 30px 94px 92px 36px 58px 250px 92px 1fr;
 
   /* The run rows inside an expanded horse. Twelve columns where the runner
      rows have ten, because they carry different things — see RUN_HEAD in

@@ -213,8 +213,13 @@ class FormGuide:
     # today's card. Keyed like `gear_first` and `vet_form`, which are the other
     # horse-level facts this payload carries.
     styles: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # The last three figures weighted 3-2-1 and their rank in this field, keyed
+    # by horse name (query/formguide.recent_form). None where a horse has no
+    # figure in its last three runs.
+    recent: dict[str, dict[str, Any] | None] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {"race": self.race.to_dict(),
                 "history": {k: [r.to_dict() for r in v] for k, v in self.history.items()},
-                "running_styles": self.styles}
+                "running_styles": self.styles,
+                "recent_form": self.recent}

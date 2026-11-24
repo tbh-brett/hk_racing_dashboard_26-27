@@ -96,6 +96,64 @@ def test_form_guide_serialises_for_the_api(db):
     assert "figure_display" in run and "finish_time_display" in run
 
 
+# ── LAST 3: the last three figures as one reading ───────────────────────────
+
+def _runs(*figures):
+    """A horse's runs NEWEST FIRST, as build_form_guide holds them."""
+    from hkrd.query.types import RunnerLine
+    return tuple(RunnerLine(race_date=f"2026-{12 - i:02d}-01", race_no=1, horse_no=1,
+                            horse_name="X", et_figure=f)
+                 for i, f in enumerate(figures))
+
+
+def test_last_three_weigh_the_newest_heaviest():
+    out = formguide.recent_form({"A": _runs(104.0, 100.0, 98.0)})["A"]
+    assert out["figure"] == pytest.approx((3 * 104 + 2 * 100 + 98) / 6, abs=0.05)
+    assert (out["figures"], out["runs"], out["rank"], out["of"]) == (3, 3, 1, 1)
+
+
+def test_a_run_with_no_figure_gives_its_weight_away():
+    """Pulled up last time: read on the two before it, not on a zero."""
+    out = formguide.recent_form({"A": _runs(None, 100.0, 98.0)})["A"]
+    assert out["figure"] == pytest.approx((2 * 100 + 98) / 3, abs=0.05)
+    assert (out["figures"], out["runs"]) == (2, 3)
+
+
+def test_only_the_last_three_runs_count():
+    out = formguide.recent_form({"A": _runs(100.0, 100.0, 100.0, 90.0, 90.0, 90.0)})
+    assert out["A"]["figure"] == 100.0
+
+
+def test_nothing_to_read_is_none_not_a_poor_reading():
+    out = formguide.recent_form({"debut": _runs(), "no times": _runs(None, None),
+                                 "rated": _runs(99.0)})
+    assert out["debut"] is None and out["no times"] is None
+    assert out["rated"]["of"] == 1                     # only the rated are ranked
+
+
+def test_rank_is_within_the_field_and_level_readings_share_it():
+    out = formguide.recent_form({"A": _runs(102.0), "B": _runs(102.0),
+                                 "C": _runs(99.0), "D": _runs()})
+    assert [out[k]["rank"] for k in "ABC"] == [1, 1, 3]
+    assert {out[k]["of"] for k in "ABC"} == {3} and out["D"] is None
+
+
+def test_the_payload_carries_last_three_for_every_runner(db):
+    conn = get_conn(db)
+    # The fixture builds no ET (too few runs for references), so every run is
+    # given a figure here: better finishers, bigger figures.
+    with transaction(conn):
+        conn.execute("INSERT INTO runner_et (race_date, race_no, horse_no, figure, "
+                     "derive_version) SELECT race_date, race_no, horse_no, "
+                     "104.0 - place, 't' FROM runners")
+    guide = formguide.build_form_guide(_last_date(db), 1, conn=conn)
+    conn.close()
+    recent = guide.to_dict()["recent_form"]
+    assert set(recent) == {r.horse_name for r in guide.race.runners}
+    rated = [v for v in recent.values() if v is not None]
+    assert rated and all(1 <= v["rank"] <= v["of"] == len(rated) for v in rated)
+
+
 # ── the STYLE column: how the horse RUNS ─────────────────────────────────────
 
 def _style_history(db, horse, styles):

@@ -22,6 +22,7 @@ import { loadTags, renderReview, trialSubject } from './review.js';
 import { bookClass } from './book-origin.js';
 import { replayLink } from './replay.js';
 import { sidePanel } from './side-panel.js';
+import { recentCell, RECENT_HINT } from './recent-form.js';
 
 
 /* How a figure is shaded in the six-run sequence. The figure is 100 + lengths
@@ -55,6 +56,7 @@ const COLS = [
   { key: 'seq', label: 'LAST 6 FIGURES · NEWEST LEFT',
     hint: 'each figure is 100 + lengths ahead of the middle of that race’s '
         + 'field: 104 beat the middle by four lengths, 97 was three behind it' },
+  { key: 'recent', label: 'LAST 3', cls: 'r', hint: RECENT_HINT },
   { key: 'flags', label: 'FLAGS' },
 ];
 
@@ -211,6 +213,7 @@ function sortValue(r, key) {
     // Best figure first when sorting by form, so ascending means "best".
     case 'odds': return r.win_odds ?? 9e9;
     case 'seq': return -(runs[0]?.et_figure ?? 0);
+    case 'recent': return -(state.guide?.recent_form?.[r.horse_name]?.figure ?? 0);
     case 'flags': return -flagsFor(r).length;
     default: return 0;
   }
@@ -385,6 +388,7 @@ function horseRow(runner) {
   row.append(el('div', 'wt', String(runner.actual_weight ?? DASH)));
   row.append(el('div', 'odds', runner.win_odds ? num(runner.win_odds, 1) : DASH));
   row.append(sequenceCell(runner));
+  row.append(recentCell(state.guide?.recent_form?.[runner.horse_name]));
 
   const flags = el('div', 'flags');
   flagsFor(runner).forEach((f) => {

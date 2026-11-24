@@ -14,7 +14,7 @@ about the ET figure or the pace style, because there is only one of them.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from hkrd.query.race import get_horse_form, get_race, habitual_styles
@@ -24,7 +24,7 @@ from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["build_form_guide", "race_quality", "gear_timeline",
            "condition_fit", "head_to_head", "notes_for_horses",
-           "ConditionCell"]
+           "recent_form", "RECENT_WEIGHTS", "ConditionCell"]
 
 
 def build_form_guide(date: str, race_no: int, *, history: int = 6,
@@ -34,13 +34,17 @@ def build_form_guide(date: str, race_no: int, *, history: int = 6,
     conn = conn or get_conn()
     try:
         race = get_race(date, race_no, conn=conn)
+        runs = {
+            r.horse_name: tuple(
+                get_horse_form(r.horse_name, limit=history, before=date, conn=conn))
+            for r in race.runners
+        }
         return FormGuide(
             race=race,
-            history={
-                r.horse_name: tuple(
-                    get_horse_form(r.horse_name, limit=history, before=date, conn=conn))
-                for r in race.runners
-            },
+            history=runs,
+            # One number per horse to read the six by, and where it stands in
+            # this field. From the runs already fetched, so it costs no query.
+            recent=recent_form(runs),
             # HOW EACH HORSE RUNS. The card's STYLE column read the most recent
             # run's style, which is one observation and the single worst
             # estimator of the next -- and the six runs the page shows are not
@@ -56,6 +60,49 @@ def build_form_guide(date: str, race_no: int, *, history: int = 6,
     finally:
         if own:
             conn.close()
+
+
+# ── the last three figures, as one reading ──────────────────────────────────
+
+# Newest heaviest. Measured 24 Nov 2026 on the 19 Nov production copy, races
+# 2021-26: how often a reading of each horse's figures ranks the next winner
+# above a beaten rival from the same race. Last run alone 66.9%, best of three
+# 67.1%, six-run average 67.3%, three-run average 68.3%, the three weighted
+# 3-2-1 69.0% (the final odds themselves 77.0%). Like every reading of the
+# figure it adds nothing to the odds: it is the best single number to READ a
+# horse's form by, not a reason to back one. About half of a horse's edge over
+# 100 shows up again next time (next = 50.8 + 0.49 x the three-run average).
+RECENT_WEIGHTS = (3.0, 2.0, 1.0)
+
+
+def recent_form(history: Mapping[str, Sequence[RunnerLine]]
+                ) -> dict[str, dict[str, Any] | None]:
+    """Each horse's last three figures weighted 3-2-1, ranked within the field.
+
+    `history` is newest first, as `build_form_guide` holds it. A run with no
+    figure -- pulled up, no time recorded -- gives its weight to the others
+    rather than counting as nothing, and `figures` says how many were read.
+    A horse with no figure in its last three runs gets None: nothing to read,
+    which is a different fact from a poor reading.
+
+    `rank` is among today's runners that have a reading, best first; level
+    readings share a rank, and `of` is how many were ranked.
+    """
+    out: dict[str, dict[str, Any] | None] = {}
+    for name, runs in history.items():
+        pairs = [(w, r.et_figure) for w, r in zip(RECENT_WEIGHTS, runs)
+                 if r.et_figure is not None]
+        if not pairs:
+            out[name] = None
+            continue
+        value = sum(w * f for w, f in pairs) / sum(w for w, _ in pairs)
+        out[name] = {"figure": round(value, 1), "figures": len(pairs),
+                     "runs": min(len(runs), len(RECENT_WEIGHTS))}
+    ranked = [v for v in out.values() if v is not None]
+    for v in ranked:
+        v["rank"] = 1 + sum(o["figure"] > v["figure"] for o in ranked)
+        v["of"] = len(ranked)
+    return out
 
 
 # ── projected race pace ──────────────────────────────────────────────────────
