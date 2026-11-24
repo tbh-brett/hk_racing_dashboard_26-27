@@ -96,7 +96,7 @@
 .bf-ranrow .res { margin-left: auto; font-size: 10px; color: var(--text-dim); }
 
 .bf-feat {
-  display: grid; grid-template-columns: 156px minmax(0, 1fr) 176px 392px;
+  display: grid; grid-template-columns: 156px minmax(0, 1fr) 176px 448px;
   border-bottom: 1px solid var(--line); border-left: 3px solid transparent; cursor: pointer;
 }
 .bf-feat:hover { background: var(--row-hover); }
@@ -148,7 +148,7 @@
 .bf-feat .c-pace .key span { background: none; }
 
 .bf-four {
-  display: grid; grid-template-columns: 18px minmax(0, 1fr) 56px 34px 52px 58px;
+  display: grid; grid-template-columns: 18px minmax(0, 1fr) 56px 34px 46px 52px 58px;
   gap: 0 6px; align-items: center; height: 20px; font-size: 12px;
 }
 .bf-four.hd { height: auto; padding-bottom: 3px; font-size: 10px; letter-spacing: .06em; color: var(--text-muted); }

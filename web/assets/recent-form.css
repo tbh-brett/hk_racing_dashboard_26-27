@@ -6,9 +6,11 @@
   font-size: var(--fs-md); font-weight: 600; color: var(--text);
   padding: 0 4px; border-radius: 2px;
 }
-.rf .rk { margin-left: 6px; font-size: var(--fs-xs); color: var(--text-muted); }
 .rf.thin .v { font-weight: 400; }
 .rf .none { color: var(--text-faint); }
+/* The Briefing's tighter rows: the Screen's four, the runner grid, the phone. */
+.bf-four .rf { text-align: right; }
+.bf-four .rf .v, .bf-runner .rf .v, .bf-prunner .rf .v { font-size: 12px; padding: 0 3px; }
 
 /* Green better, red worse, deeper further from the middle: the bands and what
    each did next start are in recent-form.js. A tint behind the number rather

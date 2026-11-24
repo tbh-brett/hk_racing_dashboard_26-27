@@ -24,7 +24,8 @@ from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["build_form_guide", "race_quality", "gear_timeline",
            "condition_fit", "head_to_head", "notes_for_horses",
-           "recent_form", "RECENT_WEIGHTS", "ConditionCell"]
+           "recent_form", "rank_readings", "recent_figures", "readings_by_race",
+           "RECENT_WEIGHTS", "ConditionCell"]
 
 
 def build_form_guide(date: str, race_no: int, *, history: int = 6,
@@ -75,34 +76,105 @@ def build_form_guide(date: str, race_no: int, *, history: int = 6,
 RECENT_WEIGHTS = (3.0, 2.0, 1.0)
 
 
-def recent_form(history: Mapping[str, Sequence[RunnerLine]]
-                ) -> dict[str, dict[str, Any] | None]:
-    """Each horse's last three figures weighted 3-2-1, ranked within the field.
+def _reading(figures: Sequence[float | None]) -> dict[str, Any] | None:
+    """One horse's reading from its last runs' figures, newest first.
 
-    `history` is newest first, as `build_form_guide` holds it. A run with no
-    figure -- pulled up, no time recorded -- gives its weight to the others
-    rather than counting as nothing, and `figures` says how many were read.
-    A horse with no figure in its last three runs gets None: nothing to read,
-    which is a different fact from a poor reading.
-
-    `rank` is among today's runners that have a reading, best first; level
-    readings share a rank, and `of` is how many were ranked.
+    A run with no figure -- pulled up, no time recorded -- gives its weight to
+    the others rather than counting as nothing, and `figures` says how many
+    were read. No figure at all is None: nothing to read, which is a different
+    fact from a poor reading.
     """
-    out: dict[str, dict[str, Any] | None] = {}
-    for name, runs in history.items():
-        pairs = [(w, r.et_figure) for w, r in zip(RECENT_WEIGHTS, runs)
-                 if r.et_figure is not None]
-        if not pairs:
-            out[name] = None
-            continue
-        value = sum(w * f for w, f in pairs) / sum(w for w, _ in pairs)
-        out[name] = {"figure": round(value, 1), "figures": len(pairs),
-                     "runs": min(len(runs), len(RECENT_WEIGHTS))}
+    pairs = [(w, f) for w, f in zip(RECENT_WEIGHTS, figures) if f is not None]
+    if not pairs:
+        return None
+    value = sum(w * f for w, f in pairs) / sum(w for w, _ in pairs)
+    return {"figure": round(value, 1), "figures": len(pairs),
+            "runs": min(len(figures), len(RECENT_WEIGHTS))}
+
+
+def rank_readings(figures: Mapping[Any, Sequence[float | None]]
+                  ) -> dict[Any, dict[str, Any] | None]:
+    """Each horse of ONE field read and ranked: `rank` among those with a
+    reading, best first, level readings sharing it, and `of` how many."""
+    out = {key: _reading(f) for key, f in figures.items()}
     ranked = [v for v in out.values() if v is not None]
     for v in ranked:
         v["rank"] = 1 + sum(o["figure"] > v["figure"] for o in ranked)
         v["of"] = len(ranked)
     return out
+
+
+def recent_form(history: Mapping[str, Sequence[RunnerLine]]
+                ) -> dict[str, dict[str, Any] | None]:
+    """Each horse's last three figures weighted 3-2-1, ranked within the field.
+
+    `history` is newest first, as `build_form_guide` holds it.
+    """
+    return rank_readings({name: [r.et_figure for r in runs]
+                          for name, runs in history.items()})
+
+
+# The runs `get_horse_form(name, limit=3, before=...)` returns -- the same join,
+# the same order -- for many horses in one statement. The Form Guide and Race
+# Day read LAST 3 through get_horse_form; a page with a whole meeting on it
+# reads it here, and a test holds the two to the same answer.
+_LAST_RUNS_SQL = """
+SELECT horse_name, figure FROM (
+    SELECT r.horse_name, e.figure,
+           ROW_NUMBER() OVER (PARTITION BY r.horse_name
+                              ORDER BY r.race_date DESC, r.race_no DESC) AS back
+      FROM runners r
+      JOIN races a ON a.race_date = r.race_date AND a.race_no = r.race_no
+      LEFT JOIN runner_et e USING (race_date, race_no, horse_no)
+     WHERE r.horse_name IN ({marks}) AND r.race_date < ?)
+ WHERE back <= ? ORDER BY horse_name, back
+"""
+
+
+def recent_figures(names: Sequence[str], *, before: str,
+                   conn: Connection) -> dict[str, list[float | None]]:
+    """The figures of each horse's last three runs before `before`, newest
+    first, in one query. A horse with no run before it has an empty list."""
+    names = sorted({n.strip().upper() for n in names if n})
+    out: dict[str, list[float | None]] = {n: [] for n in names}
+    if not names:
+        return out
+    for row in conn.execute(_LAST_RUNS_SQL.format(marks=",".join("?" * len(names))),
+                            (*names, before, len(RECENT_WEIGHTS))):
+        out[row["horse_name"]].append(row["figure"])
+    return out
+
+
+def readings_by_race(since: str, until: str, *, conn: Connection
+                     ) -> dict[tuple[str, int], dict[int, dict[str, Any] | None]]:
+    """LAST 3 for every runner of every race from `since` to `until`, as it read
+    BEFORE that race: each horse's three previous runs, whenever they were.
+
+    For scoring the reading the way the Briefing's record scores everything
+    else. Nothing in it is fitted, so a race read here is read exactly as the
+    page would have read it that morning.
+    """
+    rows = conn.execute("""
+        WITH h AS (SELECT DISTINCT horse_name FROM runners
+                    WHERE race_date BETWEEN ? AND ?),
+        runs AS (
+            SELECT r.race_date, r.race_no, r.horse_no,
+                   lag(e.figure, 1) OVER w AS f1, lag(e.figure, 2) OVER w AS f2,
+                   lag(e.figure, 3) OVER w AS f3,
+                   lag(r.race_date, 1) OVER w AS d1, lag(r.race_date, 2) OVER w AS d2,
+                   lag(r.race_date, 3) OVER w AS d3
+              FROM runners r JOIN h USING (horse_name)
+              JOIN races a ON a.race_date = r.race_date AND a.race_no = r.race_no
+              LEFT JOIN runner_et e USING (race_date, race_no, horse_no)
+            WINDOW w AS (PARTITION BY r.horse_name ORDER BY r.race_date, r.race_no))
+        SELECT * FROM runs WHERE race_date BETWEEN ? AND ?""",
+        (since, until, since, until)).fetchall()
+    fields: dict[tuple[str, int], dict[int, list[float | None]]] = {}
+    for r in rows:
+        figs = [f for f, d in ((r["f1"], r["d1"]), (r["f2"], r["d2"]),
+                               (r["f3"], r["d3"])) if d is not None]
+        fields.setdefault((r["race_date"], r["race_no"]), {})[r["horse_no"]] = figs
+    return {key: rank_readings(field) for key, field in fields.items()}
 
 
 # ── projected race pace ──────────────────────────────────────────────────────

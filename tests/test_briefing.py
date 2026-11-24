@@ -144,6 +144,23 @@ def test_race_day_follows_the_market(db):
     assert ranks == list(range(1, len(NAMES) + 1))
 
 
+def test_every_runner_carries_last_three_as_the_form_guide_reads_it(db):
+    """LAST 3 sits beside the Screen as its own computed reading -- the same
+    number, from the same runs, as the Form Guide shows for the race."""
+    from hkrd.query import formguide
+    with transaction(db):
+        db.execute("INSERT INTO runner_et (race_date, race_no, horse_no, figure, "
+                   "derive_version) SELECT race_date, race_no, horse_no, "
+                   "100.0 + horse_no, 't' FROM runners WHERE race_date < ?",
+                   (TODAY,))
+    race = _race(db, TWO_DAYS_OUT)["races"][0]
+    guide = formguide.build_form_guide(TODAY, race["race_no"], conn=db)
+    got = {r["horse_name"]: r["recent_form"] for r in race["runners"]}
+    assert got == {k: v for k, v in guide.recent.items() if k in got}
+    assert any(v is not None for v in got.values())
+    assert all("recent_form" not in r["screen"] for r in race["runners"])
+
+
 def test_the_card_is_in_race_order(db):
     """Brett, 19 Nov 2026: race order, every race in full -- no longer the
     races with the most reasons first."""

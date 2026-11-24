@@ -125,6 +125,36 @@ def test_the_screen_is_read_from_what_was_recorded(db):
     assert sc["all"] == {"n": 8, "won": 2, "placed": 6}
 
 
+def test_last_three_is_scored_like_the_screen(db):
+    """LAST 3's first is the best reading among the horses that STARTED, read
+    from runs before the race; its four are the four best. HORSE 1-6 reads
+    best of all and was withdrawn, so it is never the pick."""
+    prior = {"HORSE 1-3": 104.0, "HORSE 1-1": 100.0, "HORSE 1-6": 110.0,
+             "HORSE 2-2": 103.0, "HORSE 2-4": 98.0}
+    conn = get_conn(db)
+    with transaction(conn):
+        upsert.upsert_races(conn, [{"race_date": "2026-08-20", "race_no": 1,
+                                    "venue": "ST", "distance": 1200}])
+        upsert.upsert_runners(conn, [
+            {"race_date": "2026-08-20", "race_no": 1, "horse_no": i + 1,
+             "horse_name": name, "place": str(i + 1), "win_odds": 5.0}
+            for i, name in enumerate(prior)])
+        conn.executemany(
+            "INSERT INTO runner_et (race_date, race_no, horse_no, figure, "
+            "derive_version) VALUES ('2026-08-20', 1, ?, ?, 't')",
+            [(i + 1, f) for i, f in enumerate(prior.values())])
+    conn.close()
+    l3 = lines(db)["last3"]
+    # R1 #3 ran third at 8.0, R2 #2 won at 6.0: $20 staked, $60 back.
+    assert l3["top"] == {"n": 2, "won": 1, "placed": 2, "return_pct": 200.0,
+                         # 1 win against 0.1220 + 0.1961 expected, de-vigged
+                         "ae": 3.14,
+                         "fav_won": 0, "fav_placed": 2}
+    # Its "four" is every horse with a reading: R1 #3 and #1, R2 #2 and #4.
+    assert l3["all"] == {"n": 4, "won": 2, "placed": 3}
+    assert l3["kind"] == "computed"
+
+
 def test_the_favourite_is_the_benchmark(db):
     fav = lines(db)["favourite"]
     assert fav["top"]["n"] == 2 and fav["top"]["won"] == 0

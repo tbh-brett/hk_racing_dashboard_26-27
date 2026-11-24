@@ -14,6 +14,7 @@ import { backgroundBlock, verdictChip } from './background.js';
 import { unseenBlock } from './briefing-unseen.js';
 import { bookLineEl, noteLine, tierChip } from './book-tier.js';
 import { shortDate } from './briefing-format.js';
+import { recentCell } from './recent-form.js';
 
 /* ── shared pieces ──────────────────────────────────────────────────────── */
 
@@ -203,8 +204,11 @@ function featRow(r, ctx) {
 
   const d = el('div', 'c-four');
   const hd = el('div', 'bf-four hd');
+  // LAST 3 beside the Screen's own place chance: the horse's form alone, a
+  // second computed reading to set against the Screen's, never added to it.
   hd.append(el('span'), el('span', null, "SCREEN'S FOUR"), el('span', null, 'PLACE'), el('span'),
-            el('span', null, 'SAID'), el('span', 'r', r.hasPrices ? 'TOTE' : ''));
+            el('span', 'r', 'LAST 3'), el('span', null, 'SAID'),
+            el('span', 'r', r.hasPrices ? 'TOTE' : ''));
   d.append(hd);
   r.shortlist.forEach((x) => {
     const line = el('div', 'bf-four');
@@ -214,7 +218,7 @@ function featRow(r, ctx) {
     const price = el('span', 'r');
     price.append(el('span', 'dim', `${x.mrank} `), el('span', null, x.price));
     line.append(el('span', 'rk', String(x.rank)), nameEl(`${x.no} ${x.name}`, x.booked),
-                bar(x.bar), el('span', 'pl', x.place), said, price);
+                bar(x.bar), el('span', 'pl', x.place), recentCell(x.recent), said, price);
     d.append(line);
   });
   row.append(a, b, c, d);
@@ -252,7 +256,7 @@ function raceDetail(r, ctx) {
   const head = el('div', 'bf-runhead');
   head.style.setProperty('--bf-run-grid', grid);
   ['SCR', ...(r.run ? ['FIN'] : []), 'NO', 'HORSE · DRAW · JOCKEY · TRAINER', 'STYLE',
-   'SCREEN · PLACE / WIN', '', 'BLACKBOOK', 'SAID · SOURCES']
+   'LAST 3', 'SCREEN · PLACE / WIN', '', 'BLACKBOOK', 'SAID · SOURCES']
     .forEach((t) => head.append(el('span', null, t)));
   if (r.hasPrices) {
     const ph = el('span', 'prices');
@@ -294,7 +298,8 @@ function raceDetail(r, ctx) {
     row.append(el('span', 'rk', String(x.rk)));
     if (r.run) row.append(el('span', `fin f-${x.finTone}`, x.fin));
     row.append(el('span', 'no', String(x.no)), who,
-               style, sc, el('span', `tier${x.top ? ' top' : ''}`, x.tier), bb, said);
+               style, recentCell(x.recent), sc, el('span', `tier${x.top ? ' top' : ''}`, x.tier),
+               bb, said);
     if (r.hasPrices) {
       const pc = el('span', 'prices');
       pc.style.setProperty('--bf-price-cols', r.books.map(() => '44px').join(' '));
@@ -317,7 +322,7 @@ function raceDetail(r, ctx) {
 function runGrid(r) {
   const prices = r.hasPrices
     ? ` ${r.books.length * 44 + (r.books.length - 1) * 6}px 58px` : '';
-  return `24px ${r.run ? '34px ' : ''}22px minmax(0,1.3fr) 30px 150px 58px 116px `
+  return `24px ${r.run ? '34px ' : ''}22px minmax(0,1.3fr) 30px 52px 150px 58px 116px `
     + `minmax(0,1.2fr)${prices} 64px`;
 }
 

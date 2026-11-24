@@ -15,7 +15,8 @@ const BENCH = new Set(['computed', 'market']);
 /* What a phone has room for: three lines began "Racing …" when cut short. */
 const SHORT = { racing_sports: 'R&S', rtw_preview: 'RTW picks', factcheck: 'FC picks',
                 threads: 'Horse Det.', oncc: 'on.cc', rtw_interview: 'Interviews',
-                factcheck_featured: 'FC feat.', screen: 'Screen', favourite: 'Favourite' };
+                factcheck_featured: 'FC feat.', screen: 'Screen', last3: 'Last 3',
+                favourite: 'Favourite' };
 /* The columns, left to right. The phone keeps SRC, RACES, the top pick's
  * WON, PLACED and $10, and every horse's PLACED (briefing-after.css). Every
  * count is written out of how many — "15/35", never a bare 15. */

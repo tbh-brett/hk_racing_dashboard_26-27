@@ -138,6 +138,27 @@ def test_rank_is_within_the_field_and_level_readings_share_it():
     assert {out[k]["of"] for k in "ABC"} == {3} and out["D"] is None
 
 
+def test_one_query_reads_what_each_horse_s_own_form_reads(db):
+    """The Briefing reads a whole meeting's LAST 3 in one query and the record
+    reads a season's; both must give exactly what the Form Guide and Race Day
+    get from get_horse_form one horse at a time, gaps included."""
+    conn = get_conn(db)
+    date = _last_date(db)
+    with transaction(conn):              # every third-placed run has no figure
+        conn.execute("INSERT INTO runner_et (race_date, race_no, horse_no, figure, "
+                     "derive_version) SELECT race_date, race_no, horse_no, "
+                     "104.0 - place, 't' FROM runners WHERE place <> 3")
+    guide = formguide.build_form_guide(date, 1, conn=conn)
+    names = [r.horse_name for r in guide.race.runners]
+    figs = formguide.recent_figures(names, before=date, conn=conn)
+    by_race = formguide.readings_by_race(date, date, conn=conn)[(date, 1)]
+    conn.close()
+    assert formguide.rank_readings(figs) == guide.recent
+    name_of = {r.horse_no: r.horse_name for r in guide.race.runners}
+    assert {name_of[no]: v for no, v in by_race.items()} == guide.recent
+    assert any(v and v["figures"] < v["runs"] for v in guide.recent.values())
+
+
 def test_the_payload_carries_last_three_for_every_runner(db):
     conn = get_conn(db)
     # The fixture builds no ET (too few runs for references), so every run is

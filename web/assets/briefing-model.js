@@ -258,6 +258,7 @@ function raceView(r, ctx) {
   const shortlist = bySc.filter((x) => x.screen.tier === 'SHORTLIST').slice(0, 4).map((x) => ({
     rank: x.screen.rank, no: x.horse_no, name: x.horse_name, booked: isBooked(no, x.horse_no),
     bar: Math.min(100, x.screen.place_pct), place: `${Math.round(x.screen.place_pct)}%`,
+    recent: x.recent_form,
     price: x.price && x.price.tote && x.price.tote.win ? px(x.price.tote.win) : '',
     mrank: x.market_rank ? `M${x.market_rank}` : '', ...saidOf(x),
   }));
@@ -414,6 +415,8 @@ function runnerView(x, r, { books, srcIn, saidOf, isBooked, cap, toteEarly, ctx 
     style: x.style, styleShort: STYLE_SHORT[x.style] || DASH,
     bar: Math.min(100, s.place_pct), top: s.tier === 'SHORTLIST',
     place: `${Math.round(s.place_pct)}%`, win: `W ${Number(s.win_pct).toFixed(1)}%`,
+    // LAST 3, the horse's own form: drawn beside the Screen, never folded in.
+    recent: x.recent_form,
     tier: s.tier === 'SHORTLIST' ? 'TOP 4' : s.tier === 'CASE' ? 'A CASE' : '',
     hasBB: !!bb, bbSys: isSystem(bb), bbBoth: isBoth(bb),
     setup: bb ? s.setup : '', setupAgainst: s.setup === 'AGAINST',

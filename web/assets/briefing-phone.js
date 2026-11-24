@@ -9,6 +9,7 @@
 import { el, classCell } from './vocab.js';
 import { bookLineEl, tierChip } from './book-tier.js';
 import { verdictChip } from './background.js';
+import { recentCell } from './recent-form.js';
 import {
   wordRows, markEl, chipEl, kindEl, paceBar, styleEl, link, nameEl, bar,
   interviewBox, interviewTag, screenBlock, saidBlock, priceBlock,
@@ -120,7 +121,7 @@ function opened(r, ctx) {
               el('span', `w40 ${x.tip ? 'tip' : 'dim'}`, x.saidS),
               el('span', `w44 px${x.mPriceMost ? ' most' : ''}`, x.mPrice));
     const l2 = el('div', 'l2');
-    l2.append(styleEl(x), el('span', `tier${x.top ? ' top' : ''}`, x.tier));
+    l2.append(styleEl(x), recentCell(x.recent), el('span', `tier${x.top ? ' top' : ''}`, x.tier));
     const chip = tierChip(x.bookTier, { who: `${x.no} ${x.name}` });
     if (chip) l2.append(chip);
     else if (x.hasBB) {

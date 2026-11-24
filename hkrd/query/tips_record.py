@@ -23,7 +23,14 @@ source is never flattered by the races it chose to tip.
 THE BENCHMARKS are scored the same way: the tote favourite (and the market's
 four shortest as its "all picks") on every settled race, and the Screen — its
 first choice and its four — on the races recorded for it after its weights
-were fitted (`jobs/record_screen`), never on races it was fitted on.
+were fitted (`jobs/record_screen`), never on races it was fitted on. LAST 3,
+the horses' own form (query/formguide.recent_form), is scored on every settled
+race: its first is the best reading in the field and its four the four best,
+each read from the runs before that race. Nothing in it is fitted, so no race
+flatters it. Over 4,348 races in 2021-26 its first won 21.1% and placed 48.7%,
+the tote favourite 30.3% and 61.5%, both at A/E 1.02-1.03 (they are the same
+horse in 38% of races); this line is where that is seen to hold, or not, as
+the season runs.
 
 INTERVIEWS AND FEATURED HORSES are all-picks only. A trainer asked about a
 horse is not tipping it, and nor is Fact Check making a segment of one; what
@@ -44,6 +51,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from hkrd.derive.probability import devig
+from hkrd.query import formguide
 from hkrd.query.screen_inputs import RAN
 from hkrd.store.connect import Connection, get_conn
 
@@ -63,6 +71,7 @@ LINES: dict[str, tuple[str, str]] = {
     "rtw_interview": ("Racing To Win interviews · horses discussed", "connections"),
     "factcheck_featured": ("賽馬Fact Check · featured", "featured"),
     "screen": ("The Screen", "computed"),
+    "last3": ("LAST 3 · best recent form", "computed"),
     "favourite": ("Tote favourite", "market"),
 }
 _QUOTED = {"rtw_interview": "rtw_interview", "factcheck": "factcheck_featured"}
@@ -199,6 +208,7 @@ def record(*, since: str | None = None, until: str | None = None,
             "SELECT race_date, race_no, horse_no, rank FROM screen_pick "
             "WHERE race_date BETWEEN ? AND ? AND rank <= 4",
             (since, until)).fetchall()
+        form = formguide.readings_by_race(since, until, conn=conn)
     finally:
         if own:
             conn.close()
@@ -252,6 +262,20 @@ def record(*, since: str | None = None, until: str | None = None,
         line.all.add(race, s["horse_no"])
         if s["rank"] == 1:
             line.top.add(race, s["horse_no"], with_fav=True)
+
+    for key, race in races.items():
+        # Among the horses that started, best reading first; a level reading
+        # goes to the lower number so the same race always scores the same.
+        best = [no for _, no in sorted(
+            ((v["figure"], no) for no, v in (form.get(key) or {}).items()
+             if v is not None and no in race.runners),
+            key=lambda t: (-t[0], t[1]))]
+        if best:
+            line = lines["last3"]
+            line.races.add(key)
+            line.top.add(race, best[0], with_fav=True)
+            for no in best[:4]:
+                line.all.add(race, no)
 
     for key, race in races.items():
         if race.favourite is None:

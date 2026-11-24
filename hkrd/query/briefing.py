@@ -36,8 +36,8 @@ import datetime as dt
 from dataclasses import dataclass
 from typing import Any
 
-from hkrd.query import (background, market, money, movement, screen, tips_summary,
-                        tips_talk)
+from hkrd.query import (background, formguide, market, money, movement, screen,
+                        tips_summary, tips_talk)
 from hkrd.store.connect import Connection, get_conn
 
 __all__ = ["meeting", "CLOCK", "Due", "LATE_FIRMING", "MARKET_APART"]
@@ -128,7 +128,8 @@ def _runner(s: dict, tip: dict | None, odds: dict | None, zh: str | None,
             move: dict | None, mrank: int | None, priced: bool,
             bg: dict | None = None,
             sections: list[dict] | None = None,
-            trip_verdict: dict | None = None) -> dict[str, Any]:
+            trip_verdict: dict | None = None,
+            recent: dict | None = None) -> dict[str, Any]:
     ident = ("horse_no", "horse_name", "draw", "jockey", "trainer", "rating",
              "weight", "gear", "style")
     gear_first = [g[:-1] for g in (s["gear"] or "").replace(",", " ").split()
@@ -139,6 +140,11 @@ def _runner(s: dict, tip: dict | None, odds: dict | None, zh: str | None,
         "screen": {k: v for k, v in s.items()
                    if k not in ident and k not in ("blackbook", "result")},
         "blackbook": s["blackbook"],
+        # LAST 3: its last three figures weighted to the newest -- form alone,
+        # a second COMPUTED reading beside the Screen and never added to it.
+        # The same number the Form Guide and Race Day show
+        # (query/formguide.recent_form).
+        "recent_form": recent,
         # Where it came from, for its first few starts (query/background).
         "background": bg,
         # What its profile says of the trip, where today's trip bears on it.
@@ -308,6 +314,10 @@ def _meeting(conn: Connection, date: str, now: dt.datetime) -> dict[str, Any]:
     bgs = background.for_horses(
         [s["horse_name"] for sr in scr["races"] for s in sr["runners"]
          if s["starts"] < background.EARLY_STARTS], conn=conn)
+    # Every runner's last three figures, in one query for the meeting.
+    figs = formguide.recent_figures(
+        [s["horse_name"] for sr in scr["races"] for s in sr["runners"]],
+        before=date, conn=conn)
     races = []
     for sr in scr["races"]:
         no = sr["race_no"]
@@ -323,12 +333,16 @@ def _meeting(conn: Connection, date: str, now: dt.datetime) -> dict[str, Any]:
         trips = background.distance_verdicts(
             [s["horse_name"] for s in sr["runners"]], distance=sr["distance"],
             before=date, conn=conn)
+        recent = formguide.rank_readings(
+            {s["horse_name"]: figs.get(s["horse_name"].strip().upper(), [])
+             for s in sr["runners"]})
         runners = [_runner(s, picks.get(s["horse_no"]), odds.get(s["horse_no"]),
                            zh.get(s["horse_name"]), moves.get(s["horse_no"]),
                            mrank.get(s["horse_no"]), priced,
                            bgs.get(s["horse_name"]),
                            sections.get((no, s["horse_no"])),
-                           trips.get(s["horse_name"]))
+                           trips.get(s["horse_name"]),
+                           recent.get(s["horse_name"]))
                    for s in sr["runners"]]
         tipped = {b["source"] for p in tr["picks"] for b in p["backed_by"]}
         conc = market.concentration(date, no, conn=conn) if tote_in else None
