@@ -101,13 +101,15 @@ def rebuild(db: Path | None = None, *, window_months: int = 24,
             "et_n_eff": _i(r.et_n), "et_shrunk": _i(getattr(r, "et_shrunk", None)),
             "sec_vs_par": _f(r.sec_vs_par), "len_vs_par": _f(r.len_vs_par),
             "sec_vs_race": _f(r.sec_vs_race), "len_vs_race": _f(r.len_vs_race),
-            "figure": _f(r.figure), "confidence": r.confidence,
+            "figure": _f(r.figure), "time_figure": _f(r.time_figure),
+            "confidence": r.confidence,
             "derive_version": et.DERIVE_VERSION,
         } for r in figures.itertuples()]
 
         cols = ["race_date", "race_no", "horse_no", "et", "et_level", "et_n_eff",
                 "et_shrunk", "sec_vs_par", "len_vs_par", "sec_vs_race",
-                "len_vs_race", "figure", "confidence", "derive_version"]
+                "len_vs_race", "figure", "time_figure", "confidence",
+                "derive_version"]
         sql = (f"INSERT INTO runner_et ({', '.join(cols)}) "
                f"VALUES ({', '.join('?' for _ in cols)}) "
                f"ON CONFLICT (race_date, race_no, horse_no) DO UPDATE SET "

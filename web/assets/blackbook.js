@@ -668,9 +668,11 @@ function runLine(r, cls) {
   const figs = el('div', 'figs');
   const figCls = r.et_figure === null || r.et_figure === undefined
     ? '' : r.et_figure >= 100 ? 'above' : 'below';
+  // 100 + lengths ahead of the middle of the field (et-v6.0). The confidence
+  // word that sat beside it described the par sample, which this figure no
+  // longer leans on, so it is not printed against it.
   figs.append(el('span', `fig ${figCls}`, r.et_figure === null
     || r.et_figure === undefined ? DASH : r.et_figure.toFixed(1)));
-  figs.append(el('span', 'conf', r.et_confidence ?? ''));
   line.append(figs);
 
   const trail = el('div', 'trail');

@@ -516,8 +516,10 @@ function runRow(r) {
   // The FIGURE, where the finishing position used to be. Rows are now
   // returned in finishing order — the winner first, the last horse last — so
   // a column repeating the position said what the order already said, and the
-  // figure is the thing the position does not tell you: a 96.4 beaten a length
-  // is a better run than an 88.1 that won. The placing survives on the horse
+  // figure is the thing the position does not tell you: how FAR ahead of or
+  // behind the middle of its field the run was, in lengths around 100
+  // (et-v6.0). A 104 is a four-length beating of the middle; a 101 that won
+  // was a field that finished in a heap. The placing survives on the horse
   // itself, which is where the eye goes anyway.
   const fig = el('div', 'r fig',
     r.et_figure === null || r.et_figure === undefined ? DASH : num(r.et_figure, 1));
@@ -925,8 +927,8 @@ function renderInsight() {
   rec.body.append(line);
   if (s.avg_figure !== null) {
     rec.body.append(el('div', 'ins-line',
-      `mean ET figure ${num(s.avg_figure, 1)} over ${s.figures.toLocaleString()} `
-      + 'runs with one'));
+      `mean figure ${num(s.avg_figure, 1)} (100 = mid-field) over `
+      + `${s.figures.toLocaleString()} runs with one`));
   }
   panels.append(rec.box);
 

@@ -1411,8 +1411,8 @@ function formRow(f) {
     String(f.place ?? f.place_code ?? DASH));
   tr.append(pos);
   // Presence, not truth. `f.et_figure ?` reads a figure of 0 as no figure;
-  // par is 100 so it cannot happen today, and it is the same falsy test that
-  // hid the missing draw for a week.
+  // the figure lives between 90 and 110 so it cannot happen today, and it is
+  // the same falsy test that hid the missing draw for a week.
   const hasFig = f.et_figure !== null && f.et_figure !== undefined;
   const fig = el('td', `c-right${hasFig ? (f.et_figure >= 100 ? ' above' : ' below') : ''}`,
     hasFig ? num(f.et_figure, 0) : DASH);

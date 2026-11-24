@@ -21,6 +21,11 @@ This is a rewrite of the v4 reference-table model. Three things changed:
     but add nothing on top of the market price (p=0.746 with log-odds
     controlled). They belong on a race card, not in a selection rule.
 
+4.  (et-v6.0, 23 Nov 2026) The headline `figure` is lengths against the
+    field, not time against par. The par-based reading survives as
+    `time_figure`, beside it, and every column it was built from is unchanged.
+    See `field_figure` for what was measured.
+
 Everything here is a pure function: DataFrames in, DataFrames out. No sqlite3,
 no Streamlit, no file paths. Failures raise rather than returning None.
 """
@@ -35,7 +40,7 @@ import pandas as pd
 
 from hkrd.store import coerce
 
-DERIVE_VERSION = "et-v5.0"
+DERIVE_VERSION = "et-v6.0"
 
 # Fitted from 21,045 runs rather than assumed. See fit_seconds_per_length().
 DEFAULT_SEC_PER_LENGTH = 0.139
@@ -360,11 +365,60 @@ def expected_time(runs: pd.DataFrame, refs: ETReferences) -> pd.DataFrame:
 
 
 # --------------------------------------------------------------------------
+# the headline figure: lengths against the field
+# --------------------------------------------------------------------------
+#
+# What `figure` is from et-v6.0. Measured on the production copy of 19 Nov 2026
+# (72,867 timed runs, Sep 2019 to Nov 2026), every par rebuilt walk-forward
+# from the 24 months before each month, last three runs per horse, 4,032 races:
+#
+#   - Within a race the par-based figure orders runners exactly by finishing
+#     time, because every runner shares one par. All it adds to the result is
+#     one number per RACE, how fast that race was against par, and that part
+#     alone ranks the next winner above a beaten horse 51.1% of the time: a coin
+#     toss. It was 43% of the figure's variance, and the meeting alone (track
+#     speed, going, rail) about a quarter.
+#   - Lengths against the middle of the field ranks the winner higher 67.5% of
+#     the time, the par-based figure 64.2%, and the order holds in every class,
+#     venue, surface and experience slice. Neither adds anything to the final
+#     odds, and neither is offered as a reason to bet.
+#
+# Every runner in a race shares the track, the going, the rail, the pace and the
+# class, so a figure read against its own field is immune to all five by
+# construction and needs no par at all.
+#
+# 100 is the middle of the field, and one point is one length ahead of it,
+# exactly, out to FIELD_LINEAR lengths either side (88% of runs). Beyond that
+# the scale bends smoothly toward FIELD_LIMIT, so a horse eased down forty
+# lengths cannot wreck an average -- the par-based figure reached -737 -- and
+# the bend is strictly increasing, so a faster time never gets a worse figure.
+# A hard clip at six would have tied the 18% of winners more than six lengths
+# clear of mid-field with the horse behind them. The cap barely matters to the
+# measurement: clips from six to fifteen lengths, and no cap at all, scored
+# within 0.003 of one another, so it was chosen for reading, not fitted.
+FIELD_LINEAR = 6.0
+FIELD_LIMIT = 10.0
+
+
+def field_figure(len_vs_race) -> np.ndarray:
+    """100 + lengths ahead of the middle of the field, bent past FIELD_LINEAR.
+
+    Takes a scalar or an array of `len_vs_race`; NaN stays NaN.
+    """
+    x = np.asarray(len_vs_race, dtype=float)
+    a = np.abs(x)
+    span = FIELD_LIMIT - FIELD_LINEAR
+    bent = np.where(a <= FIELD_LINEAR, a,
+                    FIELD_LINEAR + span * np.tanh((a - FIELD_LINEAR) / span))
+    return 100.0 + np.sign(x) * bent
+
+
+# --------------------------------------------------------------------------
 # the descriptive figure
 # --------------------------------------------------------------------------
 
 def speed_figure(runs: pd.DataFrame, refs: ETReferences) -> pd.DataFrame:
-    """Turn par times into a figure meant to be read, not optimised against.
+    """Turn par times into figures meant to be read, not optimised against.
 
     Columns added:
       sec_vs_par   seconds faster (+) or slower (-) than par for the conditions
@@ -372,8 +426,12 @@ def speed_figure(runs: pd.DataFrame, refs: ETReferences) -> pd.DataFrame:
       sec_vs_race  race-relative: par-adjusted, then centred on the race median.
                    Removes the day's track speed, isolating the horse.
       len_vs_race  the same, in lengths
-      figure       standardised: 100 = par, +10 = one distance-sd faster
-      confidence   'high' / 'medium' / 'low', from the sample behind the par
+      figure       the headline: 100 + lengths ahead of the middle of the field
+                   (see field_figure)
+      time_figure  par-based: 100 = par, +10 = one distance-sd faster. What
+                   `figure` was up to et-v5.0
+      confidence   'high' / 'medium' / 'low', from the sample behind the PAR, so
+                   it qualifies time_figure and len_vs_par, not figure
 
     sec_vs_par answers "was this a fast time?". sec_vs_race answers "did this
     horse outrun the rest of its field?". They are different questions and the
@@ -393,7 +451,8 @@ def speed_figure(runs: pd.DataFrame, refs: ETReferences) -> pd.DataFrame:
     idx = pd.MultiIndex.from_arrays([m[k] for k in base_keys])
     m["_sd"] = sd.reindex(idx).to_numpy()
     m["_sd"] = m["_sd"].fillna(m["_sd"].median())
-    m["figure"] = (100 + 10 * m["sec_vs_par"] / m["_sd"]).round(1)
+    m["time_figure"] = (100 + 10 * m["sec_vs_par"] / m["_sd"]).round(1)
+    m["figure"] = np.round(field_figure(m["len_vs_race"].to_numpy()), 1)
 
     m["confidence"] = pd.cut(
         m["et_n"], bins=[-1, 25, 100, np.inf], labels=["low", "medium", "high"]
@@ -404,9 +463,15 @@ def speed_figure(runs: pd.DataFrame, refs: ETReferences) -> pd.DataFrame:
 
 
 def format_figure(row) -> str:
-    """One-line render for a race card. Never a bare number."""
+    """One-line render for a race card. Never a bare number.
+
+    The field reading first, because it is the figure; the time against par
+    after it, with the confidence mark and the sample that belong to the par.
+    """
+    f = row["len_vs_race"]
+    side = "ahead of" if f >= 0 else "behind"
     d = row["len_vs_par"]
     direction = "faster" if d >= 0 else "slower"
     conf = {"high": "", "medium": " ~", "low": " ?"}.get(str(row["confidence"]), " ?")
-    return (f"{row['figure']:.0f}{conf}  ({abs(d):.1f}L {direction} than par, "
-            f"n_eff={int(row['et_n'])})")
+    return (f"{row['figure']:.0f}  ({abs(f):.1f}L {side} mid-field; time "
+            f"{abs(d):.1f}L {direction} than par{conf}, n_eff={int(row['et_n'])})")

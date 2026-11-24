@@ -148,6 +148,20 @@ def _migrate(conn: sqlite3.Connection) -> None:
         _migrate_races_restricted(conn)
         _migrate_book_tiers(conn)
         _migrate_vet_note_key(conn)
+        _migrate_et_time_figure(conn)
+
+
+def _migrate_et_time_figure(conn: sqlite3.Connection) -> None:
+    """`runner_et.time_figure`: the par-based figure, kept beside the new one.
+
+    From et-v6.0 `figure` is lengths against the field and the par reading
+    moves here. NULL on every existing row until `jobs/rebuild_et` next runs,
+    which rewrites every row of the table; until then `derive_version` says
+    which generation a row is.
+    """
+    cols = _columns(conn, "runner_et")
+    if cols and "time_figure" not in cols:
+        conn.execute("ALTER TABLE runner_et ADD COLUMN time_figure REAL")
 
 
 def _migrate_vet_note_key(conn: sqlite3.Connection) -> None:

@@ -24,13 +24,19 @@ import { replayLink } from './replay.js';
 import { sidePanel } from './side-panel.js';
 
 
-/* The trend tint's threshold, measured rather than chosen. Over 12,540 six-run
-   windows across 1,967 horses, (mean of the newest three) − (mean of the oldest
-   three) has mean +0.08 and sd 5.89 — it is noise centred on zero. A 1.5-point
-   cut would tint 75% of runners, which is how a decoration comes to look like a
-   signal. One standard deviation tints 23%, so a tinted horse is genuinely
-   moving against the population rather than merely varying. */
-const TREND_THRESHOLD = 5.9;
+/* How a figure is shaded in the six-run sequence. The figure is 100 + lengths
+   ahead of the middle of the field (et-v6.0), and the bands are read off what
+   finishing positions earn on it over 2021-26: a third-placed horse's median
+   is 102.3 and a ninth's 98.4. So BEST is a run like a placed horse's (24% of
+   runs) and WEAK one two lengths or more behind the middle (27%), where the
+   par figure's 98 shaded 46% of all runs weak.
+
+   There is no trend tint any more. Measured over 37,059 six-run windows, the
+   tint flipped at the next start more often than it held (45% kept it), a
+   horse tinted up gave back 3.0 points next time and one tinted down
+   recovered 4.5, and the odds already priced what was left. */
+const FIG_BEST = 102;
+const FIG_WEAK = 98;
 
 const COLS = [
   { key: 'no', label: 'NO', cls: 'c' },
@@ -46,7 +52,9 @@ const COLS = [
   { key: 'trainer', label: 'TRAINER' },
   { key: 'wt', label: 'WT', cls: 'r' },
   { key: 'odds', label: 'ODDS', cls: 'r' },
-  { key: 'seq', label: 'LAST 6 FIGURES · NEWEST LEFT · BAR = TREND' },
+  { key: 'seq', label: 'LAST 6 FIGURES · NEWEST LEFT',
+    hint: 'each figure is 100 + lengths ahead of the middle of that race’s '
+        + 'field: 104 beat the middle by four lengths, 97 was three behind it' },
   { key: 'flags', label: 'FLAGS' },
 ];
 
@@ -144,7 +152,7 @@ function renderRaceHeader() {
   facts.append(pace);
 
   host.replaceChildren(box, facts, el('div', 'note',
-    'FIGURE 100 = PAR · SIX RUNS, NEWEST LEFT · TINT UNDER THE SEQUENCE IS THE TREND'));
+    'FIGURE 100 = MID-FIELD · +1 = A LENGTH AHEAD OF IT · SIX RUNS, NEWEST LEFT'));
 }
 
 /* ── the card ────────────────────────────────────────────────────────────── */
@@ -310,47 +318,25 @@ function daysBetween(a, b) {
     ? null : Math.round((y - x) / 86400000);
 }
 
-/** The six-figure sequence, newest left, with the trend as a 2px tint. Drawn
- *  as a tint rather than a line because six figures do not support a slope
- *  claimed to more precision than that. */
+/** The six-figure sequence, newest left. Each figure says on hover what it
+ *  was measured against, so a number never stands alone. */
 function sequenceCell(runner) {
   const cell = el('div');
   const runs = history(runner).slice(0, 6);
   const box = el('div', 'seq');
-  const figures = runs.map((r) => r.et_figure);
-  figures.forEach((f) => {
+  runs.forEach((r) => {
+    const f = r.et_figure;
     if (f === null || f === undefined) { box.append(el('span', 'none', DASH)); return; }
-    const cls = f >= 103 ? 'best' : f >= 98 ? 'mid' : 'weak';
-    box.append(el('span', cls, f.toFixed(0)));
+    // Shaded on the number as SHOWN, so a 101.8 printed as 102 is not drawn
+    // lighter than the 102 beside it.
+    const shown = Math.round(f);
+    const cls = shown >= FIG_BEST ? 'best' : shown >= FIG_WEAK ? 'mid' : 'weak';
+    const s = el('span', cls, String(shown));
+    if (r.figure_display) s.title = r.figure_display;
+    box.append(s);
   });
   for (let i = runs.length; i < 6; i += 1) box.append(el('span', 'none', DASH));
   cell.append(box);
-
-  // Newest first, so a rising horse has its BIGGEST figure at index 0.
-  const known = figures.filter((f) => f !== null && f !== undefined);
-  const slope = el('div', 'slope');
-  // Six figures at a time, so the halves are three and three. Fewer than six
-  // is not a trend: with four runs each half is two, and two ET figures
-  // routinely differ by more than the threshold on their own.
-  if (known.length >= 6) {
-    const half = Math.floor(known.length / 2);
-    const recent = known.slice(0, half).reduce((a, b) => a + b, 0) / half;
-    const older = known.slice(-half).reduce((a, b) => a + b, 0) / half;
-    const move = recent - older;
-    if (move >= TREND_THRESHOLD) slope.classList.add('up');
-    else if (move <= -TREND_THRESHOLD) slope.classList.add('down');
-    slope.title = `recent three ${recent.toFixed(1)} vs earlier three `
-      + `${older.toFixed(1)} (${move >= 0 ? '+' : ''}${move.toFixed(1)}); `
-      + `tinted beyond ${TREND_THRESHOLD}, one sd of the population`;
-    if (!slope.classList.contains('up') && !slope.classList.contains('down')) {
-      slope.title += ' — flat, so no tint';
-    }
-  } else if (known.length) {
-    slope.title = `${known.length} figures — a trend needs six`;
-  } else {
-    slope.title = 'no figures on record';
-  }
-  cell.append(slope);
   return cell;
 }
 
@@ -1227,7 +1213,7 @@ function renderFoot() {
   add('WEIGHT SWING', 'swing');
   add('✎ NOTE — RUN OR TRIAL', 'book');
   add('TIMES m:ss.xx · SPLITS ss.xx');
-  add('FIGURE 100 = PAR', 'right');
+  add('FIGURE 100 = MID-FIELD · 1 POINT = 1 LENGTH', 'right');
 }
 
 function render() {

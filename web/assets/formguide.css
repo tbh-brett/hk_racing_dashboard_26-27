@@ -170,8 +170,6 @@
 .fg-row .wt { padding: 0 6px; text-align: right; color: var(--text-2); }
 .fg-row .odds { text-align: right; font-size: 15px; font-weight: 600; }
 
-/* The six-figure sequence, newest left, with the trend as a tint under it.
-   A trend drawn as a line would claim more precision than six figures carry. */
 /* SIX FIGURES, NEWEST LEFT. The column the eye goes to first on this page and
    the tightest thing on it — 99 97 87 99109109 ran together as one number.
    Each figure now has its own width and gap, so the sequence reads as six
@@ -188,18 +186,8 @@
 .seq .mid { color: var(--text-2); }
 .seq .weak { color: var(--text-muted); }
 .seq .none { color: var(--text-faint); }
-/* THE TREND, as a tint under the sequence: the mean of the newest three
-   against the mean of the oldest three. Green means the horse is running to
-   bigger figures than it was, red smaller. It is drawn only past one standard
-   deviation of the population (5.9 points) — a smaller cut would tint three
-   quarters of the field, which is how a decoration comes to look like a
-   signal. Hover it for the two means and the move. */
-.slope {
-  height: 3px; margin-top: 3px; background: var(--line);
-  border-radius: 1px;
-}
-.slope.up { background: var(--win); }
-.slope.down { background: var(--loss); }
+/* No trend tint under the sequence any more: it flipped at the next start more
+   often than it held, and the odds priced what was left (form-guide.js). */
 
 .flags { display: flex; gap: 5px; overflow: hidden; }
 .flag {

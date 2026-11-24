@@ -569,7 +569,7 @@ function renderEt() {
   if (!data.runners.length) {
     body.replaceChildren(el('tr', null, ''));
     body.firstChild.append(el('td', 'model-empty', 'NO ET FIGURES FOR THIS RACE'));
-    body.firstChild.firstChild.colSpan = 10;
+    body.firstChild.firstChild.colSpan = 11;
     return;
   }
 
@@ -599,6 +599,7 @@ function renderEt() {
         : (r.place ?? DASH)],
       ['', fmtTime(priorOnly ? null : r.finish_time)],
       ['', num(p.figure, 1)],
+      ['', num(p.time_figure, 1)],
       ['', signed(p.len_vs_par)],
       ['', signed(p.len_vs_race)],
       ['', p.et_n_eff ?? DASH],
@@ -608,12 +609,14 @@ function renderEt() {
     cells.forEach(([cls, text], i) => {
       const td = el('td', cls, String(text));
       /* Sample size drives visual weight: a thin cell must not read as
-         authoritative as a well-evidenced one. */
+         authoritative as a well-evidenced one. The sample is the PAR's, so it
+         weighs the par columns from TIME FIG on; FIGURE is read against the
+         field and does not lean on the par at all (et-v6.0). */
       const nEff = priorOnly ? p.et_n_eff : r.et_n_eff;
-      if (nEff !== null && nEff !== undefined && nEff < 10 && i >= 4) {
+      if (nEff !== null && nEff !== undefined && nEff < 10 && i >= 5) {
         td.classList.add('thin');
       }
-      if (i === 5 || i === 6) td.classList.add(Number(text) >= 0 ? 'pos' : 'neg');
+      if (i === 6 || i === 7) td.classList.add(Number(text) >= 0 ? 'pos' : 'neg');
       tr.append(td);
     });
     return tr;

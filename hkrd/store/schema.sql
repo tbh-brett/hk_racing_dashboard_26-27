@@ -542,8 +542,9 @@ CREATE TABLE IF NOT EXISTS runner_et (
   len_vs_par     REAL,
   sec_vs_race    REAL,
   len_vs_race    REAL,
-  figure         REAL,
-  confidence     TEXT,                  -- low | medium | high
+  figure         REAL,                  -- 100 + lengths ahead of mid-field (et-v6.0)
+  time_figure    REAL,                  -- 100 = par; what `figure` was to et-v5.0
+  confidence     TEXT,                  -- low | medium | high, of the PAR
   derive_version TEXT    NOT NULL,
   PRIMARY KEY (race_date, race_no, horse_no)
 );
