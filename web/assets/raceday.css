@@ -341,10 +341,6 @@ table.card td { padding: 5px 7px; }
 .gear-chip.trial-withheld {
   color: var(--book); border-color: var(--book-ground); border-style: dashed;
 }
-.fig-cell { display: flex; align-items: baseline; gap: 7px; white-space: nowrap; }
-.fig-cell .v { font-size: var(--fs-md); font-weight: 600; }
-.fig-cell .len { font-size: var(--fs-sm); }
-.fig-cell .conf { font-size: 10px; color: var(--text-muted); letter-spacing: .06em; }
 .bb-dot { display: inline-block; width: 7px; height: 7px; background: var(--book); }
 .trainer-changed { background: var(--violet-ground); }
 .trainer-changed .tn { color: var(--violet); font-weight: 600; }

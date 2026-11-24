@@ -102,6 +102,9 @@ DIVERGENCES: dict[str, dict[str, str]] = {
         "EDGE": "retired with SARR (gbm-SPEC §1, §10): a model-less-market column "
                 "that ranked and coloured the disagreement; GAP shows it neutral, "
                 "because where the model is keener the price has been right",
+        "LAST-RUN FIGURE": "became LAST 3 on 24 Nov 2026 at the owner's request: the "
+                           "last three figures weighted 3-2-1 picked the next winner "
+                           "69% of the time against 67% for the last run alone",
     },
     "Results": {
         "ET FIGURE": "renamed FIGURE on 23 Nov 2026 (et-v6.0): the figure is lengths "

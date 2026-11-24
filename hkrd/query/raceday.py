@@ -25,6 +25,7 @@ from hkrd.query import (background as background_q, blackbook as bb_q, book_tier
                         gbm as gbm_q, gear as gear_q, h2h as h2h_q, market as market_q,
                         money as money_q, movement as movement_q,
                         pools as pools_q, rating as rating_q, vet as vet_q)
+from hkrd.query.formguide import recent_form
 from hkrd.query.race import (get_horse_form, get_race, habitual_styles,
                              vet_form)
 from hkrd.query.types import RaceLine
@@ -263,9 +264,19 @@ def build_card(date: str, race_no: int, *,
             [r.horse_name for r in race.runners], distance=race.distance,
             before=date, conn=conn)
 
+        # Three runs back, not one: the figure column reads LAST 3 -- the last
+        # three figures weighted to the newest and ranked in this field -- which
+        # picked the next winner better than the last run alone (69% against
+        # 67%, query/formguide.RECENT_WEIGHTS). Still one query per runner; the
+        # rank needs the whole field, so the runs are gathered before the rows.
+        priors = {r.horse_name: tuple(get_horse_form(r.horse_name, limit=3,
+                                                     before=date, conn=conn))
+                  for r in race.runners}
+        recent = recent_form(priors)
+
         runners: list[dict[str, Any]] = []
         for r in race.runners:
-            prior = get_horse_form(r.horse_name, limit=1, before=date, conn=conn)
+            prior = priors[r.horse_name]
             last = prior[0] if prior else None
             m_rank = market_rank.get(r.horse_no)
             pts, dot_x, dot_y = spark_points(series.get(r.horse_no, []))
@@ -335,6 +346,7 @@ def build_card(date: str, race_no: int, *,
                 "sarr_unrated": rating_q.unrated_reason(
                     r.sarr_rank, prior_runs.get(r.horse_name, 0),
                     card_scored=scored_card),
+                "recent_form": recent.get(r.horse_name),
                 "last_run": {
                     "race_date": last.race_date, "place": last.place,
                     "figure": last.et_figure, "figure_display": last.figure_display,

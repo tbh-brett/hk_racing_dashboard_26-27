@@ -24,6 +24,7 @@ import { tierChip, tierRank } from './book-tier.js';
 import { agentShort, backgroundBlock, backgroundView, verdictChip } from './background.js';
 import { gearCaveat, gearChips } from './gear-chips.js';
 import { sidePanel } from './side-panel.js';
+import { recentCell } from './recent-form.js';
 
 const svg = (tag, attrs) => {
   const n = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -45,7 +46,7 @@ const COLS = [
   ['move', 'MOVE · MONEY', 'c-right'], ['model', 'MODEL%', 'c-right'],
   ['win', 'WIN%', 'c-right'], ['mkt', 'MKT', 'c-num'], ['gap', 'GAP', 'c-num'],
   // Brett's READ goes between GAP and FLAGS when the reads ticket lands.
-  ['flags', 'FLAGS', ''], ['fig', 'LAST-RUN FIGURE', ''],
+  ['flags', 'FLAGS', ''], ['fig', 'LAST 3', ''],
   ['last', 'LAST RUN', ''], ['bb', 'BB', 'c-num'],
 ];
 
@@ -742,7 +743,7 @@ function sortRunners(runners) {
       case 'win': return -(r.win_pct ?? 0);
       case 'mkt': return r.market_rank ?? 99;
       case 'model': return -(r.model?.model_pct ?? 0);
-      case 'fig': return -(r.last_run?.figure ?? 0);
+      case 'fig': return -(r.recent_form?.figure ?? 0);
       case 'last': return r.last_run?.days_ago ?? 9e9;
       case 'bb': return r.blackbook ? 0 : 1;
       default: return 0;
@@ -1032,22 +1033,12 @@ function cardRow(r, index) {
   tr.append(gapCell(r));
   tr.append(flagsCell(r));
 
-  const fg = el('td');
-  const f = el('div', 'fig-cell');
+  // LAST 3, not the last run alone: the last three figures weighted to the
+  // newest, ranked in this field and shaded by what that reading has done next
+  // start. The same cell the Form Guide draws (recent-form.js).
   const lr = r.last_run;
-  if (lr?.figure !== null && lr?.figure !== undefined) {
-    const colour = lr.figure >= 100 ? 'var(--win)' : 'var(--loss)';
-    const v = el('span', 'v', num(lr.figure, 0));
-    v.style.color = colour;
-    f.append(v);
-    const m = lr.figure_display?.match(/([+-][\d.]+L)/);
-    if (m) { const l = el('span', 'len', m[1]); l.style.color = colour; f.append(l); }
-    const c = lr.figure_display?.match(/(low|medium|high)/);
-    if (c) f.append(el('span', 'conf', c[1].toUpperCase()));
-  } else {
-    f.append(el('span', 'mv-none', DASH));
-  }
-  fg.append(f);
+  const fg = el('td');
+  fg.append(recentCell(r.recent_form));
   tr.append(fg);
 
   tr.append(el('td', null, lr

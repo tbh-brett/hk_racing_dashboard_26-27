@@ -1,10 +1,21 @@
-/* The Form Guide's LAST 3 column (recent-form.js). Its own file because
-   formguide.css is at the file-size cap. */
-.fg-row .recent {
-  text-align: right; white-space: nowrap; padding-right: 10px;
-  font-variant-numeric: tabular-nums;
+/* LAST 3 (recent-form.js), on the Form Guide card and Race Day. Its own file
+   because formguide.css and raceday.css are both near the file-size cap. */
+.rf { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fg-row .rf { text-align: right; padding-right: 10px; }
+.rf .v {
+  font-size: var(--fs-md); font-weight: 600; color: var(--text);
+  padding: 0 4px; border-radius: 2px;
 }
-.fg-row .recent .v { font-size: var(--fs-md); font-weight: 600; color: var(--text); }
-.fg-row .recent .rk { margin-left: 6px; font-size: var(--fs-xs); color: var(--text-muted); }
-.fg-row .recent.thin .v { font-weight: 400; color: var(--text-2); }
-.fg-row .recent .none { color: var(--text-faint); }
+.rf .rk { margin-left: 6px; font-size: var(--fs-xs); color: var(--text-muted); }
+.rf.thin .v { font-weight: 400; }
+.rf .none { color: var(--text-faint); }
+
+/* Green better, red worse, deeper further from the middle: the bands and what
+   each did next start are in recent-form.js. A tint behind the number rather
+   than a coloured number, so the figure stays readable at every step. */
+.rf .v.g3 { background: color-mix(in srgb, var(--win) 58%, transparent); }
+.rf .v.g2 { background: color-mix(in srgb, var(--win) 36%, transparent); }
+.rf .v.g1 { background: color-mix(in srgb, var(--win) 18%, transparent); }
+.rf .v.r1 { background: color-mix(in srgb, var(--loss) 18%, transparent); }
+.rf .v.r2 { background: color-mix(in srgb, var(--loss) 36%, transparent); }
+.rf .v.r3 { background: color-mix(in srgb, var(--loss) 58%, transparent); }

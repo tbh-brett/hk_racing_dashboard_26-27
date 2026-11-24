@@ -118,6 +118,26 @@ def test_last_run_is_the_previous_race_not_todays(db):
     assert last["days_ago"] == 44
 
 
+def test_the_figure_column_is_last_three_ranked_in_the_field(db):
+    """Race Day reads LAST 3 -- the same reading, from the same function, as
+    the Form Guide -- and a horse with no figure has nothing, not a low one."""
+    conn = get_conn(db)
+    with transaction(conn):
+        conn.executemany(
+            "INSERT INTO runner_et (race_date, race_no, horse_no, figure, "
+            "derive_version) VALUES ('2026-06-01', 1, ?, ?, 't')",
+            [(1, 103.0), (2, 99.5)])                  # HORSE 2 has none
+    card = raceday.build_card("2026-07-15", 1, conn=conn)
+    conn.close()
+    by = {r["horse_name"]: r["recent_form"] for r in card["runners"]}
+    assert by["HORSE 0"] == {"figure": 103.0, "figures": 1, "runs": 1,
+                             "rank": 1, "of": 2}
+    assert by["HORSE 1"]["rank"] == 2 and by["HORSE 2"] is None
+    from hkrd.query import formguide
+    guide = formguide.build_form_guide("2026-07-15", 1, conn=get_conn(db))
+    assert guide.to_dict()["recent_form"] == by
+
+
 def test_routine_tags_never_reach_the_card(db):
     """A passed veterinary examination rendering like a real finding is how a
     badge becomes noise and gets ignored."""
